@@ -25,7 +25,7 @@ const meta = JSON.parse(fs.readFileSync(`${_dirname}/../../../../built/meta.json
 const logger = new Logger('core', 'cyan');
 const bootLogger = logger.createSubLogger('boot', 'magenta', false);
 
-const themeColor = chalk.hex('#86b300');
+const themeColor = chalk.hex('#e1aac6');
 
 function greet() {
 	if (!envOption.quiet) {

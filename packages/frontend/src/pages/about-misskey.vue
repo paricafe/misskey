@@ -22,13 +22,20 @@ SPDX-License-Identifier: AGPL-3.0-only
 					<button v-if="thereIsTreasure" class="_button treasure" @click="getTreasure"><img src="/fluent-emoji/1f3c6.png" class="treasureImg"></button>
 				</div>
 				<div style="text-align: center;">
-					{{ i18n.ts._aboutMisskey.about }}<br><a href="https://misskey-hub.net/docs/misskey.html" target="_blank" class="_link">{{ i18n.ts.learnMore }}</a>
+					{{ i18n.ts._aboutMisskey.about }}<br>
+					Pari Cafe使用的分支基于原版进行了定制。 <br>
+					<a href="https://misskey-hub.net/docs/misskey.html" target="_blank" class="_link">{{ i18n.ts.learnMore }}</a>
 				</div>
 				<div v-if="$i != null" style="text-align: center;">
 					<MkButton primary rounded inline @click="iLoveMisskey">I <Mfm text="$[jelly ❤]"/> #Misskey</MkButton>
 				</div>
 				<FormSection>
 					<div class="_formLinks">
+						<FormLink to="https://github.com/paricafe/misskey" external>
+							<template #icon><i class="ti ti-code"></i></template>
+							Pari定制的源代码
+							<template #suffix>GitHub</template>
+						</FormLink>
 						<FormLink to="https://github.com/misskey-dev/misskey" external>
 							<template #icon><i class="ti ti-code"></i></template>
 							{{ i18n.ts._aboutMisskey.source }}
@@ -93,15 +100,8 @@ SPDX-License-Identifier: AGPL-3.0-only
 					<template #label>Special thanks</template>
 					<div class="_gaps" style="text-align: center;">
 						<div>
-							<a style="display: inline-block;" class="masknetwork" title="Mask Network" href="https://mask.io/" target="_blank"><img width="180" src="https://misskey-hub.net/sponsors/masknetwork.png" alt="Mask Network"></a>
+							<a style="display: inline-block;" class="cloudflare" title="Cloudflare" href="https://www.cloudflare.com/" target="_blank"><img width="180" src="https://upload.wikimedia.org/wikipedia/commons/4/4b/Cloudflare_Logo.svg" alt="Cloudflare"></a>
 						</div>
-						<div>
-							<a style="display: inline-block;" class="skeb" title="Skeb" href="https://skeb.jp/" target="_blank"><img width="180" src="https://misskey-hub.net/sponsors/skeb.svg" alt="Skeb"></a>
-						</div>
-						<div>
-							<a style="display: inline-block;" class="dcadvirth" title="DC Advirth" href="https://www.dotchain.ltd/advirth" target="_blank"><img width="100" src="https://misskey-hub.net/sponsors/dcadvirth.png" alt="DC Advirth"></a>
-						</div>
-					</div>
 				</FormSection>
 			</div>
 		</MkSpacer>
