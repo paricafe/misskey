@@ -118,17 +118,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 					</div>
 					<p>{{ i18n.ts._aboutMisskey.morePatrons }}</p>
 				</FormSection>
-<<<<<<< HEAD
-				<FormSection>
-					<template #label>Special thanks</template>
-					<div class="_gaps" style="text-align: center;">
-						<div>
-							<a style="display: inline-block;" class="cloudflare" title="Cloudflare" href="https://www.cloudflare.com/" target="_blank"><img width="180" src="https://upload.wikimedia.org/wikipedia/commons/4/4b/Cloudflare_Logo.svg" alt="Cloudflare"></a>
-						</div>
-					</div>
-				</FormSection>
-=======
->>>>>>> master
 			</div>
 		</MkSpacer>
 	</div>
