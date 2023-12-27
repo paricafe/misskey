@@ -173,6 +173,7 @@
 			<p>Clear the browser cache / 清除瀏覽器緩存</p>
 			<p>Update your os and browser / 將您的瀏覽器和操作系統更新到最新版本</p>
 			<p>Disable an adblocker / 禁用廣告攔截器</p>
+			<p>&#40;Tor Browser&#41; Set dom.webaudio.enabled to true / 將dom.webaudio.enabled設定為true</p>
 			<details style="color: #e1aac6;">
 				<summary>Other options / 其他選項</summary>
 				<a href="/flush">
