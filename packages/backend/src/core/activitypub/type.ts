@@ -30,6 +30,7 @@ export interface IObject {
 	href?: string;
 	tag?: IObject | IObject[];
 	sensitive?: boolean;
+	updated?: string;
 }
 
 /**
@@ -127,7 +128,6 @@ export interface IPost extends IObject {
 	_misskey_quote?: string;
 	_misskey_content?: string;
 	quoteUrl?: string;
-	updated?: Date;
 }
 
 export interface IQuestion extends IObject {
