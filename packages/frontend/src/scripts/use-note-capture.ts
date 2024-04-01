@@ -76,6 +76,7 @@ export function useNoteCapture(props: {
 			}
 
 			case 'updated': {
+				console.log(JSON.stringify(note.value)); // Debug output
 				note.value.history = [
 					...note.value.history,
 					{
