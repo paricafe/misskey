@@ -1,5 +1,5 @@
-export class EditNoteNya1706162844037 {
-    name = 'EditNoteNya1706162844037'
+export class EditNote1706162844037 {
+    name = 'EditNote1706162844037'
 
     async up(queryRunner) {
         await queryRunner.query(`ALTER TABLE "note" ADD "updatedAt" TIMESTAMP WITH TIME ZONE`);
