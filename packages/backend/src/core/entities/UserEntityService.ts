@@ -494,7 +494,7 @@ export class UserEntityService implements OnModuleInit {
 			? getLocalUserDecorations()
 			: this.cacheService.pariRemoteUserDecorationsCache.fetch(user.id).then(res => res.map(ad => ({
 				...ad,
-				url: ad.url && this.config.proxyRemoteFiles
+				url: ad.url && (this.config.proxyRemoteFiles || this.config.mediaProxy)
 					? `${this.config.mediaProxy}/static.webp?url=${(encodeURIComponent(ad.url))}`
 					: ad.url,
 			})));
