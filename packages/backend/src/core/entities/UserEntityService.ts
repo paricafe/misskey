@@ -492,7 +492,7 @@ export class UserEntityService implements OnModuleInit {
 				: [];
 		const avatarDecorations = user.host == null
 			? getLocalUserDecorations()
-			: this.cacheService.stpvRemoteUserDecorationsCache.fetch(user.id).then(res => res.map(ad => ({
+			: this.cacheService.pariRemoteUserDecorationsCache.fetch(user.id).then(res => res.map(ad => ({
 				...ad,
 				url: ad.url && this.config.proxyRemoteFiles
 					? `${this.config.mediaProxy}/static.webp?url=${(encodeURIComponent(ad.url))}`
