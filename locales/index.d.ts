@@ -6643,15 +6643,13 @@ export interface Locale extends ILocale {
              */
             "canPublicNote": string;
             /**
-<<<<<<< HEAD
              * ノート内の最大メンション数
              */
             "mentionMax": string;
-=======
+            /**
              * ノートの編集
              */
             "canEditNote": string;
->>>>>>> 559cf1830 (feat(wip): note editing)
             /**
              * サーバー招待コードの発行
              */
