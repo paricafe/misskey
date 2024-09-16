@@ -1,8 +1,8 @@
 {
-	id: 'pari-light',
+	id: 'pari-light-1',
 	base: 'light',
-	desc: 'pari-light',
-	name: 'pari-light',
+	desc: 'Pari-Light',
+	name: 'Pari Light Ⅰ',
 	props: {
 		X2: ':darken<2<@panel',
 		X3: 'rgba(255, 255, 255, 0.05)',

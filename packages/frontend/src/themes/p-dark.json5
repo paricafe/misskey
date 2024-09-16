@@ -1,8 +1,8 @@
 {
-	id: 'pari-dark',
+	id: 'pari-dark-1',
 	base: 'dark',
-	desc: 'pari-dark',
-	name: 'pari-dark',
+	desc: 'Pari-Dark-1',
+	name: 'Pari Dark Ⅰ',
 	props: {
 		X2: ':darken<2<@panel',
 		X3: 'rgba(255, 255, 255, 0.05)',
