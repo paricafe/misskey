@@ -220,7 +220,7 @@ export const defaultStore = markRaw(new Storage('base', {
 	},
 	animatedMfm: {
 		where: 'device',
-		default: false,
+		default: true,
 	},
 	advancedMfm: {
 		where: 'device',
@@ -228,11 +228,11 @@ export const defaultStore = markRaw(new Storage('base', {
 	},
 	showReactionsCount: {
 		where: 'device',
-		default: false,
+		default: true,
 	},
 	enableQuickAddMfmFunction: {
 		where: 'device',
-		default: false,
+		default: true,
 	},
 	loadRawImages: {
 		where: 'device',
@@ -280,7 +280,7 @@ export const defaultStore = markRaw(new Storage('base', {
 	},
 	showGapBetweenNotesInTimeline: {
 		where: 'device',
-		default: false,
+		default: true,
 	},
 	darkMode: {
 		where: 'device',
@@ -404,7 +404,7 @@ export const defaultStore = markRaw(new Storage('base', {
 	},
 	defaultWithReplies: {
 		where: 'account',
-		default: false,
+		default: true,
 	},
 	disableStreamingTimeline: {
 		where: 'device',
@@ -489,7 +489,7 @@ export const defaultStore = markRaw(new Storage('base', {
 	},
 	sound_reaction: {
 		where: 'device',
-		default: { type: 'syuilo/bubble2', volume: 1 } as SoundStore,
+		default: { type: 'syuilo/bubble1', volume: 1 } as SoundStore,
 	},
 }));
 
