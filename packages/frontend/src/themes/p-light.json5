@@ -12,7 +12,7 @@
 		X7: 'rgba(255, 255, 255, 0.05)',
 		X8: ':lighten<5<@accent',
 		X9: ':darken<5<@accent',
-		bg: '#FFF9FB',
+		bg: ':alpha<0.9<#FFF9FB',
 		fg: '#7f6666',
 		X10: ':alpha<0.4<@accent',
 		X11: 'rgba(0, 0, 0, 0.3)',
