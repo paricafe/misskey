@@ -590,8 +590,6 @@ function onCompositionUpdate(ev: CompositionEvent) {
 
 function onCompositionEnd(ev: CompositionEvent) {
 	imeText.value = '';
-
-	nextTick(() => textareaEl.value && autosize.update(textareaEl.value));
 }
 
 async function onPaste(ev: ClipboardEvent) {
@@ -643,6 +641,7 @@ async function onPaste(ev: ClipboardEvent) {
 			upload(file, `${fileName}.txt`);
 		});
 	}
+	
 	nextTick(() => textareaEl.value && autosize.update(textareaEl.value));
 }
 
