@@ -358,7 +358,7 @@ export const defaultStore = markRaw(new Storage('base', {
 	},
 	showClipButtonInNoteFooter: {
 		where: 'device',
-		default: true,
+		default: false,
 	},
 	reactionsDisplaySize: {
 		where: 'device',
