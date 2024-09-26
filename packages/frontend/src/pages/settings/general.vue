@@ -147,12 +147,24 @@ SPDX-License-Identifier: AGPL-3.0-only
 				<div style="margin: 8px 0 0 0; font-size: 1.5em;"><Mfm :key="emojiStyle" text="🍮🍦🍭🍩🍰🍫🍬🥞🍪"/></div>
 			</div>
 
-			<MkRadios v-model="fontSize">
+			<MkRange v-model="fontSizeNumber" :min="0" :max="10" :step="1" continuousUpdate>
 				<template #label>{{ i18n.ts.fontSize }}</template>
-				<option :value="null"><span style="font-size: 14px;">Aa</span></option>
-				<option value="1"><span style="font-size: 15px;">Aa</span></option>
-				<option value="2"><span style="font-size: 16px;">Aa</span></option>
-				<option value="3"><span style="font-size: 17px;">Aa</span></option>
+				<template #caption>
+					<div :style="`font-size: ${fontSizePx}px;`">
+						<span>
+							A quick brown fox jumps over the lazy dog<br>
+							一只敏捷的棕色狐狸跳过那只懒狗<br>
+							機敏な茶色のキツネが怠惰な犬を飛び越える<br>
+						</span>
+						<MkButton v-if="fontSizeNumber !== fontSizeNumberOld" @click.stop="saveFontSize">{{ i18n.ts.save }}</MkButton>
+					</div>
+				</template>
+			</MkRange>
+
+			<MkRadios v-model="cornerRadius">
+				<template #label>{{ i18n.ts.cornerRadius }}</template>
+				<option :value="null"><i class="sk-icons sk-shark sk-icons-lg" style="top: 2px;position: relative;"></i> Sharkey</option>
+				<option value="misskey"><i class="sk-icons sk-misskey sk-icons-lg" style="top: 2px;position: relative;"></i> Misskey</option>
 			</MkRadios>
 		</div>
 	</FormSection>
@@ -273,9 +285,30 @@ import { globalEvents } from '@/events.js';
 import { claimAchievement } from '@/scripts/achievements.js';
 
 const lang = ref(miLocalStorage.getItem('lang'));
-const fontSize = ref(miLocalStorage.getItem('fontSize'));
+const fontSizeNumber = ref(Number(miLocalStorage.getItem('fontSize') || 2));
+const fontSizeNumberOld = ref(fontSizeNumber.value);
+const cornerRadius = ref(miLocalStorage.getItem('cornerRadius'));
 const useSystemFont = ref(miLocalStorage.getItem('useSystemFont') != null);
 const dataSaver = ref(defaultStore.state.dataSaver);
+
+const fontSizePx = computed(() => fontSizeNumber.value + 14);
+
+function saveFontSize() {
+	miLocalStorage.setItem('fontSize', fontSizeNumber.value.toString());
+	window.document.documentElement.classList.remove('f-' + fontSizeNumberOld.value);
+	window.document.documentElement.classList.add('f-' + fontSizeNumber.value);
+	fontSizeNumberOld.value = fontSizeNumber.value;
+}
+
+async function reloadAsk() {
+	const { canceled } = await os.confirm({
+		type: 'info',
+		text: i18n.ts.reloadToApplySetting,
+	});
+	if (canceled) return;
+
+	unisonReload();
+}
 
 const hemisphere = computed(defaultStore.makeGetterSetter('hemisphere'));
 const overridedDeviceKind = computed(defaultStore.makeGetterSetter('overridedDeviceKind'));
@@ -328,11 +361,11 @@ watch(lang, () => {
 	miLocalStorage.removeItem('localeVersion');
 });
 
-watch(fontSize, () => {
-	if (fontSize.value == null) {
-		miLocalStorage.removeItem('fontSize');
+watch(cornerRadius, () => {
+	if (cornerRadius.value == null) {
+		miLocalStorage.removeItem('cornerRadius');
 	} else {
-		miLocalStorage.setItem('fontSize', fontSize.value);
+		miLocalStorage.setItem('cornerRadius', cornerRadius.value);
 	}
 });
 
@@ -347,7 +380,7 @@ watch(useSystemFont, () => {
 watch([
 	hemisphere,
 	lang,
-	fontSize,
+	cornerRadius,
 	useSystemFont,
 	enableInfiniteScroll,
 	squareAvatars,
