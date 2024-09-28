@@ -1,0 +1,51 @@
+diff --git a/packages/backend/migration/1652210810723-PGroonga.js b/packages/backend/migration/1652210810723-PGroonga.js
+new file mode 100644
+index 000000000..bd3fee34e
+--- /dev/null
++++ b/packages/backend/migration/1652210810723-PGroonga.js
+@@ -0,0 +1,11 @@
++export class PGroonga1652210810723 {
++    name = 'PGroonga1652210810723'
++
++    async up(queryRunner) {
++        await queryRunner.query(`CREATE INDEX "IDX_f27f5d88941e57442be75ba9c8" ON "note" USING "pgroonga" ("text")`);
++    }
++
++    async down(queryRunner) {
++        await queryRunner.query(`DROP INDEX "public"."IDX_f27f5d88941e57442be75ba9c8"`);
++    }
++}
+diff --git a/packages/backend/migration/1652213168020-PGroongaUserName.js b/packages/backend/migration/1652213168020-PGroongaUserName.js
+new file mode 100644
+index 000000000..9e1e75ece
+--- /dev/null
++++ b/packages/backend/migration/1652213168020-PGroongaUserName.js
+@@ -0,0 +1,11 @@
++export class PGroongaUserName1652213168020 {
++    name = 'PGroongaUserName1652213168020'
++
++    async up(queryRunner) {
++        await queryRunner.query(`CREATE INDEX "IDX_065d4d8f3b5adb4a08841eae3c" ON "user" USING "pgroonga" ("name" pgroonga_varchar_full_text_search_ops_v2)`);
++    }
++
++    async down(queryRunner) {
++        await queryRunner.query(`DROP INDEX "public"."IDX_065d4d8f3b5adb4a08841eae3c"`);
++    }
++}
+diff --git a/packages/backend/migration/1652213556290-PGroongaUserDescription.js b/packages/backend/migration/1652213556290-PGroongaUserDescription.js
+new file mode 100644
+index 000000000..7216438ab
+--- /dev/null
++++ b/packages/backend/migration/1652213556290-PGroongaUserDescription.js
+@@ -0,0 +1,11 @@
++export class PGroongaUserDescription1652213556290 {
++    name = 'PGroongaUserDescription1652213556290'
++
++    async up(queryRunner) {
++        await queryRunner.query(`CREATE INDEX "IDX_fcb770976ff8240af5799e3ffc" ON "user_profile" USING "pgroonga" ("description" pgroonga_varchar_full_text_search_ops_v2) `);
++    }
++
++    async down(queryRunner) {
++        await queryRunner.query(`DROP INDEX "public"."IDX_fcb770976ff8240af5799e3ffc"`);
++    }
++}
