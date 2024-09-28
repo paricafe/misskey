@@ -215,7 +215,7 @@ export class SearchService {
 			}
 
 			query
-				.andWhere('note.text ILIKE :q', { q: `%${ sqlLikeEscape(q) }%` })
+				.andWhere('note.text &@~ :q', { q: sqlLikeEscape(q) })
 				.innerJoinAndSelect('note.user', 'user')
 				.leftJoinAndSelect('note.reply', 'reply')
 				.leftJoinAndSelect('note.renote', 'renote')
