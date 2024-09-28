@@ -1,5 +1,5 @@
-export class Pgroonga1727542814499 {
-    name = 'Pgroonga1727542814499'
+export class Pgroonga1727542814599 {
+    name = 'Pgroonga1727542814599'
 
     async up(queryRunner) {
 			await queryRunner.query(`CREATE INDEX "IDX_f27f5d88941e57442be75ba9c8" ON "note" USING "pgroonga" ("text")`);
