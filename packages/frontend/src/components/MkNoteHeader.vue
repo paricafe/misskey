@@ -84,7 +84,7 @@ const mock = inject<boolean>('mock', false);
 .name {
 	flex-shrink: 1;
 	display: block;
-	margin: 0 .5em 0 0;
+	margin: .5em .5em 0 0;
 	padding: 0;
 	overflow: hidden;
 	font-size: 1em;
@@ -109,10 +109,10 @@ const mock = inject<boolean>('mock', false);
 
 .username {
 	flex-shrink: 9999999;
-	margin: 0 .5em 0 0;
+	margin: -.2em .5em .5em 0;
 	overflow: hidden;
 	text-overflow: ellipsis;
-	font-size: 90%;
+	font-size: 92%;
 	opacity: 0.8;
 
 	&::-webkit-scrollbar {
