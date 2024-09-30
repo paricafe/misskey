@@ -112,7 +112,7 @@ const mock = inject<boolean>('mock', false);
 	margin: -.2em .5em .5em 0;
 	overflow: hidden;
 	text-overflow: ellipsis;
-	font-size: 92%;
+	font-size: 95%;
 	opacity: 0.8;
 
 	&::-webkit-scrollbar {
