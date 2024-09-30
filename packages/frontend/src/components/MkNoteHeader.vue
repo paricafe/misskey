@@ -4,41 +4,45 @@ SPDX-License-Identifier: AGPL-3.0-only
 -->
 
 <template>
-<header :class="$style.root">
-	<component :is="defaultStore.state.enableCondensedLine ? 'MkCondensedLine' : 'div'" :minScale="0.5" style="min-width: 0;">
-		<div style="display: flex; white-space: nowrap; align-items: baseline;">
-			<div v-if="mock" :class="$style.name">
-				<MkUserName :user="note.user"/>
+	<header :class="$style.root">
+		<div :class="$style.section">
+			<!--<component :is="defaultStore.state.enableCondensedLine ? 'MkCondensedLine' : 'div'" :minScale="0.5" style="min-width: 0;">-->
+			<div style="display: flex;">
+				<div v-if="mock" :class="$style.name">
+					<MkUserName :user="note.user"/>
+				</div>
+				<MkA v-else v-user-preview="note.user.id" :class="$style.name" :to="userPage(note.user)">
+					<MkUserName :user="note.user"/>
+				</MkA>
+				<div v-if="note.user.isBot" :class="$style.isBot">bot</div>
+				<div v-if="note.user.badgeRoles" :class="$style.badgeRoles">
+					<img v-for="(role, i) in note.user.badgeRoles" :key="i" v-tooltip="role.name" :class="$style.badgeRole" :src="role.iconUrl!"/>
+				</div>
 			</div>
-			<MkA v-else v-user-preview="note.user.id" :class="$style.name" :to="userPage(note.user)">
-				<MkUserName :user="note.user"/>
-			</MkA>
-			<div v-if="note.user.isBot" :class="$style.isBot">bot</div>
-			<div :class="$style.username"><MkAcct :user="note.user"/></div>
-		</div>
-	</component>
-	<div v-if="note.user.badgeRoles" :class="$style.badgeRoles">
-		<img v-for="(role, i) in note.user.badgeRoles" :key="i" v-tooltip="role.name" :class="$style.badgeRole" :src="role.iconUrl!"/>
-	</div>
-	<div :class="$style.info">
-		<span v-if="note.updatedAt" style="margin-right: 0.5em;" :title="i18n.ts.edited"><i class="ti ti-pencil"></i></span>
-		<div v-if="mock">
-			<MkTime :time="note.createdAt" colored/>
-		</div>
-		<MkA v-else :to="notePage(note)">
-			<MkTime :time="note.createdAt" colored/>
-		</MkA>
-		<span v-if="note.visibility !== 'public'" style="margin-left: 0.5em;" :title="i18n.ts._visibility[note.visibility]">
-			<i v-if="note.visibility === 'home'" class="ti ti-home"></i>
-			<i v-else-if="note.visibility === 'followers'" class="ti ti-lock"></i>
-			<i v-else-if="note.visibility === 'specified'" ref="specified" class="ti ti-mail"></i>
-		</span>
-		<span v-if="note.localOnly" style="margin-left: 0.5em;" :title="i18n.ts._visibility['disableFederation']"><i class="ti ti-rocket-off"></i></span>
-		<span v-if="note.channel" style="margin-left: 0.5em;" :title="note.channel.name"><i class="ti ti-device-tv"></i></span>
-	</div>
-</header>
+		   	<div :class="$style.username"><MkAcct :user="note.user"/></div>
+			<!--</component>-->
+	    </div>
+		<!--<div :class="$style.section">-->
+			<div :class="$style.info">
+				<span v-if="note.updatedAt" style="margin-right: 0.5em;" :title="i18n.ts.edited"><i class="ti ti-pencil"></i></span>
+				<div v-if="mock">
+					<MkTime :time="note.createdAt" colored/>
+				</div>
+				<MkA v-else :to="notePage(note)">
+					<MkTime :time="note.createdAt" colored/>
+				</MkA>
+				<span v-if="note.visibility !== 'public'" style="margin-left: 0.5em;" :title="i18n.ts._visibility[note.visibility]">
+					<i v-if="note.visibility === 'home'" class="ti ti-home"></i>
+					<i v-else-if="note.visibility === 'followers'" class="ti ti-lock"></i>
+					<i v-else-if="note.visibility === 'specified'" ref="specified" class="ti ti-mail"></i>
+				</span>
+				<span v-if="note.localOnly" style="margin-left: 0.5em;" :title="i18n.ts._visibility['disableFederation']"><i class="ti ti-rocket-off"></i></span>
+				<span v-if="note.channel" style="margin-left: 0.5em;" :title="note.channel.name"><i class="ti ti-device-tv"></i></span>
+			</div>
+	    <!--</div>-->
+	</header>
 </template>
-
+	
 <script lang="ts" setup>
 import { inject } from 'vue';
 import * as Misskey from 'misskey-js';
@@ -59,6 +63,22 @@ const mock = inject<boolean>('mock', false);
 	display: flex;
 	align-items: baseline;
 	white-space: nowrap;
+}
+
+.section {
+		align-items: flex-start;
+		white-space: nowrap;
+		flex-direction: column;
+		overflow: hidden;
+
+		&:last-child {
+			display: flex;
+			align-items: flex-end;
+			margin-left: auto;
+			margin-bottom: auto;
+			padding-left: 10px;
+			overflow: clip;
+		}
 }
 
 .name {
@@ -92,6 +112,12 @@ const mock = inject<boolean>('mock', false);
 	margin: 0 .5em 0 0;
 	overflow: hidden;
 	text-overflow: ellipsis;
+	font-size: 85%;
+	opacity: 0.8;
+
+	&::-webkit-scrollbar {
+		display: none;
+	}
 }
 
 .info {
