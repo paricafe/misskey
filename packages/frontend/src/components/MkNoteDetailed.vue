@@ -818,7 +818,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 	
 	.noteFooterButton {
 		margin: 0;
-		padding: 8px;
+		padding: 6px;
 		opacity: 0.7;
 	
 		&:not(:last-child) {
