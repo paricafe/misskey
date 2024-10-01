@@ -735,6 +735,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 	}
 	
 	.noteHeaderName {
+		margin: .2em 0 0 0;
 		font-weight: bold;
 		line-height: 1.3;
 	}
