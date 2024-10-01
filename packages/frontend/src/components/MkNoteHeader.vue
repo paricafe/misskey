@@ -109,7 +109,7 @@ const mock = inject<boolean>('mock', false);
 
 .username {
 	flex-shrink: 9999999;
-	margin: -.2em .5em .5em 0;
+	margin: -.2em .5em .3em 0;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	font-size: 95%;
