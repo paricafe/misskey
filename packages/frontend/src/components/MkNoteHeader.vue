@@ -84,7 +84,7 @@ const mock = inject<boolean>('mock', false);
 .name {
 	flex-shrink: 1;
 	display: block;
-	margin: .3em .5em 0 0;
+	margin: .5em .5em 0 0;
 	padding: 0;
 	overflow: hidden;
 	font-size: 1em;
