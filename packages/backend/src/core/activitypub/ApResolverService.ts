@@ -5,6 +5,7 @@
 
 import { Inject, Injectable } from '@nestjs/common';
 import { IsNull, Not } from 'typeorm';
+import * as Bull from 'bullmq';
 import type { MiLocalUser, MiRemoteUser } from '@/models/User.js';
 import { InstanceActorService } from '@/core/InstanceActorService.js';
 import type { NotesRepository, PollsRepository, NoteReactionsRepository, UsersRepository, FollowRequestsRepository, MiMeta } from '@/models/_.js';
@@ -83,7 +84,7 @@ export class Resolver {
 		}
 
 		if (this.history.size > this.recursionLimit) {
-			throw new Error(`hit recursion limit: ${this.utilityService.extractDbHost(value)}`);
+			throw new Bull.UnrecoverableError(`hit recursion limit: ${this.utilityService.extractDbHost(value)}`);
 		}
 
 		this.history.add(value);
