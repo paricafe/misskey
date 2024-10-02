@@ -1,3 +1,15 @@
+## Unreleased
+
+### General
+-
+
+### Client
+- Enhance: フォロワーへのメッセージ欄のデザイン改良
+
+### Server
+-
+
+
 ## 2024.9.0
 
 ### General
