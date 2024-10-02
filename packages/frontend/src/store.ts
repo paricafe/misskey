@@ -296,19 +296,19 @@ export const defaultStore = markRaw(new Storage('base', {
 	},
 	emojiPickerScale: {
 		where: 'device',
-		default: 1,
+		default: 2,
 	},
 	emojiPickerWidth: {
 		where: 'device',
-		default: 1,
+		default: 4,
 	},
 	emojiPickerHeight: {
 		where: 'device',
-		default: 2,
+		default: 4,
 	},
 	emojiPickerStyle: {
 		where: 'device',
-		default: 'auto' as 'auto' | 'popup' | 'drawer',
+		default: 'popup' as 'auto' | 'popup' | 'drawer',
 	},
 	recentlyUsedEmojis: {
 		where: 'device',
