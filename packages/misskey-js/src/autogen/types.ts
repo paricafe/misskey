@@ -2667,7 +2667,7 @@ export type paths = {
      *
      * **Credential required**: *Yes* / **Permission**: *write:notes*
      */
-    post: operations['notes/update'];
+    post: operations['notes___update'];
   };
   '/notes/favorites/create': {
     /**
@@ -4858,6 +4858,7 @@ export type components = {
       canImportFollowing: boolean;
       canImportMuting: boolean;
       canImportUserLists: boolean;
+      canEditNote: boolean;
     };
     ReversiGameLite: {
       /** Format: id */
@@ -21544,13 +21545,15 @@ export type operations = {
    *
    * **Credential required**: *Yes* / **Permission**: *write:notes*
    */
-  'notes/update': {
+  notes___update: {
     requestBody: {
       content: {
         'application/json': {
           /** Format: misskey:id */
           noteId: string;
           text: string;
+          fileIds?: string[];
+          mediaIds?: string[];
           cw: string | null;
         };
       };
@@ -22463,6 +22466,8 @@ export type operations = {
           untilId?: string;
           /** @default 10 */
           limit?: number;
+          /** @default false */
+          localHostOnly?: boolean;
           tag?: string;
           /** @description The outer arrays are chained with OR, the inner arrays are chained with AND. */
           query?: string[][];

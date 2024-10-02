@@ -59,6 +59,8 @@ export class EmailService {
 			} : undefined,
 		} as any);
 
+		const siteName = meta.name || this.config.host;
+
 		const htmlContent = `<!doctype html>
 <html>
 	<head>
@@ -78,7 +80,7 @@ export class EmailService {
 
 			a {
 				text-decoration: none;
-				color: #86b300;
+				color: #fa9bcc;
 			}
 			a:hover {
 				text-decoration: underline;
@@ -92,7 +94,7 @@ export class EmailService {
 			}
 				main > header {
 					padding: 32px;
-					background: #86b300;
+					background: #fa9bcc;
 				}
 					main > header > img {
 						max-width: 128px;
@@ -135,7 +137,7 @@ export class EmailService {
 			</footer>
 		</main>
 		<nav>
-			<a href="${ this.config.url }">${ this.config.host }</a>
+			<a href="${ this.config.url }">${ siteName }</a>
 		</nav>
 	</body>
 </html>`;
@@ -147,7 +149,7 @@ export class EmailService {
 			const info = await transporter.sendMail({
 				from: this.meta.email!,
 				to: to,
-				subject: subject,
+				subject: `[${siteName}] ${subject}`,
 				text: text,
 				html: inlinedHtml,
 			});

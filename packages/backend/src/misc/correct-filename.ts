@@ -25,7 +25,7 @@ const extRegExp = /\.[0-9a-zA-Z]+$/i;
  * extはfile-typeのextを想定
  */
 export function correctFilename(filename: string, ext: string | null) {
-	const dotExt = ext ? ext[0] === '.' ? ext : `.${ext}` : '.unknown';
+	const dotExt = ext ? ext[0] === '.' ? ext : `.${ext}` : '';
 
 	const match = extRegExp.exec(filename);
 	if (!match || !match[0]) {
