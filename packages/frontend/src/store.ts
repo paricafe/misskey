@@ -120,7 +120,7 @@ export const defaultStore = markRaw(new Storage('base', {
 	},
 	reactions: {
 		where: 'account',
-		default: ['👍', '❤️', '😆', '🤔', '😮', '🎉', '💢', '😥', '😇', '🍮'],
+		default: ['👍', '❤️', '😆', '🤔', '😮', '🎉', '💢', '😥', '😇', '🍮', '😋', '🥰'],
 	},
 	pinnedEmojis: {
 		where: 'account',
@@ -300,7 +300,7 @@ export const defaultStore = markRaw(new Storage('base', {
 	},
 	emojiPickerWidth: {
 		where: 'device',
-		default: 4,
+		default: 2,
 	},
 	emojiPickerHeight: {
 		where: 'device',
