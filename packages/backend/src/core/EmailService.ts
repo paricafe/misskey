@@ -59,7 +59,6 @@ export class EmailService {
 			} : undefined,
 		} as any);
 
-		const siteName = meta.name || this.config.host;
 
 		const htmlContent = `<!doctype html>
 <html>
@@ -137,7 +136,7 @@ export class EmailService {
 			</footer>
 		</main>
 		<nav>
-			<a href="${ this.config.url }">${ siteName }</a>
+			<a href="${ this.config.url }">${ this.config.host }</a>
 		</nav>
 	</body>
 </html>`;
@@ -149,7 +148,7 @@ export class EmailService {
 			const info = await transporter.sendMail({
 				from: this.meta.email!,
 				to: to,
-				subject: `[${siteName}] ${subject}`,
+				subject: subject,
 				text: text,
 				html: inlinedHtml,
 			});
