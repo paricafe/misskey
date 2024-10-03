@@ -38,11 +38,6 @@ import { defaultStore } from '@/store.js';
 import MkPullToRefresh from '@/components/MkPullToRefresh.vue';
 import { misskeyApi } from '@/scripts/misskey-api';
 
-const MkNote = defineAsyncComponent(() =>
-	(defaultStore.state.noteDesign === 'misskey') ? import('@/components/MkNote.vue') :
-	null,
-);
-
 const props = defineProps<{
 	excludeTypes?: typeof notificationTypes[number][];
 }>();
