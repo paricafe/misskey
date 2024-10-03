@@ -22,12 +22,13 @@ import MkSparkle from '@/components/MkSparkle.vue';
 import { version } from '@@/js/config.js';
 import { i18n } from '@/i18n.js';
 import { confetti } from '@/scripts/confetti.js';
+import { useRouter } from '@/router/supplier';
 
 const modal = shallowRef<InstanceType<typeof MkModal>>();
 
 function whatIsNew() {
 	modal.value?.close();
-	window.open(`https://misskey-hub.net/docs/releases/#_${version.replace(/\./g, '')}`, '_blank');
+	useRouter().push(`/tags/${version.replaceAll('.', '-')}`);
 }
 
 onMounted(() => {
