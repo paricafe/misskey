@@ -308,7 +308,7 @@ export const defaultStore = markRaw(new Storage('base', {
 	},
 	emojiPickerStyle: {
 		where: 'device',
-		default: 'popup' as 'auto' | 'popup' | 'drawer',
+		default: 'auto' as 'auto' | 'popup' | 'drawer',
 	},
 	recentlyUsedEmojis: {
 		where: 'device',
