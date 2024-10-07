@@ -1283,6 +1283,8 @@ signinWithPasskey: "使用密碼金鑰登入"
 unknownWebAuthnKey: "未註冊的金鑰。"
 passkeyVerificationFailed: "驗證金鑰失敗。"
 passkeyVerificationSucceededButPasswordlessLoginDisabled: "雖然驗證金鑰成功，但是無密碼登入的方式是停用的。"
+timeTravel: "時光機"
+timeTravelDescription: "回到指定的日期"
 _delivery:
   status: "傳送狀態"
   stop: "停止發送"

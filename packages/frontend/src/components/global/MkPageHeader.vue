@@ -56,6 +56,7 @@ const props = withDefaults(defineProps<{
 	actions?: PageHeaderItem[] | null;
 	thin?: boolean;
 	displayMyAvatar?: boolean;
+	hideTitle?: boolean;
 }>(), {
 	tabs: () => ([] as Tab[]),
 });
@@ -66,7 +67,7 @@ const emit = defineEmits<{
 
 const pageMetadata = injectReactiveMetadata();
 
-const hideTitle = inject('shouldOmitHeaderTitle', false);
+const hideTitle = props.hideTitle || inject('shouldOmitHeaderTitle', false);
 const thin_ = props.thin || inject('shouldHeaderThin', false);
 
 const el = shallowRef<HTMLElement | undefined>(undefined);

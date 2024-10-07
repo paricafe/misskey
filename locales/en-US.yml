@@ -1266,6 +1266,8 @@ fromX: "From {x}"
 genEmbedCode: "Generate embed code"
 noteOfThisUser: "Notes by this user"
 clipNoteLimitExceeded: "No more notes can be added to this clip."
+timeTravel: "Time Travel"
+timeTravelDescription: "Show posts before this date."
 _delivery:
   status: "Delivery status"
   stop: "Suspended"

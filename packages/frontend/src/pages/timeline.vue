@@ -221,11 +221,12 @@ function saveTlFilter(key: keyof typeof defaultStore.state.tl.filter, newValue: 
 
 async function timetravel(): Promise<void> {
 	const { canceled, result: date } = await os.inputDate({
-		title: i18n.ts.date,
+		title: i18n.ts.timeTravel as string,
+		text: i18n.ts.timeTravelDescription as string,
 	});
 	if (canceled) return;
 
-	tlComponent.value.timetravel(date);
+	tlComponent.value?.timetravel(date);
 }
 
 function focus(): void {
@@ -323,10 +324,10 @@ const headerTabs = computed(() => [...(defaultStore.reactiveState.pinnedUserList
 	iconOnly: true,
 	onClick: chooseAntenna,
 }, {
-	icon: 'ti ti-device-tv',
-	title: i18n.ts.channel,
+	icon: 'ti ti-calendar-time',
+	title: i18n.ts.timeTravel,
 	iconOnly: true,
-	onClick: chooseChannel,
+	onClick: timetravel,
 }] as Tab[]);
 
 const headerTabsWhenNotLogin = computed(() => [...availableBasicTimelines().map(tl => ({
