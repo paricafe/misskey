@@ -75,7 +75,9 @@ export async function common(createVue: () => App<Element>) {
 			if (lastVersion != null && compareVersions(version, lastVersion) === 1) {
 				isClientUpdated = true;
 			}
-		} catch (err) { /* empty */ }
+		} catch (err) {
+			console.error('Error comparing versions:', err);
+		}
 	}
 	//#endregion
 
