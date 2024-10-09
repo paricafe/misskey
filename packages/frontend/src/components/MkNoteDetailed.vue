@@ -589,10 +589,10 @@ function blur() {
 	rootEl.value?.blur();
 }
 
-const repliesLoaded = ref(false);
+// const repliesLoaded = ref(false);
 
 function loadReplies() {
-	repliesLoaded.value = true;
+	// repliesLoaded.value = true;
 	misskeyApi('notes/children', {
 		noteId: appearNote.value.id,
 		limit: 30,
@@ -601,10 +601,10 @@ function loadReplies() {
 	});
 }
 
-const conversationLoaded = ref(false);
+// const conversationLoaded = ref(false);
 
 function loadConversation() {
-	conversationLoaded.value = true;
+	// conversationLoaded.value = true;
 	if (appearNote.value.replyId == null) return;
 	misskeyApi('notes/conversation', {
 		noteId: appearNote.value.replyId,
