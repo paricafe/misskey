@@ -1,6 +1,6 @@
 {
 	"name": "misskey",
-	"version": "2024.9.0~pari.Espresso",
+	"version": "2024.10.0~pari.Affogato",
 	"codename": "nasubi",
 	"repository": {
 		"type": "git",

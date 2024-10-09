@@ -6,7 +6,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 <template>
 	<header :class="$style.root">
 		<div :class="$style.section">
-			<!--<component :is="defaultStore.state.enableCondensedLine ? 'MkCondensedLine' : 'div'" :minScale="0.7" style="min-width: 0;">-->
 			<div style="display: flex;">
 				<div v-if="mock" :class="$style.name">
 					<MkUserName :user="note.user"/>
@@ -20,7 +19,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 				</div>
 			</div>
 		   	<div :class="$style.username"><MkAcct :user="note.user"/></div>
-			<!--</component>-->
 	    </div>
 		<!--<div :class="$style.section">-->
 			<div :class="$style.info">
@@ -103,7 +101,7 @@ const mock = inject<boolean>('mock', false);
 	margin: 0 .5em 0 0;
 	padding: 1px 6px;
 	font-size: 80%;
-	border: solid 0.5px var(--divider);
+	border: solid 0.5px var(--MI_THEME-divider);
 	border-radius: 3px;
 }
 

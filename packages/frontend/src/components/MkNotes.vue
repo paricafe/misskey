@@ -56,17 +56,17 @@ defineExpose({
 .root {
 	&.noGap {
 		> .notes {
-			background: var(--panel);
+			background: var(--MI_THEME-panel);
 		}
 	}
 
 	&:not(.noGap) {
 		> .notes {
-			background: var(--bg);
+			background: var(--MI_THEME-bg);
 
 			.note {
 				box-shadow: 0 4px 25px #0000000a;
-				background: var(--panel);
+				background: var(--MI_THEME-panel);
 				border-radius: var(--radius);
 			}
 		}
