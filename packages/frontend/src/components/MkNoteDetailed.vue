@@ -612,6 +612,12 @@ function loadConversation() {
 		conversation.value = res.reverse();
 	});
 }
+
+// Extend note content automatically (no manual click)
+onMounted(() => {
+	loadReplies();
+	loadConversation();
+});
 </script>
 
 <style lang="scss" module>
