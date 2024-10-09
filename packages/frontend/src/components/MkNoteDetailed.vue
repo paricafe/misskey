@@ -181,9 +181,9 @@ SPDX-License-Identifier: AGPL-3.0-only
 	</div>
 	<div>
 		<div v-if="tab === 'replies'">
-			<div v-if="!repliesLoaded" style="padding: 16px">
+			<!-- <div v-if="!repliesLoaded" style="padding: 16px">
 				<MkButton style="margin: 0 auto;" primary rounded @click="loadReplies">{{ i18n.ts.loadReplies }}</MkButton>
-			</div>
+			</div> -->
 			<MkNoteSub v-for="note in replies" :key="note.id" :note="note" :class="$style.reply" :detail="true"/>
 		</div>
 		<div v-else-if="tab === 'renotes'" :class="$style.tab_renotes">
