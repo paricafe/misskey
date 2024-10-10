@@ -59,7 +59,7 @@ function noteclick(id: string) {
 	height: 34px;
 	border-radius: 8px;
 	position: sticky !important;
-	top: calc(16px + var(--stickyTop, 0px));
+	top: calc(16px + var(--MI-stickyTop, 0px));
 	left: 0;
 }
 

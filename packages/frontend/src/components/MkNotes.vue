@@ -67,7 +67,7 @@ defineExpose({
 			.note {
 				box-shadow: 0 4px 25px #0000000a;
 				background: var(--MI_THEME-panel);
-				border-radius: var(--radius);
+				border-radius: var(--MI-radius);
 			}
 		}
 	}

@@ -100,13 +100,13 @@ import { defineAsyncComponent, onDeactivated, onUnmounted, ref } from 'vue';
 import * as Misskey from 'misskey-js';
 import MkNoteSimple from './MkNoteSimple.vue';
 import { misskeyApi } from '@/scripts/misskey-api.js';
-import type { summaly } from '@misskey-dev/summaly';
 import { url as local } from '@@/js/config.js';
+import { versatileLang } from '@@/js/intl-const.js';
+import type { summaly } from '@misskey-dev/summaly';
 import { i18n } from '@/i18n.js';
 import * as os from '@/os.js';
 import { deviceKind } from '@/scripts/device-kind.js';
 import MkButton from '@/components/MkButton.vue';
-import { versatileLang } from '@@/js/intl-const.js';
 import { transformPlayerUrl } from '@/scripts/player-url-transform.js';
 import { defaultStore } from '@/store.js';
 
@@ -353,7 +353,6 @@ onUnmounted(() => {
 .siteName {
 	display: inline-block;
 	margin: 0;
-	color: var(--urlPreviewInfo);
 	font-size: 0.8em;
 	line-height: 16px;
 	vertical-align: top;
