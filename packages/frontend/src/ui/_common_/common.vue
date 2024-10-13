@@ -219,6 +219,21 @@ if ($i) {
 	}
 }
 
+@keyframes dash {
+  0% {
+    stroke-dasharray: 1, 150;
+    stroke-dashoffset: 0;
+  }
+  50% {
+    stroke-dasharray: 90, 150;
+    stroke-dashoffset: -35;
+  }
+  100% {
+    stroke-dasharray: 90, 150;
+    stroke-dashoffset: -124;
+  }
+}
+
 #wait {
 	display: block;
 	position: fixed;
@@ -227,18 +242,19 @@ if ($i) {
 	right: 15px;
 	pointer-events: none;
 
-	&::before {
-		content: "";
-		display: block;
-		width: 18px;
-		height: 18px;
-		box-sizing: border-box;
-		border: solid 2px transparent;
-		border-top-color: var(--MI_THEME-accent);
-		border-left-color: var(--MI_THEME-accent);
-		border-radius: 50%;
-		animation: progress-spinner 400ms linear infinite;
-	}
+  > svg {
+    display: block;
+    width: 18px;
+    height: 18px;
+    box-sizing: border-box;
+    animation: progress-spinner 2s linear infinite;
+  }
+
+  > svg > circle {
+    stroke: var(--MI_THEME-accent);
+    stroke-linecap: round;
+    animation: dash 1.2s ease-in-out infinite;
+  }
 }
 
 #botWarn {
