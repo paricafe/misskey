@@ -22,6 +22,7 @@ import type { ReactionService } from '../ReactionService.js';
 import type { UserEntityService } from './UserEntityService.js';
 import type { DriveFileEntityService } from './DriveFileEntityService.js';
 
+// is-renote.tsとよしなにリンク
 function isPureRenote(note: MiNote): note is MiNote & { renoteId: MiNote['id']; renote: MiNote } {
 	return (
 		note.renote != null &&
@@ -113,7 +114,7 @@ export class NoteEntityService implements OnModuleInit {
 				hide = false;
 			} else {
 				// 指定されているかどうか
-				const specified = packedNote.visibleUserIds!.some((id: any) => meId === id);
+				const specified = packedNote.visibleUserIds!.some(id => meId === id);
 
 				if (specified) {
 					hide = false;
@@ -250,7 +251,7 @@ export class NoteEntityService implements OnModuleInit {
 				return true;
 			} else {
 				// 指定されているかどうか
-				return note.visibleUserIds.some((id: any) => meId === id);
+				return note.visibleUserIds.some(id => meId === id);
 			}
 		}
 
