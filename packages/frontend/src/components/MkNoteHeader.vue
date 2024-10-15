@@ -26,8 +26,12 @@ SPDX-License-Identifier: AGPL-3.0-only
 				<div v-if="mock">
 					<MkTime :time="note.createdAt" colored/>
 				</div>
-				<MkA v-else :to="notePage(note)">
-					<MkTime :time="note.createdAt" colored/>
+				<MkA v-else @click="toggleDetail()">
+					<MkTime 
+                        :time="isDetail ? note.createdAt : note.createdAt" 
+                        :mode="isDetail ? 'detail' : undefined" 
+                        colored 
+                    />
 				</MkA>
 				<span v-if="note.visibility !== 'public'" style="margin-left: 0.5em;" :title="i18n.ts._visibility[note.visibility]">
 					<i v-if="note.visibility === 'home'" class="ti ti-home"></i>
@@ -42,12 +46,17 @@ SPDX-License-Identifier: AGPL-3.0-only
 </template>
 	
 <script lang="ts" setup>
-import { inject } from 'vue';
+import { inject, ref } from 'vue';
 import * as Misskey from 'misskey-js';
 import { i18n } from '@/i18n.js';
 import { notePage } from '@/filters/note.js';
 import { userPage } from '@/filters/user.js';
 import { defaultStore } from '@/store.js';
+
+const isDetail = ref(false);
+const toggleDetail = () => {
+    isDetail.value = !isDetail.value;
+};
 
 defineProps<{
 	note: Misskey.entities.Note;
