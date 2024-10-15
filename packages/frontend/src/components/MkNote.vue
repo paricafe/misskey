@@ -141,6 +141,9 @@ SPDX-License-Identifier: AGPL-3.0-only
 				<button v-if="defaultStore.state.showClipButtonInNoteFooter" ref="clipButton" :class="$style.footerButton" class="_button" @mousedown.prevent="clip()">
 					<i class="ti ti-paperclip"></i>
 				</button>
+				<button ref="expandButton" :class="$style.footerButton" class="_button" @click.stop @click="expandNote(appearNote.id)">
+					<i class="ti ti-info-circle"></i>
+				</button>
 				<button ref="menuButton" :class="$style.footerButton" class="_button" @mousedown.prevent="showMenu()">
 					<i class="ti ti-dots"></i>
 				</button>
@@ -215,6 +218,7 @@ import { isEnabledUrlPreview } from '@/instance.js';
 import { type Keymap } from '@/scripts/hotkey.js';
 import { focusPrev, focusNext } from '@/scripts/focus.js';
 import { getAppearNote } from '@/scripts/get-appear-note.js';
+import { useRouter } from '@/router/supplier.js';
 
 const props = withDefaults(defineProps<{
 	note: Misskey.entities.Note;
@@ -232,11 +236,17 @@ const emit = defineEmits<{
 	(ev: 'removeReaction', emoji: string): void;
 }>();
 
+const router = useRouter();
+
 const inTimeline = inject<boolean>('inTimeline', false);
 const inChannel = inject('inChannel', null);
 const currentClip = inject<Ref<Misskey.entities.Clip> | null>('currentClip', null);
 
 const note = ref(deepClone(props.note));
+
+function expandNote(id: string) {
+	router.push(`/notes/${id}`);
+}
 
 // plugin
 if (noteViewInterruptors.length > 0) {
@@ -261,6 +271,7 @@ const isRenote = Misskey.note.isPureRenote(note.value);
 
 const rootEl = shallowRef<HTMLElement>();
 const menuButton = shallowRef<HTMLElement>();
+const expandButton = shallowRef<HTMLElement>();
 const renoteButton = shallowRef<HTMLElement>();
 const renoteTime = shallowRef<HTMLElement>();
 const reactButton = shallowRef<HTMLElement>();
