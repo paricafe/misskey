@@ -150,11 +150,14 @@ SPDX-License-Identifier: AGPL-3.0-only
 			<button v-else class="_button" :class="$style.noteFooterButton" disabled>
 				<i class="ti ti-ban"></i>
 			</button>
+			<button v-if="appearNote.myReaction == null && appearNote.reactionAcceptance !== 'likeOnly'" ref="likeButton" :class="$style.noteFooterButton" class="_button" @mousedown="like()">
+				<i class="ti ti-heart"></i>
+			</button>
 			<button ref="reactButton" :class="$style.noteFooterButton" class="_button" @click="toggleReact()">
 				<i v-if="appearNote.reactionAcceptance === 'likeOnly' && appearNote.myReaction != null" class="ti ti-heart-filled" style="color: var(--MI_THEME-love);"></i>
 				<i v-else-if="appearNote.myReaction != null" class="ti ti-minus" style="color: var(--MI_THEME-accent);"></i>
 				<i v-else-if="appearNote.reactionAcceptance === 'likeOnly'" class="ti ti-heart"></i>
-				<i v-else class="ti ti-plus"></i>
+				<i v-else class="ti ti-mood-plus"></i>
 				<p v-if="(appearNote.reactionAcceptance === 'likeOnly' || defaultStore.state.showReactionsCount) && appearNote.reactionCount > 0" :class="$style.noteFooterButtonCount">{{ number(appearNote.reactionCount) }}</p>
 			</button>
 			<button
@@ -309,6 +312,7 @@ const renoteButton = shallowRef<HTMLElement>();
 const renoteTime = shallowRef<HTMLElement>();
 const reactButton = shallowRef<HTMLElement>();
 const clipButton = shallowRef<HTMLElement>();
+const likeButton = shallowRef<HTMLElement>();
 const historyMenuButton = shallowRef<HTMLElement>();
 const appearNote = computed(() => getAppearNote(note.value));
 const galleryEl = shallowRef<InstanceType<typeof MkMediaList>>();
@@ -453,6 +457,28 @@ function reply(): void {
 	}).then(() => {
 		focus();
 	});
+}
+
+function like(): void {
+	pleaseLogin(undefined, pleaseLoginContext.value);
+	showMovedDialog();
+	sound.playMisskeySfx('reaction');
+	if (props.mock) {
+		return;
+	}
+	misskeyApi('notes/reactions/create', {
+		noteId: appearNote.value.id,
+		reaction: '❤️',
+	});
+	const el = likeButton.value as HTMLElement | null | undefined;
+	if (el) {
+		const rect = el.getBoundingClientRect();
+		const x = rect.left + (el.offsetWidth / 2);
+		const y = rect.top + (el.offsetHeight / 2);
+		const { dispose } = os.popup(MkRippleEffect, { x, y }, {
+			end: () => dispose(),
+		});
+	}
 }
 
 function react(): void {
@@ -650,6 +676,16 @@ onMounted(() => {
 	}
 }
 
+.footer {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		position: relative;
+		z-index: 1;
+		margin-top: 0.4em;
+		max-width: 400px;
+}
+
 .replyTo {
 	opacity: 0.7;
 	padding-bottom: 0;
@@ -823,7 +859,7 @@ onMounted(() => {
 	opacity: 0.7;
 
 	&:not(:last-child) {
-		margin-right: 28px;
+		margin-right: 1.5em;
 	}
 
 	&:hover {

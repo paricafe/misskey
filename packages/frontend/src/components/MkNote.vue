@@ -46,11 +46,14 @@ SPDX-License-Identifier: AGPL-3.0-only
 		<Mfm :text="getNoteSummary(appearNote)" :plain="true" :nowrap="true" :author="appearNote.user" :nyaize="'respect'" :class="$style.collapsedRenoteTargetText" @click="renoteCollapsed = false"/>
 	</div>
 	<article v-else :class="$style.article" @contextmenu.stop="onContextmenu">
+		<div style="display: flex; padding-bottom: 10px;">
 		<div v-if="appearNote.channel" :class="$style.colorBar" :style="{ background: appearNote.channel.color }"></div>
 		<MkAvatar :class="$style.avatar" :user="appearNote.user" :link="!mock" :preview="!mock"/>
 		<div :class="$style.main">
 			<MkNoteHeader :note="appearNote" :mini="true"/>
 			<MkInstanceTicker v-if="showTicker" :instance="appearNote.user.instance"/>
+		</div>
+	    </div>
 			<div style="container-type: inline-size;">
 				<p v-if="appearNote.cw != null" :class="$style.cw">
 					<Mfm
@@ -125,11 +128,14 @@ SPDX-License-Identifier: AGPL-3.0-only
 				<button v-else :class="$style.footerButton" class="_button" disabled>
 					<i class="ti ti-ban"></i>
 				</button>
+				<button v-if="appearNote.myReaction == null && appearNote.reactionAcceptance !== 'likeOnly'" ref="likeButton" :class="$style.footerButton" class="_button" @click.stop @click="like()">
+					<i class="ti ti-heart"></i>
+				</button>
 				<button ref="reactButton" :class="$style.footerButton" class="_button" @click="toggleReact()">
 					<i v-if="appearNote.reactionAcceptance === 'likeOnly' && appearNote.myReaction != null" class="ti ti-heart-filled" style="color: var(--MI_THEME-love);"></i>
 					<i v-else-if="appearNote.myReaction != null" class="ti ti-minus" style="color: var(--MI_THEME-accent);"></i>
 					<i v-else-if="appearNote.reactionAcceptance === 'likeOnly'" class="ti ti-heart"></i>
-					<i v-else class="ti ti-plus"></i>
+					<i v-else class="ti ti-mood-plus"></i>
 					<p v-if="(appearNote.reactionAcceptance === 'likeOnly' || defaultStore.state.showReactionsCount) && appearNote.reactionCount > 0" :class="$style.footerButtonCount">{{ number(appearNote.reactionCount) }}</p>
 				</button>
 				<button v-if="defaultStore.state.showClipButtonInNoteFooter" ref="clipButton" :class="$style.footerButton" class="_button" @mousedown.prevent="clip()">
@@ -139,7 +145,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 					<i class="ti ti-dots"></i>
 				</button>
 			</footer>
-		</div>
+		
 	</article>
 </div>
 <div v-else-if="!hardMuted" :class="$style.muted" @click="muted = false">
@@ -259,6 +265,7 @@ const renoteButton = shallowRef<HTMLElement>();
 const renoteTime = shallowRef<HTMLElement>();
 const reactButton = shallowRef<HTMLElement>();
 const clipButton = shallowRef<HTMLElement>();
+const likeButton = shallowRef<HTMLElement>();
 const appearNote = computed(() => getAppearNote(note.value));
 const galleryEl = shallowRef<InstanceType<typeof MkMediaList>>();
 const isMyRenote = $i && ($i.id === note.value.userId);
@@ -439,6 +446,28 @@ function reply(): void {
 	}).then(() => {
 		focus();
 	});
+}
+
+function like(): void {
+	pleaseLogin(undefined, pleaseLoginContext.value);
+	showMovedDialog();
+	sound.playMisskeySfx('reaction');
+	if (props.mock) {
+		return;
+	}
+	misskeyApi('notes/reactions/create', {
+		noteId: appearNote.value.id,
+		reaction: '❤️',
+	});
+	const el = likeButton.value as HTMLElement | null | undefined;
+	if (el) {
+		const rect = el.getBoundingClientRect();
+		const x = rect.left + (el.offsetWidth / 2);
+		const y = rect.top + (el.offsetHeight / 2);
+		const { dispose } = os.popup(MkRippleEffect, { x, y }, {
+			end: () => dispose(),
+		});
+	}
 }
 
 function react(): void {
@@ -642,8 +671,13 @@ function emitUpdReaction(emoji: string, delta: number) {
 	}
 
 	.footer {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
 		position: relative;
 		z-index: 1;
+		margin-top: 0.4em;
+		max-width: 400px;
 	}
 
 	&:hover > .article > .main > .footer > .footerButton {
@@ -786,7 +820,7 @@ function emitUpdReaction(emoji: string, delta: number) {
 
 .article {
 	position: relative;
-	display: flex;
+	//display: flex;
 	padding: 28px 32px;
 }
 
@@ -806,8 +840,8 @@ function emitUpdReaction(emoji: string, delta: number) {
 	margin: 0 14px 0 0;
 	width: 58px;
 	height: 58px;
-	position: sticky !important;
-	top: calc(22px + var(--MI-stickyTop, 0px));
+	//position: sticky !important;
+	//top: calc(22px + var(--MI-stickyTop, 0px));
 	left: 0;
 }
 
@@ -920,7 +954,7 @@ function emitUpdReaction(emoji: string, delta: number) {
 	opacity: 0.7;
 
 	&:not(:last-child) {
-		margin-right: 28px;
+		margin-right: 1.5em;
 	}
 
 	&:hover {
@@ -963,7 +997,7 @@ function emitUpdReaction(emoji: string, delta: number) {
 	}
 
 	.article {
-		padding: 20px 22px;
+		padding: 23px 25px;
 	}
 
 	.footer {
@@ -986,7 +1020,7 @@ function emitUpdReaction(emoji: string, delta: number) {
 	}
 
 	.article {
-		padding: 14px 16px;
+		padding: 22px 24px;
 	}
 }
 
@@ -995,7 +1029,7 @@ function emitUpdReaction(emoji: string, delta: number) {
 		margin: 0 10px 0 0;
 		width: 46px;
 		height: 46px;
-		top: calc(14px + var(--MI-stickyTop, 0px));
+		//top: calc(14px + var(--MI-stickyTop, 0px));
 	}
 }
 
@@ -1003,7 +1037,7 @@ function emitUpdReaction(emoji: string, delta: number) {
 	.root:not(.showActionsOnlyHover) {
 		.footerButton {
 			&:not(:last-child) {
-				margin-right: 18px;
+				margin-right: 0.2em;
 			}
 		}
 	}
@@ -1013,7 +1047,7 @@ function emitUpdReaction(emoji: string, delta: number) {
 	.root:not(.showActionsOnlyHover) {
 		.footerButton {
 			&:not(:last-child) {
-				margin-right: 12px;
+				margin-right: 0.1em;
 			}
 		}
 	}
@@ -1035,7 +1069,7 @@ function emitUpdReaction(emoji: string, delta: number) {
 	.root:not(.showActionsOnlyHover) {
 		.footerButton {
 			&:not(:last-child) {
-				margin-right: 8px;
+				margin-right: 0.1em;
 			}
 		}
 	}
