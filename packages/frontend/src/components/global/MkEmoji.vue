@@ -40,6 +40,7 @@ function computeTitle(event: PointerEvent): void {
 
 function onClick(ev: MouseEvent) {
 	if (props.menu) {
+		ev.stopPropagation();
 		const menuItems: MenuItem[] = [];
 
 		menuItems.push({

@@ -43,7 +43,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 	</div>
 	<div v-if="renoteCollapsed" :class="$style.collapsedRenoteTarget">
 		<MkAvatar :class="$style.collapsedRenoteTargetAvatar" :user="appearNote.user" link preview/>
-		<Mfm :text="getNoteSummary(appearNote)" :plain="true" :nowrap="true" :author="appearNote.user" :nyaize="'respect'" :class="$style.collapsedRenoteTargetText" @click="renoteCollapsed = false"/>
+		<Mfm :text="getNoteSummary(appearNote)" :plain="true" :nowrap="true" :author="appearNote.user" :nyaize="'respect'" :class="$style.collapsedRenoteTargetText" @click.stop="renoteCollapsed = false"/>
 	</div>
 	<article v-else :class="$style.article" @contextmenu.stop="onContextmenu">
 		<div style="display: flex; padding-bottom: 10px;">
@@ -96,10 +96,10 @@ SPDX-License-Identifier: AGPL-3.0-only
 						<MkUrlPreview v-for="url in urls" :key="url" :url="url" :compact="true" :detail="false" :class="$style.urlPreview"/>
 					</div>
 					<div v-if="appearNote.renote" :class="$style.quote"><MkNoteSimple :note="appearNote.renote" :class="$style.quoteNote"/></div>
-					<button v-if="isLong && collapsed" :class="$style.collapsed" class="_button" @click="collapsed = false">
+					<button v-if="isLong && collapsed" :class="$style.collapsed" class="_button" @click.stop="collapsed = false">
 						<span :class="$style.collapsedLabel">{{ i18n.ts.showMore }}</span>
 					</button>
-					<button v-else-if="isLong && !collapsed" :class="$style.showLess" class="_button" @click="collapsed = true">
+					<button v-else-if="isLong && !collapsed" :class="$style.showLess" class="_button" @click.stop="collapsed = true">
 						<span :class="$style.showLessLabel">{{ i18n.ts.showLess }}</span>
 					</button>
 				</div>
@@ -111,7 +111,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 				</template>
 			</MkReactionsViewer>
 			<footer :class="$style.footer">
-				<button :class="$style.footerButton" class="_button" @click="reply()">
+				<button :class="$style.footerButton" class="_button" @click.stop="reply()">
 					<i class="ti ti-arrow-back-up"></i>
 					<p v-if="appearNote.repliesCount > 0" :class="$style.footerButtonCount">{{ number(appearNote.repliesCount) }}</p>
 				</button>
@@ -128,10 +128,10 @@ SPDX-License-Identifier: AGPL-3.0-only
 				<button v-else :class="$style.footerButton" class="_button" disabled>
 					<i class="ti ti-ban"></i>
 				</button>
-				<button v-if="appearNote.myReaction == null && appearNote.reactionAcceptance !== 'likeOnly'" ref="likeButton" :class="$style.footerButton" class="_button" @click.stop @click="like()">
+				<button v-if="appearNote.myReaction == null && appearNote.reactionAcceptance !== 'likeOnly'" ref="likeButton" :class="$style.footerButton" class="_button" @click.stop="like()">
 					<i class="ti ti-heart"></i>
 				</button>
-				<button ref="reactButton" :class="$style.footerButton" class="_button" @click="toggleReact()">
+				<button ref="reactButton" :class="$style.footerButton" class="_button" @click.stop="toggleReact()">
 					<i v-if="appearNote.reactionAcceptance === 'likeOnly' && appearNote.myReaction != null" class="ti ti-heart-filled" style="color: var(--MI_THEME-love);"></i>
 					<i v-else-if="appearNote.myReaction != null" class="ti ti-minus" style="color: var(--MI_THEME-accent);"></i>
 					<i v-else-if="appearNote.reactionAcceptance === 'likeOnly'" class="ti ti-heart"></i>
@@ -148,7 +148,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 		
 	</article>
 </div>
-<div v-else-if="!hardMuted" :class="$style.muted" @click="muted = false">
+<div v-else-if="!hardMuted" :class="$style.muted" @click.stop="muted = false">
 	<I18n v-if="muted === 'sensitiveMute'" :src="i18n.ts.userSaysSomethingSensitive" tag="small">
 		<template #name>
 			<MkA v-user-preview="appearNote.userId" :to="userPage(appearNote.user)">

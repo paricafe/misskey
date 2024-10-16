@@ -86,6 +86,7 @@ const errored = ref(url.value == null);
 
 function onClick(ev: MouseEvent) {
 	if (props.menu) {
+		ev.stopPropagation();
 		const menuItems: MenuItem[] = [];
 
 		menuItems.push({
