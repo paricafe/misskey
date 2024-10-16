@@ -147,12 +147,4 @@ const mock = inject<boolean>('mock', false);
 		margin-left: 0.2em;
 	}
 }
-
-.no-underline {
-    text-decoration: none;
-}
-
-.no-select {
-    user-select: none;
-}
 </style>
