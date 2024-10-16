@@ -26,7 +26,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 				<div v-if="mock">
 					<MkTime :time="note.createdAt" colored/>
 				</div>
-				<MkA v-else @click="toggleDetail()">
+				<MkA v-else :to="notePage(note)" @mouseenter="setDetail(true)" @mouseleave="setDetail(false)" :style="{ textDecoration: 'none', userSelect: 'none' }">
 					<MkTime 
                         :time="isDetail ? note.createdAt : note.createdAt" 
                         :mode="isDetail ? 'detail' : undefined" 
@@ -54,8 +54,8 @@ import { userPage } from '@/filters/user.js';
 import { defaultStore } from '@/store.js';
 
 const isDetail = ref(false);
-const toggleDetail = () => {
-    isDetail.value = !isDetail.value;
+const setDetail = (value) => {
+    isDetail.value = value;
 };
 
 defineProps<{
@@ -100,7 +100,8 @@ const mock = inject<boolean>('mock', false);
 	text-overflow: ellipsis;
 
 	&:hover {
-		text-decoration: underline;
+		text-decoration: none;
+		opacity: 0.8;
 	}
 }
 
@@ -131,6 +132,7 @@ const mock = inject<boolean>('mock', false);
 	flex-shrink: 0;
 	margin-left: auto;
 	font-size: 0.9em;
+	text-decoration: none;
 }
 
 .badgeRoles {
@@ -144,5 +146,13 @@ const mock = inject<boolean>('mock', false);
 	& + .badgeRole {
 		margin-left: 0.2em;
 	}
+}
+
+.no-underline {
+    text-decoration: none;
+}
+
+.no-select {
+    user-select: none;
 }
 </style>
