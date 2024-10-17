@@ -479,11 +479,10 @@ body {
 	left: 0;
 	color: var(--MI_THEME-indicator);
 	font-size: 16px;
-	animation: global-blink 1s infinite;
 
 	&:has(.itemIndicateValueIcon) {
 		animation: none;
-		font-size: 10px;
+		font-size: 12px;
 	}
 }
 </style>
