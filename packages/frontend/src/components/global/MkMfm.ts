@@ -289,7 +289,11 @@ export default function (props: MfmProps, { emit }: { emit: SetupContext<MfmEven
 							if (!disableNyaize && shouldNyaize) {
 								text = Misskey.nyaize(text);
 							}
-							return h('ruby', {}, [text.split(' ')[0], h('rt', text.split(' ')[1])]);
+							if (text.includes('|')) {
+								return h('ruby', {}, [text.split('|')[0], h('rt', text.split('|')[1])]);
+							} else {
+								return h('ruby', {}, [text.split(' ')[0], h('rt', text.split(' ')[1])]);
+							}
 						} else {
 							const rt = token.children.at(-1)!;
 							let text = rt.type === 'text' ? rt.props.text : '';
