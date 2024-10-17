@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { detect } from 'tinyld';
+import { detect } from 'tinyld/heavy';
 import * as mfm from 'mfm-js';
 
 export default function detectLanguage(text: string): string {

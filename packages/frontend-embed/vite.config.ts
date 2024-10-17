@@ -29,7 +29,7 @@ const externalPackages = [
 		name: 'tinyld',
 		match: /^tinyld$/,
 		path(): string {
-			return `https://cdn.jsdelivr.net/npm/tinyld@${packageInfo.dependencies.tinyld}/dist/tinyld.normal.node.mjs`
+			return `https://cdn.jsdelivr.net/npm/tinyld@${packageInfo.dependencies.tinyld}/dist/tinyld.heavy.node.mjs`
 		},
 	},
 ];
