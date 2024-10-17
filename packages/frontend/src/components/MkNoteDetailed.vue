@@ -605,7 +605,6 @@ const isForeignLanguage: boolean = appearNote.value.text != null && (() => {
 
 async function translate(): Promise<void> {
 	if (translation.value != null) return;
-	collapsed.value = false;
 	translating.value = true;
 	if (props.mock) {
 		return;
