@@ -881,7 +881,7 @@ onMounted(() => {
 
 .noteFooterButton {
 	margin: 0;
-	padding: 6px;
+	padding: 8px;
 	opacity: 0.7;
 
 	&:not(:last-child) {
@@ -906,6 +906,26 @@ onMounted(() => {
 .noteFooterButtonHistoryMenu {
 	&.active {
 		color: var(--MI_THEME--accent);
+	}
+}
+
+@container (max-width: 400px) {
+	.root {
+		.noteFooterButton {
+			&:not(:last-child) {
+				margin-right: 0.2em;
+			}
+		}
+	}
+}
+
+@container (max-width: 350px) {
+	.root {
+		.noteFooterButton {
+			&:not(:last-child) {
+				margin-right: 0.1em;
+			}
+		}
 	}
 }
 
