@@ -22,11 +22,11 @@ SPDX-License-Identifier: AGPL-3.0-only
 					:offsetX="avatarDecoration.offsetX"
 					:offsetY="avatarDecoration.offsetY"
 					:active="true"
-					@click.stop="openDecoration(avatarDecoration, i)"
+					@click="openDecoration(avatarDecoration, i)"
 				/>
 			</div>
 
-			<MkButton danger @click.stop="detachAllDecorations">{{ i18n.ts.detachAll }}</MkButton>
+			<MkButton danger @click="detachAllDecorations">{{ i18n.ts.detachAll }}</MkButton>
 		</div>
 
 		<div :class="$style.decorations">
@@ -34,7 +34,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 				v-for="avatarDecoration in avatarDecorations"
 				:key="avatarDecoration.id"
 				:decoration="avatarDecoration"
-				@click.stop="openDecoration(avatarDecoration)"
+				@click="openDecoration(avatarDecoration)"
 			/>
 		</div>
 	</div>
