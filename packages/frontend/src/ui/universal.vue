@@ -25,11 +25,11 @@ SPDX-License-Identifier: AGPL-3.0-only
 	<button v-if="(!isDesktop || pageMetadata?.needWideArea) && !isMobile" :class="$style.widgetButton" class="_button" @click="widgetsShowing = true"><i class="ti ti-apps"></i></button>
 
 	<div v-if="isMobile" ref="navFooter" :class="$style.nav">
-		<button :class="$style.navButton" class="_button" @click="drawerMenuShowing = true"><i :class="$style.navButtonIcon" class="ti ti-menu-2"></i><span v-if="menuIndicated" :class="$style.navButtonIndicator" class="_blink"><i class="_indicatorCircle"></i></span></button>
+		<button :class="$style.navButton" class="_button" @click="drawerMenuShowing = true"><i :class="$style.navButtonIcon" class="ti ti-menu-2"></i><span v-if="menuIndicated" :class="$style.navButtonIndicator"><i class="_indicatorCircle"></i></span></button>
 		<button :class="$style.navButton" class="_button" @click="isRoot ? top() : mainRouter.push('/')"><i :class="$style.navButtonIcon" class="ti ti-home"></i></button>
 		<button :class="$style.navButton" class="_button" @click="mainRouter.push('/my/notifications')">
 			<i :class="$style.navButtonIcon" class="ti ti-bell"></i>
-			<span v-if="$i?.hasUnreadNotification" :class="$style.navButtonIndicator" class="_blink">
+			<span v-if="$i?.hasUnreadNotification" :class="$style.navButtonIndicator">
 				<span class="_indicateCounter" :class="$style.itemIndicateValueIcon">{{ $i.unreadNotificationsCount > 99 ? '99+' : $i.unreadNotificationsCount }}</span>
 			</span>
 		</button>
@@ -196,6 +196,12 @@ onMounted(() => {
 });
 
 const onContextmenu = (ev) => {
+	const isLink = (el: HTMLElement) => {
+		if (el.tagName === 'A') return true;
+		if (el.parentElement) {
+			return isLink(el.parentElement);
+		}
+	};
 	if (isLink(ev.target)) return;
 	if (['INPUT', 'TEXTAREA', 'IMG', 'VIDEO', 'CANVAS'].includes(ev.target.tagName) || ev.target.attributes['contenteditable']) return;
 	if (window.getSelection()?.toString() !== '') return;
@@ -409,20 +415,22 @@ $widgets-hide-threshold: 1090px;
 .navButton {
 	position: relative;
 	padding: 0;
-	aspect-ratio: 1;
+	aspect-ratio: 1.5;
 	width: 100%;
 	max-width: 60px;
 	margin: auto;
-	border-radius: 100%;
+	border-radius: 70% / 100%;
 	background: var(--MI_THEME-panel);
 	color: var(--MI_THEME-fg);
 
 	&:hover {
 		background: var(--MI_THEME-panelHighlight);
+		color: var(--MI_THEME-accent);
 	}
 
 	&:active {
 		background: hsl(from var(--MI_THEME-panel) h s calc(l - 2));
+		color: var(--MI_THEME-accent);
 	}
 }
 
@@ -451,6 +459,7 @@ $widgets-hide-threshold: 1090px;
 	left: 0;
 	color: var(--MI_THEME-indicator);
 	font-size: 16px;
+	animation: global-blink 1s infinite;
 
 	&:has(.itemIndicateValueIcon) {
 		animation: none;
