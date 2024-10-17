@@ -6,7 +6,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 <template>
 <div
 	:class="[$style.root, { [$style.active]: active }]"
-	@click="emit('click')"
+	@click.stop="emit('click')"
 >
 	<div :class="$style.name"><MkCondensedLine :minScale="0.5">{{ decoration.name }}</MkCondensedLine></div>
 	<MkAvatar style="width: 60px; height: 60px;" :user="$i" :decorations="[{ url: decoration.url, angle, flipH, offsetX, offsetY }]" forceShowDecoration/>
