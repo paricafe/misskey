@@ -913,7 +913,7 @@ onMounted(() => {
 	.root {
 		.noteFooterButton {
 			&:not(:last-child) {
-				margin-right: 0.5em;
+				margin-right: 0.6em;
 			}
 		}
 	}
