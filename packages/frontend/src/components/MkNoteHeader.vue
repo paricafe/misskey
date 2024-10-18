@@ -28,8 +28,8 @@ SPDX-License-Identifier: AGPL-3.0-only
 				</div>
 				<MkA v-else :to="notePage(note)" @mouseenter="setDetail(true)" @mouseleave="setDetail(false)" :style="{ textDecoration: 'none', userSelect: 'none' }">
 					<MkTime 
-                        :time="isDetail ? note.createdAt : note.createdAt" 
-                        :mode="isDetail ? 'detail' : undefined" 
+                        :time="note.createdAt" 
+                        :mode="(defaultStore.state.showDetailTimeWhenHover && isDetail) ? 'detail' : undefined" 
                         colored 
                     />
 				</MkA>

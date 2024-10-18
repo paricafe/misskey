@@ -507,6 +507,14 @@ export const defaultStore = markRaw(new Storage('base', {
 		where: 'device',
 		default: true,
 	},
+	showDetailTimeWhenHover: {
+		where: 'device',
+		default: true,
+	},
+	noteClickToOpen: {
+		where: 'device',
+		default: false,
+	},
 }));
 
 // TODO: 他のタブと永続化されたstateを同期

@@ -5,7 +5,10 @@ SPDX-License-Identifier: AGPL-3.0-only
 
 <template>
 	<div class="_gaps_m">
+		<div class="label">{{ i18n.ts.pariPlusNoteSettings }}</div>
 		<MkSwitch v-model="autoTranslateButton">{{ i18n.ts.autoTranslateButton }}</MkSwitch>
+		<MkSwitch v-model="showDetailTimeWhenHover">{{ i18n.ts.showDetailTimeWhenHover }}</MkSwitch>
+		<MkSwitch v-model="noteClickToOpen">{{ i18n.ts.noteClickToOpen }}</MkSwitch>
     </div>
 </template>
 
@@ -17,9 +20,11 @@ import { defaultStore } from '@/store.js';
 import MkSwitch from '@/components/MkSwitch.vue';
 
 const autoTranslateButton = computed(defaultStore.makeGetterSetter('autoTranslateButton'));
+const showDetailTimeWhenHover = computed(defaultStore.makeGetterSetter('showDetailTimeWhenHover'));
+const noteClickToOpen = computed(defaultStore.makeGetterSetter('noteClickToOpen'));
 
 definePageMetadata(() => ({
-	title: 'Pari Plus',
+	title: 'Pari Plus!',
 	icon: 'ti ti-plus',
 }));
 </script>

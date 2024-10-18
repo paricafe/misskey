@@ -111,6 +111,11 @@ const menuDef = computed(() => [{
 		to: '/settings/theme',
 		active: currentPage.value?.route.name === 'theme',
 	}, {
+		icon: 'ti ti-plus',
+		text: 'Pari Plus!',
+		to: '/settings/pari',
+		active: currentPage.value?.route.name === 'pari',
+	}, {
 		icon: 'ti ti-menu-2',
 		text: i18n.ts.navbar,
 		to: '/settings/navbar',
@@ -130,11 +135,6 @@ const menuDef = computed(() => [{
 		text: i18n.ts.plugins,
 		to: '/settings/plugin',
 		active: currentPage.value?.route.name === 'plugin',
-	}, {
-		icon: 'ti ti-plus',
-		text: 'Pari Plus',
-		to: '/settings/pari',
-		active: currentPage.value?.route.name === 'pari',
 	}],
 }, {
 	title: i18n.ts.otherSettings,

@@ -45,14 +45,14 @@ SPDX-License-Identifier: AGPL-3.0-only
 		<MkAvatar :class="$style.collapsedRenoteTargetAvatar" :user="appearNote.user" link preview/>
 		<Mfm :text="getNoteSummary(appearNote)" :plain="true" :nowrap="true" :author="appearNote.user" :nyaize="'respect'" :class="$style.collapsedRenoteTargetText" @click="renoteCollapsed = false"/>
 	</div>
-	<article v-else :class="$style.article" @contextmenu.stop="onContextmenu">
+	<article v-else :class="$style.article" @click.stop="defaultStore.state.noteClickToOpen ? noteClickToOpen(appearNote.id) : undefined" @contextmenu.stop="onContextmenu">
 		<div style="display: flex; padding-bottom: 10px;">
-		<div v-if="appearNote.channel" :class="$style.colorBar" :style="{ background: appearNote.channel.color }"></div>
-		<MkAvatar :class="$style.avatar" :user="appearNote.user" :link="!mock" :preview="!mock"/>
-		<div :class="$style.main">
-			<MkNoteHeader :note="appearNote" :mini="true"/>
-			<MkInstanceTicker v-if="showTicker" :instance="appearNote.user.instance"/>
-		</div>
+		    <div v-if="appearNote.channel" :class="$style.colorBar" :style="{ background: appearNote.channel.color }"></div>
+		    <MkAvatar :class="$style.avatar" :user="appearNote.user" :link="!mock" :preview="!mock"/>
+		    <div :class="$style.main">
+			    <MkNoteHeader :note="appearNote" :mini="true"/>
+			    <MkInstanceTicker v-if="showTicker" :instance="appearNote.user.instance"/>
+		    </div>
 	    </div>
 			<div style="container-type: inline-size;">
 				<p v-if="appearNote.cw != null" :class="$style.cw">
@@ -219,6 +219,7 @@ import { isEnabledUrlPreview } from '@/instance.js';
 import { type Keymap } from '@/scripts/hotkey.js';
 import { focusPrev, focusNext } from '@/scripts/focus.js';
 import { getAppearNote } from '@/scripts/get-appear-note.js';
+import { useRouter } from '@/router/supplier.js';
 import { miLocalStorage } from '@/local-storage.js';
 import detectLanguage from '@/scripts/detect-language.js';
 
@@ -237,6 +238,8 @@ const emit = defineEmits<{
 	(ev: 'reaction', emoji: string): void;
 	(ev: 'removeReaction', emoji: string): void;
 }>();
+
+const router = useRouter();
 
 const inTimeline = inject<boolean>('inTimeline', false);
 const inChannel = inject('inChannel', null);
@@ -428,6 +431,13 @@ if (!props.mock) {
 				closed: () => dispose(),
 			});
 		});
+	}
+}
+
+function noteClickToOpen(id: string) {
+	const selection = document.getSelection();
+	if (selection?.toString().length === 0) {
+		router.push(`/notes/${id}`);
 	}
 }
 
