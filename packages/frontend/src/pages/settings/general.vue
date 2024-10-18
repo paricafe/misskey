@@ -160,12 +160,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 					</div>
 				</template>
 			</MkRange>
-
-			<MkRadios v-model="cornerRadius">
-				<template #label>{{ i18n.ts.cornerRadius }}</template>
-				<option :value="null"><i class="sk-icons sk-shark sk-icons-lg" style="top: 2px;position: relative;"></i> Sharkey</option>
-				<option value="misskey"><i class="sk-icons sk-misskey sk-icons-lg" style="top: 2px;position: relative;"></i> Misskey</option>
-			</MkRadios>
 		</div>
 	</FormSection>
 
@@ -285,9 +279,8 @@ import { globalEvents } from '@/events.js';
 import { claimAchievement } from '@/scripts/achievements.js';
 
 const lang = ref(miLocalStorage.getItem('lang'));
-const fontSizeNumber = ref(Number(miLocalStorage.getItem('fontSize') || 2));
+const fontSizeNumber = ref(Number(miLocalStorage.getItem('fontSize') || 1));
 const fontSizeNumberOld = ref(fontSizeNumber.value);
-const cornerRadius = ref(miLocalStorage.getItem('cornerRadius'));
 const useSystemFont = ref(miLocalStorage.getItem('useSystemFont') != null);
 const dataSaver = ref(defaultStore.state.dataSaver);
 
@@ -361,14 +354,6 @@ watch(lang, () => {
 	miLocalStorage.removeItem('localeVersion');
 });
 
-watch(cornerRadius, () => {
-	if (cornerRadius.value == null) {
-		miLocalStorage.removeItem('cornerRadius');
-	} else {
-		miLocalStorage.setItem('cornerRadius', cornerRadius.value);
-	}
-});
-
 watch(useSystemFont, () => {
 	if (useSystemFont.value) {
 		miLocalStorage.setItem('useSystemFont', 't');
@@ -380,7 +365,6 @@ watch(useSystemFont, () => {
 watch([
 	hemisphere,
 	lang,
-	cornerRadius,
 	useSystemFont,
 	enableInfiniteScroll,
 	squareAvatars,
