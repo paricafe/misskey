@@ -471,6 +471,7 @@ onUnmounted(() => {
 
 				> .followedMessage {
 					padding: 24px 24px 0 154px;
+					box-shadow: none;
 
 					> .fukidashi {
 						display: block;
