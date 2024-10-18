@@ -503,6 +503,10 @@ export const defaultStore = markRaw(new Storage('base', {
 		where: 'device',
 		default: { type: 'syuilo/bubble1', volume: 1 } as SoundStore,
 	},
+	autoTranslateButton: {
+		where: 'device',
+		default: true,
+	},
 }));
 
 // TODO: 他のタブと永続化されたstateを同期

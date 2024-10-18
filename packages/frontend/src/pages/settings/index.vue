@@ -130,6 +130,11 @@ const menuDef = computed(() => [{
 		text: i18n.ts.plugins,
 		to: '/settings/plugin',
 		active: currentPage.value?.route.name === 'plugin',
+	}, {
+		icon: 'ti ti-light-bulb',
+		text: 'Pari Cafe',
+		to: '/settings/pari',
+		active: currentPage.value?.route.name === 'pari',
 	}],
 }, {
 	title: i18n.ts.otherSettings,
