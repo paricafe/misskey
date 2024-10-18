@@ -5,11 +5,8 @@ SPDX-License-Identifier: AGPL-3.0-only
 
 <template>
 	<div class="_gaps_m">
-		<MkSwitch v-model="autoTranslateButton">
-			<template #label>{{ i18n.ts.autoTranslateButton }}</template>
-		</MkSwitch>
-	
-	</div>
+		<MkSwitch v-model="autoTranslateButton">{{ i18n.ts.autoTranslateButton }}</MkSwitch>
+    </div>
 </template>
 
 <script lang="ts" setup>
@@ -22,7 +19,7 @@ import MkSwitch from '@/components/MkSwitch.vue';
 const autoTranslateButton = computed(defaultStore.makeGetterSetter('autoTranslateButton'));
 
 definePageMetadata(() => ({
-	title: 'Pari Cafe',
+	title: 'Pari Plus',
 	icon: 'ti ti-plus',
 }));
 </script>
