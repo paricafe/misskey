@@ -23,6 +23,6 @@ const autoTranslateButton = computed(defaultStore.makeGetterSetter('autoTranslat
 
 definePageMetadata(() => ({
 	title: 'Pari Cafe',
-	icon: 'ti ti-light-bulb',
+	icon: 'ti ti-plus',
 }));
 </script>

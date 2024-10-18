@@ -128,6 +128,10 @@ const routes: RouteDef[] = [{
 		name: 'plugin',
 		component: page(() => import('@/pages/settings/plugin.vue')),
 	}, {
+		path: '/pari',
+		name: 'pari',
+		component: page(() => import('@/pages/settings/pari.vue')),
+	},{
 		path: '/import-export',
 		name: 'import-export',
 		component: page(() => import('@/pages/settings/import-export.vue')),
