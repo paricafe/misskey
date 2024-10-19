@@ -977,6 +977,16 @@ onMounted(() => {
 	border-color: var(--MI_THEME-accent);
 }
 
+.footerButton {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		position: relative;
+		z-index: 1;
+		margin-top: 0.4em;
+		max-width: 400px;
+}
+
 @container (max-width: 500px) {
 	.root {
 		font-size: 0.9em;
@@ -998,10 +1008,18 @@ onMounted(() => {
 	}
 }
 
+@container (max-width: 400px) {
+	.footerButton {
+		&:not(:last-child) {
+			margin-right: 0.2em;
+		}
+	}
+}
+
 @container (max-width: 350px) {
 	.footerButton {
 		&:not(:last-child) {
-			margin-right: 18px;
+			margin-right: 0.1em;
 		}
 	}
 }
@@ -1018,7 +1036,7 @@ onMounted(() => {
 
 	.footerButton {
 		&:not(:last-child) {
-			margin-right: 12px;
+			margin-right: 0.1em;
 		}
 	}
 }
@@ -1028,14 +1046,4 @@ onMounted(() => {
 	text-align: center;
 	opacity: 0.7;
 }
-
-.footer {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		position: relative;
-		z-index: 1;
-		margin-top: 0.4em;
-		max-width: 400px;
-	}
 </style>
