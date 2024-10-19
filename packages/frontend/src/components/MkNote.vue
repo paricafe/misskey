@@ -45,7 +45,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 		<MkAvatar :class="$style.collapsedRenoteTargetAvatar" :user="appearNote.user" link preview/>
 		<Mfm :text="getNoteSummary(appearNote)" :plain="true" :nowrap="true" :author="appearNote.user" :nyaize="'respect'" :class="$style.collapsedRenoteTargetText" @click="renoteCollapsed = false"/>
 	</div>
-	<article v-else :class="$style.article" @click.stop="defaultStore.state.noteClickToOpen ? noteClickToOpen(appearNote.id) : undefined" @contextmenu.stop="onContextmenu">
+	<article v-else :class="$style.article" @contextmenu.stop="onContextmenu">
 		<div style="display: flex; padding-bottom: 10px;">
 		    <div v-if="appearNote.channel" :class="$style.colorBar" :style="{ background: appearNote.channel.color }"></div>
 		    <MkAvatar :class="$style.avatar" :user="appearNote.user" :link="!mock" :preview="!mock"/>
@@ -54,7 +54,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 			    <MkInstanceTicker v-if="showTicker" :instance="appearNote.user.instance"/>
 		    </div>
 	    </div>
-			<div style="container-type: inline-size;">
+			<div style="container-type: inline-size;" @click.stop="defaultStore.state.noteClickToOpen ? noteClickToOpen(appearNote.id) : undefined">
 				<p v-if="appearNote.cw != null" :class="$style.cw">
 					<Mfm
 						v-if="appearNote.cw != ''"
