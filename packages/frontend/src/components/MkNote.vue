@@ -54,7 +54,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 			    <MkInstanceTicker v-if="showTicker" :instance="appearNote.user.instance"/>
 		    </div>
 	    </div>
-		    <div @click.stop="defaultStore.state.noteClickToOpen ? noteClickToOpen(appearNote.id) : undefined">
+		<div :class="[{ [$style.noteClickToOpen]: defaultStore.state.noteClickToOpen }]" @click.stop="defaultStore.state.noteClickToOpen ? noteClickToOpen(appearNote.id) : undefined">
 			<div style="container-type: inline-size;">
 				<p v-if="appearNote.cw != null" :class="$style.cw">
 					<Mfm
@@ -110,7 +110,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 				</div>
 				<MkA v-if="appearNote.channel && !inChannel" :class="$style.channel" :to="`/channels/${appearNote.channel.id}`"><i class="ti ti-device-tv"></i> {{ appearNote.channel.name }}</MkA>
 			</div>
-		    </div>
 			<MkReactionsViewer v-if="appearNote.reactionAcceptance !== 'likeOnly'" :note="appearNote" :maxNumber="16" @mockUpdateMyReaction="emitUpdReaction">
 				<template #more>
 					<MkA :to="`/notes/${appearNote.id}/reactions`" :class="[$style.reactionOmitted]">{{ i18n.ts.more }}</MkA>
@@ -151,7 +150,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 					<i class="ti ti-dots"></i>
 				</button>
 			</footer>
-		
+		</div>
 	</article>
 </div>
 <div v-else-if="!hardMuted" :class="$style.muted" @click="muted = false">
@@ -1131,5 +1130,10 @@ function emitUpdReaction(emoji: string, delta: number) {
 	margin-left: 8px;
 	opacity: .8;
 	font-size: 95%;
+}
+
+.noteClickToOpen {
+	cursor: pointer;
+	-webkit-tap-highlight-color: transparent;
 }
 </style>
