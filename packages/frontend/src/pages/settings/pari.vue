@@ -9,6 +9,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 		<MkSwitch v-model="autoTranslateButton">{{ i18n.ts.autoTranslateButton }}</MkSwitch>
 		<MkSwitch v-model="showDetailTimeWhenHover">{{ i18n.ts.showDetailTimeWhenHover }}</MkSwitch>
 		<MkSwitch v-model="noteClickToOpen">{{ i18n.ts.noteClickToOpen }}</MkSwitch>
+		<MkSwitch v-model="enableFallbackReactButton">{{ i18n.ts.enableFallbackReactButton }}</MkSwitch>
     </div>
 </template>
 
@@ -22,6 +23,7 @@ import MkSwitch from '@/components/MkSwitch.vue';
 const autoTranslateButton = computed(defaultStore.makeGetterSetter('autoTranslateButton'));
 const showDetailTimeWhenHover = computed(defaultStore.makeGetterSetter('showDetailTimeWhenHover'));
 const noteClickToOpen = computed(defaultStore.makeGetterSetter('noteClickToOpen'));
+const enableFallbackReactButton = computed(defaultStore.makeGetterSetter('enableFallbackReactButton'));
 
 definePageMetadata(() => ({
 	title: 'Pari Plus!',

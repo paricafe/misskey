@@ -133,7 +133,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 				<button v-else :class="$style.footerButton" class="_button" disabled>
 					<i class="ti ti-ban"></i>
 				</button>
-				<button v-if="appearNote.myReaction == null && appearNote.reactionAcceptance !== 'likeOnly'" ref="likeButton" :class="$style.footerButton" class="_button" @click.stop="like()">
+				<button v-if="defaultStore.state.enableFallbackReactButton && appearNote.myReaction == null && appearNote.reactionAcceptance !== 'likeOnly'" ref="likeButton" :class="$style.footerButton" class="_button" @click.stop="like()">
 					<i class="ti ti-heart"></i>
 				</button>
 				<button ref="reactButton" :class="$style.footerButton" class="_button" @click.stop="toggleReact()">
