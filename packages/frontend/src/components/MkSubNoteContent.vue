@@ -5,7 +5,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 
 <template>
 <div :class="[$style.root, { [$style.collapsed]: collapsed }]">
-	<div :class="[{ [$style.noteClickToOpen]: defaultStore.state.noteClickToOpen }]" @click.stop="defaultStore.state.noteClickToOpen ? noteClickToOpen(appearNote.id) : undefined">
+	<div :class="[{ [$style.noteClickToOpen]: defaultStore.state.noteClickToOpen }]" @click.stop="defaultStore.state.noteClickToOpen ? noteClickToOpen(note.id) : undefined">
 		<span v-if="note.isHidden" style="opacity: 0.5">({{ i18n.ts.private }})</span>
 		<span v-if="note.deletedAt" style="opacity: 0.5">({{ i18n.ts.deletedNote }})</span>
 		<MkA v-if="note.replyId" :class="$style.reply" :to="`/notes/${note.replyId}`" @click.stop><i class="ti ti-arrow-back-up"></i></MkA>
