@@ -108,4 +108,9 @@ const collapsed = ref(isLong);
 	border-radius: 999px;
 	box-shadow: 0 2px 6px rgb(0 0 0 / 20%);
 }
+
+.noteClickToOpen {
+	cursor: pointer;
+	-webkit-tap-highlight-color: transparent;
+}
 </style>
