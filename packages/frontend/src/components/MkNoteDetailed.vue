@@ -137,6 +137,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 				</MkA>
 			</div>
 			<MkReactionsViewer v-if="appearNote.reactionAcceptance !== 'likeOnly'" ref="reactionsViewer" :note="appearNote"/>
+			<div :class="$style.footerButton">
 			<button class="_button" :class="$style.noteFooterButton" @click.stop="reply()">
 				<i class="ti ti-arrow-back-up"></i>
 				<p v-if="appearNote.repliesCount > 0" :class="$style.noteFooterButtonCount">{{ number(appearNote.repliesCount) }}</p>
@@ -179,6 +180,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 			<button ref="menuButton" class="_button" :class="$style.noteFooterButton" @mousedown.prevent="showMenu()">
 				<i class="ti ti-dots"></i>
 			</button>
+		    </div>
 		</footer>
 	</article>
 	<div :class="$style.tabs">
@@ -997,7 +999,7 @@ onMounted(() => {
 }
 
 @container (max-width: 350px) {
-	.noteFooterButton {
+	.footerButton {
 		&:not(:last-child) {
 			margin-right: 18px;
 		}
@@ -1014,7 +1016,7 @@ onMounted(() => {
 		height: 50px;
 	}
 
-	.noteFooterButton {
+	.footerButton {
 		&:not(:last-child) {
 			margin-right: 12px;
 		}
@@ -1026,4 +1028,14 @@ onMounted(() => {
 	text-align: center;
 	opacity: 0.7;
 }
+
+.footer {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		position: relative;
+		z-index: 1;
+		margin-top: 0.4em;
+		max-width: 400px;
+	}
 </style>
