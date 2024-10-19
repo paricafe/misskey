@@ -513,7 +513,11 @@ export const defaultStore = markRaw(new Storage('base', {
 	},
 	noteClickToOpen: {
 		where: 'device',
-		default: false,
+		default: true,
+	},
+	enableFallbackReactButton: {
+		where: 'device',
+		default: true,
 	},
 }));
 
