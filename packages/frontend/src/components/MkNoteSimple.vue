@@ -7,13 +7,13 @@ SPDX-License-Identifier: AGPL-3.0-only
 <div :class="$style.root">
 	<MkAvatar :class="$style.avatar" :user="note.user" link preview/>
 	<div :class="$style.main">
-		<MkNoteHeader :class="$style.header" :note="note" :mini="true" @click.stop/>
+		<MkNoteHeader :class="$style.header" :note="note" :mini="true"/>
 		<div>
 			<p v-if="note.cw != null" :class="$style.cw">
 				<Mfm v-if="note.cw != ''" style="margin-right: 8px;" :text="note.cw" :isBlock="true" :author="note.user" :nyaize="'respect'" :emojiUrls="note.emojis" @click.stop/>
-				<MkCwButton v-model="showContent" :text="note.text" :files="note.files" :poll="note.poll" @click.stop="!note.poll" />
+				<MkCwButton v-model="showContent" :text="note.text" :files="note.files" :poll="note.poll" @click.stop />
 			</p>
-			<div v-show="note.cw == null || showContent" @click.stop>
+			<div v-show="note.cw == null || showContent">
 				<MkSubNoteContent :class="$style.text" :note="note"/>
 			</div>
 		</div>

@@ -50,7 +50,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 		    <div v-if="appearNote.channel" :class="$style.colorBar" :style="{ background: appearNote.channel.color }"></div>
 		    <MkAvatar :class="$style.avatar" :user="appearNote.user" :link="!mock" :preview="!mock"/>
 		    <div :class="$style.main">
-			    <MkNoteHeader :note="appearNote" :mini="true"/>
+			    <MkNoteHeader :note="appearNote" :mini="true" @click.stop/>
 			    <MkInstanceTicker v-if="showTicker" :instance="appearNote.user.instance"/>
 		    </div>
 	    </div>
@@ -125,6 +125,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 					ref="renoteButton"
 					:class="$style.footerButton"
 					class="_button"
+					@click.stop
 					@mousedown.prevent="renote()"
 				>
 					<i class="ti ti-repeat"></i>

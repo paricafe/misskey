@@ -20,10 +20,10 @@ SPDX-License-Identifier: AGPL-3.0-only
 		<summary>{{ i18n.ts.poll }}</summary>
 		<MkPoll :noteId="note.id" :poll="note.poll"/>
 	</details>
-	<button v-if="isLong && collapsed" :class="$style.fade" class="_button" @click="collapsed = false">
+	<button v-if="isLong && collapsed" :class="$style.fade" class="_button" @click.stop="collapsed = false">
 		<span :class="$style.fadeLabel">{{ i18n.ts.showMore }}</span>
 	</button>
-	<button v-else-if="isLong && !collapsed" :class="$style.showLess" class="_button" @click="collapsed = true">
+	<button v-else-if="isLong && !collapsed" :class="$style.showLess" class="_button" @click.stop="collapsed = true">
 		<span :class="$style.showLessLabel">{{ i18n.ts.showLess }}</span>
 	</button>
 </div>
