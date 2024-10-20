@@ -14,7 +14,7 @@ import * as swos from '@/scripts/operations.js';
 
 const CACHE_NAME = 'pari-cache-${_VERSION_}';
 const urlsToCache = [
-  '/',
+  //'/',
   '/emoji',
   '/twemoji',
   '/fluent-emoji',
