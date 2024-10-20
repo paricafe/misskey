@@ -54,6 +54,11 @@ export const getBuiltinThemes = () => Promise.all(
 		'd-u0',
 		'p-light',
 		'p-dark',
+		'p-light2',
+		'p-dark2',
+		"shw-light",
+		"shw-light",
+		"stpv-dark"
 	].map(name => import(`@@/themes/${name}.json5`).then(({ default: _default }): Theme => _default)),
 );
 

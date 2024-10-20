@@ -1,5 +1,5 @@
 {
-	id: '43eeb316-8e4f-4e45-91ad-bc794fea3ea4',
+	id: 'stpv-light',
 	base: 'light',
 	name: 'Stellacolor Transparent',
 	props: {
