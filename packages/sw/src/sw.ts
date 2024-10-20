@@ -12,7 +12,7 @@ import { createEmptyNotification, createNotification } from '@/scripts/create-no
 import { swLang } from '@/scripts/lang.js';
 import * as swos from '@/scripts/operations.js';
 
-const CACHE_NAME = 'pari-cache-0';
+const CACHE_NAME = 'pari-cache-${_VERSION_}';
 const urlsToCache = [
   '/',
   '/emoji',
