@@ -89,6 +89,7 @@ const url = computed(() => {
 
 function onClick(ev: MouseEvent): void {
 	if (props.link) return;
+	ev.stopPropagation();
 	emit('click', ev);
 }
 

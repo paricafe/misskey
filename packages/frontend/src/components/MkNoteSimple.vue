@@ -7,13 +7,13 @@ SPDX-License-Identifier: AGPL-3.0-only
 <div :class="$style.root">
 	<MkAvatar :class="$style.avatar" :user="note.user" link preview/>
 	<div :class="$style.main">
-		<MkNoteHeader :class="$style.header" :note="note" :mini="true"/>
+		<MkNoteHeader :class="$style.header" :note="note" :mini="true" @click.stop/>
 		<div>
 			<p v-if="note.cw != null" :class="$style.cw">
-				<Mfm v-if="note.cw != ''" style="margin-right: 8px;" :text="note.cw" :isBlock="true" :author="note.user" :nyaize="'respect'" :emojiUrls="note.emojis" @click.stop="defaultStore.state.clickToOpen ? noteclick(note.id) : undefined"/>
-				<MkCwButton v-model="showContent" :text="note.text" :files="note.files" :poll="note.poll"/>
+				<Mfm v-if="note.cw != ''" style="margin-right: 8px;" :text="note.cw" :isBlock="true" :author="note.user" :nyaize="'respect'" :emojiUrls="note.emojis" @click.stop/>
+				<MkCwButton v-model="showContent" :text="note.text" :files="note.files" :poll="note.poll" @click.stop/>
 			</p>
-			<div v-show="note.cw == null || showContent">
+			<div v-show="note.cw == null || showContent" @click.stop>
 				<MkSubNoteContent :class="$style.text" :note="note"/>
 			</div>
 		</div>
@@ -27,7 +27,6 @@ import * as Misskey from 'misskey-js';
 import MkNoteHeader from '@/components/MkNoteHeader.vue';
 import MkSubNoteContent from '@/components/MkSubNoteContent.vue';
 import MkCwButton from '@/components/MkCwButton.vue';
-import { useRouter } from '@/router/supplier.js';
 
 const props = defineProps<{
 	note: Misskey.entities.Note;
@@ -35,12 +34,6 @@ const props = defineProps<{
 
 const showContent = ref(false);
 
-function noteclick(id: string) {
-	const selection = document.getSelection();
-	if (selection?.toString().length === 0) {
-		useRouter().push(`/notes/${id}`);
-	}
-}
 </script>
 
 <style lang="scss" module>
