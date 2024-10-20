@@ -1,6 +1,6 @@
 {
 	"name": "misskey",
-	"version": "2024.10.1-pari-Eclair",
+	"version": "2024.10.1-pari-Eclair-alpha",
 	"codename": "nasubi",
 	"repository": {
 		"type": "git",
