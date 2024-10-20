@@ -6,8 +6,8 @@
 import { markRaw, ref } from 'vue';
 import * as Misskey from 'misskey-js';
 import { hemisphere } from '@@/js/intl-const.js';
-import lightTheme from '@@/themes/p-light.json5';
-import darkTheme from '@@/themes/p-dark.json5';
+import lightTheme from '@@/themes/p-light2.json5';
+import darkTheme from '@@/themes/p-dark2.json5';
 import { miLocalStorage } from './local-storage.js';
 import type { SoundType } from '@/scripts/sound.js';
 import { Storage } from '@/pizzax.js';
