@@ -8,6 +8,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 	:is="self ? 'MkA' : 'a'" ref="el" :class="$style.root" class="_link" :[attr]="self ? props.url.substring(local.length) : props.url" :rel="rel ?? 'nofollow noopener'" :target="target"
 	:behavior="props.navigationBehavior"
 	@contextmenu.stop="() => {}"
+	@click.stop
 >
 	<template v-if="!self">
 		<span :class="$style.schema">{{ schema }}//</span>
