@@ -14,11 +14,14 @@ import * as swos from '@/scripts/operations.js';
 
 const CACHE_NAME = 'pari-cache-${_VERSION_}';
 const urlsToCache = [
-  //'/',
+  '/manifest.json',
+  '/assets',
   '/emoji',
   '/twemoji',
   '/fluent-emoji',
   '/vite',
+  '/identicon',
+  '/proxy'
 ];
 
 globalThis.addEventListener('install', (event) => {
@@ -44,6 +47,30 @@ globalThis.addEventListener('activate', (event) => {
 });
 
 globalThis.addEventListener('fetch', (event) => {
+  let isHTMLRequest = false;
+  
+  if (event.request.headers.get('sec-fetch-dest') === 'document' ||
+      event.request.headers.get('accept')?.includes('/html') ||
+      event.request.url.endsWith('/')) {
+      isHTMLRequest = true;
+  }
+
+  if (isHTMLRequest) {
+    event.respondWith(
+      fetch(event.request)
+        .catch(async () => {
+          const html = await offlineContentHTML();
+          return new Response(html, {
+            status: 200,
+            headers: {
+              'content-type': 'text/html',
+            },
+          });
+        })
+    );
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request)
       .then((response) => {
@@ -52,7 +79,7 @@ globalThis.addEventListener('fetch', (event) => {
         }
         return fetch(event.request).then(
           (response) => {
-            if(!response || response.status !== 200 || response.type !== 'basic') {
+            if (!response || response.status !== 200 || response.type !== 'basic') {
               return response;
             }
 
@@ -65,7 +92,18 @@ globalThis.addEventListener('fetch', (event) => {
 
             return response;
           }
-        );
+        ).catch(async () => {
+          if (isHTMLRequest) {
+            const html = await offlineContentHTML();
+            return new Response(html, {
+              status: 200,
+              headers: {
+                'content-type': 'text/html',
+              },
+            });
+          }
+          throw new Error('Failed to fetch');
+        });
       })
   );
 });
