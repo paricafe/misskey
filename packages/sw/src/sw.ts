@@ -53,7 +53,7 @@ globalThis.addEventListener('fetch', (event) => {
       event.request.headers.get('accept')?.includes('/html') ||
       event.request.url.endsWith('/')) {
       isHTMLRequest = true;
-  }
+  } //If offlineContentHTML() is not needed anymore, add navigate.
 
   if (isHTMLRequest) {
     event.respondWith(
