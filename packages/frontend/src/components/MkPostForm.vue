@@ -90,7 +90,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 		</div>
 		<div :class="$style.footerRight">
 			<button v-tooltip="i18n.ts.previewNoteText" class="_button" :class="[$style.footerButton, { [$style.previewButtonActive]: showPreview }]" @click="showPreview = !showPreview"><i class="ti ti-eye"></i></button>
-			<button v-tooltip="'MFM Cheatsheet'" class="_button" :class="$style.footerButton" @click="MFMWindow"><i class="ti ti-note"></i></button>
 			<!--<button v-tooltip="i18n.ts.more" class="_button" :class="$style.footerButton" @click="showingOptions = !showingOptions"><i class="ti ti-dots"></i></button>-->
 		</div>
 	</footer>
@@ -106,7 +105,6 @@ import * as mfm from 'mfm-js';
 import * as Misskey from 'misskey-js';
 import insertTextAtCursor from 'insert-text-at-cursor';
 import { toASCII } from 'punycode/';
-import autosize from 'autosize';
 import { host, url } from '@@/js/config.js';
 import MkNoteSimple from '@/components/MkNoteSimple.vue';
 import MkNotePreview from '@/components/MkNotePreview.vue';
@@ -154,7 +152,6 @@ const props = withDefaults(defineProps<{
 	autofocus?: boolean;
 	freezeAfterPosted?: boolean;
 	mock?: boolean;
-	updateMode?: boolean;
 }>(), {
 	initialVisibleUsers: () => [],
 	autofocus: true,
@@ -375,15 +372,6 @@ function watchForDraft() {
 	watch(reactionAcceptance, () => saveDraft());
 }
 
-function MFMWindow() {
-	const { dispose } = os.popup(
-		defineAsyncComponent(() => import('@/components/MkMfmWindow.vue')),
-		{},
-		{
-			closed: () => dispose(),
-		});
-}
-
 function checkMissingMention() {
 	if (visibility.value === 'specified') {
 		const ast = mfm.parse(text.value);
@@ -581,8 +569,6 @@ function clear() {
 	files.value = [];
 	poll.value = null;
 	quoteId.value = null;
-
-	nextTick(() => textareaEl.value && autosize.update(textareaEl.value));
 }
 
 function onKeydown(ev: KeyboardEvent) {
@@ -591,8 +577,6 @@ function onKeydown(ev: KeyboardEvent) {
 	// justEndedComposition.value is for Safari, which keyDown occurs after compositionend.
 	// ev.isComposing is for another browsers.
 	if (ev.key === 'Escape' && !justEndedComposition.value && !ev.isComposing) emit('esc');
-
-	nextTick(() => textareaEl.value && autosize.update(textareaEl.value));
 }
 
 function onKeyup(ev: KeyboardEvent) {
@@ -601,8 +585,6 @@ function onKeyup(ev: KeyboardEvent) {
 
 function onCompositionUpdate(ev: CompositionEvent) {
 	imeText.value = ev.data;
-
-	nextTick(() => textareaEl.value && autosize.update(textareaEl.value));
 }
 
 function onCompositionEnd(ev: CompositionEvent) {
@@ -659,8 +641,6 @@ async function onPaste(ev: ClipboardEvent) {
 			upload(file, `${fileName}.txt`);
 		});
 	}
-	
-	nextTick(() => textareaEl.value && autosize.update(textareaEl.value));
 }
 
 function onDragover(ev) {
@@ -816,7 +796,6 @@ async function post(ev?: MouseEvent) {
 		visibility: visibility.value,
 		visibleUserIds: visibility.value === 'specified' ? visibleUsers.value.map(u => u.id) : undefined,
 		reactionAcceptance: reactionAcceptance.value,
-		noteId: props.updateMode ? props.initialNote?.id : undefined,
 	};
 
 	if (withHashtags.value && hashtags.value && hashtags.value.trim() !== '') {
@@ -853,7 +832,7 @@ async function post(ev?: MouseEvent) {
 	}
 
 	posting.value = true;
-	misskeyApi(props.updateMode ? 'notes/update' : 'notes/create', postData, token).then(() => {
+	misskeyApi('notes/create', postData, token).then(() => {
 		if (props.freezeAfterPosted) {
 			posted.value = true;
 		} else {
@@ -1069,7 +1048,6 @@ onMounted(() => {
 		}
 
 		nextTick(() => watchForDraft());
-		nextTick(() => textareaEl.value && autosize(textareaEl.value));
 	});
 });
 
@@ -1086,7 +1064,6 @@ defineExpose({
 	&.modal {
 		width: 100%;
 		max-width: 520px;
-		overflow-y: auto;
 	}
 }
 
@@ -1361,7 +1338,7 @@ html[data-color-scheme=light] .preview {
 }
 
 .footerRight {
-	flex: 0.3;
+	flex: 0;
 	margin-left: auto;
 	display: grid;
 	grid-auto-flow: row;
