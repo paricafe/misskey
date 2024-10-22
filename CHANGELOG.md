@@ -1,7 +1,8 @@
-## Unreleased
+## 2024.10.2
 
 ### General
 - Feat: コンテンツの表示にログインを必須にできるように
+- Feat: 過去のノートを非公開化/フォロワーのみ表示可能にできるように
 
 ### Client
 - Enhance: Bull DashboardでRelationship Queueの状態も確認できるように  
@@ -14,8 +15,8 @@
 - Fix: デッキのタイムラインカラムで「センシティブなファイルを含むノートを表示」設定が使用できなかった問題を修正
 
 ### Server
--
-
+- Fix: Nested proxy requestsを検出した際にブロックするように
+  [ghsa-gq5q-c77c-v236](https://github.com/misskey-dev/misskey/security/advisories/ghsa-gq5q-c77c-v236)
 
 ## 2024.10.1
 

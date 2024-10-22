@@ -3746,6 +3746,8 @@ export type components = {
       isBot?: boolean;
       isCat?: boolean;
       requireSigninToViewContents?: boolean;
+      makeNotesFollowersOnlyBefore?: number | null;
+      makeNotesHiddenBefore?: number | null;
       instance?: {
         name: string | null;
         softwareName: string | null;
@@ -19864,6 +19866,8 @@ export type operations = {
           noCrawle?: boolean;
           preventAiLearning?: boolean;
           requireSigninToViewContents?: boolean;
+          makeNotesFollowersOnlyBefore?: number | null;
+          makeNotesHiddenBefore?: number | null;
           isBot?: boolean;
           isCat?: boolean;
           injectFeaturedNote?: boolean;
