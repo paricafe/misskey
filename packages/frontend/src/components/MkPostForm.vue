@@ -1361,7 +1361,7 @@ html[data-color-scheme=light] .preview {
 }
 
 .footerRight {
-	flex: 0.3;
+	flex: 0;
 	margin-left: auto;
 	display: grid;
 	grid-auto-flow: row;
