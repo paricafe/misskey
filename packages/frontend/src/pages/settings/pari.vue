@@ -14,8 +14,8 @@ SPDX-License-Identifier: AGPL-3.0-only
 		<MkSelect v-model="autoSpacingBehaviour">
 			<template #label>{{ i18n.ts.autoSpacing }}</template>
 			<option :value="null">{{ i18n.ts.disabled }}</option>
+			<option value="special">Auto</option>
 			<option value="all">{{ i18n.ts.all }}</option>
-			<option value="special">{{ i18n.ts.auto }}</option>
 			<template #caption>{{ i18n.ts.autoSpacingDescription }}</template>
 		</MkSelect>
     </div>
