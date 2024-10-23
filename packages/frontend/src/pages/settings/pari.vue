@@ -10,6 +10,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 		<MkSwitch v-model="showDetailTimeWhenHover">{{ i18n.ts.showDetailTimeWhenHover }}</MkSwitch>
 		<MkSwitch v-model="noteClickToOpen">{{ i18n.ts.noteClickToOpen }}</MkSwitch>
 		<MkSwitch v-model="enableFallbackReactButton">{{ i18n.ts.enableFallbackReactButton }}</MkSwitch>
+		<MkSwitch v-model="enableMFMCheatsheet">{{ i18n.ts.enableMFMCheatsheet }}</MkSwitch>
     </div>
 </template>
 
@@ -24,6 +25,7 @@ const autoTranslateButton = computed(defaultStore.makeGetterSetter('autoTranslat
 const showDetailTimeWhenHover = computed(defaultStore.makeGetterSetter('showDetailTimeWhenHover'));
 const noteClickToOpen = computed(defaultStore.makeGetterSetter('noteClickToOpen'));
 const enableFallbackReactButton = computed(defaultStore.makeGetterSetter('enableFallbackReactButton'));
+const enableMFMCheatsheet = computed(defaultStore.makeGetterSetter('enableMFMCheatsheet'));
 
 definePageMetadata(() => ({
 	title: 'Pari Plus!',

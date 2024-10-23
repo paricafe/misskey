@@ -1288,6 +1288,7 @@ autoTranslateButton: "Display translation function on notes in different languag
 showDetailTimeWhenHover: "Hover the timestamp of the note to expand the detailed time"
 noteClickToOpen: "Click to open note details"
 enableFallbackReactButton: "Enable fallback reaction button"
+enableMFMCheatsheet: "Enable MFM Cheatsheet in post form"
 performance: "Performance"
 modified: "Modified"
 discard: "Discard"
