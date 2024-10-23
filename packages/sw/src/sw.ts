@@ -51,8 +51,7 @@ globalThis.addEventListener('fetch', (event) => {
   
   if (event.request.headers.get('sec-fetch-dest') === 'document' ||
       event.request.headers.get('accept')?.includes('/html') ||
-      event.request.url.endsWith('/') ||
-      event.request.mode === 'navigate') { //navigate may cause offlineContentHTML doesn't work but doesn' matter
+      event.request.url.endsWith('/')) {
       isHTMLRequest = true;
     }
 
