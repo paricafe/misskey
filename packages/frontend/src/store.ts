@@ -527,6 +527,10 @@ export const defaultStore = markRaw(new Storage('base', {
 		where: 'device',
 		default: true,
 	},
+	autoSpacingBehaviour: {
+		where: 'device',
+		default: null as 'all' | 'special' | null,
+	},
 }));
 
 // TODO: 他のタブと永続化されたstateを同期

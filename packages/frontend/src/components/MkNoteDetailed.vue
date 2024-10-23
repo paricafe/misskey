@@ -281,6 +281,7 @@ import { getAppearNote } from '@/scripts/get-appear-note.js';
 import { type Keymap } from '@/scripts/hotkey.js';
 import { miLocalStorage } from '@/local-storage.js';
 import detectLanguage from '@/scripts/detect-language.js';
+import { spacingNote } from '@/scripts/autospacing.js';
 
 const props = withDefaults(defineProps<{
 	note: Misskey.entities.Note;
@@ -322,7 +323,7 @@ const reactButton = shallowRef<HTMLElement>();
 const clipButton = shallowRef<HTMLElement>();
 const likeButton = shallowRef<HTMLElement>();
 const historyMenuButton = shallowRef<HTMLElement>();
-const appearNote = computed(() => getAppearNote(note.value));
+const appearNote = computed(() => spacingNote(getAppearNote(note.value)));
 const galleryEl = shallowRef<InstanceType<typeof MkMediaList>>();
 const isMyRenote = $i && ($i.id === note.value.userId);
 const showContent = ref(false);
