@@ -127,6 +127,11 @@
 		document.documentElement.classList.add('useSystemFont');
 	}
 
+	const defaultFontFace = localStorage.getItem('defaultFontFace');
+	if (defaultFontFace) {
+		document.documentElement.classList.add(`default-font-${defaultFontFace}`);
+	}
+
 	const wallpaper = localStorage.getItem('wallpaper');
 	if (wallpaper) {
 		document.documentElement.style.backgroundImage = `url(${wallpaper})`;

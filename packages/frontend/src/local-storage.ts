@@ -22,6 +22,7 @@ export type Keys =
 	'theme' |
 	'colorScheme' |
 	'useSystemFont' |
+	'defaultFontFace' |
 	'fontSize' |
 	'ui' |
 	'ui_temp' |

@@ -113,6 +113,18 @@ html {
 	}
 }
 
+@import "./styles-font/usual.scss";
+@import "./styles-font/maokentangyuan.scss";
+@import "./styles-font/chillroundgothic.scss";
+@import "./styles-font/clearsans.scss";
+@import "./styles-font/lgtw-wenkai.scss";
+@import "./styles-font/lgtw-marker-gothic.scss";
+@import "./styles-font/genryomin2.scss";
+@import "./styles-font/genwanmin2.scss";
+@import "./styles-font/jinghualaosong.scss";
+@import "./styles-font/fusion-pixel.scss";
+@import "./styles-font/zhuanti.scss";
+
 html._themeChanging_ {
 	&, * {
 		transition: background 1s ease, border 1s ease !important;
