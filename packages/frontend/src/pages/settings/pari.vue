@@ -4,6 +4,9 @@ SPDX-License-Identifier: AGPL-3.0-only
 -->
 
 <template>
+	<MkInfo>
+		{{ i18n.ts.pariPlusInfo }}
+	</MkInfo>
 	<FormSection>
 		<div class="label">{{ i18n.ts.pariPlusAppearanceSettings }}</div>
 		<div class="_gaps_m">
@@ -64,6 +67,8 @@ import { getDefaultFontSettings } from '@/scripts/font-settings.js';
 import MkSwitch from '@/components/MkSwitch.vue';
 import MkSelect from '@/components/MkSelect.vue';
 import MkRadios from '@/components/MkRadios.vue';
+import MkInfo from '@/components/MkInfo.vue';
+import FormSection from '@/components/form/section.vue';
 
 const defaultFont = getDefaultFontSettings();
 console.log(defaultFont);
