@@ -117,7 +117,7 @@
 	}
 	//#endregion
 
-	const fontSize = localStorage.getItem('fontSize') || 2;
+	const fontSize = localStorage.getItem('fontSize') || 1;
 	if (fontSize) {
 		document.documentElement.classList.add('f-' + fontSize);
 	}
