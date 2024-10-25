@@ -12,19 +12,40 @@ import { createEmptyNotification, createNotification } from '@/scripts/create-no
 import { swLang } from '@/scripts/lang.js';
 import * as swos from '@/scripts/operations.js';
 
-globalThis.addEventListener('install', () => {
-	// ev.waitUntil(globalThis.skipWaiting());
-});
+const CACHE_NAME = `pari-cache-${_VERSION_}`;
+const urlsToCache = [
+  '/manifest.json',
+  '/assets',
+  '/emoji',
+  '/twemoji',
+  '/fluent-emoji',
+  '/vite',
+  '/identicon',
+  '/proxy'
+];
 
+globalThis.addEventListener('install', async (event) => {
+	event.waitUntil(
+	  caches.keys().then(cacheNames => {
+		return Promise.all(
+		  cacheNames
+			.filter(name => name.startsWith('pari-cache-'))
+			.map(name => caches.delete(name))
+		);
+	  })
+	);
+	await globalThis.skipWaiting();
+});
+  
 globalThis.addEventListener('activate', ev => {
 	ev.waitUntil(
-		caches.keys()
-			.then(cacheNames => Promise.all(
-				cacheNames
-					.filter((v) => v !== swLang.cacheName)
-					.map(name => caches.delete(name)),
-			))
-			.then(() => globalThis.clients.claim()),
+	  caches.keys()
+		.then(cacheNames => Promise.all(
+		  cacheNames
+			.filter(name => name.startsWith('pari-cache-') || urlsToCache.some(url => name.includes(url)))
+			.map(name => caches.delete(name))
+		))
+		.then(() => globalThis.clients.claim())
 	);
 });
 
