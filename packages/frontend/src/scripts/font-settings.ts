@@ -54,7 +54,7 @@ function getFontId(name: string, option: string) {
 
 export function getDefaultFontSettings() {
 	const def_arr = miLocalStorage.getItem('defaultFontFace')?.split('_');
-	const fontFace = ref(def_arr?.[0] ?? 'maokentangyuan');
+	const fontFace = ref(def_arr?.[0] ?? 'system-ui');
 	const fontFaceType = ref(def_arr?.[1] ?? '');
 	const availableTypes = computed(() => getFontOptionsList(fontFace.value));
 

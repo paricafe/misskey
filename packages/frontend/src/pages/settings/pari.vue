@@ -4,52 +4,54 @@ SPDX-License-Identifier: AGPL-3.0-only
 -->
 
 <template>
-	<div class="_gaps_m">
+	<FormSection>
 		<div class="label">{{ i18n.ts.pariPlusAppearanceSettings }}</div>
-		<div class="_gaps_s">
-			<MkSelect v-model="defaultFont.fontFace">
-				<template #label>Font face</template>
-				<template #caption>
-					Default font
-				</template>
-				<option
-					v-for="item in defaultFont.fontList"
-					:key="item.id"
-					:value="item.id"
-				>
-					{{ item.name }}
-				</option>
+		<div class="_gaps_m">
+			<div class="_gaps_s">
+				<MkSelect v-model="defaultFont.fontFace">
+					<template #label>{{ i18n.ts.pariPlusFontPicker }}</template>
+					<template #caption>
+						Testing feature, may cause slow loading.
+					</template>
+					<option
+						v-for="item in defaultFont.fontList"
+						:key="item.id"
+						:value="item.id"
+					>
+						{{ item.name }}
+					</option>
+				</MkSelect>
+				<MkRadios v-if="defaultFont.availableTypes.length > 0" v-model="defaultFont.fontFaceType">
+					<template #label>{{ i18n.ts.appearance }}</template>
+					<option
+						v-for="item in defaultFont.availableTypes"
+						:key="item.id"
+						:value="item.id"
+					>
+						{{ item.name }}
+					</option>
+				</MkRadios>
+			</div>
+		</div>
+	</FormSection>
+
+	<FormSection>
+		<div class="_gaps_m">
+			<div class="label">{{ i18n.ts.pariPlusNoteSettings }}</div>
+			<MkSwitch v-model="autoTranslateButton">{{ i18n.ts.autoTranslateButton }}</MkSwitch>
+			<MkSwitch v-model="showDetailTimeWhenHover">{{ i18n.ts.showDetailTimeWhenHover }}</MkSwitch>
+			<MkSwitch v-model="noteClickToOpen">{{ i18n.ts.noteClickToOpen }}</MkSwitch>
+			<MkSwitch v-model="enableFallbackReactButton">{{ i18n.ts.enableFallbackReactButton }}</MkSwitch>
+			<MkSwitch v-model="enableMFMCheatsheet">{{ i18n.ts.enableMFMCheatsheet }}</MkSwitch>
+			<MkSelect v-model="autoSpacingBehaviour">
+				<template #label>{{ i18n.ts.autoSpacing }}</template>
+				<option :value="null">{{ i18n.ts.disabled }}</option>
+				<option value="special">Auto</option>
+				<option value="all">{{ i18n.ts.all }}</option>
+				<template #caption>{{ i18n.ts.autoSpacingDescription }}</template>
 			</MkSelect>
-			<MkRadios v-if="defaultFont.availableTypes.length > 0" v-model="defaultFont.fontFaceType">
-				<template #label>Testing feature, may cause slow loading.</template>
-				<template #caption>
-					Properties
-				</template>
-				<option
-					v-for="item in defaultFont.availableTypes"
-					:key="item.id"
-					:value="item.id"
-				>
-					{{ item.name }}
-				</option>
-			</MkRadios>
-        </div>
-    </div>
-	<div class="_gaps_m">
-		<div class="label">{{ i18n.ts.pariPlusNoteSettings }}</div>
-		<MkSwitch v-model="autoTranslateButton">{{ i18n.ts.autoTranslateButton }}</MkSwitch>
-		<MkSwitch v-model="showDetailTimeWhenHover">{{ i18n.ts.showDetailTimeWhenHover }}</MkSwitch>
-		<MkSwitch v-model="noteClickToOpen">{{ i18n.ts.noteClickToOpen }}</MkSwitch>
-		<MkSwitch v-model="enableFallbackReactButton">{{ i18n.ts.enableFallbackReactButton }}</MkSwitch>
-		<MkSwitch v-model="enableMFMCheatsheet">{{ i18n.ts.enableMFMCheatsheet }}</MkSwitch>
-		<MkSelect v-model="autoSpacingBehaviour">
-			<template #label>{{ i18n.ts.autoSpacing }}</template>
-			<option :value="null">{{ i18n.ts.disabled }}</option>
-			<option value="special">Auto</option>
-			<option value="all">{{ i18n.ts.all }}</option>
-			<template #caption>{{ i18n.ts.autoSpacingDescription }}</template>
-		</MkSelect>
-    </div>
+		</div>
+	</FormSection>
 </template>
 
 <script lang="ts" setup>
