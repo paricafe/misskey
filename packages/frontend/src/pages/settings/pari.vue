@@ -87,6 +87,18 @@ import FormSection from '@/components/form/section.vue';
 const defaultFont = getDefaultFontSettings();
 console.log(defaultFont);
 
+const fontSizeNumber = ref(Number(miLocalStorage.getItem('fontSize') || 1));
+const fontSizeNumberOld = ref(fontSizeNumber.value);
+
+const fontSizePx = computed(() => fontSizeNumber.value + 14);
+
+function saveFontSize() {
+	miLocalStorage.setItem('fontSize', fontSizeNumber.value.toString());
+	window.document.documentElement.classList.remove('f-' + fontSizeNumberOld.value);
+	window.document.documentElement.classList.add('f-' + fontSizeNumber.value);
+	fontSizeNumberOld.value = fontSizeNumber.value;
+}
+
 const autoTranslateButton = computed(defaultStore.makeGetterSetter('autoTranslateButton'));
 const showDetailTimeWhenHover = computed(defaultStore.makeGetterSetter('showDetailTimeWhenHover'));
 const noteClickToOpen = computed(defaultStore.makeGetterSetter('noteClickToOpen'));

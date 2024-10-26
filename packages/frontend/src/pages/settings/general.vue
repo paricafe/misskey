@@ -267,19 +267,8 @@ import { globalEvents } from '@/events.js';
 import { claimAchievement } from '@/scripts/achievements.js';
 
 const lang = ref(miLocalStorage.getItem('lang'));
-const fontSizeNumber = ref(Number(miLocalStorage.getItem('fontSize') || 1));
-const fontSizeNumberOld = ref(fontSizeNumber.value);
 const useSystemFont = ref(miLocalStorage.getItem('useSystemFont') != null);
 const dataSaver = ref(defaultStore.state.dataSaver);
-
-const fontSizePx = computed(() => fontSizeNumber.value + 14);
-
-function saveFontSize() {
-	miLocalStorage.setItem('fontSize', fontSizeNumber.value.toString());
-	window.document.documentElement.classList.remove('f-' + fontSizeNumberOld.value);
-	window.document.documentElement.classList.add('f-' + fontSizeNumber.value);
-	fontSizeNumberOld.value = fontSizeNumber.value;
-}
 
 async function reloadAsk() {
 	const { canceled } = await os.confirm({
