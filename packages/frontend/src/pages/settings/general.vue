@@ -148,20 +148,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 				</MkRadios>
 				<div style="margin: 8px 0 0 0; font-size: 1.5em;"><Mfm :key="emojiStyle" text="🍮🍦🍭🍩🍰🍫🍬🥞🍪"/></div>
 			</div>
-
-			<MkRange v-model="fontSizeNumber" :min="0" :max="10" :step="1" continuousUpdate>
-				<template #label>{{ i18n.ts.fontSize }}</template>
-				<template #caption>
-					<div :style="`font-size: ${fontSizePx}px;`">
-						<span>
-							A quick brown fox jumps over the lazy dog<br>
-							一只敏捷的棕色狐狸跳过那只懒狗<br>
-							機敏な茶色のキツネが怠惰な犬を飛び越える<br>
-						</span>
-						<MkButton v-if="fontSizeNumber !== fontSizeNumberOld" @click.stop="saveFontSize">{{ i18n.ts.save }}</MkButton>
-					</div>
-				</template>
-			</MkRange>
 		</div>
 	</FormSection>
 
