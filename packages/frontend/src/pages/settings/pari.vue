@@ -82,6 +82,7 @@ import MkSelect from '@/components/MkSelect.vue';
 import MkRadios from '@/components/MkRadios.vue';
 import MkInfo from '@/components/MkInfo.vue';
 import MkRange from '@/components/MkRange.vue';
+import MkButton from '@/components/MkButton.vue';
 import FormSection from '@/components/form/section.vue';
 
 const defaultFont = getDefaultFontSettings();
