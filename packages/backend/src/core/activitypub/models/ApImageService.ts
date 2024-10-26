@@ -4,6 +4,7 @@
  */
 
 import { Inject, Injectable } from '@nestjs/common';
+import { UnrecoverableError } from 'bullmq';
 import { DI } from '@/di-symbols.js';
 import type { DriveFilesRepository, MiMeta } from '@/models/_.js';
 import type { MiRemoteUser } from '@/models/User.js';
@@ -43,7 +44,7 @@ export class ApImageService {
 	public async createImage(actor: MiRemoteUser, value: string | IObject): Promise<MiDriveFile | null> {
 		// 投稿者が凍結されていたらスキップ
 		if (actor.isSuspended) {
-			throw new Error('actor has been suspended');
+			throw new UnrecoverableError(`actor has been suspended: ${actor.uri}`);
 		}
 
 		const image = await this.apResolverService.createResolver().resolve(value);
