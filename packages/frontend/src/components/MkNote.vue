@@ -14,7 +14,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 >
     <div v-if="appearNote.reply && inReplyToCollapsed" :class="$style.collapsedInReplyTo">
 		<MkAvatar :class="$style.collapsedInReplyToAvatar" :user="appearNote.reply.user" link preview/>
-		<Mfm :text="getNoteSummary(appearNote.reply)" :stpvInline="true" :nowrap="true" :author="appearNote.reply.user" :nyaize="'respect'" :class="$style.collapsedInReplyToText" @click="inReplyToCollapsed = false"/>
+		<Mfm :text="getNoteSummary(appearNote.reply)" :plain="true" :nowrap="true" :author="appearNote.reply.user" :nyaize="'respect'" :class="$style.collapsedInReplyToText" @click="inReplyToCollapsed = false"/>
 	</div>
 	<MkNoteSub v-if="appearNote.reply && !renoteCollapsed && !inReplyToCollapsed" :note="appearNote.reply" :class="$style.replyTo"/>
 	<div v-if="pinned" :class="$style.tip"><i class="ti ti-pin"></i> {{ i18n.ts.pinnedNote }}</div>
@@ -866,7 +866,6 @@ function emitUpdReaction(emoji: string, delta: number) {
 	text-overflow: ellipsis;
 	white-space: nowrap;
 	font-size: 90%;
-	opacity: 0.7;
 	cursor: pointer;
 
 	&:hover {
@@ -876,7 +875,7 @@ function emitUpdReaction(emoji: string, delta: number) {
 
 .article {
 	position: relative;
-	//display: flex;
+	display: flex;
 	padding: 28px 32px;
 }
 
