@@ -8,8 +8,8 @@ SPDX-License-Identifier: AGPL-3.0-only
 	ref="buttonEl"
 	v-ripple="canToggle"
 	class="_button"
-	:class="[$style.root, { [$style.reacted]: isReacted, [$style.canToggle]: canToggle, [$style.small]: defaultStore.state.reactionsDisplaySize === 'small', [$style.large]: defaultStore.state.reactionsDisplaySize === 'large' }]"
-	@click.stop="toggleReaction()"  
+	:class="[$style.root, { [$style.reacted]: note.myReaction == reaction, [$style.canToggle]: canToggle, [$style.small]: defaultStore.state.reactionsDisplaySize === 'small', [$style.large]: defaultStore.state.reactionsDisplaySize === 'large' }]"
+	@click.stop="toggleReaction()"
 	@contextmenu.prevent.stop="menu"
 >
 	<MkReactionIcon :class="defaultStore.state.limitWidthOfReaction ? $style.limitWidth : ''" :reaction="reaction" :emojiUrl="note.reactionEmojis[reaction.substring(1, reaction.length - 1)]"/>
@@ -18,7 +18,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 </template>
 
 <script lang="ts" setup>
-import { computed, inject, onMounted, onBeforeMount, shallowRef, watch } from 'vue';
+import { computed, inject, onMounted, shallowRef, watch } from 'vue';
 import * as Misskey from 'misskey-js';
 import { getUnicodeEmoji } from '@@/js/emojilist.js';
 import MkCustomEmojiDetailedDialog from './MkCustomEmojiDetailedDialog.vue';
@@ -33,32 +33,8 @@ import { claimAchievement } from '@/scripts/achievements.js';
 import { defaultStore } from '@/store.js';
 import { i18n } from '@/i18n.js';
 import * as sound from '@/scripts/sound.js';
+import { checkReactionPermissions } from '@/scripts/check-reaction-permissions.js';
 import { customEmojisMap } from '@/custom-emojis.js';
-
-const localEmojiSet = new Set(Array.from(customEmojisMap.keys()));
-const reactionCache = new Map<string, { hasNative: boolean; base: string }>();
-
-function getReactionInfo(reaction: string) {
-  if (reactionCache.has(reaction)) {
-    return reactionCache.get(reaction)!;
-  }
-
-  let hasNative: boolean;
-  let base: string;
-
-  if (!reaction.includes(':')) {
-    hasNative = true;
-    base = reaction;
-  } else {
-    const baseName = reaction.split('@')[0].split(':')[1];
-    hasNative = localEmojiSet.has(baseName);
-    base = hasNative ? `:${baseName}:` : reaction;
-  }
-
-  const info = { hasNative, base };
-  reactionCache.set(reaction, info);
-  return info;
-}
 
 const props = defineProps<{
 	reaction: string;
@@ -78,31 +54,25 @@ const buttonEl = shallowRef<HTMLElement>();
 const emojiName = computed(() => props.reaction.replace(/:/g, '').replace(/@\./, ''));
 const emoji = computed(() => customEmojisMap.get(emojiName.value) ?? getUnicodeEmoji(props.reaction));
 
-const reactionInfo = computed(() => getReactionInfo(props.reaction));
-const hasNativeEmoji = computed(() => reactionInfo.value.hasNative);
-const baseReaction = computed(() => reactionInfo.value.base);
-
-const canToggle = computed(() => $i != null && hasNativeEmoji.value);
-
-const isReacted = computed(() => {
-  if (!props.note.myReaction) return false;
-  const myInfo = getReactionInfo(props.note.myReaction);
-  return myInfo.base === reactionInfo.value.base;
+const canToggle = computed(() => {
+	return !props.reaction.match(/@\w/) && $i && emoji.value && checkReactionPermissions($i, props.note, emoji.value);
 });
-
-let lastCount = props.count;
+const canGetInfo = computed(() => !props.reaction.match(/@\w/) && props.reaction.includes(':'));
 
 async function toggleReaction() {
 	if (!canToggle.value) return;
-	
+
 	const oldReaction = props.note.myReaction;
-	
-	if (isReacted.value) {
+	if (oldReaction) {
 		const confirm = await os.confirm({
 			type: 'warning',
-			text: i18n.ts.cancelReactionConfirm,
+			text: oldReaction !== props.reaction ? i18n.ts.changeReactionConfirm : i18n.ts.cancelReactionConfirm,
 		});
 		if (confirm.canceled) return;
+
+		if (oldReaction !== props.reaction) {
+			sound.playMisskeySfx('reaction');
+		}
 
 		if (mock) {
 			emit('reactionToggled', props.reaction, (props.count - 1));
@@ -111,17 +81,15 @@ async function toggleReaction() {
 
 		misskeyApi('notes/reactions/delete', {
 			noteId: props.note.id,
+		}).then(() => {
+			if (oldReaction !== props.reaction) {
+				misskeyApi('notes/reactions/create', {
+					noteId: props.note.id,
+					reaction: props.reaction,
+				});
+			}
 		});
-		return;
-	}
-
-	if (oldReaction) {
-		const confirm = await os.confirm({
-			type: 'warning',
-			text: i18n.ts.changeReactionConfirm,
-		});
-		if (confirm.canceled) return;
-
+	} else {
 		sound.playMisskeySfx('reaction');
 
 		if (mock) {
@@ -129,30 +97,18 @@ async function toggleReaction() {
 			return;
 		}
 
-		await misskeyApi('notes/reactions/delete', {
+		misskeyApi('notes/reactions/create', {
 			noteId: props.note.id,
+			reaction: props.reaction,
 		});
-	}
-
-	sound.playMisskeySfx('reaction');
-
-	if (mock) {
-		emit('reactionToggled', props.reaction, (props.count + 1));
-		return;
-	}
-
-	misskeyApi('notes/reactions/create', {
-		noteId: props.note.id,
-		reaction: baseReaction.value,
-	});
-	
-	if (props.note.text && props.note.text.length > 100 && (Date.now() - new Date(props.note.createdAt).getTime() < 1000 * 3)) {
-		claimAchievement('reactWithoutRead');
+		if (props.note.text && props.note.text.length > 100 && (Date.now() - new Date(props.note.createdAt).getTime() < 1000 * 3)) {
+			claimAchievement('reactWithoutRead');
+		}
 	}
 }
 
 async function menu(ev) {
-	if (!props.reaction.includes(':')) return;
+	if (!canGetInfo.value) return;
 
 	os.popupMenu([{
 		text: i18n.ts.info,
@@ -181,54 +137,28 @@ function anime() {
 }
 
 watch(() => props.count, (newCount, oldCount) => {
-	if (oldCount < newCount && !props.isInitial) anime();
-	lastCount = newCount;
-}, { immediate: true });
+	if (oldCount < newCount) anime();
+});
 
-onBeforeMount(() => {
-  getReactionInfo(props.reaction);
-  if (props.note.myReaction) {
-    getReactionInfo(props.note.myReaction);
-  }
-  Object.keys(props.note.reactions).forEach(reaction => {
-    getReactionInfo(reaction);
-  });
+onMounted(() => {
+	if (!props.isInitial) anime();
 });
 
 if (!mock) {
 	useTooltip(buttonEl, async (showing) => {
-    const allVariants = new Set([props.reaction]);
-    
-    if (reactionInfo.value.hasNative) {
-      allVariants.add(reactionInfo.value.base);
-      
-      Object.keys(props.note.reactions).forEach(reaction => {
-        const info = getReactionInfo(reaction);
-        if (info.hasNative && info.base === reactionInfo.value.base) {
-          allVariants.add(reaction);
-        }
-      });
-    }
+		const reactions = await misskeyApiGet('notes/reactions', {
+			noteId: props.note.id,
+			type: props.reaction,
+			limit: 10,
+			_cacheKey_: props.count,
+		});
 
-    const reactionPromises = Array.from(allVariants).map(variant =>
-      misskeyApiGet('notes/reactions', {
-        noteId: props.note.id,
-        type: variant,
-        limit: 10,
-        _cacheKey_: props.count,
-      })
-    );
-
-    const allReactions = await Promise.all(reactionPromises);
-    
-    const allUsers = [...new Map(
-      allReactions.flat().map(x => [x.user.id, x.user])
-    ).values()];
+		const users = reactions.map(x => x.user);
 
 		const { dispose } = os.popup(XDetails, {
 			showing,
 			reaction: props.reaction,
-			users: allUsers,
+			users,
 			count: props.count,
 			targetElement: buttonEl.value,
 		}, {

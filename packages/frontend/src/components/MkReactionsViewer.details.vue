@@ -30,7 +30,7 @@ import MkReactionIcon from '@/components/MkReactionIcon.vue';
 defineProps<{
 	showing: boolean;
 	reaction: string;
-	users: any[];
+	users: any[]; // TODO
 	count: number;
 	targetElement: HTMLElement;
 }>();
