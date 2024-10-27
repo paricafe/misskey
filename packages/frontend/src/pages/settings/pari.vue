@@ -59,6 +59,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 			<MkSwitch v-model="noteClickToOpen">{{ i18n.ts.noteClickToOpen }}</MkSwitch>
 			<MkSwitch v-model="enableFallbackReactButton">{{ i18n.ts.enableFallbackReactButton }}</MkSwitch>
 			<MkSwitch v-model="enableMFMCheatsheet">{{ i18n.ts.enableMFMCheatsheet }}</MkSwitch>
+			<MkSwitch v-model="collapseNotesRepliedTo">{{ i18n.ts.collapseNotesRepliedTo }}</MkSwitch>
 			<MkSelect v-model="autoSpacingBehaviour">
 				<template #label>{{ i18n.ts.autoSpacing }}</template>
 				<option :value="null">{{ i18n.ts.disabled }}</option>
@@ -106,6 +107,7 @@ const noteClickToOpen = computed(defaultStore.makeGetterSetter('noteClickToOpen'
 const enableFallbackReactButton = computed(defaultStore.makeGetterSetter('enableFallbackReactButton'));
 const enableMFMCheatsheet = computed(defaultStore.makeGetterSetter('enableMFMCheatsheet'));
 const autoSpacingBehaviour = computed(defaultStore.makeGetterSetter('autoSpacingBehaviour'));
+const collapseNotesRepliedTo = computed(defaultStore.makeGetterSetter('collapseNotesRepliedTo'));
 
 definePageMetadata(() => ({
 	title: 'Pari Plus!',

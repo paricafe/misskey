@@ -12,7 +12,11 @@ SPDX-License-Identifier: AGPL-3.0-only
 	:class="[$style.root, { [$style.showActionsOnlyHover]: defaultStore.state.showNoteActionsOnlyHover, [$style.skipRender]: defaultStore.state.skipNoteRender }]"
 	:tabindex="isDeleted ? '-1' : '0'"
 >
-	<MkNoteSub v-if="appearNote.reply && !renoteCollapsed" :note="appearNote.reply" :class="$style.replyTo"/>
+    <div v-if="appearNote.reply && inReplyToCollapsed" :class="$style.collapsedInReplyTo">
+		<MkAvatar :class="$style.collapsedInReplyToAvatar" :user="appearNote.reply.user" link preview/>
+		<Mfm :text="getNoteSummary(appearNote.reply)" :stpvInline="true" :nowrap="true" :author="appearNote.reply.user" :nyaize="'respect'" :class="$style.collapsedInReplyToText" @click="inReplyToCollapsed = false"/>
+	</div>
+	<MkNoteSub v-if="appearNote.reply && !renoteCollapsed && !inReplyToCollapsed" :note="appearNote.reply" :class="$style.replyTo"/>
 	<div v-if="pinned" :class="$style.tip"><i class="ti ti-pin"></i> {{ i18n.ts.pinnedNote }}</div>
 	<!--<div v-if="appearNote._prId_" class="tip"><i class="ti ti-speakerphone"></i> {{ i18n.ts.promotion }}<button class="_textButton hide" @click="readPromo()">{{ i18n.ts.hideThisNote }} <i class="ti ti-x"></i></button></div>-->
 	<!--<div v-if="appearNote._featuredId_" class="tip"><i class="ti ti-bolt"></i> {{ i18n.ts.featured }}</div>-->
@@ -43,7 +47,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 	</div>
 	<div v-if="renoteCollapsed" :class="$style.collapsedRenoteTarget">
 		<MkAvatar :class="$style.collapsedRenoteTargetAvatar" :user="appearNote.user" link preview/>
-		<Mfm :text="getNoteSummary(appearNote)" :plain="true" :nowrap="true" :author="appearNote.user" :nyaize="'respect'" :class="$style.collapsedRenoteTargetText" @click="renoteCollapsed = false"/>
+		<Mfm :text="getNoteSummary(appearNote)" :plain="true" :nowrap="true" :author="appearNote.user" :nyaize="'respect'" :class="$style.collapsedRenoteTargetText" @click="renoteCollapsed = false; inReplyToCollapsed = false"/>
 	</div>
 	<article v-else :class="$style.article" @contextmenu.stop="onContextmenu">
 		<div style="display: flex; padding-bottom: 10px;">
@@ -300,6 +304,8 @@ const renoteCollapsed = ref(
 		(appearNote.value.myReaction != null)
 	),
 );
+
+const inReplyToCollapsed = ref(defaultStore.state.collapseNotesRepliedTo);
 
 const pleaseLoginContext = computed<OpenOnRemoteOptions>(() => ({
 	type: 'lookup',
@@ -829,7 +835,7 @@ function emitUpdReaction(emoji: string, delta: number) {
 	margin-right: 4px;
 }
 
-.collapsedRenoteTarget {
+.collapsedRenoteTarget, .collapsedInReplyTo {
 	display: flex;
 	align-items: center;
 	line-height: 28px;
@@ -837,7 +843,12 @@ function emitUpdReaction(emoji: string, delta: number) {
 	padding: 0 32px 18px;
 }
 
-.collapsedRenoteTargetAvatar {
+.collapsedInReplyTo {
+	padding: 28px 32px 0;
+	opacity: 0.7;
+}
+
+.collapsedRenoteTargetAvatar, .collapsedInReplyToAvatar {
 	flex-shrink: 0;
 	display: inline-block;
 	width: 28px;
@@ -846,6 +857,10 @@ function emitUpdReaction(emoji: string, delta: number) {
 }
 
 .collapsedRenoteTargetText {
+	opacity: 0.7;
+}
+
+.collapsedRenoteTargetText, .collapsedInReplyToText {
 	overflow: hidden;
 	flex-shrink: 1;
 	text-overflow: ellipsis;
@@ -1058,6 +1073,10 @@ function emitUpdReaction(emoji: string, delta: number) {
 	.collapsedRenoteTarget {
 		padding: 0 16px 9px;
 		margin-top: 4px;
+	}
+
+	.collapsedInReplyTo {
+		padding: 14px 16px 0;
 	}
 
 	.article {
