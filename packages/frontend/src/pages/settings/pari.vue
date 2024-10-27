@@ -60,6 +60,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 			<MkSwitch v-model="enableFallbackReactButton">{{ i18n.ts.enableFallbackReactButton }}</MkSwitch>
 			<MkSwitch v-model="enableMFMCheatsheet">{{ i18n.ts.enableMFMCheatsheet }}</MkSwitch>
 			<MkSwitch v-model="collapseNotesRepliedTo">{{ i18n.ts.collapseNotesRepliedTo }}</MkSwitch>
+			<MkSwitch v-model="disableReactionsViewer">{{ i18n.ts.disableReactionsViewer }}</MkSwitch>
 			<MkSelect v-model="autoSpacingBehaviour">
 				<template #label>{{ i18n.ts.autoSpacing }}</template>
 				<option :value="null">{{ i18n.ts.disabled }}</option>
@@ -108,6 +109,7 @@ const enableFallbackReactButton = computed(defaultStore.makeGetterSetter('enable
 const enableMFMCheatsheet = computed(defaultStore.makeGetterSetter('enableMFMCheatsheet'));
 const autoSpacingBehaviour = computed(defaultStore.makeGetterSetter('autoSpacingBehaviour'));
 const collapseNotesRepliedTo = computed(defaultStore.makeGetterSetter('collapseNotesRepliedTo'));
+const disableReactionsViewer = computed(defaultStore.makeGetterSetter('disableReactionsViewer'));
 
 definePageMetadata(() => ({
 	title: 'Pari Plus!',
