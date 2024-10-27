@@ -876,7 +876,7 @@ function emitUpdReaction(emoji: string, delta: number) {
 
 .article {
 	position: relative;
-	display: flex;
+	//display: flex;
 	padding: 28px 32px;
 }
 
