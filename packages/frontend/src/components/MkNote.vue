@@ -866,6 +866,7 @@ function emitUpdReaction(emoji: string, delta: number) {
 	text-overflow: ellipsis;
 	white-space: nowrap;
 	font-size: 90%;
+	opacity: 0.7;
 	cursor: pointer;
 
 	&:hover {
