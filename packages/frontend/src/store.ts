@@ -509,7 +509,7 @@ export const defaultStore = markRaw(new Storage('base', {
 	},
 	autoTranslateButton: {
 		where: 'device',
-		default: true,
+		default: false,
 	},
 	showDetailTimeWhenHover: {
 		where: 'device',
