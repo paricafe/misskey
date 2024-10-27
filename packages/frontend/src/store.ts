@@ -392,7 +392,7 @@ export const defaultStore = markRaw(new Storage('base', {
 	},
 	notificationPosition: {
 		where: 'device',
-		default: 'rightBottom' as 'leftTop' | 'leftBottom' | 'rightTop' | 'rightBottom',
+		default: 'rightBottom' as 'leftTop' | 'leftBottom' | 'rightTop' | 'rightBottom' | null,
 	},
 	notificationStackAxis: {
 		where: 'device',

@@ -100,6 +100,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 				<option value="rightTop"><i class="ti ti-align-box-right-top"></i> {{ i18n.ts.rightTop }}</option>
 				<option value="leftBottom"><i class="ti ti-align-box-left-bottom"></i> {{ i18n.ts.leftBottom }}</option>
 				<option value="rightBottom"><i class="ti ti-align-box-right-bottom"></i> {{ i18n.ts.rightBottom }}</option>
+				<option value=""><i class="ti ti-close"></i> {{ i18n.ts.close }}</option>
 			</MkRadios>
 
 			<MkRadios v-model="notificationStackAxis">
