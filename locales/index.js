@@ -85,6 +85,7 @@ export function build() {
                 default:
                     return merge(
                         locales['en-US'],
+                        locales['ja-JP'],
                         locales[`${lang}-${primaries[lang]}`] ?? {},
                         v
                     );

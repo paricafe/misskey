@@ -1852,6 +1852,7 @@ _role:
     gtlAvailable: "Can view the global timeline"
     ltlAvailable: "Can view the local timeline"
     canPublicNote: "Can send public notes"
+    canEditNote: "Can edit notes"
     mentionMax: "Maximum number of mentions in a note"
     canInvite: "Can create instance invite codes"
     inviteLimit: "Invite limit"
@@ -2820,3 +2821,9 @@ _embedCodeGen:
   generateCode: "Generate embed code"
   codeGenerated: "The code has been generated"
   codeGeneratedDescription: "Paste the generated code into your website to embed the content."
+_selfXssPrevention: 
+  warning: "WARNING"
+  title: "Any request to 'paste something into this screen' is a scam."
+  description1: "Pasting content here could allow malicious users to hijack your account or steal your personal information."
+  description2: "If you don't fully understand what you're about to paste, %cplease stop immediately and close this window."
+  description3: "For more information, please check here: {link}"
