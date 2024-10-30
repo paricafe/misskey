@@ -134,9 +134,9 @@ globalThis.addEventListener('notificationclick', (ev: ServiceWorkerGlobalScopeEv
 					case 'showFollowRequests':
 						client = await swos.openClient('push', '/my/follow-requests', loginId);
 						break;
-          case 'edited':
-            if ('note' in data.body) client = await swos.openPost({ reply: data.body.note }, loginId);
-            break;
+         			case 'edited':
+         			    if ('note' in data.body) client = await swos.openPost({ reply: data.body.note }, loginId);
+         			    break;
 					default:
 						switch (data.body.type) {
 							case 'receiveFollowRequest':
