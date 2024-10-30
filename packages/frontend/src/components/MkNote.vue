@@ -249,7 +249,7 @@ const emit = defineEmits<{
 const router = useRouter();
 
 const inTimeline = inject<boolean>('inTimeline', false);
-const tl_withSensitive = inject<Ref<boolean>>('tl_withSensitive', ref(false));
+const tl_withSensitive = inject<Ref<boolean>>('tl_withSensitive', ref(true));
 const inChannel = inject('inChannel', null);
 const currentClip = inject<Ref<Misskey.entities.Clip> | null>('currentClip', null);
 
