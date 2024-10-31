@@ -8,6 +8,14 @@ SPDX-License-Identifier: AGPL-3.0-only
 		{{ i18n.ts.pariPlusInfo }}
 	</MkInfo>
 	<FormSection>
+		<div class="label">{{ i18n.ts.pariPlusSystemSettings }}</div>
+		<div class="_gaps_m">
+			<div class="_gaps_s">
+				<MkSwitch v-model="useHardwareAcceleration">{{ i18n.ts.useHardwareAcceleration }}</MkSwitch>
+			</div>
+		</div>
+	</FormSection>
+	<FormSection>
 		<div class="label">{{ i18n.ts.pariPlusAppearanceSettings }}</div>
 		<div class="_gaps_m">
 			<div class="_gaps_s">
@@ -101,6 +109,8 @@ function saveFontSize() {
 	window.document.documentElement.classList.add('f-' + fontSizeNumber.value);
 	fontSizeNumberOld.value = fontSizeNumber.value;
 }
+
+const useHardwareAcceleration = computed(defaultStore.makeGetterSetter('useHardwareAcceleration'));
 
 const autoTranslateButton = computed(defaultStore.makeGetterSetter('autoTranslateButton'));
 const showDetailTimeWhenHover = computed(defaultStore.makeGetterSetter('showDetailTimeWhenHover'));

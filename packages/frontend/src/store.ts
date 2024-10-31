@@ -508,6 +508,10 @@ export const defaultStore = markRaw(new Storage('base', {
 		where: 'device',
 		default: { type: 'syuilo/bubble1', volume: 1 } as SoundStore,
 	},
+	useHardwareAcceleration: {
+		where: 'device',
+		default: true,
+	},
 	autoTranslateButton: {
 		where: 'device',
 		default: false,
