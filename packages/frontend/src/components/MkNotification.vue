@@ -4,7 +4,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 -->
 
 <template>
-<div :class="[$style.root, { [$style.skipRender]: defaultStore.state.enableRenderingOptimization }]">
+<div :class="$style.root">
 	<div :class="$style.head">
 		<MkAvatar v-if="['pollEnded', 'note'].includes(notification.type) && 'note' in notification" :class="$style.icon" :user="notification.note.user" link preview/>
 		<MkAvatar v-else-if="['roleAssigned', 'achievementEarned', 'exportCompleted', 'login'].includes(notification.type)" :class="$style.icon" :user="$i" link preview/>
@@ -231,13 +231,6 @@ function getActualReactedUsersCount(notification: Misskey.entities.Notification)
 	--eventAchievement: #cb9a11;
 	--eventLogin: #007aff;
 	--eventOther: #88a6b7;
-}
-
-.skipRender {
-	content-visibility: auto;
-	contain-intrinsic-size: 0 200px;
-	transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out;
-	will-change: opacity, transform;
 }
 
 .head {

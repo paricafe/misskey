@@ -707,9 +707,7 @@ onMounted(() => {
 
 .skipRender {
 	content-visibility: auto;
-	contain-intrinsic-size: 0 200px;
-	transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out;
-	will-change: opacity, transform;
+	contain-intrinsic-size: 0 180px;
 }
 
 .footer {
