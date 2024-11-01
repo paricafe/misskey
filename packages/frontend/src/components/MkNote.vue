@@ -9,7 +9,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 	v-show="!isDeleted"
 	ref="rootEl"
 	v-hotkey="keymap"
-	:class="[$style.root, { [$style.showActionsOnlyHover]: defaultStore.state.showNoteActionsOnlyHover, [$style.skipRender]: defaultStore.state.skipNoteRender }]"
+	:class="[$style.root, { [$style.showActionsOnlyHover]: defaultStore.state.showNoteActionsOnlyHover, [$style.skipRender]: defaultStore.state.skipNoteRender || defaultStore.state.enableRenderingOptimization }]"
 	:tabindex="isDeleted ? '-1' : '0'"
 >
     <div v-if="appearNote.reply && inReplyToCollapsed" :class="$style.collapsedInReplyTo">
@@ -762,7 +762,9 @@ function emitUpdReaction(emoji: string, delta: number) {
 
 .skipRender {
 	content-visibility: auto;
-	contain-intrinsic-size: 0 150px;
+	contain-intrinsic-size: 0 200px;
+	transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out;
+	will-change: opacity, transform;
 }
 
 .tip {

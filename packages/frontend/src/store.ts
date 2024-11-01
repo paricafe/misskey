@@ -512,6 +512,10 @@ export const defaultStore = markRaw(new Storage('base', {
 		where: 'device',
 		default: true,
 	},
+	enableRenderingOptimization: {
+		where: 'device',
+		default: true,
+	},
 	autoTranslateButton: {
 		where: 'device',
 		default: false,

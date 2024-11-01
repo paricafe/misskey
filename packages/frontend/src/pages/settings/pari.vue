@@ -12,6 +12,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 		<div class="_gaps_m">
 			<div class="_gaps_s">
 				<MkSwitch v-model="useHardwareAcceleration">{{ i18n.ts.useHardwareAcceleration }}</MkSwitch>
+				<MkSwitch v-model="enableRenderingOptimization">{{ i18n.ts.enableRenderingOptimization }}</MkSwitch>
 			</div>
 		</div>
 	</FormSection>
@@ -111,6 +112,7 @@ function saveFontSize() {
 }
 
 const useHardwareAcceleration = computed(defaultStore.makeGetterSetter('useHardwareAcceleration'));
+const enableRenderingOptimization = computed(defaultStore.makeGetterSetter('enableRenderingOptimization'));
 
 const autoTranslateButton = computed(defaultStore.makeGetterSetter('autoTranslateButton'));
 const showDetailTimeWhenHover = computed(defaultStore.makeGetterSetter('showDetailTimeWhenHover'));
