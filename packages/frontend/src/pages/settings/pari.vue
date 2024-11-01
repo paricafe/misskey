@@ -69,6 +69,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 			<MkSwitch v-model="noteClickToOpen">{{ i18n.ts.noteClickToOpen }}</MkSwitch>
 			<MkSwitch v-model="enableFallbackReactButton">{{ i18n.ts.enableFallbackReactButton }}</MkSwitch>
 			<MkSwitch v-model="enableMFMCheatsheet">{{ i18n.ts.enableMFMCheatsheet }}</MkSwitch>
+			<MkSwitch v-model="enableUndoClearPostForm">{{ i18n.ts.enableUndoClearPostForm }}</MkSwitch>
 			<MkSwitch v-model="collapseNotesRepliedTo">{{ i18n.ts.collapseNotesRepliedTo }}</MkSwitch>
 			<MkSwitch v-model="disableReactionsViewer">{{ i18n.ts.disableReactionsViewer }}</MkSwitch>
 			<MkSelect v-model="autoSpacingBehaviour">
@@ -121,6 +122,7 @@ const showDetailTimeWhenHover = computed(defaultStore.makeGetterSetter('showDeta
 const noteClickToOpen = computed(defaultStore.makeGetterSetter('noteClickToOpen'));
 const enableFallbackReactButton = computed(defaultStore.makeGetterSetter('enableFallbackReactButton'));
 const enableMFMCheatsheet = computed(defaultStore.makeGetterSetter('enableMFMCheatsheet'));
+const enableUndoClearPostForm = computed(defaultStore.makeGetterSetter('enableUndoClearPostForm'));
 const autoSpacingBehaviour = computed(defaultStore.makeGetterSetter('autoSpacingBehaviour'));
 const collapseNotesRepliedTo = computed(defaultStore.makeGetterSetter('collapseNotesRepliedTo'));
 const disableReactionsViewer = computed(defaultStore.makeGetterSetter('disableReactionsViewer'));

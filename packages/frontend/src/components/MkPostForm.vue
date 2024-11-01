@@ -87,11 +87,11 @@ SPDX-License-Identifier: AGPL-3.0-only
 			<button v-if="postFormActions.length > 0" v-tooltip="i18n.ts.plugins" class="_button" :class="$style.footerButton" @click="showActions"><i class="ti ti-plug"></i></button>
 			<button v-tooltip="i18n.ts.emoji" :class="['_button', $style.footerButton]" @click="insertEmoji"><i class="ti ti-mood-happy"></i></button>
 			<button v-if="showAddMfmFunction" v-tooltip="i18n.ts.addMfmFunction" :class="['_button', $style.footerButton]" @click="insertMfmFunction"><i class="ti ti-palette"></i></button>
+			<button v-if="enableMFMCheatsheet" v-tooltip="'MFM Cheatsheet'" class="_button" :class="$style.footerButton" @click="MFMWindow"><i class="ti ti-note"></i></button>
 		</div>
 		<div :class="$style.footerRight">
 			<button v-tooltip="i18n.ts.previewNoteText" class="_button" :class="[$style.footerButton, { [$style.previewButtonActive]: showPreview }]" @click="showPreview = !showPreview"><i class="ti ti-eye"></i></button>
-			<button v-if="showTextManageButton" v-tooltip="currentHistoryIndex >= 0 ? i18n.ts.undoPostForm : i18n.ts.clearPostForm" class="_button" :class="$style.footerButton" @click="handleTextManageClick"><i :class="textManageButtonIcon"></i></button>
-			<button v-if="defaultStore.state.enableMFMCheatsheet" v-tooltip="'MFM Cheatsheet'" class="_button" :class="$style.footerButton" @click="MFMWindow"><i class="ti ti-note"></i></button>
+			<button v-if="showTextManageButton && enableUndoClearPostForm" v-tooltip="currentHistoryIndex >= 0 ? i18n.ts.undoPostForm : i18n.ts.clearPostForm" class="_button" :class="$style.footerButton" @click="handleTextManageClick"><i :class="textManageButtonIcon"></i></button>
 			<!--<button v-tooltip="i18n.ts.more" class="_button" :class="$style.footerButton" @click="showingOptions = !showingOptions"><i class="ti ti-dots"></i></button>-->
 		</div>
 	</footer>
@@ -195,6 +195,9 @@ const showingOptions = ref(false);
 const textAreaReadOnly = ref(false);
 const justEndedComposition = ref(false);
 
+const enableMFMCheatsheet = ref(defaultStore.state.enableMFMCheatsheet);
+const enableUndoClearPostForm = ref(defaultStore.state.enableUndoClearPostForm);
+
 const draftKey = computed((): string => {
 	let key = props.channel ? `channel:${props.channel.id}` : '';
 
@@ -268,6 +271,8 @@ const textManageButtonIcon = computed(() => {
   if (currentHistoryIndex.value >= 0) return 'ti ti-arrow-back-up';
   return text.value !== '' ? 'ti ti-trash' : '';
 });
+let lastSaveTime = 0;
+const SAVE_INTERVAL = 300;
 
 function clearText() {
   if (text.value !== '') {
@@ -278,9 +283,22 @@ function clearText() {
 }
 
 function saveToHistory() {
-  textHistory.value = textHistory.value.slice(0, currentHistoryIndex.value + 1);
-  textHistory.value.push(text.value);
-  currentHistoryIndex.value = textHistory.value.length - 1;
+  const now = Date.now();
+  if (
+    (now - lastSaveTime > SAVE_INTERVAL) &&
+    (textHistory.value[currentHistoryIndex.value] !== text.value) &&
+    (text.value.length > 0)
+  ) {
+    textHistory.value = textHistory.value.slice(0, currentHistoryIndex.value + 1);
+    textHistory.value.push(text.value);
+    currentHistoryIndex.value = textHistory.value.length - 1;
+    lastSaveTime = now;
+    
+    if (textHistory.value.length > 50) {
+      textHistory.value = textHistory.value.slice(-50);
+      currentHistoryIndex.value = textHistory.value.length - 1;
+    }
+  }
 }
 
 function undoTextChange() {
@@ -615,7 +633,9 @@ function clear() {
 function onKeydown(ev: KeyboardEvent) {
 	if (ev.key === 'Enter' && (ev.ctrlKey || ev.metaKey) && canPost.value) post();
 
-	if (!ev.ctrlKey && !ev.metaKey && !ev.altKey && !justEndedComposition.value && !ev.isComposing) {
+	if (enableUndoClearPostForm.value && !ev.ctrlKey && !ev.metaKey && !ev.altKey && 
+        !justEndedComposition.value && !ev.isComposing && 
+        !['Shift', 'Alt', 'Control', 'Meta', 'CapsLock', 'Tab'].includes(ev.key)) {
       saveToHistory();
     }
 	

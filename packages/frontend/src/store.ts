@@ -536,6 +536,10 @@ export const defaultStore = markRaw(new Storage('base', {
 		where: 'device',
 		default: true,
 	},
+	enableUndoClearPostForm: {
+		where: 'device',
+		default: true,
+	},
 	autoSpacingBehaviour: {
 		where: 'device',
 		default: null as 'all' | 'special' | null,
