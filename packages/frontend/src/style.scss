@@ -14,6 +14,16 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.font-smoothing-auto * {
+  -webkit-font-smoothing: auto;
+  -moz-osx-font-smoothing: auto;
+}
+
 :root {
 	--MI-radius: 12px;
 	--MI-marginFull: 16px;

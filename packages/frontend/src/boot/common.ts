@@ -198,17 +198,8 @@ export async function common(createVue: () => App<Element>) {
 	}, { immediate: true });
 
 	watch(defaultStore.reactiveState.useHardwareAcceleration, v => {
-		if (v) {
-			const miHwAcc = document.createElement('style');
-			miHwAcc.textContent = `html { 
-				-webkit-font-smoothing: antialiased;
-				-moz-osx-font-smoothing: grayscale;
-			}`;
-			document.head.appendChild(miHwAcc);
-		} else {
-			document.querySelector('style')?.remove();
-		}
-	}, { immediate: true });
+		document.documentElement.classList.toggle('font-smoothing-auto', !v);
+	  }, { immediate: true });
 
 	// Keep screen on
 	const onVisibilityChange = () => document.addEventListener('visibilitychange', () => {
