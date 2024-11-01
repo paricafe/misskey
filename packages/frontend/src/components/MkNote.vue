@@ -420,7 +420,7 @@ if (!props.mock) {
 		});
 	});
 
-	if (appearNote.value.reactionAcceptance === 'likeOnly' || disableReactionsViewer) {
+	if (appearNote.value.reactionAcceptance === 'likeOnly' || disableReactionsViewer.value) {
 		useTooltip(reactButton, async (showing) => {
 			const reactions = await misskeyApiGet('notes/reactions', {
 				noteId: appearNote.value.id,
@@ -500,7 +500,7 @@ function like(): void {
 function react(): void {
 	pleaseLogin({ openOnRemote: pleaseLoginContext.value });
 	showMovedDialog();
-	if (appearNote.value.reactionAcceptance === 'likeOnly' || disableReactionsViewer) {
+	if (appearNote.value.reactionAcceptance === 'likeOnly' || disableReactionsViewer.value) {
 		sound.playMisskeySfx('reaction');
 
 		if (props.mock) {
