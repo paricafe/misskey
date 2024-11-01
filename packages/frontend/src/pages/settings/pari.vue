@@ -4,6 +4,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 -->
 
 <template>
+<div class="_gaps_m">
 	<MkInfo>
 		{{ i18n.ts.pariPlusInfo }}
 	</MkInfo>
@@ -79,6 +80,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 			</MkSelect>
 		</div>
 	</FormSection>
+</div>
 </template>
 
 <script lang="ts" setup>
