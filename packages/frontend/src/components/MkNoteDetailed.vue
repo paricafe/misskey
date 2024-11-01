@@ -136,7 +136,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 					<MkTime :time="appearNote.createdAt" mode="detail" colored/>
 				</MkA>
 			</div>
-			<MkReactionsViewer v-if="appearNote.reactionAcceptance !== 'likeOnly'" ref="reactionsViewer" :note="appearNote"/>
+			<MkReactionsViewer v-if="appearNote.reactionAcceptance !== 'likeOnly' && !disableReactionsViewer" ref="reactionsViewer" :note="appearNote"/>
 			<div :class="$style.footerButton">
 			<button class="_button" :class="$style.noteFooterButton" @click.stop="reply()">
 				<i class="ti ti-arrow-back-up"></i>
@@ -155,15 +155,15 @@ SPDX-License-Identifier: AGPL-3.0-only
 			<button v-else class="_button" :class="$style.noteFooterButton" disabled>
 				<i class="ti ti-ban"></i>
 			</button>
-			<button v-if="appearNote.myReaction == null && appearNote.reactionAcceptance !== 'likeOnly'" ref="likeButton" :class="$style.noteFooterButton" class="_button" @mousedown="like()">
+			<button v-if="appearNote.myReaction == null && appearNote.reactionAcceptance !== 'likeOnly' && !disableReactionsViewer" ref="likeButton" :class="$style.noteFooterButton" class="_button" @mousedown="like()">
 				<i class="ti ti-heart"></i>
 			</button>
 			<button ref="reactButton" :class="$style.noteFooterButton" class="_button" @click.stop="toggleReact()">
-				<i v-if="appearNote.reactionAcceptance === 'likeOnly' && appearNote.myReaction != null" class="ti ti-heart-filled" style="color: var(--MI_THEME-love);"></i>
+				<i v-if="(appearNote.reactionAcceptance === 'likeOnly' || disableReactionsViewer) && appearNote.myReaction != null" class="ti ti-heart-filled" style="color: var(--MI_THEME-love);"></i>
 				<i v-else-if="appearNote.myReaction != null" class="ti ti-minus" style="color: var(--MI_THEME-accent);"></i>
-				<i v-else-if="appearNote.reactionAcceptance === 'likeOnly'" class="ti ti-heart"></i>
+				<i v-else-if="appearNote.reactionAcceptance === 'likeOnly' || disableReactionsViewer" class="ti ti-heart"></i>
 				<i v-else class="ti ti-mood-plus"></i>
-				<p v-if="(appearNote.reactionAcceptance === 'likeOnly' || defaultStore.state.showReactionsCount) && appearNote.reactionCount > 0" :class="$style.noteFooterButtonCount">{{ number(appearNote.reactionCount) }}</p>
+				<p v-if="(appearNote.reactionAcceptance === 'likeOnly' || defaultStore.state.showReactionsCount || disableReactionsViewer) && appearNote.reactionCount > 0" :class="$style.noteFooterButtonCount">{{ number(appearNote.reactionCount) }}</p>
 			</button>
 			<button
 				v-if="appearNote.updatedAt" ref="historyMenuButton" class="_button" :class="[
@@ -345,6 +345,8 @@ type ShowingNoteHistoryState = {
 } | null;
 const showingNoteHistoryRef = ref<ShowingNoteHistoryState>(null);
 
+const disableReactionsViewer = ref(defaultStore.reactiveState.disableReactionsViewer);
+
 const pleaseLoginContext = computed<OpenOnRemoteOptions>(() => ({
 	type: 'lookup',
 	url: `https://${host}/notes/${appearNote.value.id}`,
@@ -425,7 +427,7 @@ useTooltip(renoteButton, async (showing) => {
 	});
 });
 
-if (appearNote.value.reactionAcceptance === 'likeOnly') {
+if (appearNote.value.reactionAcceptance === 'likeOnly' || disableReactionsViewer) {
 	useTooltip(reactButton, async (showing) => {
 		const reactions = await misskeyApiGet('notes/reactions', {
 			noteId: appearNote.value.id,
@@ -493,7 +495,7 @@ function like(): void {
 function react(): void {
 	pleaseLogin({ openOnRemote: pleaseLoginContext.value });
 	showMovedDialog();
-	if (appearNote.value.reactionAcceptance === 'likeOnly') {
+	if (appearNote.value.reactionAcceptance === 'likeOnly' || disableReactionsViewer) {
 		sound.playMisskeySfx('reaction');
 
 		misskeyApi('notes/reactions/create', {

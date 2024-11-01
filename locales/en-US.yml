@@ -1296,7 +1296,7 @@ showDetailTimeWhenHover: "Hover the timestamp of the note to expand the detailed
 noteClickToOpen: "Click to open note details"
 enableFallbackReactButton: "Enable fallback reaction button"
 enableMFMCheatsheet: "Enable MFM Cheatsheet in post form"
-disableReactionsViewer: "Disable reactions viewer"
+disableReactionsViewer: "Disable emoji reactions viewer"
 autoSpacing: "Auto Spacing"
 autoSpacingDescription: "Adding spaces between CJK and English characters"
 performance: "Performance"
