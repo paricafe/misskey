@@ -9,8 +9,8 @@ SPDX-License-Identifier: AGPL-3.0-only
 		{{ i18n.ts.pariPlusInfo }}
 	</MkInfo>
 	<FormSection>
-		<div class="label">{{ i18n.ts.pariPlusSystemSettings }}</div>
 		<div class="_gaps_m">
+			<div class="label">{{ i18n.ts.pariPlusSystemSettings }}</div>
 			<div class="_gaps_s">
 				<MkSwitch v-model="useHardwareAcceleration">{{ i18n.ts.useHardwareAcceleration }}</MkSwitch>
 				<MkSwitch v-model="enableRenderingOptimization">{{ i18n.ts.enableRenderingOptimization }}</MkSwitch>
@@ -18,8 +18,8 @@ SPDX-License-Identifier: AGPL-3.0-only
 		</div>
 	</FormSection>
 	<FormSection>
-		<div class="label">{{ i18n.ts.pariPlusAppearanceSettings }}</div>
 		<div class="_gaps_m">
+			<div class="label">{{ i18n.ts.pariPlusAppearanceSettings }}</div>
 			<div class="_gaps_s">
 				<MkRange v-model="fontSizeNumber" :min="0" :max="10" :step="1" continuousUpdate>
 					<template #label>{{ i18n.ts.fontSize }}</template>
@@ -64,21 +64,23 @@ SPDX-License-Identifier: AGPL-3.0-only
 	<FormSection>
 		<div class="_gaps_m">
 			<div class="label">{{ i18n.ts.pariPlusNoteSettings }}</div>
-			<MkSwitch v-model="autoTranslateButton">{{ i18n.ts.autoTranslateButton }}</MkSwitch>
-			<MkSwitch v-model="showDetailTimeWhenHover">{{ i18n.ts.showDetailTimeWhenHover }}</MkSwitch>
-			<MkSwitch v-model="noteClickToOpen">{{ i18n.ts.noteClickToOpen }}</MkSwitch>
-			<MkSwitch v-model="enableFallbackReactButton">{{ i18n.ts.enableFallbackReactButton }}</MkSwitch>
-			<MkSwitch v-model="enableMFMCheatsheet">{{ i18n.ts.enableMFMCheatsheet }}</MkSwitch>
-			<MkSwitch v-model="enableUndoClearPostForm">{{ i18n.ts.enableUndoClearPostForm }}</MkSwitch>
-			<MkSwitch v-model="collapseNotesRepliedTo">{{ i18n.ts.collapseNotesRepliedTo }}</MkSwitch>
-			<MkSwitch v-model="disableReactionsViewer">{{ i18n.ts.disableReactionsViewer }}</MkSwitch>
-			<MkSelect v-model="autoSpacingBehaviour">
-				<template #label>{{ i18n.ts.autoSpacing }}</template>
-				<option :value="null">{{ i18n.ts.disabled }}</option>
-				<option value="special">Auto</option>
-				<option value="all">{{ i18n.ts.all }}</option>
-				<template #caption>{{ i18n.ts.autoSpacingDescription }}</template>
-			</MkSelect>
+			<div class="_gaps_s">
+				<MkSwitch v-model="autoTranslateButton">{{ i18n.ts.autoTranslateButton }}</MkSwitch>
+				<MkSwitch v-model="showDetailTimeWhenHover">{{ i18n.ts.showDetailTimeWhenHover }}</MkSwitch>
+				<MkSwitch v-model="noteClickToOpen">{{ i18n.ts.noteClickToOpen }}</MkSwitch>
+				<MkSwitch v-model="enableFallbackReactButton">{{ i18n.ts.enableFallbackReactButton }}</MkSwitch>
+				<MkSwitch v-model="enableMFMCheatsheet">{{ i18n.ts.enableMFMCheatsheet }}</MkSwitch>
+				<MkSwitch v-model="enableUndoClearPostForm">{{ i18n.ts.enableUndoClearPostForm }}</MkSwitch>
+				<MkSwitch v-model="collapseNotesRepliedTo">{{ i18n.ts.collapseNotesRepliedTo }}</MkSwitch>
+				<MkSwitch v-model="disableReactionsViewer">{{ i18n.ts.disableReactionsViewer }}</MkSwitch>
+				<MkSelect v-model="autoSpacingBehaviour">
+					<template #label>{{ i18n.ts.autoSpacing }}</template>
+					<option :value="null">{{ i18n.ts.disabled }}</option>
+					<option value="special">Auto</option>
+					<option value="all">{{ i18n.ts.all }}</option>
+					<template #caption>{{ i18n.ts.autoSpacingDescription }}</template>
+				</MkSelect>
+		    </div>
 		</div>
 	</FormSection>
 </div>
