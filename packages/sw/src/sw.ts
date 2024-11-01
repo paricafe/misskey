@@ -13,12 +13,20 @@ import { swLang } from '@/scripts/lang.js';
 import * as swos from '@/scripts/operations.js';
 
 const STATIC_CACHE_NAME = `misskey-static-${_VERSION_}`;
-const PATHS_TO_CACHE = ['/assets/','/emoji/','/twemoji/','/fluent-emoji/','/vite/'];
+const PATHS_TO_CACHE = ['/assets/', '/emoji/', '/twemoji/', '/fluent-emoji/', '/vite/'];
+
+async function cacheWithFallback(cache, paths) {
+    for (const path of paths) {
+        try {
+            await cache.add(new Request(path, { credentials: 'same-origin' }));
+        } catch (error) {}
+    }
+}
 
 globalThis.addEventListener('install', (ev) => {
     ev.waitUntil((async () => {
         const cache = await caches.open(STATIC_CACHE_NAME);
-        await cache.addAll(PATHS_TO_CACHE);
+        await cacheWithFallback(cache, PATHS_TO_CACHE);
         await globalThis.skipWaiting();
     })());
 });
