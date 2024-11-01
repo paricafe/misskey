@@ -90,6 +90,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 		</div>
 		<div :class="$style.footerRight">
 			<button v-tooltip="i18n.ts.previewNoteText" class="_button" :class="[$style.footerButton, { [$style.previewButtonActive]: showPreview }]" @click="showPreview = !showPreview"><i class="ti ti-eye"></i></button>
+			<button v-if="showTextManageButton" v-tooltip="currentHistoryIndex >= 0 ? i18n.ts.undoPostForm : i18n.ts.clearPostForm" class="_button" :class="$style.footerButton" @click="handleTextManageClick"><i :class="textManageButtonIcon"></i></button>
 			<button v-if="defaultStore.state.enableMFMCheatsheet" v-tooltip="'MFM Cheatsheet'" class="_button" :class="$style.footerButton" @click="MFMWindow"><i class="ti ti-note"></i></button>
 			<!--<button v-tooltip="i18n.ts.more" class="_button" :class="$style.footerButton" @click="showingOptions = !showingOptions"><i class="ti ti-dots"></i></button>-->
 		</div>
@@ -259,6 +260,44 @@ const canPost = computed((): boolean => {
 
 const withHashtags = computed(defaultStore.makeGetterSetter('postFormWithHashtags'));
 const hashtags = computed(defaultStore.makeGetterSetter('postFormHashtags'));
+
+const textHistory = ref<string[]>([]);
+const currentHistoryIndex = ref(-1);
+const showTextManageButton = computed(() => text.value !== '' || currentHistoryIndex.value >= 0);
+const textManageButtonIcon = computed(() => {
+  if (currentHistoryIndex.value >= 0) return 'ti ti-arrow-back-up';
+  return text.value !== '' ? 'ti ti-trash' : '';
+});
+
+function clearText() {
+  if (text.value !== '') {
+    saveToHistory();
+    text.value = '';
+    nextTick(() => textareaEl.value && autosize.update(textareaEl.value));
+  }
+}
+
+function saveToHistory() {
+  textHistory.value = textHistory.value.slice(0, currentHistoryIndex.value + 1);
+  textHistory.value.push(text.value);
+  currentHistoryIndex.value = textHistory.value.length - 1;
+}
+
+function undoTextChange() {
+  if (currentHistoryIndex.value >= 0) {
+    text.value = textHistory.value[currentHistoryIndex.value];
+    currentHistoryIndex.value--;
+    nextTick(() => textareaEl.value && autosize.update(textareaEl.value));
+  }
+}
+
+function handleTextManageClick() {
+  if (currentHistoryIndex.value >= 0) {
+    undoTextChange();
+  } else {
+    clearText();
+  }
+}
 
 watch(text, () => {
 	checkMissingMention();
@@ -576,6 +615,10 @@ function clear() {
 function onKeydown(ev: KeyboardEvent) {
 	if (ev.key === 'Enter' && (ev.ctrlKey || ev.metaKey) && canPost.value) post();
 
+	if (!ev.ctrlKey && !ev.metaKey && !ev.altKey && !justEndedComposition.value && !ev.isComposing) {
+      saveToHistory();
+    }
+	
 	// justEndedComposition.value is for Safari, which keyDown occurs after compositionend.
 	// ev.isComposing is for another browsers.
 	if (ev.key === 'Escape' && !justEndedComposition.value && !ev.isComposing) emit('esc');
