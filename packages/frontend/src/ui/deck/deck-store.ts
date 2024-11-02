@@ -113,8 +113,8 @@ export const loadDeck = async () => {
 };
 
 // TODO: deckがloadされていない状態でsaveすると意図せず上書きが発生するので対策する
-export const saveDeck = throttle(1000, () => {
-	misskeyApi('i/registry/set', {
+export const saveDeck = throttle(1000, async () => {
+	await misskeyApi('i/registry/set', {
 		scope: ['client', 'deck', 'profiles'],
 		key: deckStore.state.profile,
 		value: {
@@ -314,7 +314,7 @@ export function updateColumnWidget(id: Column['id'], widgetId: string, widgetDat
 	saveDeck();
 }
 
-export function updateColumn(id: Column['id'], column: Partial<Column>) {
+export async function updateColumn<TColumn>(id: Column['id'], column: Partial<TColumn>) {
 	const columns = deepClone(deckStore.state.columns);
 	const columnIndex = deckStore.state.columns.findIndex(c => c.id === id);
 	const currentColumn = deepClone(deckStore.state.columns[columnIndex]);
@@ -323,6 +323,8 @@ export function updateColumn(id: Column['id'], column: Partial<Column>) {
 		currentColumn[k] = v;
 	}
 	columns[columnIndex] = currentColumn;
-	deckStore.set('columns', columns);
-	saveDeck();
+	await Promise.all([
+		deckStore.set('columns', columns),
+		saveDeck(),
+	]);
 }
