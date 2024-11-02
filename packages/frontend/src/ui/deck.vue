@@ -18,16 +18,21 @@ SPDX-License-Identifier: AGPL-3.0-only
 				:style="columns.filter(c => ids.includes(c.id)).some(c => c.flexible) ? { flex: 1, minWidth: '350px' } : { width: Math.max(...columns.filter(c => ids.includes(c.id)).map(c => c.width)) + 'px' }"
 				@wheel.self="onWheel"
 			>
-				<component
-					:is="columnComponents[columns.find(c => c.id === id)!.type] ?? XTlColumn"
-					v-for="id in ids"
-					:ref="id"
-					:key="id"
-					:class="$style.column"
-					:column="columns.find(c => c.id === id)!"
-					:isStacked="ids.length > 1"
-					@headerWheel="onWheel"
-				/>
+				<Suspense>
+					<component
+						:is="columnComponents[columns.find(c => c.id === id)!.type] ?? XTlColumn"
+						v-for="id in ids"
+						:ref="id"
+						:key="id"
+						:class="$style.column"
+						:column="columns.find(c => c.id === id)!"
+						:isStacked="ids.length > 1"
+						@headerWheel="onWheel"
+					/>
+					<template #fallback>
+						<MkLoading/>
+					</template>
+				</Suspense>
 			</section>
 			<div v-if="layout.length === 0" class="_panel" :class="$style.onboarding">
 				<div>{{ i18n.ts._deck.introduction }}</div>
