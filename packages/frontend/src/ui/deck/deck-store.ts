@@ -4,7 +4,7 @@
  */
 
 import { throttle } from 'throttle-debounce';
-import { markRaw } from 'vue';
+import { computed, markRaw, Ref } from 'vue';
 import { notificationTypes } from 'misskey-js';
 import type { BasicTimelineType } from '@/timelines.js';
 import { Storage } from '@/pizzax.js';
@@ -327,4 +327,14 @@ export async function updateColumn<TColumn>(id: Column['id'], column: Partial<TC
 		deckStore.set('columns', columns),
 		saveDeck(),
 	]);
+}
+
+export function getColumn<TColumn extends Column>(id: Column['id']): TColumn {
+	return deckStore.state.columns.find(c => c.id === id) as TColumn;
+}
+
+export function getReactiveColumn<TColumn extends Column>(id: Column['id']): Ref<TColumn> {
+	return computed(() => {
+		return deckStore.reactiveState.columns.value.find(c => c.id === id) as TColumn;
+	});
 }
