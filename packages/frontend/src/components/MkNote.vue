@@ -850,7 +850,7 @@ function emitUpdReaction(emoji: string, delta: number) {
 	align-items: center;
 	line-height: 28px;
 	white-space: pre;
-	padding: 0 32px 18px;
+	padding: 10px 32px;
 }
 
 .collapsedInReplyTo {
@@ -1081,7 +1081,7 @@ function emitUpdReaction(emoji: string, delta: number) {
 	}
 
 	.collapsedRenoteTarget {
-		padding: 0 16px 9px;
+		padding: 3px 16px;
 		margin-top: 4px;
 	}
 
