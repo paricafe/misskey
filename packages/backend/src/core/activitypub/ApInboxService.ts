@@ -29,9 +29,9 @@ import { bindThis } from '@/decorators.js';
 import type { MiRemoteUser } from '@/models/User.js';
 import { GlobalEventService } from '@/core/GlobalEventService.js';
 import { AbuseReportService } from '@/core/AbuseReportService.js';
-import { IdentifiableError } from '@/misc/identifiable-error.js';
 import { fromTuple } from '@/misc/from-tuple.js';
-import { getApHrefNullable, getApId, getApIds, getApType, isAccept, isActor, isAdd, isAnnounce, isApObject, isBlock, isCollection, isCollectionOrOrderedCollection, isCreate, isDelete, isFlag, isFollow, isLike, isMove, isPost, isReject, isRemove, isTombstone, isUndo, isUpdate, validActor, validPost } from './type.js';
+import { IdentifiableError } from '@/misc/identifiable-error.js';
+import { getApHrefNullable, getApId, getApIds, getApType, getNullableApId, isAccept, isActor, isAdd, isAnnounce, isApObject, isBlock, isCollection, isCollectionOrOrderedCollection, isCreate, isDelete, isFlag, isFollow, isLike, isMove, isPost, isReject, isRemove, isTombstone, isUndo, isUpdate, validActor, validPost } from './type.js';
 import { ApNoteService } from './models/ApNoteService.js';
 import { ApLoggerService } from './ApLoggerService.js';
 import { ApDbResolverService } from './ApDbResolverService.js';
@@ -428,7 +428,7 @@ export class ApInboxService {
 		if (isPost(object)) {
 			await this.createNote(resolver, actor, object, false, activity);
 		} else {
-			return `Unknown type: ${getApType(object)}`;
+			return `skip: Unsupported type for Create: ${getApType(object)} (object ${getNullableApId(object)})`;
 		}
 	}
 
@@ -815,7 +815,7 @@ export class ApInboxService {
 			await this.apNoteService.updateNote(object, resolver).catch(err => console.error(err));
 			return 'ok: Note updated';
 		} else {
-			return `skip: Unknown type: ${getApType(object)}`;
+			return `skip: Unsupported type for Update: ${getApType(object)} (object ${getNullableApId(object)})`;
 		}
 	}
 
