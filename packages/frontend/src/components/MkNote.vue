@@ -13,16 +13,18 @@ SPDX-License-Identifier: AGPL-3.0-only
 	:tabindex="isDeleted ? '-1' : '0'"
 >
 
-    <div v-if="collapsedUnexpectedLangs && isUnexpectedLanguage && !languageExpanded" :class="$style.collapsedLanguage">
-        <MkAvatar :class="$style.collapsedLanguageAvatar" :user="appearNote.user" link preview/>
-        <span :class="$style.collapsedLanguageText" @click.stop="languageExpanded = true">
-            <I18n :src="i18n.ts.userSaysInOtherLanguage" tag="small">
-                <template #name>
-                    <MkUserName :user="appearNote.user"/>
-                </template>
-            </I18n>
-        </span>
-    </div>
+	<div v-if="collapsedUnexpectedLangs && isUnexpectedLanguage && !languageExpanded" :class="$style.collapsedLanguage">
+		<MkAvatar :class="$style.collapsedLanguageAvatar" :user="appearNote.user" link preview/>
+		<Mfm 
+			:text="getNoteSummary(appearNote)" 
+			:plain="true" 
+			:nowrap="true" 
+			:author="appearNote.user" 
+			:nyaize="'respect'" 
+			:class="$style.collapsedLanguageText" 
+			@click.stop="languageExpanded = true"
+		/>
+	</div>
 	<template v-else>
     <div v-if="appearNote.reply && inReplyToCollapsed && !isRenote" :class="$style.collapsedInReplyTo">
 		<MkAvatar :class="$style.collapsedInReplyToAvatar" :user="appearNote.reply.user" link preview/>
@@ -1208,23 +1210,11 @@ function emitUpdReaction(emoji: string, delta: number) {
     text-overflow: ellipsis;
     white-space: nowrap;
     font-size: 90%;
+    opacity: 0.7;
     cursor: pointer;
 
     &:hover {
         text-decoration: underline;
-    }
-}
-
-@container (max-width: 480px) {
-    .collapsedLanguage {
-        padding: 12px 16px;
-    }
-}
-
-@container (max-width: 350px) {
-    .collapsedLanguageAvatar {
-        width: 24px;
-        height: 24px;
     }
 }
 </style>
