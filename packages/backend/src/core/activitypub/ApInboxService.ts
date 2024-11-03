@@ -547,7 +547,7 @@ export class ApInboxService {
 			const note = await this.apDbResolverService.getNoteFromApId(uri);
 
 			if (note == null) {
-				return 'message not found';
+				return 'skip: ignoring deleted note on both ends';
 			}
 
 			if (note.userId !== actor.id) {
