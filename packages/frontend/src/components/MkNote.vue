@@ -12,7 +12,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 	:class="[$style.root, { [$style.showActionsOnlyHover]: defaultStore.state.showNoteActionsOnlyHover, [$style.skipRender]: defaultStore.state.skipNoteRender || defaultStore.state.enableRenderingOptimization }]"
 	:tabindex="isDeleted ? '-1' : '0'"
 >
-    <div v-if="appearNote.reply && inReplyToCollapsed" :class="$style.collapsedInReplyTo">
+    <div v-if="appearNote.reply && inReplyToCollapsed && !isRenote" :class="$style.collapsedInReplyTo">
 		<MkAvatar :class="$style.collapsedInReplyToAvatar" :user="appearNote.reply.user" link preview/>
 		<Mfm :text="getNoteSummary(appearNote.reply)" :plain="true" :nowrap="true" :author="appearNote.reply.user" :nyaize="'respect'" :class="$style.collapsedInReplyToText" @click.stop="inReplyToCollapsed = false"/>
 	</div>
@@ -1081,7 +1081,7 @@ function emitUpdReaction(emoji: string, delta: number) {
 	}
 
 	.collapsedRenoteTarget {
-		padding: 3px 16px;
+		padding: 6px 16px;
 		margin-top: 4px;
 	}
 
