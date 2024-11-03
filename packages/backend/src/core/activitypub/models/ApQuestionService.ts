@@ -13,7 +13,7 @@ import type { MiRemoteUser } from '@/models/User.js';
 import type Logger from '@/logger.js';
 import { bindThis } from '@/decorators.js';
 import { UtilityService } from '@/core/UtilityService.js';
-import { getApId, getApType, getOneApId, isQuestion } from '../type.js';
+import { getApId, getApType, getNullableApId, getOneApId, isQuestion } from '../type.js';
 import { ApLoggerService } from '../ApLoggerService.js';
 import { ApResolverService } from '../ApResolverService.js';
 import type { Resolver } from '../ApResolverService.js';
@@ -49,10 +49,10 @@ export class ApQuestionService {
 		if (resolver == null) resolver = this.apResolverService.createResolver();
 
 		const question = await resolver.resolve(source);
-		if (!isQuestion(question)) throw new UnrecoverableError(`invalid type ${getApType(question)}: ${getApId(source)}`);
+		if (!isQuestion(question)) throw new UnrecoverableError(`invalid type ${getApType(question)}: ${getNullableApId(question)}`);
 
 		const multiple = question.oneOf === undefined;
-		if (multiple && question.anyOf === undefined) throw new Error(`invalid question - neither oneOf nor anyOf is defined: ${getApId(source)}`);
+		if (multiple && question.anyOf === undefined) throw new Error(`invalid question - neither oneOf nor anyOf is defined: ${getNullableApId(question)}`);
 
 		const expiresAt = question.endTime ? new Date(question.endTime) : question.closed ? new Date(question.closed) : null;
 

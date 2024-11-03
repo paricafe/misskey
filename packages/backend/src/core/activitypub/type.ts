@@ -73,6 +73,18 @@ export function getApId(value: string | IObject | [string | IObject]): string {
 }
 
 /**
+ * Get ActivityStreams Object id
+ */
+export function getNullableApId(value: string | IObject | [string | IObject]): string | null {
+	// eslint-disable-next-line no-param-reassign
+	value = fromTuple(value);
+
+	if (typeof value === 'string') return value;
+	if (typeof value.id === 'string') return value.id;
+	return null;
+}
+
+/**
  * Get ActivityStreams Object type
  *
  * タイプ判定ができなかった場合に、あえてエラーではなくnullを返すようにしている。
