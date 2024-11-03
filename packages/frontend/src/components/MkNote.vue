@@ -13,7 +13,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 	:tabindex="isDeleted ? '-1' : '0'"
 >
 
-	<div v-if="collapsedUnexpectedLangs && isUnexpectedLanguage && !languageExpanded" :class="$style.collapsedLanguage">
+	<div v-if="collapsedUnexpectedLangs && isUnexpectedLanguage && !languageExpanded && !isRenote" :class="$style.collapsedLanguage">
 		<MkAvatar :class="$style.collapsedLanguageAvatar" :user="appearNote.user" link preview/>
 		<Mfm 
 			:text="getNoteSummary(appearNote)" 
@@ -1052,6 +1052,37 @@ function emitUpdReaction(emoji: string, delta: number) {
 	opacity: 0.7;
 }
 
+.collapsedLanguage {
+    display: flex;
+    align-items: center;
+    padding: 16px 32px;
+    line-height: 28px;
+    white-space: pre;
+    opacity: 0.7;
+}
+
+.collapsedLanguageAvatar {
+    flex-shrink: 0;
+    display: inline-block;
+    width: 28px;
+    height: 28px;
+    margin: 0 8px 0 0;
+}
+
+.collapsedLanguageText {
+    overflow: hidden;
+    flex-shrink: 1;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 90%;
+    opacity: 0.7;
+    cursor: pointer;
+
+    &:hover {
+        text-decoration: underline;
+    }
+}
+
 @container (max-width: 580px) {
 	.root {
 		font-size: 0.95em;
@@ -1110,6 +1141,10 @@ function emitUpdReaction(emoji: string, delta: number) {
 	.article {
 		padding: 22px 24px;
 	}
+
+    .collapsedLanguage {
+        padding: 12px 16px;
+    }
 }
 
 @container (max-width: 450px) {
@@ -1146,6 +1181,11 @@ function emitUpdReaction(emoji: string, delta: number) {
 		width: 4px;
 		height: calc(100% - 12px);
 	}
+
+    .collapsedLanguageAvatar {
+        width: 24px;
+        height: 24px;
+    }
 }
 
 @container (max-width: 300px) {
@@ -1185,36 +1225,5 @@ function emitUpdReaction(emoji: string, delta: number) {
 .noteClickToOpen {
 	cursor: pointer;
 	-webkit-tap-highlight-color: transparent;
-}
-
-.collapsedLanguage {
-    display: flex;
-    align-items: center;
-    padding: 16px 32px;
-    line-height: 28px;
-    white-space: pre;
-    opacity: 0.7;
-}
-
-.collapsedLanguageAvatar {
-    flex-shrink: 0;
-    display: inline-block;
-    width: 28px;
-    height: 28px;
-    margin: 0 8px 0 0;
-}
-
-.collapsedLanguageText {
-    overflow: hidden;
-    flex-shrink: 1;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: 90%;
-    opacity: 0.7;
-    cursor: pointer;
-
-    &:hover {
-        text-decoration: underline;
-    }
 }
 </style>
