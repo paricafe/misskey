@@ -29,7 +29,7 @@ const keys = [
 	'd-ice',
 	'd-u0',
 	'p-light2',
-	'p-dark2'
+	'p-dark2',
 ]
 
 await Promise.all(keys.map((key) => readFile(new URL(`../../frontend-shared/themes/${key}.json5`, import.meta.url), 'utf8'))).then((sources) => {
