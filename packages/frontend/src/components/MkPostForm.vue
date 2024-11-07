@@ -999,20 +999,38 @@ async function insertEmoji(ev: MouseEvent) {
 
 	let pos = textareaEl.value?.selectionStart ?? 0;
 	let posEnd = textareaEl.value?.selectionEnd ?? text.value.length;
-	emojiPicker.show(
-		target as HTMLElement,
-		emoji => {
-			const textBefore = text.value.substring(0, pos);
-			const textAfter = text.value.substring(posEnd);
-			text.value = textBefore + emoji + textAfter;
-			pos += emoji.length;
-			posEnd += emoji.length;
-		},
-		() => {
-			textAreaReadOnly.value = false;
-			nextTick(() => focus());
-		},
-	);
+
+    const addSpacing = (before: string, emoji: string, after: string) => {
+        let result = emoji;
+        const needSpaceBefore = before.length > 0 && !before.endsWith(' ');
+        const needSpaceAfter = after.length > 0 && !after.startsWith(' ');
+
+        if (needSpaceBefore) result = ' ' + result;
+        if (needSpaceAfter) result = result + ' ';
+
+        return result;
+    };
+
+    emojiPicker.show(
+        target as HTMLElement,
+        emoji => {
+            const textBefore = text.value.substring(0, pos);
+            const textAfter = text.value.substring(posEnd);
+
+            const processedEmoji = defaultStore.state.emojiAutoSpacing 
+                ? addSpacing(textBefore, emoji, textAfter)
+                : emoji;
+
+            text.value = textBefore + processedEmoji + textAfter;
+
+            pos += processedEmoji.length;
+            posEnd += processedEmoji.length;
+        },
+        () => {
+            textAreaReadOnly.value = false;
+            nextTick(() => focus());
+        },
+    );
 }
 
 async function insertMfmFunction(ev: MouseEvent) {
