@@ -5,12 +5,12 @@ SPDX-License-Identifier: AGPL-3.0-only
 
 <template>
 <div
+    v-if="user.onlineStatus !== 'unknown'"
 	v-tooltip="text"
 	:class="[$style.root, {
 		[$style.status_online]: user.onlineStatus === 'online',
 		[$style.status_active]: user.onlineStatus === 'active',
 		[$style.status_offline]: user.onlineStatus === 'offline',
-		[$style.status_unknown]: user.onlineStatus === 'unknown',
 	}]"
 ></div>
 </template>
@@ -29,7 +29,6 @@ const text = computed(() => {
 		case 'online': return i18n.ts.online;
 		case 'active': return i18n.ts.active;
 		case 'offline': return i18n.ts.offline;
-		case 'unknown': return i18n.ts.unknown;
 	}
 });
 </script>
@@ -49,10 +48,6 @@ const text = computed(() => {
 
 	&.status_offline {
 		background: #ea5353;
-	}
-
-	&.status_unknown {
-		background: #888;
 	}
 }
 </style>
