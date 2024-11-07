@@ -1000,13 +1000,12 @@ async function insertEmoji(ev: MouseEvent) {
 	let pos = textareaEl.value?.selectionStart ?? 0;
 	let posEnd = textareaEl.value?.selectionEnd ?? text.value.length;
 
-    const addSpacing = (before: string, emoji: string, after: string) => {
+    const addSpacing = (before: string, emoji: string) => {
         let result = emoji;
         const needSpaceBefore = before.length > 0 && !before.endsWith(' ');
-        const needSpaceAfter = after.length > 0 && !after.startsWith(' ');
 
         if (needSpaceBefore) result = ' ' + result;
-        if (needSpaceAfter) result = result + ' ';
+        result = result + ' ';
 
         return result;
     };
@@ -1018,8 +1017,8 @@ async function insertEmoji(ev: MouseEvent) {
             const textAfter = text.value.substring(posEnd);
 
             const processedEmoji = defaultStore.state.emojiAutoSpacing 
-                ? addSpacing(textBefore, emoji, textAfter)
-                : emoji;
+                ? addSpacing(textBefore, emoji)
+                : emoji + ' ';
 
             text.value = textBefore + processedEmoji + textAfter;
 
