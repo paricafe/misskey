@@ -15,13 +15,13 @@ SPDX-License-Identifier: AGPL-3.0-only
 
 	<div v-if="collapsedUnexpectedLangs && isUnexpectedLanguage && !languageExpanded && !isRenote" :class="$style.collapsedLanguage">
 		<MkAvatar :class="$style.collapsedLanguageAvatar" :user="appearNote.user" link preview/>
-		<Mfm 
-			:text="getNoteSummary(appearNote)" 
-			:plain="true" 
-			:nowrap="true" 
-			:author="appearNote.user" 
-			:nyaize="'respect'" 
-			:class="$style.collapsedLanguageText" 
+		<Mfm
+			:text="getNoteSummary(appearNote)"
+			:plain="true"
+			:nowrap="true"
+			:author="appearNote.user"
+			:nyaize="'respect'"
+			:class="$style.collapsedLanguageText"
 			@click.stop="languageExpanded = true"
 		/>
 	</div>
@@ -790,7 +790,7 @@ function emitUpdReaction(emoji: string, delta: number) {
 
 .skipRender {
 	content-visibility: auto;
-	contain-intrinsic-size: 0 180px;
+	contain-intrinsic-size: 0 200px;
 }
 
 .tip {
