@@ -56,13 +56,13 @@ async function offlineContentHTML() {
 
 globalThis.addEventListener('fetch', ev => {
     const shouldCache = PATHS_TO_CACHE.some(path => ev.request.url.includes(path));
-    
+
     if (shouldCache) {
         ev.respondWith(
             caches.match(ev.request)
                 .then(response => {
                     if (response) return response;
-                    
+
                     return fetch(ev.request).then(response => {
                         if (!response || response.status !== 200 || response.type !== 'basic') return response;
                         const responseToCache = response.clone();
