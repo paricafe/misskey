@@ -293,7 +293,7 @@ function saveToHistory() {
     textHistory.value.push(text.value);
     currentHistoryIndex.value = textHistory.value.length - 1;
     lastSaveTime = now;
-    
+
     if (textHistory.value.length > 50) {
       textHistory.value = textHistory.value.slice(-50);
       currentHistoryIndex.value = textHistory.value.length - 1;
@@ -637,12 +637,12 @@ function clear() {
 function onKeydown(ev: KeyboardEvent) {
 	if (ev.key === 'Enter' && (ev.ctrlKey || ev.metaKey) && canPost.value) post();
 
-	if (enableUndoClearPostForm.value && !ev.ctrlKey && !ev.metaKey && !ev.altKey && 
-        !justEndedComposition.value && !ev.isComposing && 
+	if (enableUndoClearPostForm.value && !ev.ctrlKey && !ev.metaKey && !ev.altKey &&
+        !justEndedComposition.value && !ev.isComposing &&
         !['Shift', 'Alt', 'Control', 'Meta', 'CapsLock', 'Tab'].includes(ev.key)) {
       saveToHistory();
     }
-	
+
 	// justEndedComposition.value is for Safari, which keyDown occurs after compositionend.
 	// ev.isComposing is for another browsers.
 	if (ev.key === 'Escape' && !justEndedComposition.value && !ev.isComposing) emit('esc');
@@ -714,7 +714,7 @@ async function onPaste(ev: ClipboardEvent) {
 			upload(file, `${fileName}.txt`);
 		});
 	}
-	
+
 	nextTick(() => textareaEl.value && autosize.update(textareaEl.value));
 }
 
@@ -916,7 +916,16 @@ async function post(ev?: MouseEvent) {
 		}
 		nextTick(() => {
 			deleteDraft();
+			if (props.reply) {
+				props.reply.repliesCount = (props.reply.repliesCount || 0) + 1;
+			}
+			if (props.quote) {
+				props.renote.renoteCount = (props.renote.renoteCount || 0) + 1;
+			}
 			emit('posted');
+			if (postAccount.value != null ? postAccount.value.id : null) {
+				postAccount.value = null;
+			}
 			if (postData.text && postData.text !== '') {
 				const hashtags_ = mfm.parse(postData.text).map(x => x.type === 'hashtag' && x.props.hashtag).filter(x => x) as string[];
 				const history = JSON.parse(miLocalStorage.getItem('hashtags') ?? '[]') as string[];
@@ -1016,7 +1025,7 @@ async function insertEmoji(ev: MouseEvent) {
             const textBefore = text.value.substring(0, pos);
             const textAfter = text.value.substring(posEnd);
 
-            const processedEmoji = defaultStore.state.emojiAutoSpacing 
+            const processedEmoji = defaultStore.state.emojiAutoSpacing
                 ? addSpacing(textBefore, emoji)
                 : emoji + ' ';
 

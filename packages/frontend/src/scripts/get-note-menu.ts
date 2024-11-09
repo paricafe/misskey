@@ -459,7 +459,7 @@ export function getNoteMenu(props: {
 					action: edit,
 				});
 			}
-			
+
 			if (appearNote.userId === $i.id) {
 				menuItems.push({
 					icon: 'ti ti-edit',
@@ -576,6 +576,7 @@ export function getRenoteMenu(props: {
 						channelId: appearNote.channelId,
 					}).then(() => {
 						os.toast(i18n.ts.renoted);
+						appearNote.renoteCount = (appearNote.renoteCount || 0) + 1;
 					});
 				}
 			},
@@ -624,6 +625,7 @@ export function getRenoteMenu(props: {
 						renoteId: appearNote.id,
 					}).then(() => {
 						os.toast(i18n.ts.renoted);
+						appearNote.renoteCount = (appearNote.renoteCount || 0) + 1;
 					});
 				}
 			},
@@ -665,6 +667,7 @@ export function getRenoteMenu(props: {
 								channelId: channel.id,
 							}).then(() => {
 								os.toast(i18n.tsx.renotedToX({ name: channel.name }));
+								appearNote.renoteCount = (appearNote.renoteCount || 0) + 1;
 							});
 						}
 					},
