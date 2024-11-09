@@ -15,7 +15,8 @@
   - どのアカウントで認証しようとしているのかがわかるように
   - 認証するアカウントを切り替えられるように
 - Enhance: Self-XSS防止用の警告を追加
-- Enhance: カタルーニャ語 (ca-ES) に対応  
+- Enhance: カタルーニャ語 (ca-ES) に対応
+- Enhance: 個別お知らせページではMetaタグを出力するように
 - Fix: 通知の範囲指定の設定項目が必要ない通知設定でも範囲指定の設定がでている問題を修正
 - Fix: Turnstileが失敗・期限切れした際にも成功扱いとなってしまう問題を修正  
   (Cherry-picked from https://github.com/MisskeyIO/misskey/pull/768)
@@ -36,8 +37,11 @@
   (Cherry-picked from https://activitypub.software/TransFem-org/Sharkey/-/merge_requests/706)
 - Fix: 連合への配信時に、acctの大小文字が区別されてしまい正しくメンションが処理されないことがある問題を修正  
   (Cherry-picked from https://activitypub.software/TransFem-org/Sharkey/-/merge_requests/711)
+- Fix: ローカルユーザーへのメンションを含むノートが連合される際に正しいURLに変換されないことがある問題を修正  
+  (Cherry-picked from https://activitypub.software/TransFem-org/Sharkey/-/merge_requests/712)
 - Fix: FTT無効時にユーザーリストタイムラインが使用できない問題を修正  
   (Cherry-picked from https://activitypub.software/TransFem-org/Sharkey/-/merge_requests/709)
+- Enhance: リモートユーザーの照会をオリジナルにリダイレクトするように
 
 ### Misskey.js
 - Fix: Stream初期化時、別途WebSocketを指定する場合の型定義を修正
