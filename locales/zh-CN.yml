@@ -1860,6 +1860,7 @@ _role:
     gtlAvailable: "查看全局时间线"
     ltlAvailable: "查看本地时间线"
     canPublicNote: "允许公开发帖"
+    canEditNote: "允许编辑帖子"
     mentionMax: "帖子内最多提及数"
     canInvite: "发放服务器邀请码"
     inviteLimit: "可生成邀请码的数量"

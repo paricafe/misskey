@@ -1859,6 +1859,7 @@ _role:
     gtlAvailable: "瀏覽全域時間軸"
     ltlAvailable: "瀏覽本地時間軸"
     canPublicNote: "允許公開貼文"
+    canEditNote: "允許編輯貼文"
     mentionMax: "貼文內的最大提及數"
     canInvite: "發行伺服器邀請碼"
     inviteLimit: "可建立邀請碼的數量"
