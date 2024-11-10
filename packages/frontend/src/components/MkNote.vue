@@ -9,6 +9,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 	v-show="!isDeleted"
 	ref="rootEl"
 	v-hotkey="keymap"
+	:data-note-id="note.id"
 	:class="[$style.root, { [$style.showActionsOnlyHover]: defaultStore.state.showNoteActionsOnlyHover, [$style.skipRender]: defaultStore.state.skipNoteRender || defaultStore.state.enableRenderingOptimization }]"
 	:tabindex="isDeleted ? '-1' : '0'"
 >

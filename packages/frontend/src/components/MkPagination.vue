@@ -478,6 +478,54 @@ onBeforeUnmount(() => {
 	scrollObserver.value?.disconnect();
 });
 
+// 添加新的方法
+const insertNote = (item: MisskeyEntity): void => {
+	if (items.value.size === 0) {
+		items.value.set(item.id, item);
+		fetching.value = false;
+		return;
+	}
+
+	// 如果在顶部,直接添加到顶部
+	if (isTop() && !isPausingUpdate) {
+		unshiftItems([item]);
+	} else {
+		// 不在顶部时,根据设置决定行为
+		if (defaultStore.state.insertNewNotes) {
+			// 插入到当前可见位置
+			const entries = Array.from(items.value.entries());
+			const visibleIndex = findFirstVisibleNoteIndex(entries);
+			if (visibleIndex !== -1) {
+				entries.splice(visibleIndex, 0, [item.id, item]);
+				items.value = new Map(entries);
+			} else {
+				// 如果找不到可见的帖文,添加到队列
+				prependQueue(item);
+			}
+		} else {
+			// 保持原有行为
+			prependQueue(item);
+		}
+	}
+};
+
+// 添加辅助方法来找到第一个可见的帖文
+function findFirstVisibleNoteIndex(entries: [string, MisskeyEntity][]): number {
+	if (!rootEl.value) return -1;
+
+	const notes = rootEl.value.querySelectorAll('[data-note-id]');
+	for (let i = 0; i < notes.length; i++) {
+		const note = notes[i];
+		const rect = note.getBoundingClientRect();
+		if (rect.top >= 0 && rect.bottom <= window.innerHeight) {
+			// 找到对应的 entry index
+			const noteId = note.getAttribute('data-note-id');
+			return entries.findIndex(([id]) => id === noteId);
+		}
+	}
+	return -1;
+}
+
 defineExpose({
 	items,
 	queue,
@@ -488,6 +536,7 @@ defineExpose({
 	append: appendItem,
 	removeItem,
 	updateItem,
+	insertNote,
 });
 </script>
 
