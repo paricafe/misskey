@@ -500,26 +500,32 @@ function reply(): void {
 	});
 }
 
-function like(): void {
-	pleaseLogin(undefined, pleaseLoginContext.value);
-	showMovedDialog();
-	sound.playMisskeySfx('reaction');
+async function toggleReaction(reaction: string): Promise<void> {
 	if (props.mock) {
+		if (appearNote.value.myReaction) {
+			emit('removeReaction', appearNote.value.myReaction);
+		} else {
+			emit('reaction', reaction);
+		}
 		return;
 	}
-	misskeyApi('notes/reactions/create', {
-		noteId: appearNote.value.id,
-		reaction: '❤️',
-	});
-	const el = likeButton.value as HTMLElement | null | undefined;
-	if (el) {
-		const rect = el.getBoundingClientRect();
-		const x = rect.left + (el.offsetWidth / 2);
-		const y = rect.top + (el.offsetHeight / 2);
-		const { dispose } = os.popup(MkRippleEffect, { x, y }, {
-			end: () => dispose(),
+
+	if (appearNote.value.myReaction) {
+		await misskeyApi('notes/reactions/delete', {
+			noteId: appearNote.value.id,
+		});
+	} else {
+		await misskeyApi('notes/reactions/create', {
+			noteId: appearNote.value.id,
+			reaction: reaction,
 		});
 	}
+}
+
+async function like() {
+	if (props.appearNote.myReaction) return;
+	const emoji = defaultStore.state.defaultReactionEmoji;
+	await toggleReaction(emoji);
 }
 
 function react(): void {

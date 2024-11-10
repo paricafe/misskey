@@ -69,6 +69,10 @@ SPDX-License-Identifier: AGPL-3.0-only
 				<MkSwitch v-model="showDetailTimeWhenHover">{{ i18n.ts.showDetailTimeWhenHover }}</MkSwitch>
 				<MkSwitch v-model="noteClickToOpen">{{ i18n.ts.noteClickToOpen }}</MkSwitch>
 				<MkSwitch v-model="enableFallbackReactButton">{{ i18n.ts.enableFallbackReactButton }}</MkSwitch>
+				<MkButton @click="changeDefaultEmoji">
+					<template #label>{{ i18n.ts.defaultReactionEmoji }}</template>
+					<template #suffix>{{ defaultReactionEmoji }}</template>
+				</MkButton>
 				<MkSwitch v-model="enableMFMCheatsheet">{{ i18n.ts.enableMFMCheatsheet }}</MkSwitch>
 				<MkSwitch v-model="enableUndoClearPostForm">{{ i18n.ts.enableUndoClearPostForm }}</MkSwitch>
 				<MkSwitch v-model="collapseNotesRepliedTo">{{ i18n.ts.collapseNotesRepliedTo }}</MkSwitch>
@@ -106,6 +110,7 @@ import MkInfo from '@/components/MkInfo.vue';
 import MkRange from '@/components/MkRange.vue';
 import MkButton from '@/components/MkButton.vue';
 import FormSection from '@/components/form/section.vue';
+import * as os from '@/os.js';
 
 const defaultFont = getDefaultFontSettings();
 console.log(defaultFont);
@@ -137,6 +142,14 @@ const disableReactionsViewer = computed(defaultStore.makeGetterSetter('disableRe
 const collapsedUnexpectedLangs = computed(defaultStore.makeGetterSetter('collapsedUnexpectedLangs'));
 const emojiAutoSpacing = computed(defaultStore.makeGetterSetter('emojiAutoSpacing'));
 const insertNewNotes = computed(defaultStore.makeGetterSetter('insertNewNotes'));
+
+const defaultReactionEmoji = computed(defaultStore.makeGetterSetter('defaultReactionEmoji'));
+
+async function changeDefaultEmoji() {
+	const { canceled, result: emoji } = await os.pickEmoji();
+	if (canceled) return;
+	defaultReactionEmoji.value = emoji;
+}
 
 definePageMetadata(() => ({
 	title: 'Pari Plus!',
