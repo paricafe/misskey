@@ -15,6 +15,8 @@ import NotesChart from '@/core/chart/charts/notes.js';
 import UsersChart from '@/core/chart/charts/users.js';
 import { DEFAULT_POLICIES } from '@/core/RoleService.js';
 import type { FastifyInstance, FastifyPluginOptions } from 'fastify';
+import { IsNull, MoreThan } from 'typeorm';
+import type { UsersRepository } from '@/models/_.js';
 
 const nodeinfo2_1path = '/nodeinfo/2.1';
 const nodeinfo2_0path = '/nodeinfo/2.0';
@@ -25,6 +27,8 @@ export class NodeinfoServerService {
 	constructor(
 		@Inject(DI.config)
 		private config: Config,
+		@Inject(DI.usersRepository)
+		private usersRepository: UsersRepository,
 
 		private userEntityService: UserEntityService,
 		private metaService: MetaService,
@@ -58,17 +62,13 @@ export class NodeinfoServerService {
 
 			const [
 				meta,
-				//activeHalfyear,
-				//activeMonth,
+				activeHalfyear,
+				activeMonth,
 			] = await Promise.all([
 				this.metaService.fetch(true),
-				// 重い
-				//this.usersRepository.count({ where: { host: IsNull(), lastActiveDate: MoreThan(new Date(now - 15552000000)) } }),
-				//this.usersRepository.count({ where: { host: IsNull(), lastActiveDate: MoreThan(new Date(now - 2592000000)) } }),
+				this.usersRepository.count({ where: { host: IsNull(), lastActiveDate: MoreThan(new Date(now - 15552000000)) } }),
+				this.usersRepository.count({ where: { host: IsNull(), lastActiveDate: MoreThan(new Date(now - 2592000000)) } }),
 			]);
-
-			const activeHalfyear = null;
-			const activeMonth = null;
 
 			const proxyAccount = meta.proxyAccountId ? await this.userEntityService.pack(meta.proxyAccountId).catch(() => null) : null;
 
