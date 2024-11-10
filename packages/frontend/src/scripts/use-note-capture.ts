@@ -5,25 +5,44 @@
 
 import { onUnmounted, Ref, ShallowRef } from 'vue';
 import * as Misskey from 'misskey-js';
+import { misskeyApi } from './misskey-api.js';
 import { useStream } from '@/stream.js';
 import { $i } from '@/account.js';
+import * as os from '@/os.js';
 
 export function useNoteCapture(props: {
 	rootEl: ShallowRef<HTMLElement | undefined>;
 	note: Ref<Misskey.entities.Note>;
-	pureNote: Ref<Misskey.entities.Note>;
+	pureNote?: Ref<Misskey.entities.Note>;
 	isDeletedRef: Ref<boolean>;
+	onReplyCallback?: (replyNote: Misskey.entities.Note) => void | Promise<void>;
+	onDeleteCallback?: (id: Misskey.entities.Note['id']) => void | Promise<void>;
 }) {
 	const note = props.note;
 	const pureNote = props.pureNote;
 	const connection = $i ? useStream() : null;
 
-	function onStreamNoteUpdated(noteData): void {
+	async function onStreamNoteUpdated(noteData): Promise<void> {
 		const { type, id, body } = noteData;
 
 		if ((id !== note.value.id) && (id !== pureNote.value.id)) return;
 
 		switch (type) {
+			case 'replied': {
+				if (!props.onReplyCallback) break;
+
+				// notes/show may throw if the current user can't see the note
+				try {
+					const replyNote = await misskeyApi('notes/show', {
+						noteId: body.id,
+					});
+
+					await props.onReplyCallback(replyNote);
+				} catch { /* empty */ }
+
+				break;
+			}
+
 			case 'reacted': {
 				const reaction = body.reaction;
 
@@ -96,6 +115,8 @@ export function useNoteCapture(props: {
 
 			case 'deleted': {
 				props.isDeletedRef.value = true;
+
+				if (props.onDeleteCallback) await props.onDeleteCallback(id);
 				break;
 			}
 		}

@@ -417,6 +417,9 @@ if (props.mock) {
 		note: appearNote,
 		pureNote: note,
 		isDeletedRef: isDeleted,
+		onReplyCallback: () => {
+			appearNote.value.repliesCount += 1;
+		},
 	});
 }
 

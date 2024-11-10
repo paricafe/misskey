@@ -193,7 +193,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 			<!-- <div v-if="!repliesLoaded" style="padding: 16px">
 				<MkButton style="margin: 0 auto;" primary rounded @click="loadReplies">{{ i18n.ts.loadReplies }}</MkButton>
 			</div> -->
-			<MkNoteSub v-for="note in replies" :key="note.id" :note="note" :class="$style.reply" :detail="true"/>
+			<MkNoteSub v-for="note in replies" :key="note.id" :note="note" :class="$style.reply" :detail="true" :onDeleteCallback="removeReply" :isReply="true"/>
 		</div>
 		<div v-else-if="tab === 'renotes'" :class="$style.tab_renotes">
 			<MkPagination :pagination="renotesPagination" :disableAutoLoad="true">
@@ -400,11 +400,25 @@ const reactionsPagination = computed<Paging>(() => ({
 	},
 }));
 
+async function addReplyTo(replyNote: Misskey.entities.Note) {
+	replies.value.unshift(replyNote);
+	appearNote.value.repliesCount += 1;
+}
+
+async function removeReply(id: Misskey.entities.Note['id']) {
+	const replyIdx = replies.value.findIndex(note => note.id === id);
+	if (replyIdx >= 0) {
+		replies.value.splice(replyIdx, 1);
+		appearNote.value.repliesCount -= 1;
+	}
+}
+
 useNoteCapture({
 	rootEl: rootEl,
 	note: appearNote,
 	pureNote: note,
 	isDeletedRef: isDeleted,
+	onReplyCallback: addReplyTo,
 });
 
 useTooltip(renoteButton, async (showing) => {
