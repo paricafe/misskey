@@ -2837,5 +2837,3 @@ _selfXssPrevention:
   description3: "For more information, please check here: {link}"
 insertNewNotes: "Insert new notes at current position"
 insertNewNotesDescription: "Insert new notes at the current position while scrolling timeline."
-defaultReactionEmoji: "Default reaction emoji"
-defaultReactionEmojiDescription: "Set the emoji used for quick reaction button."
