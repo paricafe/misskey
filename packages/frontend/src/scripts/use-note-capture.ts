@@ -19,7 +19,7 @@ export function useNoteCapture(props: {
 	onDeleteCallback?: (id: Misskey.entities.Note['id']) => void | Promise<void>;
 }) {
 	const note = props.note;
-	const pureNote = props.pureNote;
+	const pureNote = props.pureNote !== undefined ? props.pureNote : props.note;
 	const connection = $i ? useStream() : null;
 
 	async function onStreamNoteUpdated(noteData): Promise<void> {
