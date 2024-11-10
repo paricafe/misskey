@@ -69,7 +69,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 				<MkSwitch v-model="showDetailTimeWhenHover">{{ i18n.ts.showDetailTimeWhenHover }}</MkSwitch>
 				<MkSwitch v-model="noteClickToOpen">{{ i18n.ts.noteClickToOpen }}</MkSwitch>
 				<MkSwitch v-model="enableFallbackReactButton">{{ i18n.ts.enableFallbackReactButton }}</MkSwitch>
-				<MkButton @click="changeDefaultEmoji">
+				<MkButton v-if="enableFallbackReactButton" @click="changeDefaultEmoji">
 					<template #label>{{ i18n.ts.defaultReactionEmoji }}</template>
 					<template #suffix>{{ defaultReactionEmoji }}</template>
 				</MkButton>
