@@ -2823,4 +2823,4 @@ _selfXssPrevention:
   description3: "詳しくはこちらをご確認ください。 {link}"
 
 insertNewNotes: "新着ノートを表示位置に挿入"
-insertNewNotesDescription: "タイムラインをスクロール中に新着ノートを受信した場合、現在の表示位置に挿入します。オフの場合は従来通り通知を表示します。"
+insertNewNotesDescription: "タイムラインをスクロール中、現在の位置に新しいノートを挿入。"

@@ -2836,4 +2836,4 @@ _selfXssPrevention:
   description2: "If you don't fully understand what you're about to paste, %cplease stop immediately and close this window."
   description3: "For more information, please check here: {link}"
 insertNewNotes: "Insert new notes at current position"
-insertNewNotesDescription: "When receiving new notes while scrolling timeline, insert them at current viewing position. If disabled, show notification as usual."
+insertNewNotesDescription: "Insert new notes at the current position while scrolling timeline."
