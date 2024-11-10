@@ -68,14 +68,19 @@ export function useStream(): Misskey.IStream {
     if (timeoutHeartBeat) window.clearTimeout(timeoutHeartBeat);
     timeoutHeartBeat = window.setTimeout(heartbeat, HEART_BEAT_INTERVAL);
 
-    // send heartbeat right now when last send time is over HEART_BEAT_INTERVAL
-    document.addEventListener('visibilitychange', () => {
+    const target = () => {
         if (
             !stream
             || document.visibilityState !== 'visible'
             || Date.now() - lastHeartbeatCall < HEART_BEAT_INTERVAL
         ) return;
         heartbeat();
+    }
+	// send heartbeat right now when last send time is over HEART_BEAT_INTERVAL
+    document.addEventListener('visibilitychange', target);
+
+    stream.on('_disconnected_', () => {
+        document.removeEventListener('visibilitychange', target);
     });
 
     return stream;
