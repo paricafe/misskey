@@ -25,26 +25,28 @@ import { defaultStore } from '@/store.js';
 import { customEmojisMap } from '@/custom-emojis.js';
 
 const localEmojiSet = new Set(Array.from(customEmojisMap.keys()));
-const emojiCache = new Map<string, boolean>();
+const emojiCache = new Map<string, { hasNative: boolean; base: string }>();
 
-function hasLocalEmoji(reaction: string): boolean {
-  if (emojiCache.has(reaction)) return emojiCache.get(reaction)!;
-  
-  let result: boolean;
-  if (!reaction.includes(':')) {
-    result = true;
-  } else {
-    const emojiName = reaction.split('@')[0].split(':')[1];
-    result = localEmojiSet.has(emojiName);
+function getReactionInfo(reaction: string) {
+  if (emojiCache.has(reaction)) {
+    return emojiCache.get(reaction)!;
   }
-  
-  emojiCache.set(reaction, result);
-  return result;
-}
 
-function getBaseReaction(reaction: string): string {
-  if (!reaction.includes(':')) return reaction;
-  return `:${reaction.split('@')[0].split(':')[1]}:`;
+  let hasNative: boolean;
+  let base: string;
+
+  if (!reaction.includes(':')) {
+    hasNative = true;
+    base = reaction;
+  } else {
+    const baseName = reaction.split('@')[0].split(':')[1];
+    hasNative = localEmojiSet.has(baseName);
+    base = hasNative ? `:${baseName}:` : reaction;
+  }
+
+  const info = { hasNative, base };
+  emojiCache.set(reaction, info);
+  return info;
 }
 
 const props = withDefaults(defineProps<{
@@ -67,22 +69,15 @@ const hasMoreReactions = ref(false);
 
 const mergedReactions = computed(() => {
   const reactionMap = new Map();
-  
+
   reactions.value.forEach(([reaction, count]) => {
-    if (!hasLocalEmoji(reaction)) {
-      if (reactionMap.has(reaction)) {
-        reactionMap.set(reaction, reactionMap.get(reaction) + count);
-      } else {
-        reactionMap.set(reaction, count);
-      }
-      return;
-    }
-    
-    const baseReaction = getBaseReaction(reaction);
-    if (reactionMap.has(baseReaction)) {
-      reactionMap.set(baseReaction, reactionMap.get(baseReaction) + count);
+    const info = getReactionInfo(reaction);
+    const key = info.base;
+
+    if (reactionMap.has(key)) {
+      reactionMap.set(key, reactionMap.get(key) + count);
     } else {
-      reactionMap.set(baseReaction, count);
+      reactionMap.set(key, count);
     }
   });
 
@@ -95,7 +90,7 @@ if (props.note.myReaction && !Object.keys(reactions.value).includes(props.note.m
 
 onBeforeMount(() => {
   Object.keys(props.note.reactions).forEach(reaction => {
-    hasLocalEmoji(reaction);
+    getReactionInfo(reaction);
   });
 });
 
