@@ -1883,6 +1883,7 @@ _role:
     canHideAds: "不顯示廣告"
     canSearchNotes: "可否搜尋貼文"
     canUseTranslator: "使用翻譯功能"
+    canImportNotes: "允許匯入貼文"
     avatarDecorationLimit: "頭像裝飾的最大設置量"
     canImportAntennas: "允許匯入天線"
     canImportBlocking: "允許匯入封鎖名單"

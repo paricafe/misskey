@@ -1884,6 +1884,7 @@ _role:
     canHideAds: "可以隐藏广告"
     canSearchNotes: "是否可以搜索帖子"
     canUseTranslator: "使用翻译功能"
+    canImportNotes: "允许导入帖子"
     avatarDecorationLimit: "可添加头像挂件的最大个数"
     canImportAntennas: "允许导入天线"
     canImportBlocking: "允许导入拉黑列表"
