@@ -402,6 +402,16 @@ export class NoteCreateService implements OnApplicationShutdown {
 	}
 
 	@bindThis
+	public async import(user: {
+		id: MiUser['id'];
+		username: MiUser['username'];
+		host: MiUser['host'];
+		isBot: MiUser['isBot'];
+	}, data: Option): Promise<MiNote> {
+		return this.create(user, data, true);
+	}
+
+	@bindThis
 	private async insertNote(user: { id: MiUser['id']; host: MiUser['host']; }, data: Option, tags: string[], emojis: string[], mentionedUsers: MinimumUser[]) {
 		const insert = new MiNote({
 			id: this.idService.gen(data.createdAt?.getTime()),

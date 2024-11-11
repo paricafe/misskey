@@ -6980,6 +6980,7 @@ export interface Locale extends ILocale {
             /**
              * アンテナのインポートを許可
              */
+            "canImportNotes": string;
             "canImportAntennas": string;
             /**
              * ブロックのインポートを許可

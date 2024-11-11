@@ -45,6 +45,7 @@ import { CleanProcessorService } from './processors/CleanProcessorService.js';
 import { AggregateRetentionProcessorService } from './processors/AggregateRetentionProcessorService.js';
 import { QueueLoggerService } from './QueueLoggerService.js';
 import { QUEUE, baseQueueOptions } from './const.js';
+import { ImportNotesProcessorService } from './processors/ImportNotesProcessorService.js';
 
 // ref. https://github.com/misskey-dev/misskey/pull/7635#issue-971097019
 function httpRelatedBackoff(attemptsMade: number) {
@@ -106,6 +107,7 @@ export class QueueProcessorService implements OnApplicationShutdown {
 		private exportUserListsProcessorService: ExportUserListsProcessorService,
 		private exportAntennasProcessorService: ExportAntennasProcessorService,
 		private importFollowingProcessorService: ImportFollowingProcessorService,
+		private importNotesProcessorService: ImportNotesProcessorService,
 		private importMutingProcessorService: ImportMutingProcessorService,
 		private importBlockingProcessorService: ImportBlockingProcessorService,
 		private importUserListsProcessorService: ImportUserListsProcessorService,
@@ -220,6 +222,13 @@ export class QueueProcessorService implements OnApplicationShutdown {
 					case 'importUserLists': return this.importUserListsProcessorService.process(job);
 					case 'importCustomEmojis': return this.importCustomEmojisProcessorService.process(job);
 					case 'importAntennas': return this.importAntennasProcessorService.process(job);
+					case 'importNotes': return this.importNotesProcessorService.process(job);
+					case 'importTweetsToDb': return this.importNotesProcessorService.processTwitterDb(job);
+					case 'importIGToDb': return this.importNotesProcessorService.processIGDb(job);
+					case 'importFBToDb': return this.importNotesProcessorService.processFBDb(job);
+					case 'importMastoToDb': return this.importNotesProcessorService.processMastoToDb(job);
+					case 'importPleroToDb': return this.importNotesProcessorService.processPleroToDb(job);
+					case 'importKeyNotesToDb': return this.importNotesProcessorService.processKeyNotesToDb(job);
 					case 'deleteAccount': return this.deleteAccountProcessorService.process(job);
 					default: throw new Error(`unrecognized job type ${job.name} for db`);
 				}
