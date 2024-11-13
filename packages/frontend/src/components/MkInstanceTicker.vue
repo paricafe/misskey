@@ -4,7 +4,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 -->
 
 <template>
-<div :class="$style.root" :style="bg" @click.stop="defaultStore.state.clickToShowInstanceTickerWindow && showInstanceTickerWindow">
+<div :class="$style.root" :style="bg" @click.stop="showInstanceTickerWindow">
 	<img v-if="faviconUrl" :class="$style.icon" :src="faviconUrl"/>
 	<div :class="$style.name">{{ instance.name }}</div>
 </div>
@@ -43,6 +43,8 @@ const bg = {
 };
 
 function showInstanceTickerWindow() {
+	if (!defaultStore.state.clickToShowInstanceTickerWindow) return;
+
 	if (props.host) {
 		os.pageWindow(`/instance-info/${props.host}`);
 	} else {
