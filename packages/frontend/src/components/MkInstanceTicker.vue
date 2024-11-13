@@ -1,10 +1,10 @@
 <!--
-SPDX-FileCopyrightText: syuilo and misskey-project
+SPDX-FileCopyrightText: syuilo and other misskey contributors
 SPDX-License-Identifier: AGPL-3.0-only
 -->
 
 <template>
-<div :class="$style.root" :style="bg">
+<div :class="$style.root" :style="bg" @click.stop="defaultStore.state.clickToShowInstanceTickerWindow && showInstanceTickerWindow">
 	<img v-if="faviconUrl" :class="$style.icon" :src="faviconUrl"/>
 	<div :class="$style.name">{{ instance.name }}</div>
 </div>
@@ -15,13 +15,16 @@ import { computed } from 'vue';
 import { instanceName } from '@@/js/config.js';
 import { instance as Instance } from '@/instance.js';
 import { getProxiedImageUrlNullable } from '@/scripts/media-proxy.js';
+import { defaultStore } from '@/store.js';
+import * as os from '@/os.js';
 
 const props = defineProps<{
 	instance?: {
-		faviconUrl?: string | null
-		name?: string | null
-		themeColor?: string | null
+		faviconUrl?: string
+		name: string
+		themeColor?: string
 	}
+	host: string | null,
 }>();
 
 // if no instance data is given, this is for the local instance
@@ -30,26 +33,33 @@ const instance = props.instance ?? {
 	themeColor: (document.querySelector('meta[name="theme-color-orig"]') as HTMLMetaElement).content,
 };
 
-const faviconUrl = computed(() => props.instance ? getProxiedImageUrlNullable(props.instance.faviconUrl, 'preview') : getProxiedImageUrlNullable(Instance.iconUrl, 'preview') ?? '/favicon.ico');
+const faviconUrl = computed(() => props.instance ? getProxiedImageUrlNullable(props.instance.faviconUrl, 'preview') : getProxiedImageUrlNullable(Instance.iconUrl, 'preview') ?? getProxiedImageUrlNullable(Instance.faviconUrl, 'preview') ?? '/favicon.ico');
 
 const themeColor = instance.themeColor ?? '#777777';
 
 const bg = {
-	background: `linear-gradient(90deg, ${themeColor}, ${themeColor}00)`,
+	//background: `linear-gradient(90deg, ${themeColor}, ${themeColor}00)`,
+	background: `${themeColor}`,
 };
+
+function showInstanceTickerWindow() {
+	if (props.host) {
+		os.pageWindow(`/instance-info/${props.host}`);
+	} else {
+		os.pageWindow('/about');
+	}
+}
 </script>
 
 <style lang="scss" module>
-$height: 2ex;
-
 .root {
 	display: flex;
 	align-items: center;
-	height: $height;
-	border-radius: 4px 0 0 4px;
+	height: 1.5ex;
+	border-radius: 1.0rem;
+	padding: 4px;
 	overflow: clip;
 	color: #fff;
-	margin: -.3em 0 0 0;
 	text-shadow: /* .866 ≈ sin(60deg) */
 		1px 0 1px #000,
 		.866px .5px 1px #000,
@@ -63,24 +73,34 @@ $height: 2ex;
 		0 -1px 1px #000,
 		.5px -.866px 1px #000,
 		.866px -.5px 1px #000;
-	mask-image: linear-gradient(90deg,
-		rgb(0,0,0),
-		rgb(0,0,0) calc(100% - 16px),
-		rgba(0,0,0,0) 100%
-	);
 }
 
 .icon {
-	height: $height;
+	height: 2ex;
 	flex-shrink: 0;
 }
 
 .name {
-	margin-left: 4px;
+	padding: 0.5ex;
+	margin: -0.5ex;
+	margin-left: calc(4px - 0.5ex);
 	line-height: 1;
-	font-size: 0.9em;
+	font-size: 0.8em;
 	font-weight: bold;
 	white-space: nowrap;
-	overflow: visible;
+	overflow: hidden;
+	overflow-wrap: anywhere;
+	max-width: 300px;
+	text-overflow: ellipsis;
+
+	&::-webkit-scrollbar {
+		display: none;
+	}
+}
+
+@container (max-width: 400px) {
+	.name {
+		max-width: 55px;
+	}
 }
 </style>

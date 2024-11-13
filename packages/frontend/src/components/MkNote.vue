@@ -70,7 +70,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 		    <MkAvatar :class="$style.avatar" :user="appearNote.user" :link="!mock" :preview="!mock"/>
 		    <div :class="$style.main">
 			    <MkNoteHeader :note="appearNote" :mini="true" @click.stop/>
-			    <MkInstanceTicker v-if="showTicker" :instance="appearNote.user.instance"/>
 		    </div>
 	    </div>
 		<div :class="[{ [$style.noteClickToOpen]: defaultStore.state.noteClickToOpen }]" @click.stop="defaultStore.state.noteClickToOpen ? noteClickToOpen(appearNote.id) : undefined">

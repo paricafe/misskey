@@ -53,14 +53,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 						<MkUserName :nowrap="false" :user="appearNote.user"/>
 					</MkA>
 					<span v-if="appearNote.user.isBot" :class="$style.isBot">bot</span>
-					<div :class="$style.noteHeaderInfo">
-						<span v-if="appearNote.visibility !== 'public'" style="margin-left: 0.5em;" :title="i18n.ts._visibility[appearNote.visibility]">
-							<i v-if="appearNote.visibility === 'home'" class="ti ti-home"></i>
-							<i v-else-if="appearNote.visibility === 'followers'" class="ti ti-lock"></i>
-							<i v-else-if="appearNote.visibility === 'specified'" ref="specified" class="ti ti-mail"></i>
-						</span>
-						<span v-if="appearNote.localOnly" style="margin-left: 0.5em;" :title="i18n.ts._visibility['disableFederation']"><i class="ti ti-rocket-off"></i></span>
-					</div>
 				</div>
 				<div :class="$style.noteHeaderUsernameAndBadgeRoles">
 					<div :class="$style.noteHeaderUsername">
@@ -70,7 +62,19 @@ SPDX-License-Identifier: AGPL-3.0-only
 						<img v-for="(role, i) in appearNote.user.badgeRoles" :key="i" v-tooltip="role.name" :class="$style.noteHeaderBadgeRole" :src="role.iconUrl!"/>
 					</div>
 				</div>
-				<MkInstanceTicker v-if="showTicker" :instance="appearNote.user.instance"/>
+			</div>
+			<div :class="$style.noteHeaderMetaInfo">
+				<div :class="$style.noteHeaderInfo">
+					<span v-if="appearNote.visibility !== 'public'" style="margin-right: 0.5em;" :title="i18n.ts._visibility[appearNote.visibility]">
+						<i v-if="appearNote.visibility === 'home'" class="ti ti-home"></i>
+						<i v-else-if="appearNote.visibility === 'followers'" class="ti ti-lock"></i>
+						<i v-else-if="appearNote.visibility === 'specified'" ref="specified" class="ti ti-mail"></i>
+					</span>
+					<span v-if="appearNote.localOnly" style="margin-right: 0.5em;" :title="i18n.ts._visibility['disableFederation']">
+						<i class="ti ti-rocket-off"></i>
+					</span>
+				</div>
+				<MkInstanceTicker v-if="showTicker" :style="{ cursor: defaultStore.state.clickToShowInstanceTickerWindow ? 'pointer' : 'default' }" :instance="appearNote.user.instance" :host="note.user.host"/>
 			</div>
 		</header>
 		<div :class="$style.noteContent">
@@ -823,7 +827,6 @@ onMounted(() => {
 }
 
 .noteHeaderName {
-	margin: 0 0 -.2em 0;
 	font-weight: bold;
 	line-height: 1.3;
 }
@@ -848,9 +851,23 @@ onMounted(() => {
 
 .noteHeaderUsername {
 	margin-bottom: 2px;
-	margin-right: 0.5em;
 	line-height: 1.3;
 	word-wrap: anywhere;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+
+	&::-webkit-scrollbar {
+		display: none;
+	}
+}
+
+.noteHeaderMetaInfo {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  margin-left: auto;
+  min-width: fit-content;
+  flex-shrink: 0;
 }
 
 .noteHeaderBadgeRoles {

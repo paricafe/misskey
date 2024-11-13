@@ -20,17 +20,17 @@ SPDX-License-Identifier: AGPL-3.0-only
 			</div>
 		   	<div :class="$style.username"><MkAcct :user="note.user"/></div>
 	    </div>
-		<!--<div :class="$style.section">-->
+		<div :class="$style.section">
 			<div :class="$style.info">
 				<span v-if="note.updatedAt" style="margin-right: 0.5em;" :title="i18n.ts.edited"><i class="ti ti-pencil"></i></span>
 				<div v-if="mock">
 					<MkTime :time="note.createdAt" colored/>
 				</div>
 				<MkA v-else :to="notePage(note)" @mouseenter="setDetail(true)" @mouseleave="setDetail(false)" :style="{ textDecoration: 'none', userSelect: 'none' }">
-					<MkTime 
-                        :time="note.createdAt" 
-                        :mode="(defaultStore.state.showDetailTimeWhenHover && isDetail) ? 'detail' : undefined" 
-                        colored 
+					<MkTime
+                        :time="note.createdAt"
+                        :mode="(defaultStore.state.showDetailTimeWhenHover && isDetail) ? 'detail' : undefined"
+                        colored
                     />
 				</MkA>
 				<span v-if="note.visibility !== 'public'" style="margin-left: 0.5em;" :title="i18n.ts._visibility[note.visibility]">
@@ -41,10 +41,11 @@ SPDX-License-Identifier: AGPL-3.0-only
 				<span v-if="note.localOnly" style="margin-left: 0.5em;" :title="i18n.ts._visibility['disableFederation']"><i class="ti ti-rocket-off"></i></span>
 				<span v-if="note.channel" style="margin-left: 0.5em;" :title="note.channel.name"><i class="ti ti-device-tv"></i></span>
 			</div>
-	    <!--</div>-->
+			<div :class="$style.info"><MkInstanceTicker v-if="showTicker" :style="{ cursor: defaultStore.state.clickToShowInstanceTickerWindow ? 'pointer' : 'default' }" :instance="note.user.instance" :host="note.user.host"/></div>
+	  </div>
 	</header>
 </template>
-	
+
 <script lang="ts" setup>
 import { inject, ref } from 'vue';
 import * as Misskey from 'misskey-js';
@@ -52,15 +53,18 @@ import { i18n } from '@/i18n.js';
 import { notePage } from '@/filters/note.js';
 import { userPage } from '@/filters/user.js';
 import { defaultStore } from '@/store.js';
+import MkInstanceTicker from '@/components/MkInstanceTicker.vue';
 
 const isDetail = ref(false);
 const setDetail = (value) => {
     isDetail.value = value;
 };
 
-defineProps<{
+const props = defineProps<{
 	note: Misskey.entities.Note;
 }>();
+
+const showTicker = (defaultStore.state.instanceTicker === 'always') || (defaultStore.state.instanceTicker === 'remote' && props.note.user.instance);
 
 const mock = inject<boolean>('mock', false);
 </script>
@@ -73,25 +77,29 @@ const mock = inject<boolean>('mock', false);
 }
 
 .section {
-		align-items: flex-start;
-		white-space: nowrap;
-		flex-direction: column;
-		overflow: hidden;
+	display: flex;
+	white-space: nowrap;
+	flex-direction: column;
 
-		&:last-child {
-			display: flex;
-			align-items: flex-end;
-			margin-left: auto;
-			margin-bottom: auto;
-			padding-left: 10px;
-			overflow: clip;
-		}
+	&:first-child {
+		flex: 1;
+		overflow: hidden;
+		min-width: 0;
+	}
+
+	&:last-child {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-end;
+		margin-left: auto;
+		overflow: visible;
+	}
 }
 
 .name {
 	flex-shrink: 1;
 	display: block;
-	margin: .3em .5em 0 0;
+	margin: 0 .5em 0 0;
 	padding: 0;
 	overflow: hidden;
 	font-size: 1em;
@@ -117,10 +125,9 @@ const mock = inject<boolean>('mock', false);
 
 .username {
 	flex-shrink: 9999999;
-	margin: -.3em .5em .3em 0;
+	margin: 0;
 	overflow: hidden;
 	text-overflow: ellipsis;
-	font-size: 95%;
 	opacity: 0.8;
 
 	&::-webkit-scrollbar {
@@ -129,10 +136,19 @@ const mock = inject<boolean>('mock', false);
 }
 
 .info {
-	flex-shrink: 0;
-	margin-left: auto;
-	font-size: 0.9em;
-	text-decoration: none;
+	display: flex;
+	align-items: center;
+	gap: 4px;
+
+	&:first-child {
+		margin-top: 0;
+		font-size: 0.9em;
+	}
+
+	&:not(:first-child) {
+		margin-top: 4px;
+		font-size: 0.9em;
+	}
 }
 
 .badgeRoles {

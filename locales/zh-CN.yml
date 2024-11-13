@@ -2838,3 +2838,4 @@ _selfXssPrevention:
   description3: "详情请看这里。{link}"
 insertNewNotes: "在当前位置插入新帖文"
 insertNewNotesDescription: "將新收到的帖文插入到正在浏览的位置。"
+clickToShowInstanceTickerWindow: "点击Instance ticker显示实例信息窗口"

@@ -79,6 +79,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 					<template #label>{{ i18n.ts.insertNewNotes }}</template>
 					<template #caption>{{ i18n.ts.insertNewNotesDescription }}</template>
 				</MkSwitch>
+				<MkSwitch v-model="clickToShowInstanceTickerWindow">{{ i18n.ts.clickToShowInstanceTickerWindow }}</MkSwitch>
 				<MkSelect v-model="autoSpacingBehaviour">
 					<template #label>{{ i18n.ts.autoSpacing }}</template>
 					<option :value="null">{{ i18n.ts.disabled }}</option>
@@ -137,6 +138,7 @@ const disableReactionsViewer = computed(defaultStore.makeGetterSetter('disableRe
 const collapsedUnexpectedLangs = computed(defaultStore.makeGetterSetter('collapsedUnexpectedLangs'));
 const emojiAutoSpacing = computed(defaultStore.makeGetterSetter('emojiAutoSpacing'));
 const insertNewNotes = computed(defaultStore.makeGetterSetter('insertNewNotes'));
+const clickToShowInstanceTickerWindow = computed(defaultStore.makeGetterSetter('clickToShowInstanceTickerWindow'));
 
 definePageMetadata(() => ({
 	title: 'Pari Plus!',
