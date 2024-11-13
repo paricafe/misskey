@@ -36,7 +36,7 @@ globalThis.addEventListener('activate', ev => {
         caches.keys()
             .then(cacheNames => Promise.all(
                 cacheNames
-                    .filter((v) => v !== swLang.cacheName && !v.startsWith('misskey-static-'))
+                    .filter((v) => v !== STATIC_CACHE_NAME && v !== swLang.cacheName)
                     .map(name => caches.delete(name)),
             ))
             .then(() => globalThis.clients.claim()),
