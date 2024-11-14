@@ -320,7 +320,7 @@ const renoteCollapsed = ref(
 	),
 );
 
-const defaultLike = computed(() => defaultStore.state.like ? defaultStore.state.like : null);
+const defaultLike = computed(() => defaultStore.state.like ?? '♥');
 
 const inReplyToCollapsed = ref(defaultStore.state.collapseNotesRepliedTo);
 const disableReactionsViewer = ref(defaultStore.reactiveState.disableReactionsViewer);
