@@ -500,9 +500,9 @@ function like(): void {
 	pleaseLogin({ openOnRemote: pleaseLoginContext.value });
 	showMovedDialog();
 	sound.playMisskeySfx('reaction');
-	misskeyApi('notes/like', {
+	misskeyApi('notes/reactions/create', {
 		noteId: appearNote.value.id,
-		override: defaultLike.value,
+		reaction: defaultLike.value,
 	});
 	const el = likeButton.value as HTMLElement | null | undefined;
 	if (el) {
@@ -521,9 +521,9 @@ function react(): void {
 	if (appearNote.value.reactionAcceptance === 'likeOnly' || disableReactionsViewer.value) {
 		sound.playMisskeySfx('reaction');
 
-		misskeyApi('notes/like', {
+		misskeyApi('notes/reactions/create', {
 			noteId: appearNote.value.id,
-			override: defaultLike.value,
+			reaction: defaultLike.value,
 		});
 		const el = reactButton.value;
 		if (el) {

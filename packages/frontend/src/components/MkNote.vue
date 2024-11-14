@@ -508,9 +508,9 @@ function like(): void {
 	if (props.mock) {
 		return;
 	}
-	misskeyApi('notes/like', {
+	misskeyApi('notes/reactions/create', {
 		noteId: appearNote.value.id,
-		override: defaultLike.value,
+		reaction: defaultLike.value,
 	});
 	const el = likeButton.value as HTMLElement | null | undefined;
 	if (el) {
@@ -533,9 +533,9 @@ function react(): void {
 			return;
 		}
 
-		misskeyApi('notes/like', {
+		misskeyApi('notes/reactions/create', {
 			noteId: appearNote.value.id,
-			override: defaultLike.value,
+			reaction: defaultLike.value,
 		});
 		const el = reactButton.value;
 		if (el) {
