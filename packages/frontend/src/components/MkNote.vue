@@ -320,6 +320,8 @@ const renoteCollapsed = ref(
 	),
 );
 
+const defaultLike = computed(() => defaultStore.state.like ? defaultStore.state.like : null);
+
 const inReplyToCollapsed = ref(defaultStore.state.collapseNotesRepliedTo);
 const disableReactionsViewer = ref(defaultStore.reactiveState.disableReactionsViewer);
 const collapsedUnexpectedLangs = ref(defaultStore.reactiveState.collapsedUnexpectedLangs);
@@ -500,15 +502,15 @@ function reply(): void {
 }
 
 function like(): void {
-	pleaseLogin(undefined, pleaseLoginContext.value);
+	pleaseLogin({ openOnRemote: pleaseLoginContext.value });
 	showMovedDialog();
 	sound.playMisskeySfx('reaction');
 	if (props.mock) {
 		return;
 	}
-	misskeyApi('notes/reactions/create', {
+	misskeyApi('notes/like', {
 		noteId: appearNote.value.id,
-		reaction: '❤️',
+		override: defaultLike.value,
 	});
 	const el = likeButton.value as HTMLElement | null | undefined;
 	if (el) {
@@ -531,9 +533,9 @@ function react(): void {
 			return;
 		}
 
-		misskeyApi('notes/reactions/create', {
+		misskeyApi('notes/like', {
 			noteId: appearNote.value.id,
-			reaction: '❤️',
+			override: defaultLike.value,
 		});
 		const el = reactButton.value;
 		if (el) {

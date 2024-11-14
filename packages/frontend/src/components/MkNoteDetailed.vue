@@ -348,6 +348,7 @@ const showTicker = (defaultStore.state.instanceTicker === 'always') || (defaultS
 const conversation = ref<Misskey.entities.Note[]>([]);
 const replies = ref<Misskey.entities.Note[]>([]);
 const canRenote = computed(() => ['public', 'home'].includes(appearNote.value.visibility) || appearNote.value.userId === $i?.id);
+const defaultLike = computed(() => defaultStore.state.like ? defaultStore.state.like : null);
 
 type ShowingNoteHistoryState = {
 	createdAt: string | null;
@@ -496,15 +497,12 @@ function reply(): void {
 }
 
 function like(): void {
-	pleaseLogin(undefined, pleaseLoginContext.value);
+	pleaseLogin({ openOnRemote: pleaseLoginContext.value });
 	showMovedDialog();
 	sound.playMisskeySfx('reaction');
-	if (props.mock) {
-		return;
-	}
-	misskeyApi('notes/reactions/create', {
+	misskeyApi('notes/like', {
 		noteId: appearNote.value.id,
-		reaction: '❤️',
+		override: defaultLike.value,
 	});
 	const el = likeButton.value as HTMLElement | null | undefined;
 	if (el) {
@@ -523,9 +521,9 @@ function react(): void {
 	if (appearNote.value.reactionAcceptance === 'likeOnly' || disableReactionsViewer.value) {
 		sound.playMisskeySfx('reaction');
 
-		misskeyApi('notes/reactions/create', {
+		misskeyApi('notes/like', {
 			noteId: appearNote.value.id,
-			reaction: '❤️',
+			override: defaultLike.value,
 		});
 		const el = reactButton.value;
 		if (el) {

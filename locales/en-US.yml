@@ -2839,3 +2839,4 @@ _selfXssPrevention:
 insertNewNotes: "Insert new notes at current position"
 insertNewNotesDescription: "Insert new notes at the current position while scrolling timeline."
 clickToShowInstanceTickerWindow: "Click InstanceTicker to show instance info"
+defaultLike: "Default like reaction"

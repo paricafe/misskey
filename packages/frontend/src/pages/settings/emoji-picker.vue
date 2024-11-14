@@ -85,6 +85,17 @@ SPDX-License-Identifier: AGPL-3.0-only
 		</div>
 	</MkFolder>
 
+	<FromSlot>
+		<template #label>{{ i18n.ts.defaultLike }}</template>
+		<MkCustomEmoji v-if="like && like.startsWith(':')" style="max-height: 3em; font-size: 1.1em;" :useOriginalSize="false" :name="like" :normal="true" :noStyle="true"/>
+		<MkEmoji v-else-if="like && !like.startsWith(':')" :emoji="like" style="max-height: 3em; font-size: 1.1em;" :normal="true" :noStyle="true"/>
+		<span v-else-if="!like">{{ i18n.ts.notSet }}</span>
+		<div class="_buttons" style="padding-top: 8px;">
+			<MkButton rounded :small="true" inline @click="chooseNewLike"><i class="ti ti-plus"></i></MkButton>
+			<MkButton rounded :small="true" inline @click="resetLike"><i class="ti ti-refresh"></i></MkButton>
+		</div>
+	</FromSlot>
+
 	<FormSection>
 		<template #label>{{ i18n.ts.emojiPickerDisplay }}</template>
 
@@ -131,6 +142,7 @@ import Sortable from 'vuedraggable';
 import MkRadios from '@/components/MkRadios.vue';
 import MkButton from '@/components/MkButton.vue';
 import FormSection from '@/components/form/section.vue';
+import FromSlot from '@/components/form/slot.vue';
 import MkSelect from '@/components/MkSelect.vue';
 import * as os from '@/os.js';
 import { defaultStore } from '@/store.js';
@@ -154,6 +166,8 @@ const emojiPickerStyle = computed(defaultStore.makeGetterSetter('emojiPickerStyl
 const removeReaction = (reaction: string, ev: MouseEvent) => remove(pinnedEmojisForReaction, reaction, ev);
 const chooseReaction = (ev: MouseEvent) => pickEmoji(pinnedEmojisForReaction, ev);
 const setDefaultReaction = () => setDefault(pinnedEmojisForReaction);
+
+const like = computed(defaultStore.makeGetterSetter('like'));
 
 const removeEmoji = (reaction: string, ev: MouseEvent) => remove(pinnedEmojis, reaction, ev);
 const chooseEmoji = (ev: MouseEvent) => pickEmoji(pinnedEmojis, ev);
@@ -221,6 +235,18 @@ async function pickEmoji(itemsRef: Ref<string[]>, ev: MouseEvent) {
 			itemsRef.value.push(emoji);
 		}
 	});
+}
+
+function chooseNewLike(ev: MouseEvent) {
+	os.pickEmoji(getHTMLElement(ev), {
+		showPinned: false,
+	}).then(async emoji => {
+		defaultStore.set('like', emoji as string);
+	});
+}
+
+async function resetLike() {
+	defaultStore.set('like', null);
 }
 
 function getHTMLElement(ev: MouseEvent): HTMLElement {
