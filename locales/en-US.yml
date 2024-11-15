@@ -331,6 +331,7 @@ selectFile: "Select a file"
 selectFiles: "Select files"
 selectFolder: "Select a folder"
 selectFolders: "Select folders"
+fileNotSelected: "No file selected"
 renameFile: "Rename file"
 folderName: "Folder name"
 createFolder: "Create a folder"
@@ -1321,6 +1322,7 @@ yourNameContainsProhibitedWordsDescription: "If you wish to use this name, pleas
 thisContentsAreMarkedAsSigninRequiredByAuthor: "Set by the author to require login to view"
 lockdown: "Lockdown"
 pleaseSelectAccount: "Select an account"
+availableRoles: "Available roles"
 _accountSettings:
   requireSigninToViewContents: "Require sign-in to view contents"
   requireSigninToViewContentsDescription1: "Require login to view all notes and other content you have created. This will have the effect of preventing crawlers from collecting your information."
@@ -2322,7 +2324,7 @@ _widgets:
   _userList:
     chooseList: "Select a list"
   clicker: "Clicker"
-  birthdayFollowings: "Users who celebrate their birthday today"
+  birthdayFollowings: "Today's Birthdays"
 _cw:
   hide: "Hide"
   show: "Show content"
@@ -2831,10 +2833,11 @@ _embedCodeGen:
   codeGeneratedDescription: "Paste the generated code into your website to embed the content."
 _selfXssPrevention:
   warning: "WARNING"
-  title: "Any request to 'paste something into this screen' is a scam."
-  description1: "Pasting content here could allow malicious users to hijack your account or steal your personal information."
-  description2: "If you don't fully understand what you're about to paste, %cplease stop immediately and close this window."
-  description3: "For more information, please check here: {link}"
+  title: "\"Paste something on this screen\" is all a scam."
+  description1: "If you paste something here, a malicious user could hijack your account or steal your personal information."
+  description2: "If you do not understand exactly what you are trying to paste, %cstop working right now and close this window."
+  description3: "For more information, please refer to this. {link}"
+
 insertNewNotes: "Insert new notes at current position"
 insertNewNotesDescription: "Insert new notes at the current position while scrolling timeline."
 clickToShowInstanceTickerWindow: "Click InstanceTicker to show instance info"

@@ -2822,5 +2822,6 @@ _selfXssPrevention:
   description2: "貼り付けようとしているものが何なのかを正確に理解していない場合は、%c今すぐ作業を中止してこのウィンドウを閉じてください。"
   description3: "詳しくはこちらをご確認ください。 {link}"
 
-insertNewNotes: "新着ノートを表示位置に挿入"
-insertNewNotesDescription: "タイムラインをスクロール中、現在の位置に新しいノートを挿入。"
+_followRequest:
+  recieved: "受け取った申請"
+  sent: "送った申請"
