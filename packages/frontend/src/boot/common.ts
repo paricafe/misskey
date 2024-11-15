@@ -201,10 +201,6 @@ export async function common(createVue: () => App<Element>) {
 		}
 	}, { immediate: true });
 
-	watch(defaultStore.reactiveState.useHardwareAcceleration, v => {
-		document.documentElement.classList.toggle('font-smoothing-auto', !v);
-	  }, { immediate: true });
-
 	// Keep screen on
 	const onVisibilityChange = () => document.addEventListener('visibilitychange', () => {
 		if (document.visibilityState === 'visible') {

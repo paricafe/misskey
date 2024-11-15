@@ -12,7 +12,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 		<div class="_gaps_m">
 			<div class="label">{{ i18n.ts.pariPlusSystemSettings }}</div>
 			<div class="_gaps_s">
-				<MkSwitch v-model="useHardwareAcceleration">{{ i18n.ts.useHardwareAcceleration }}</MkSwitch>
 				<MkSwitch v-model="enableRenderingOptimization">{{ i18n.ts.enableRenderingOptimization }}</MkSwitch>
 			</div>
 		</div>
