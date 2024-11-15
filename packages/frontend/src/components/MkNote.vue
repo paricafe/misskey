@@ -627,13 +627,12 @@ async function clip(): Promise<void> {
 
 function isUnexpectedNote(note: Misskey.entities.Note): boolean {
   if (!note.text) return false;
-  const currentLang = (miLocalStorage.getItem('lang') ?? navigator.language).slice(0, 2);
   const expectedLangs = new Set([
-    currentLang,
-    navigator.language
+	  (miLocalStorage.getItem('lang') ?? navigator.language).slice(0, 2),
+    (navigator.language).slice(0, 2)
   ]);
-  const postLang = detectLanguage(note.text);
-  return postLang !== '' && !expectedLangs.has(postLang);
+  const noteLang = detectLanguage(note.text);
+  return noteLang !== '' && !expectedLangs.has(noteLang);
 }
 const isUnexpectedLanguage = computed(() => isUnexpectedNote(appearNote.value));
 
