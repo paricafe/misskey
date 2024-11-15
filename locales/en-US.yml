@@ -2837,7 +2837,9 @@ _selfXssPrevention:
   description1: "If you paste something here, a malicious user could hijack your account or steal your personal information."
   description2: "If you do not understand exactly what you are trying to paste, %cstop working right now and close this window."
   description3: "For more information, please refer to this. {link}"
-
+_followRequest:
+  recieved: "Requests received"
+  sent: "Requests sent"
 insertNewNotes: "Insert new notes at current position"
 insertNewNotesDescription: "Insert new notes at the current position while scrolling timeline."
 clickToShowInstanceTickerWindow: "Click InstanceTicker to show instance info"
