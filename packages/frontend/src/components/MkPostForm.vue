@@ -996,49 +996,54 @@ function insertMention() {
 }
 
 async function insertEmoji(ev: MouseEvent) {
-	textAreaReadOnly.value = true;
-	const target = ev.currentTarget ?? ev.target;
-	if (target == null) return;
+  textAreaReadOnly.value = true;
+  const target = ev.currentTarget ?? ev.target;
+  if (target == null) return;
 
-	// emojiPickerはダイアログが閉じずにtextareaとやりとりするので、
-	// focustrapをかけているとinsertTextAtCursorが効かない
-	// そのため、投稿フォームのテキストに直接注入する
-	// See: https://github.com/misskey-dev/misskey/pull/14282
-	//      https://github.com/misskey-dev/misskey/issues/14274
+  // emojiPickerはダイアログが閉じずにtextareaとやりとりするので、
+  // focustrapをかけているとinsertTextAtCursorが効かない
+  // そのため、投稿フォームのテキストに直接注入する
+  // See: https://github.com/misskey-dev/misskey/pull/14282
+  //      https://github.com/misskey-dev/misskey/issues/14274
 
-	let pos = textareaEl.value?.selectionStart ?? 0;
-	let posEnd = textareaEl.value?.selectionEnd ?? text.value.length;
+  let pos = textareaEl.value?.selectionStart ?? 0;
+  let posEnd = textareaEl.value?.selectionEnd ?? text.value.length;
 
-    const addSpacing = (before: string, emoji: string) => {
-        let result = emoji;
-        const needSpaceBefore = before.length > 0 && !before.endsWith(' ');
+  const addSpacing = (before: string, after: string, emoji: string) => {
+    let result = emoji;
+    const needSpaceBefore = before.length > 0 && !before.endsWith(' ');
+    const needSpaceAfter = !after.startsWith(' ');
 
-        if (needSpaceBefore) result = ' ' + result;
-        result = result + ' ';
+    if (needSpaceBefore) result = ' ' + result;
+    if (needSpaceAfter) result = result + ' ';
 
-        return result;
+    return {
+      text: result,
+      addedSpaces: (needSpaceBefore ? 1 : 0) + (needSpaceAfter ? 1 : 0),
     };
+  };
 
-    emojiPicker.show(
-        target as HTMLElement,
-        emoji => {
-            const textBefore = text.value.substring(0, pos);
-            const textAfter = text.value.substring(posEnd);
+  emojiPicker.show(
+    target as HTMLElement,
+    (emoji) => {
+      const textBefore = text.value.substring(0, pos);
+      const textAfter = text.value.substring(posEnd);
 
-            const processedEmoji = defaultStore.state.emojiAutoSpacing
-                ? addSpacing(textBefore, emoji)
-                : emoji + ' ';
+      const processed = defaultStore.state.emojiAutoSpacing
+        ? addSpacing(textBefore, textAfter, emoji)
+        : { text: emoji + ' ', addedSpaces: 1 };
 
-            text.value = textBefore + processedEmoji + textAfter;
+      text.value = textBefore + processed.text + textAfter;
 
-            pos += processedEmoji.length;
-            posEnd += processedEmoji.length;
-        },
-        () => {
-            textAreaReadOnly.value = false;
-            nextTick(() => focus());
-        },
-    );
+      const newPos = pos + emoji.length + processed.addedSpaces;
+      pos = newPos;
+      posEnd = newPos;
+    },
+    () => {
+      textAreaReadOnly.value = false;
+      nextTick(() => focus());
+    },
+  );
 }
 
 async function insertMfmFunction(ev: MouseEvent) {

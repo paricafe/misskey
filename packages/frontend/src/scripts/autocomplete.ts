@@ -7,6 +7,7 @@ import { nextTick, Ref, ref, defineAsyncComponent } from 'vue';
 import getCaretCoordinates from 'textarea-caret';
 import { toASCII } from 'punycode/';
 import { popup } from '@/os.js';
+import { defaultStore } from '@/store.js';
 
 export type SuggestionType = 'user' | 'hashtag' | 'emoji' | 'mfmTag' | 'mfmParam';
 
@@ -265,20 +266,37 @@ export class Autocomplete {
 			});
 		} else if (type === 'emoji') {
 			const source = this.text;
-
 			const before = source.substring(0, caret);
 			const trimmedBefore = before.substring(0, before.lastIndexOf(':'));
 			const after = source.substring(caret);
 
-			// 挿入
-			this.text = trimmedBefore + value + after;
+			if (defaultStore.state.emojiAutoSpacing) {
+				const needSpaceBefore = trimmedBefore.length > 0 && !trimmedBefore.endsWith(' ');
+				const needSpaceAfter = !after.startsWith(' ');
 
-			// キャレットを戻す
-			nextTick(() => {
-				this.textarea.focus();
-				const pos = trimmedBefore.length + value.length;
-				this.textarea.setSelectionRange(pos, pos);
-			});
+				this.text = trimmedBefore +
+					(needSpaceBefore ? ' ' : '') +
+					value +
+					(needSpaceAfter ? ' ' : '') +
+					after;
+
+				nextTick(() => {
+					this.textarea.focus();
+					const pos = trimmedBefore.length +
+						(needSpaceBefore ? 1 : 0) +
+						value.length +
+						(needSpaceAfter ? 1 : 0);
+					this.textarea.setSelectionRange(pos, pos);
+				});
+			} else {
+				this.text = trimmedBefore + value + after;
+
+				nextTick(() => {
+					this.textarea.focus();
+					const pos = trimmedBefore.length + value.length;
+					this.textarea.setSelectionRange(pos, pos);
+				});
+			}
 		} else if (type === 'mfmTag') {
 			const source = this.text;
 
