@@ -122,7 +122,6 @@ function saveFontSize() {
 	fontSizeNumberOld.value = fontSizeNumber.value;
 }
 
-const useHardwareAcceleration = computed(defaultStore.makeGetterSetter('useHardwareAcceleration'));
 const enableRenderingOptimization = computed(defaultStore.makeGetterSetter('enableRenderingOptimization'));
 
 const autoTranslateButton = computed(defaultStore.makeGetterSetter('autoTranslateButton'));
