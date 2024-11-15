@@ -17,6 +17,7 @@ import { DebounceLoader } from '@/misc/loader.js';
 import { IdService } from '@/core/IdService.js';
 import { ReactionsBufferingService } from '@/core/ReactionsBufferingService.js';
 import type { OnModuleInit } from '@nestjs/common';
+import type { CacheService } from '../CacheService.js';
 import type { CustomEmojiService } from '../CustomEmojiService.js';
 import type { ReactionService } from '../ReactionService.js';
 import type { UserEntityService } from './UserEntityService.js';
@@ -50,6 +51,7 @@ function getAppearNoteIds(notes: MiNote[]): Set<string> {
 export class NoteEntityService implements OnModuleInit {
 	private userEntityService: UserEntityService;
 	private driveFileEntityService: DriveFileEntityService;
+	private cacheService: CacheService;
 	private customEmojiService: CustomEmojiService;
 	private reactionService: ReactionService;
 	private reactionsBufferingService: ReactionsBufferingService;
@@ -95,6 +97,7 @@ export class NoteEntityService implements OnModuleInit {
 	onModuleInit() {
 		this.userEntityService = this.moduleRef.get('UserEntityService');
 		this.driveFileEntityService = this.moduleRef.get('DriveFileEntityService');
+		this.cacheService = this.moduleRef.get('CacheService');
 		this.customEmojiService = this.moduleRef.get('CustomEmojiService');
 		this.reactionService = this.moduleRef.get('ReactionService');
 		this.reactionsBufferingService = this.moduleRef.get('ReactionsBufferingService');
@@ -177,6 +180,12 @@ export class NoteEntityService implements OnModuleInit {
 					hide = !isFollowing;
 				}
 			}
+		}
+
+		if (!hide && meId && packedNote.userId !== meId) {
+			const isBlocked = (await this.cacheService.userBlockedCache.fetch(meId)).has(packedNote.userId);
+
+			if (isBlocked) hide = true;
 		}
 
 		if (hide) {
@@ -300,7 +309,8 @@ export class NoteEntityService implements OnModuleInit {
 				return true;
 			} else {
 				// フォロワーかどうか
-				const [following, user] = await Promise.all([
+				const [blocked, following, user] = await Promise.all([
+					this.cacheService.userBlockingCache.fetch(meId).then((ids) => ids.has(note.userId)),
 					this.followingsRepository.count({
 						where: {
 							followeeId: note.userId,
@@ -320,6 +330,12 @@ export class NoteEntityService implements OnModuleInit {
 				*/
 				return following > 0 || (note.userHost != null && user.host != null);
 			}
+		}
+
+		if (meId != null) {
+			const isBlocked = (await this.cacheService.userBlockedCache.fetch(meId)).has(note.userId);
+
+			if (isBlocked) return false;
 		}
 
 		return true;
