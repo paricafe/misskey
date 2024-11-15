@@ -46,7 +46,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 <template v-else-if="apNote && apExpanded">
 	<MkNoteSimple :note="apNote" :class="$style.linkNote"/>
 	<div :class="$style.action">
-		<MkButton :small="true" inline @click="apExpanded = false">
+		<MkButton :small="true" inline @click.stop="apExpanded = false">
 			<i class="ti ti-x"></i> {{ i18n.ts.close }}
 		</MkButton>
 	</div>
