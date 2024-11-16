@@ -770,6 +770,7 @@ onMounted(() => {
 	height: 28px;
 	margin: 0 8px 0 0;
 	border-radius: 6px;
+	transform: translateZ(0);
 }
 
 .renoteText {
@@ -800,6 +801,7 @@ onMounted(() => {
 .note {
 	padding: 32px;
 	font-size: 1.2em;
+	will-change: transform, opacity;
 
 	&:hover > .main > .footer > .button {
 		opacity: 1;
@@ -818,6 +820,7 @@ onMounted(() => {
 	flex-shrink: 0;
 	width: 58px;
 	height: 58px;
+	transform: translateZ(0);
 }
 
 .noteHeaderBody {

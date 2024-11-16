@@ -823,6 +823,7 @@ function emitUpdReaction(emoji: string, delta: number) {
 	width: 28px;
 	height: 28px;
 	margin: 0 8px 0 0;
+	transform: translateZ(0);
 }
 
 .renoteText {
@@ -830,6 +831,7 @@ function emitUpdReaction(emoji: string, delta: number) {
 	flex-shrink: 1;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+	will-change: transform, opacity;
 }
 
 .renoteUserName {
