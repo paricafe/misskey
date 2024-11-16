@@ -72,7 +72,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 				<MkSwitch v-model="enableUndoClearPostForm">{{ i18n.ts.enableUndoClearPostForm }}</MkSwitch>
 				<MkSwitch v-model="collapseNotesRepliedTo">{{ i18n.ts.collapseNotesRepliedTo }}</MkSwitch>
 				<MkSwitch v-model="disableReactionsViewer">{{ i18n.ts.disableReactionsViewer }}</MkSwitch>
-				<MkSwitch v-model="collapsedUnexpectedLangs">{{ i18n.ts.collapsedUnexpectedLangs }}</MkSwitch>
+				<MkSwitch v-model="collapsedUnexpectedLangs" disabled>{{ i18n.ts.collapsedUnexpectedLangs }}</MkSwitch>
 				<MkSwitch v-model="emojiAutoSpacing">{{ i18n.ts.emojiAutoSpacing }}</MkSwitch>
 				<MkSwitch v-model="insertNewNotes">
 					<template #label>{{ i18n.ts.insertNewNotes }}</template>
