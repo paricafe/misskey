@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { detect } from 'tinyld/heavy';
+import { detect } from 'tinyld';
 import * as mfm from 'mfm-js';
 import { miLocalStorage } from '@/local-storage.js';
 
