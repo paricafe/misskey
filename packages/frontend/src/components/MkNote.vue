@@ -894,7 +894,6 @@ function emitUpdReaction(emoji: string, delta: number) {
 	position: relative;
 	//display: flex;
 	padding: 28px 32px;
-	will-change: transform, opacity;
 }
 
 .colorBar {
@@ -916,7 +915,6 @@ function emitUpdReaction(emoji: string, delta: number) {
 	//position: sticky !important;
 	//top: calc(22px + var(--MI-stickyTop, 0px));
 	left: 0;
-	transform: translateZ(0);
 }
 
 .main {
