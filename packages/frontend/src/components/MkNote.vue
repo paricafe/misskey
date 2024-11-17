@@ -13,6 +13,20 @@ SPDX-License-Identifier: AGPL-3.0-only
 	:class="[$style.root, { [$style.showActionsOnlyHover]: defaultStore.state.showNoteActionsOnlyHover, [$style.skipRender]: defaultStore.state.skipNoteRender || defaultStore.state.enableRenderingOptimization }]"
 	:tabindex="isDeleted ? '-1' : '0'"
 >
+
+	<div v-if="collapsedUnexpectedLangs && isUnexpectedLanguage && !languageExpanded && !isRenote" :class="$style.collapsedLanguage">
+		<MkAvatar :class="$style.collapsedLanguageAvatar" :user="appearNote.user" link preview/>
+		<Mfm
+			:text="getNoteSummary(appearNote)"
+			:plain="true"
+			:nowrap="true"
+			:author="appearNote.user"
+			:nyaize="'respect'"
+			:class="$style.collapsedLanguageText"
+			@click.stop="languageExpanded = true"
+		/>
+	</div>
+	<template v-else>
     <div v-if="appearNote.reply && inReplyToCollapsed && !isRenote" :class="$style.collapsedInReplyTo">
 		<MkAvatar :class="$style.collapsedInReplyToAvatar" :user="appearNote.reply.user" link preview/>
 		<Mfm :text="getNoteSummary(appearNote.reply)" :plain="true" :nowrap="true" :author="appearNote.reply.user" :nyaize="'respect'" :class="$style.collapsedInReplyToText" @click.stop="inReplyToCollapsed = false"/>
@@ -157,6 +171,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 			</footer>
 		</div>
 	</article>
+    </template>
 </div>
 <div v-else-if="!hardMuted" :class="$style.muted" @click="muted = false">
 	<I18n v-if="muted === 'sensitiveMute'" :src="i18n.ts.userSaysSomethingSensitive" tag="small">
@@ -316,6 +331,7 @@ const pleaseLoginContext = computed<OpenOnRemoteOptions>(() => ({
 	url: `https://${host}/notes/${appearNote.value.id}`,
 }));
 
+const languageExpanded = ref(false);
 
 /* Overload FunctionにLintが対応していないのでコメントアウト
 function checkMute(noteToCheck: Misskey.entities.Note, mutedWords: Array<string | string[]> | undefined | null, checkOnly: true): boolean;
@@ -1040,6 +1056,37 @@ function emitUpdReaction(emoji: string, delta: number) {
 	opacity: 0.7;
 }
 
+.collapsedLanguage {
+    display: flex;
+    align-items: center;
+    padding: 16px 32px;
+    line-height: 28px;
+    white-space: pre;
+    opacity: 0.7;
+}
+
+.collapsedLanguageAvatar {
+    flex-shrink: 0;
+    display: inline-block;
+    width: 28px;
+    height: 28px;
+    margin: 0 8px 0 0;
+}
+
+.collapsedLanguageText {
+    overflow: hidden;
+    flex-shrink: 1;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 90%;
+    opacity: 0.7;
+    cursor: pointer;
+
+    &:hover {
+        text-decoration: underline;
+    }
+}
+
 @container (max-width: 580px) {
 	.root {
 		font-size: 0.95em;
@@ -1098,6 +1145,10 @@ function emitUpdReaction(emoji: string, delta: number) {
 	.article {
 		padding: 22px 24px;
 	}
+
+    .collapsedLanguage {
+        padding: 12px 16px;
+    }
 }
 
 @container (max-width: 450px) {
@@ -1134,6 +1185,11 @@ function emitUpdReaction(emoji: string, delta: number) {
 		width: 4px;
 		height: calc(100% - 12px);
 	}
+
+    .collapsedLanguageAvatar {
+        width: 24px;
+        height: 24px;
+    }
 }
 
 @container (max-width: 300px) {
