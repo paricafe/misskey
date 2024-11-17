@@ -1148,9 +1148,9 @@ function emitUpdReaction(emoji: string, delta: number) {
 		padding: 22px 24px;
 	}
 
-    .collapsedLanguage {
-        padding: 12px 16px;
-    }
+  .collapsedLanguage {
+    padding: 12px 16px;
+  }
 }
 
 @container (max-width: 450px) {
@@ -1188,10 +1188,10 @@ function emitUpdReaction(emoji: string, delta: number) {
 		height: calc(100% - 12px);
 	}
 
-    .collapsedLanguageAvatar {
-        width: 24px;
-        height: 24px;
-    }
+  .collapsedLanguageAvatar {
+    width: 24px;
+    height: 24px;
+  }
 }
 
 @container (max-width: 300px) {
