@@ -4,7 +4,7 @@
  */
 
 import { Inject, Injectable } from '@nestjs/common';
-import { In } from 'typeorm';
+import { Brackets, In } from 'typeorm';
 import { DI } from '@/di-symbols.js';
 import type { Config } from '@/config.js';
 import { bindThis } from '@/decorators.js';
@@ -215,7 +215,10 @@ export class SearchService {
 			}
 
 			query
-				.andWhere('note.text &@~ :q', { q: sqlLikeEscape(q) })
+				.andWhere(new Brackets((qb => {
+					qb.where('note.text &@~ :q', { q: sqlLikeEscape(q) })
+						.orWhere('note.cw &@~ :q', { q: sqlLikeEscape(q) });
+				})))
 				.innerJoinAndSelect('note.user', 'user')
 				.leftJoinAndSelect('note.reply', 'reply')
 				.leftJoinAndSelect('note.renote', 'renote')
