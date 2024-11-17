@@ -296,6 +296,7 @@ const muted = ref(checkMute(appearNote.value, $i?.mutedWords));
 const hardMuted = ref(props.withHardMute && checkMute(appearNote.value, $i?.hardMutedWords, true));
 const translation = ref<Misskey.entities.NotesTranslateResponse | null>(null);
 const translating = ref(false);
+const showTicker = (defaultStore.state.instanceTicker === 'always') || (defaultStore.state.instanceTicker === 'remote' && appearNote.value.user.instance);
 const canRenote = computed(() => ['public', 'home'].includes(appearNote.value.visibility) || (appearNote.value.visibility === 'followers' && appearNote.value.userId === $i?.id));
 const renoteCollapsed = ref(
 	defaultStore.state.collapseRenotes && isRenote && (
@@ -308,6 +309,7 @@ const defaultLike = computed(() => defaultStore.state.like ?? '❤️');
 
 const inReplyToCollapsed = ref(defaultStore.state.collapseNotesRepliedTo);
 const disableReactionsViewer = ref(defaultStore.reactiveState.disableReactionsViewer);
+const collapsedUnexpectedLangs = ref(defaultStore.reactiveState.collapsedUnexpectedLangs);
 
 const pleaseLoginContext = computed<OpenOnRemoteOptions>(() => ({
 	type: 'lookup',
