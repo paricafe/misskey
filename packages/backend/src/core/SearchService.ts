@@ -4,7 +4,7 @@
  */
 
 import { Inject, Injectable } from '@nestjs/common';
-import { In } from 'typeorm';
+import { In, SelectQueryBuilder } from 'typeorm';
 import { DI } from '@/di-symbols.js';
 import type { Config } from '@/config.js';
 import { bindThis } from '@/decorators.js';
@@ -206,35 +206,60 @@ export class SearchService {
 			});
 			return notes.sort((a, b) => a.id > b.id ? -1 : 1);
 		} else {
-			const query = this.queryService.makePaginationQuery(this.notesRepository.createQueryBuilder('note'), pagination.sinceId, pagination.untilId);
+			const searchByPgroonga = async (makeQuery: (query: SelectQueryBuilder<MiNote>) => void) => {
+				const query = this.queryService.makePaginationQuery(this.notesRepository.createQueryBuilder('note'), pagination.sinceId, pagination.untilId);
 
-			if (opts.userId) {
-				query.andWhere('note.userId = :userId', { userId: opts.userId });
-			} else if (opts.channelId) {
-				query.andWhere('note.channelId = :channelId', { channelId: opts.channelId });
-			}
-
-			query
-				.andWhere('note.text &@~ :q', { q: sqlLikeEscape(q) })
-				.innerJoinAndSelect('note.user', 'user')
-				.leftJoinAndSelect('note.reply', 'reply')
-				.leftJoinAndSelect('note.renote', 'renote')
-				.leftJoinAndSelect('reply.user', 'replyUser')
-				.leftJoinAndSelect('renote.user', 'renoteUser');
-
-			if (opts.host) {
-				if (opts.host === '.') {
-					query.andWhere('user.host IS NULL');
-				} else {
-					query.andWhere('user.host = :host', { host: opts.host });
+				if (opts.userId) {
+					query.andWhere('note.userId = :userId', { userId: opts.userId });
+				} else if (opts.channelId) {
+					query.andWhere('note.channelId = :channelId', { channelId: opts.channelId });
 				}
-			}
 
-			this.queryService.generateVisibilityQuery(query, me);
-			if (me) this.queryService.generateMutedUserQuery(query, me);
-			if (me) this.queryService.generateBlockedUserQuery(query, me);
+				query
+					.andWhere('note.text &@~ :q', { q: sqlLikeEscape(q) })
+					.innerJoinAndSelect('note.user', 'user')
+					.leftJoinAndSelect('note.reply', 'reply')
+					.leftJoinAndSelect('note.renote', 'renote')
+					.leftJoinAndSelect('reply.user', 'replyUser')
+					.leftJoinAndSelect('renote.user', 'renoteUser');
+					makeQuery(query);
 
-			return await query.limit(pagination.limit).getMany();
+				if (opts.host) {
+					if (opts.host === '.') {
+						query.andWhere('user.host IS NULL');
+					} else {
+						query.andWhere('user.host = :host', { host: opts.host });
+					}
+				}
+
+				this.queryService.generateVisibilityQuery(query, me);
+				if (me) this.queryService.generateMutedUserQuery(query, me);
+				if (me) this.queryService.generateBlockedUserQuery(query, me);
+
+				return await query.limit(pagination.limit).getMany();
+			};
+			const searchWord = sqlLikeEscape(q);
+
+			const notes = [
+				...new Map(
+					(
+						await Promise.all([
+							searchByPgroonga((query) => {
+								query.andWhere('note.text &@~ :q', { q: searchWord });
+							}),
+							searchByPgroonga((query) => {
+								query.andWhere('note.cw &@~ :q', { q: searchWord });
+							}),
+						])
+					)
+						.flatMap((e) => e)
+						.map((note) => [note.id, note]),
+				).values(),
+			]
+				.sort((lhs, rhs) => lhs.id < rhs.id ? 1 : -1)
+				.slice(0, pagination.limit);
+
+			return notes;
 		}
 	}
 }
