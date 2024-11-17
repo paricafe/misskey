@@ -324,7 +324,20 @@ const defaultLike = computed(() => defaultStore.state.like ?? '❤️');
 
 const inReplyToCollapsed = ref(defaultStore.state.collapseNotesRepliedTo);
 const disableReactionsViewer = ref(defaultStore.reactiveState.disableReactionsViewer);
+
 const collapsedUnexpectedLangs = ref(defaultStore.reactiveState.collapsedUnexpectedLangs);
+const expectedLangs = computed(() => new Set([
+  (miLocalStorage.getItem('lang') ?? navigator.language).slice(0, 2),
+  navigator.language.slice(0, 2)
+]));
+const noteLanguage = computed(() => {
+  if (!appearNote.value.text || appearNote.value.text.length < 10) return '';
+  return detectLanguage(appearNote.value.text);
+});
+const isUnexpectedLanguage = computed(() => {
+  const lang = noteLanguage.value;
+  return lang !== '' && !expectedLangs.value.has(lang);
+});
 
 const pleaseLoginContext = computed<OpenOnRemoteOptions>(() => ({
 	type: 'lookup',
@@ -624,17 +637,6 @@ async function clip(): Promise<void> {
 
 	os.popupMenu(await getNoteClipMenu({ note: note.value, isDeleted, currentClip: currentClip?.value }), clipButton.value).then(focus);
 }
-
-function isUnexpectedNote(note: Misskey.entities.Note): boolean {
-  if (!note.text) return false;
-  const expectedLangs = new Set([
-	  (miLocalStorage.getItem('lang') ?? navigator.language).slice(0, 2),
-    (navigator.language).slice(0, 2)
-  ]);
-  const noteLang = detectLanguage(note.text);
-  return noteLang !== '' && !expectedLangs.has(noteLang);
-}
-const isUnexpectedLanguage = computed(() => isUnexpectedNote(appearNote.value));
 
 async function translate(): Promise<void> {
 	if (translation.value != null) return;
