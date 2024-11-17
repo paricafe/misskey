@@ -73,7 +73,7 @@ export function getApId(value: string | IObject | [string | IObject]): string {
 }
 
 /**
- * Get ActivityStreams Object id
+ * Get ActivityStreams Object id, or null if not present
  */
 export function getNullableApId(value: string | IObject | [string | IObject]): string | null {
 	// eslint-disable-next-line no-param-reassign
