@@ -86,12 +86,11 @@ export function build() {
                 case 'zh-TW':
                     return merge(locales['en-US'], v);
                 default:
-                    return merge(
-                        locales['en-US'],
-                        locales['ja-JP'],
-                        locales[`${lang}-${primaries[lang]}`] ?? {},
-                        v
-                    );
+                    const base = Object.keys(v).some(key =>
+                        !locales['en-US'][key] && locales['ja-JP'][key]
+                    ) ? merge(locales['en-US'], locales['ja-JP']) : locales['en-US'];
+
+                    return merge(base, v);
             }
         })(), a), {});
 }
