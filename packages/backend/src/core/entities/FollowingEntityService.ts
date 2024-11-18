@@ -8,11 +8,14 @@ import { DI } from '@/di-symbols.js';
 import type { FollowingsRepository } from '@/models/_.js';
 import { awaitAll } from '@/misc/prelude/await-all.js';
 import type { Packed } from '@/misc/json-schema.js';
-import type { } from '@/models/Blocking.js';
-import type { MiUser } from '@/models/User.js';
-import type { MiFollowing } from '@/models/Following.js';
+import { MiBlocking } from '@/models/Blocking.js';
+import { MiUserProfile } from '@/models/UserProfile.js';
+import type { MiLocalUser, MiUser } from '@/models/User.js';
+import { MiFollowing } from '@/models/Following.js';
 import { bindThis } from '@/decorators.js';
 import { IdService } from '@/core/IdService.js';
+import { QueryService } from '@/core/QueryService.js';
+import { RoleService } from '@/core/RoleService.js';
 import { UserEntityService } from './UserEntityService.js';
 
 type LocalFollowerFollowing = MiFollowing & {
@@ -47,6 +50,8 @@ export class FollowingEntityService {
 
 		private userEntityService: UserEntityService,
 		private idService: IdService,
+		private queryService: QueryService,
+		private roleService: RoleService,
 	) {
 	}
 
@@ -68,6 +73,53 @@ export class FollowingEntityService {
 	@bindThis
 	public isRemoteFollowee(following: MiFollowing): following is RemoteFolloweeFollowing {
 		return following.followeeHost != null;
+	}
+
+	@bindThis
+	public async getFollowing(me: MiLocalUser, params: FollowsQueryParams) {
+		return await this.getFollows(me, params, 'following.followerHost = :host');
+	}
+
+	@bindThis
+	public async getFollowers(me: MiLocalUser, params: FollowsQueryParams) {
+		return await this.getFollows(me, params, 'following.followeeHost = :host');
+	}
+
+	private async getFollows(me: MiLocalUser, params: FollowsQueryParams, condition: string) {
+		const builder = this.followingsRepository.createQueryBuilder('following');
+		const query = this.queryService
+			.makePaginationQuery(builder, params.sinceId, params.untilId)
+			.andWhere(condition, { host: params.host })
+			.limit(params.limit);
+
+		if (!await this.roleService.isModerator(me)) {
+			query.setParameter('me', me.id);
+
+			// Make sure that the followee doesn't block us, if their profile will be included.
+			if (params.includeFollowee) {
+				query.leftJoin(MiBlocking, 'followee_blocking', 'followee_blocking."blockerId" = following."followeeId" AND followee_blocking."blockeeId" = :me');
+				query.andWhere('followee_blocking.id IS NULL');
+			}
+
+			// Make sure that the follower doesn't block us, if their profile will be included.
+			if (params.includeFollower) {
+				query.leftJoin(MiBlocking, 'follower_blocking', 'follower_blocking."blockerId" = following."followerId" AND follower_blocking."blockeeId" = :me');
+				query.andWhere('follower_blocking.id IS NULL');
+			}
+
+			// Make sure that the followee hasn't hidden this connection.
+			query.leftJoin(MiUserProfile, 'followee', 'followee."userId" = following."followeeId"');
+			query.leftJoin(MiFollowing, 'me_following_followee', 'me_following_followee."followerId" = :me AND me_following_followee."followeeId" = following."followerId"');
+			query.andWhere('(followee."userId" = :me OR followee."followersVisibility" = \'public\' OR (followee."followersVisibility" = \'followers\' AND me_following_followee.id IS NOT NULL))');
+
+			// Make sure that the follower hasn't hidden this connection.
+			query.leftJoin(MiUserProfile, 'follower', 'follower."userId" = following."followerId"');
+			query.leftJoin(MiFollowing, 'me_following_follower', 'me_following_follower."followerId" = :me AND me_following_follower."followeeId" = following."followerId"');
+			query.andWhere('(follower."userId" = :me OR follower."followingVisibility" = \'public\' OR (follower."followingVisibility" = \'followers\' AND me_following_follower.id IS NOT NULL))');
+		}
+
+		const followings = await query.getMany();
+		return await this.packMany(followings, me, { populateFollowee: params.includeFollowee, populateFollower: params.includeFollower });
 	}
 
 	@bindThis
@@ -124,3 +176,12 @@ export class FollowingEntityService {
 	}
 }
 
+interface FollowsQueryParams {
+	readonly host: string;
+	readonly limit: number;
+	readonly includeFollower: boolean;
+	readonly includeFollowee: boolean;
+
+	readonly sinceId?: string;
+	readonly untilId?: string;
+}
