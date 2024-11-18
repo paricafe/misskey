@@ -39,7 +39,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 					<option value="Instagram">Instagram</option>
 					<option value="Facebook">Facebook</option>
 				</MkRadios>
-				<MkButton primary :class="$style.button" inline @click="importNotes($event)"><i class="ph-upload ph-bold ph-lg"></i> {{ i18n.ts.import }}</MkButton>
+				<MkButton primary :class="$style.button" inline @click="importNotes($event)"><i class="ti ti-upload"></i> {{ i18n.ts.import }}</MkButton>
 			</MkFolder>
 		</div>
 	</FormSection>
