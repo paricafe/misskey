@@ -336,6 +336,7 @@ import type {
 	IGalleryPostsResponse,
 	IImportBlockingRequest,
 	IImportFollowingRequest,
+	IImportNotesRequest,
 	IImportMutingRequest,
 	IImportUserListsRequest,
 	IImportAntennasRequest,
@@ -796,6 +797,7 @@ export type Endpoints = {
 	'i/claim-achievement': { req: IClaimAchievementRequest; res: EmptyResponse };
 	'i/change-password': { req: IChangePasswordRequest; res: EmptyResponse };
 	'i/delete-account': { req: IDeleteAccountRequest; res: EmptyResponse };
+	'i/export-data': { req: EmptyRequest; res: EmptyResponse };
 	'i/export-blocking': { req: EmptyRequest; res: EmptyResponse };
 	'i/export-following': { req: IExportFollowingRequest; res: EmptyResponse };
 	'i/export-mute': { req: EmptyRequest; res: EmptyResponse };
@@ -809,6 +811,7 @@ export type Endpoints = {
 	'i/gallery/posts': { req: IGalleryPostsRequest; res: IGalleryPostsResponse };
 	'i/import-blocking': { req: IImportBlockingRequest; res: EmptyResponse };
 	'i/import-following': { req: IImportFollowingRequest; res: EmptyResponse };
+	'i/import-notes': { req: IImportNotesRequest; res: EmptyResponse };
 	'i/import-muting': { req: IImportMutingRequest; res: EmptyResponse };
 	'i/import-user-lists': { req: IImportUserListsRequest; res: EmptyResponse };
 	'i/import-antennas': { req: IImportAntennasRequest; res: EmptyResponse };

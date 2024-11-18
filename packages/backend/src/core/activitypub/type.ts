@@ -3,6 +3,8 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { fromTuple } from '@/misc/from-tuple.js';
+
 export type Obj = { [x: string]: any };
 export type ApObject = IObject | string | (IObject | string)[];
 
@@ -11,7 +13,7 @@ export interface IObject {
 	type: string | string[];
 	id?: string;
 	name?: string | null;
-	summary?: string;
+	summary?: string | null;
 	_misskey_summary?: string;
 	_misskey_followedMessage?: string | null;
 	_misskey_requireSigninToViewContents?: boolean;
@@ -57,10 +59,13 @@ export function getOneApId(value: ApObject): string {
 /**
  * Get ActivityStreams Object id
  */
-export function getApId(value: string | IObject): string {
+export function getApId(value: string | IObject | [string | IObject]): string {
+	// eslint-disable-next-line no-param-reassign
+	value = fromTuple(value);
+
 	if (typeof value === 'string') return value;
 	if (typeof value.id === 'string') return value.id;
-	throw new Error('cannot detemine id');
+	throw new Error('cannot determine id');
 }
 
 /**
@@ -89,7 +94,9 @@ export function getApHrefNullable(value: string | IObject | undefined): string |
 export interface IActivity extends IObject {
 	//type: 'Activity';
 	actor: IObject | string;
-	object: IObject | string;
+	// ActivityPub spec allows for arrays: https://www.w3.org/TR/activitystreams-vocabulary/#properties
+	// Misskey can only handle one value, so we use a tuple for that case.
+	object: IObject | string | [IObject | string] ;
 	target?: IObject | string;
 	/** LD-Signature */
 	signature?: {
@@ -132,6 +139,8 @@ export interface IPost extends IObject {
 	_misskey_quote?: string;
 	_misskey_content?: string;
 	quoteUrl?: string;
+	quoteUri?: string;
+	updated?: string;
 }
 
 export interface IQuestion extends IObject {
@@ -143,6 +152,7 @@ export interface IQuestion extends IObject {
 	};
 	_misskey_quote?: string;
 	quoteUrl?: string;
+	quoteUri?: string;
 	oneOf?: IQuestionChoice[];
 	anyOf?: IQuestionChoice[];
 	endTime?: Date;
