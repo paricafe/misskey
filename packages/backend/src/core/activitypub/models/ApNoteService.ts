@@ -5,6 +5,7 @@
 
 import { forwardRef, Inject, Injectable } from '@nestjs/common';
 import { In } from 'typeorm';
+import * as Bull from 'bullmq';
 import { DI } from '@/di-symbols.js';
 import type { PollsRepository, EmojisRepository, NotesRepository, MiMeta } from '@/models/_.js';
 import type { Config } from '@/config.js';
@@ -235,6 +236,18 @@ export class ApNoteService {
 				})
 				.catch(async err => {
 					this.logger.warn(`Error in inReplyTo ${note.inReplyTo} - ${err.statusCode ?? err}`);
+					if (visibility === 'followers') { throw err; } // private reply
+					if (err.message === 'Instance is blocked') { throw err; }
+					if (err.message === 'blocked host') { throw err; }
+					if (err instanceof IdentifiableError) {
+						if (err.id === '85ab9bd7-3a41-4530-959d-f07073900109') { throw err; } // actor has been suspended
+					}
+					if (err instanceof StatusError) {
+						if (err.statusCode === 404) { return null; } // eat 404 error
+					}
+					if (err instanceof Bull.UnrecoverableError) {
+						return null; // eat unrecoverableerror
+					}
 					throw err;
 				})
 			: null;
@@ -242,14 +255,14 @@ export class ApNoteService {
 		// 引用
 		let quote: MiNote | undefined | null = null;
 
-		if (note._misskey_quote ?? note.quoteUrl) {
+		if (note._misskey_quote ?? note.quoteUrl ?? note.quoteUri) {
 			const tryResolveNote = async (uri: string): Promise<
 				| { status: 'ok'; res: MiNote }
 				| { status: 'permerror' | 'temperror' }
 			> => {
-				if (!/^https?:/.test(uri)) return { status: 'permerror' };
+				if (typeof uri !== 'string' || !/^https?:/.test(uri)) return { status: 'permerror' };
 				try {
-					const res = await this.resolveNote(uri);
+					const res = await this.resolveNote(uri, { resolver });
 					if (res == null) return { status: 'permerror' };
 					return { status: 'ok', res };
 				} catch (e) {

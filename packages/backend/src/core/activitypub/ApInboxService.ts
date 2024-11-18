@@ -86,7 +86,6 @@ export class ApInboxService {
 		private apQuestionService: ApQuestionService,
 		private queueService: QueueService,
 		private globalEventService: GlobalEventService,
-		private federatedInstanceService: FederatedInstanceService,
 	) {
 		this.logger = this.apLoggerService.logger;
 	}
