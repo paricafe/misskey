@@ -72,27 +72,21 @@ export function build() {
 	};
 	removeEmpty(locales);
 
-    return Object.entries(locales)
-        .reduce((a, [k, v]) => (a[k] = (() => {
-            const [lang] = k.split('-');
-            switch (k) {
-                case 'en-US':
-                    return v;
-                case 'ja-JP':
-                    return merge(locales['en-US'], v);
-                case 'ja-KS':
-                    return merge(locales['en-US'], locales['ja-JP'], v);
-                case 'zh-CN':
-                case 'zh-TW':
-                    return merge(locales['en-US'], v);
-                default:
-                    const base = Object.keys(v).some(key =>
-                        !locales['en-US'][key] && locales['ja-JP'][key]
-                    ) ? merge(locales['en-US'], locales['ja-JP']) : locales['en-US'];
-
-                    return merge(base, v);
-            }
-        })(), a), {});
+	return Object.entries(locales)
+		.reduce((a, [k, v]) => (a[k] = (() => {
+			const [lang] = k.split('-');
+			switch (k) {
+				case 'ja-JP': return v;
+				case 'ja-KS':
+				case 'en-US': return merge(locales['ja-JP'], v);
+				default: return merge(
+					locales['ja-JP'],
+					locales['en-US'],
+					locales[`${lang}-${primaries[lang]}`] ?? {},
+					v
+				);
+			}
+		})(), a), {});
 }
 
 export default build();
