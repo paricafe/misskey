@@ -17,6 +17,7 @@ import { EndedPollNotificationProcessorService } from './processors/EndedPollNot
 import { DeliverProcessorService } from './processors/DeliverProcessorService.js';
 import { InboxProcessorService } from './processors/InboxProcessorService.js';
 import { DeleteDriveFilesProcessorService } from './processors/DeleteDriveFilesProcessorService.js';
+import { ExportAccountDataProcessorService } from './processors/ExportAccountDataProcessorService.js';
 import { ExportCustomEmojisProcessorService } from './processors/ExportCustomEmojisProcessorService.js';
 import { ExportNotesProcessorService } from './processors/ExportNotesProcessorService.js';
 import { ExportClipsProcessorService } from './processors/ExportClipsProcessorService.js';
@@ -97,6 +98,7 @@ export class QueueProcessorService implements OnApplicationShutdown {
 		private deliverProcessorService: DeliverProcessorService,
 		private inboxProcessorService: InboxProcessorService,
 		private deleteDriveFilesProcessorService: DeleteDriveFilesProcessorService,
+		private exportAccountDataProcessorService: ExportAccountDataProcessorService,
 		private exportCustomEmojisProcessorService: ExportCustomEmojisProcessorService,
 		private exportNotesProcessorService: ExportNotesProcessorService,
 		private exportClipsProcessorService: ExportClipsProcessorService,
@@ -214,6 +216,7 @@ export class QueueProcessorService implements OnApplicationShutdown {
 					case 'exportBlocking': return this.exportBlockingProcessorService.process(job);
 					case 'exportUserLists': return this.exportUserListsProcessorService.process(job);
 					case 'exportAntennas': return this.exportAntennasProcessorService.process(job);
+					case 'exportAccountData': return this.exportAccountDataProcessorService.process(job);
 					case 'importFollowing': return this.importFollowingProcessorService.process(job);
 					case 'importFollowingToDb': return this.importFollowingProcessorService.processDb(job);
 					case 'importMuting': return this.importMutingProcessorService.process(job);

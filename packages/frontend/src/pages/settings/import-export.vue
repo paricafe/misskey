@@ -6,6 +6,21 @@ SPDX-License-Identifier: AGPL-3.0-only
 <template>
 <div class="_gaps_m">
 	<FormSection first>
+		<template #label><i class="'ti ti-package"></i> {{ i18n.ts._dataRequest.lable }}</template>
+		<div class="_gap_s">
+			<MkFolder>
+				<template #icon><i class="ti ti-download"></i></template>
+				<template #label>{{ i18n.ts._dataRequest.title }}</template>
+
+				<div class="_gaps_m">
+					<FormInfo warn>{{ i18n.ts._dataRequest.warn }}</FormInfo>
+					<FormInfo>{{ i18n.ts._dataRequest.text }}</FormInfo>
+					<MkButton primary @click="exportData">{{ i18n.ts._dataRequest.button }}</MkButton>
+				</div>
+			</MkFolder>
+		</div>
+	</FormSection>
+	<FormSection>
 		<template #label><i class="ti ti-pencil"></i> {{ i18n.ts._exportOrImport.allNotes }}</template>
 		<div class="_gaps_s">
 			<MkFolder>
@@ -171,6 +186,20 @@ const onError = (ev) => {
 	os.alert({
 		type: 'error',
 		text: ev.message,
+	});
+};
+
+const exportData = () => {
+	misskeyApi('i/export-data', {}).then(() => {
+		os.alert({
+			type: 'info',
+			text: i18n.ts.exportRequested,
+		});
+	}).catch((ev) => {
+		os.alert({
+			type: 'error',
+			text: ev.message,
+		});
 	});
 };
 
