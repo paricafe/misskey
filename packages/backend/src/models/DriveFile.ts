@@ -60,8 +60,8 @@ export class MiDriveFile {
 	})
 	public size: number;
 
-	@Column('varchar', {
-		length: 512, nullable: true,
+	@Column('text', {
+		nullable: true,
 		comment: 'The comment of the DriveFile.',
 	})
 	public comment: string | null;
