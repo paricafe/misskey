@@ -27,7 +27,7 @@ export const meta = {
 	kind: 'read:account',
 
 	limit: {
-		duration: ms('1hour'),
+		duration: ms('1minute'),
 		max: 30,
 	},
 
@@ -117,6 +117,11 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 			this.apDbResolverService.getNoteFromApId(uri),
 		]));
 		if (local != null) return local;
+
+		const host = this.utilityService.extractDbHost(uri);
+
+		// local object, not found in db? fail
+		if (this.utilityService.isSelfHost(host)) return null;
 
 		// リモートから一旦オブジェクトフェッチ
 		const resolver = this.apResolverService.createResolver();

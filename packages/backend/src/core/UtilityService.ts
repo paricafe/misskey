@@ -49,7 +49,7 @@ export class UtilityService {
 	@bindThis
 	public isMediaSilencedHost(silencedHosts: string[] | undefined, host: string | null): boolean {
 		if (!silencedHosts || host == null) return false;
-		return silencedHosts.some(x => host.toLowerCase() === x);
+		return silencedHosts.some(x => `.${host.toLowerCase()}`.endsWith(`.${x}`));
 	}
 
 	@bindThis
@@ -96,7 +96,7 @@ export class UtilityService {
 	@bindThis
 	public extractDbHost(uri: string): string {
 		const url = new URL(uri);
-		return this.toPuny(url.hostname);
+		return this.toPuny(url.host);
 	}
 
 	@bindThis
@@ -111,6 +111,12 @@ export class UtilityService {
 	}
 
 	@bindThis
+	public punyHost(url: string): string {
+		const urlObj = new URL(url);
+		const host = `${this.toPuny(urlObj.hostname)}${urlObj.port.length > 0 ? ':' + urlObj.port : ''}`;
+		return host;
+	}
+
 	public isFederationAllowedHost(host: string): boolean {
 		if (this.meta.federation === 'none') return false;
 		if (this.meta.federation === 'specified' && !this.meta.federationHosts.some(x => `.${host.toLowerCase()}`.endsWith(`.${x}`))) return false;

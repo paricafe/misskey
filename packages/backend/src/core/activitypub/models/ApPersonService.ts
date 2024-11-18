@@ -129,12 +129,6 @@ export class ApPersonService implements OnModuleInit {
 		this.logger = this.apLoggerService.logger;
 	}
 
-	private punyHost(url: string): string {
-		const urlObj = new URL(url);
-		const host = `${this.utilityService.toPuny(urlObj.hostname)}${urlObj.port.length > 0 ? ':' + urlObj.port : ''}`;
-		return host;
-	}
-
 	/**
 	 * Validate and convert to actor object
 	 * @param x Fetched object

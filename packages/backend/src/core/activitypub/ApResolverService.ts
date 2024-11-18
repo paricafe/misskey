@@ -16,6 +16,7 @@ import { UtilityService } from '@/core/UtilityService.js';
 import { bindThis } from '@/decorators.js';
 import { LoggerService } from '@/core/LoggerService.js';
 import type Logger from '@/logger.js';
+import { fromTuple } from '@/misc/from-tuple.js';
 import { isCollectionOrOrderedCollection } from './type.js';
 import { ApDbResolverService } from './ApDbResolverService.js';
 import { ApRendererService } from './ApRendererService.js';
@@ -67,7 +68,10 @@ export class Resolver {
 	}
 
 	@bindThis
-	public async resolve(value: string | IObject): Promise<IObject> {
+	public async resolve(value: string | IObject | [string | IObject]): Promise<IObject> {
+		// eslint-disable-next-line no-param-reassign
+		value = fromTuple(value);
+
 		if (typeof value !== 'string') {
 			return value;
 		}
@@ -95,7 +99,7 @@ export class Resolver {
 		}
 
 		if (!this.utilityService.isFederationAllowedHost(host)) {
-			throw new Error('Instance is blocked');
+			throw new Bull.UnrecoverableError('Instance is blocked');
 		}
 
 		if (this.config.signToActivityPubGet && !this.user) {
@@ -112,6 +116,14 @@ export class Resolver {
 				object['@context'] !== 'https://www.w3.org/ns/activitystreams'
 		) {
 			throw new Error('invalid response');
+		}
+
+		// HttpRequestService / ApRequestService have already checked that
+		// `object.id` or `object.url` matches the URL used to fetch the
+		// object after redirects; here we double-check that no redirects
+		// bounced between hosts
+		if (object.id && (this.utilityService.punyHost(object.id) !== this.utilityService.punyHost(value))) {
+			throw new Error(`invalid AP object ${value}: id ${object.id} has different host`);
 		}
 
 		return object;
