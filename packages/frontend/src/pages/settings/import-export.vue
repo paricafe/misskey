@@ -6,7 +6,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 <template>
 <div class="_gaps_m">
 	<FormSection first>
-		<template #label><i class="'ti ti-package"></i> {{ i18n.ts._dataRequest.lable }}</template>
+		<template #label><i class="ti ti-package"></i> {{ i18n.ts._dataRequest.lable }}</template>
 		<div class="_gap_s">
 			<MkFolder>
 				<template #icon><i class="ti ti-download"></i></template>
