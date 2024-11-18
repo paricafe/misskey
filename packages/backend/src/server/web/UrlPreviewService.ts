@@ -52,7 +52,7 @@ export class UrlPreviewService {
 		reply: FastifyReply,
 	): Promise<object | undefined> {
 		const url = request.query.url;
-		if (typeof url !== 'string') {
+		if (typeof url !== 'string' || !URL.canParse(url)) {
 			reply.code(400);
 			return;
 		}
