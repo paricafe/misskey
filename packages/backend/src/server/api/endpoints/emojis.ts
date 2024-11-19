@@ -50,11 +50,11 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 		private emojiEntityService: EmojiEntityService,
 	) {
 		super(meta, paramDef, async (ps, me) => {
-			const emojis = await this.emojisRepository.createQueryBuilder()
-				.where('host IS NULL')
-				.orderBy('LOWER(category)', 'ASC')
-				.orderBy('LOWER(name)', 'ASC')
-				.getMany()
+			const emojis = await this.emojisRepository.createQueryBuilder('emoji')
+				.where('emoji.host IS NULL')
+				.orderBy('LOWER(emoji.category)', 'ASC')
+				.addOrderBy('LOWER(emoji.name)', 'ASC')
+				.getMany();
 
 			return {
 				emojis: await this.emojiEntityService.packSimpleMany(emojis),
