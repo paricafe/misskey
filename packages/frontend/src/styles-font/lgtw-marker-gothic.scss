@@ -1,18 +1,4 @@
-@font-face {
-	font-display: swap; /* Check https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-display for other options. */
-	font-family: 'LXGW Marker Gothic"';
-	font-style: normal;
-	font-weight: 400;
-	src: url('/static-assets/fonts/LXGWMarkerGothic-Regular.ttf') format('truetype');
-}
-@font-face {
-	font-display: swap; /* Check https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-display for other options. */
-	font-family: 'jf-openhuninn';
-	font-style: normal;
-	font-weight: 400;
-	src: url('/static-assets/fonts/jf-openhuninn-2.1.woff2') format("woff2");
-}
-
 html.default-font-lxgw-marker-gothic {
-	font-family: "LXGW Marker Gothic", 'Lexend', 'jf-openhuninn', Roboto, HelveticaNeue, Arial, sans-serif;
+	@import url("https://chinese-fonts-cdn.deno.dev/packages/lxgwmanhei/dist/LXGWMarkerGothic/result.css");
+	font-family: "LXGW Marker Gothic", 'Lexend', Roboto, HelveticaNeue, Arial, sans-serif;
 }
