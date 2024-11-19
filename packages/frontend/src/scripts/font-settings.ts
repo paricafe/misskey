@@ -52,13 +52,21 @@ function getFontId(name: string, option: string) {
 	}
 }
 
+async function loadFontStyle(fontId: string) {
+	try {
+		await import(`@/styles-font/${fontId}.scss`);
+	} catch (e) {
+		console.warn(`Failed to load font style: ${fontId}`, e);
+	}
+}
+
 export function getDefaultFontSettings() {
 	const def_arr = miLocalStorage.getItem('defaultFontFace')?.split('_');
 	const fontFace = ref(def_arr?.[0] ?? 'system-ui');
 	const fontFaceType = ref(def_arr?.[1] ?? '');
 	const availableTypes = computed(() => getFontOptionsList(fontFace.value));
 
-	function setDafaultFont() {
+	async function setDafaultFont() {
 		for (const klass of [...document.documentElement.classList.values()]) {
 			if (klass.startsWith('default-font-')) {
 				document.documentElement.classList.remove(klass);
@@ -67,6 +75,10 @@ export function getDefaultFontSettings() {
 		const newFontId = getFontId(fontFace.value, fontFaceType.value);
 		miLocalStorage.setItem('defaultFontFace', newFontId);
 		document.documentElement.classList.add(`default-font-${newFontId}`);
+
+		if (fontFace.value !== 'system-ui') {
+			await loadFontStyle(fontFace.value);
+		}
 		console.log(newFontId);
 	}
 
