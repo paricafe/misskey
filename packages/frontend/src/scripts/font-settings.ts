@@ -82,18 +82,6 @@ export function getDefaultFontSettings() {
 		console.log(newFontId);
 	}
 
-	if (fontFace.value !== 'system-ui') {
-		if (window.requestIdleCallback) {
-			window.requestIdleCallback(() => {
-				loadFontStyle(fontFace.value);
-			});
-		} else {
-			setTimeout(() => {
-				loadFontStyle(fontFace.value);
-			}, 0);
-		}
-	}
-
 	watch(fontFace, (newVal) => {
 		const optionsList = getFontOptionsList(newVal);
 		if (optionsList.length !== 0) {

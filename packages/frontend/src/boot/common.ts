@@ -294,6 +294,19 @@ export async function common(createVue: () => App<Element>) {
 	console.log(i18n.tsx._selfXssPrevention.description3({ link: 'https://misskey-hub.net/docs/for-users/resources/self-xss/' }));
 	//#endregion
 
+	//#region Load default font
+	const def_arr = miLocalStorage.getItem('defaultFontFace')?.split('_');
+	const fontId = def_arr?.[0];
+	if (fontId && fontId !== 'system-ui') {
+		try {
+			await import(`@/styles-font/${fontId}.scss`);
+			document.documentElement.classList.add(`default-font-${def_arr.join('_')}`);
+		} catch (e) {
+			console.warn(`Failed to load font style: ${fontId}`, e);
+		}
+	}
+	//#endregion
+
 	return {
 		isClientUpdated,
 		app,
