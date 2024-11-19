@@ -10,6 +10,7 @@ import type { Packed } from '@/misc/json-schema.js';
 import type { } from '@/models/Blocking.js';
 import type { MiEmoji } from '@/models/Emoji.js';
 import { bindThis } from '@/decorators.js';
+import { In } from 'typeorm';
 
 @Injectable()
 export class EmojiEntityService {
@@ -20,11 +21,9 @@ export class EmojiEntityService {
 	}
 
 	@bindThis
-	public async packSimple(
-		src: MiEmoji['id'] | MiEmoji,
-	): Promise<Packed<'EmojiSimple'>> {
-		const emoji = typeof src === 'object' ? src : await this.emojisRepository.findOneByOrFail({ id: src });
-
+	public packSimpleNoQuery(
+		emoji: MiEmoji,
+	): Packed<'EmojiSimple'> {
 		return {
 			aliases: emoji.aliases,
 			name: emoji.name,
@@ -38,18 +37,34 @@ export class EmojiEntityService {
 	}
 
 	@bindThis
-	public packSimpleMany(
-		emojis: any[],
-	) {
-		return Promise.all(emojis.map(x => this.packSimple(x)));
+	public async packSimple(
+		src: MiEmoji['id'] | MiEmoji,
+	): Promise<Packed<'EmojiSimple'>> {
+		const emoji = typeof src === 'object' ? src : await this.emojisRepository.findOneByOrFail({ id: src });
+
+		return this.packSimpleNoQuery(emoji);
 	}
 
 	@bindThis
-	public async packDetailed(
-		src: MiEmoji['id'] | MiEmoji,
-	): Promise<Packed<'EmojiDetailed'>> {
-		const emoji = typeof src === 'object' ? src : await this.emojisRepository.findOneByOrFail({ id: src });
+	public async packSimpleMany(
+		emojis: MiEmoji['id'][] | MiEmoji[],
+	): Promise<Packed<'EmojiSimple'>[]> {
+		if (emojis.length === 0) {
+			return [];
+		}
+		
+		if (typeof emojis[0] === 'string') {
+			const res = await this.emojisRepository.findBy({ id: In(emojis as MiEmoji['id'][]) });
+			return res.map(this.packSimpleNoQuery);
+		}
 
+		return (emojis as MiEmoji[]).map(this.packSimpleNoQuery);
+	}
+
+	@bindThis
+	public packDetailedNoQuery(
+		emoji: MiEmoji,
+	): Packed<'EmojiDetailed'> {
 		return {
 			id: emoji.id,
 			aliases: emoji.aliases,
@@ -66,10 +81,28 @@ export class EmojiEntityService {
 	}
 
 	@bindThis
-	public packDetailedMany(
-		emojis: any[],
-	) {
-		return Promise.all(emojis.map(x => this.packDetailed(x)));
+	public async packDetailed(
+		src: MiEmoji['id'] | MiEmoji,
+	): Promise<Packed<'EmojiDetailed'>> {
+		const emoji = typeof src === 'object' ? src : await this.emojisRepository.findOneByOrFail({ id: src });
+
+		return this.packDetailedNoQuery(emoji);
+	}
+
+	@bindThis
+	public async packDetailedMany(
+		emojis: MiEmoji['id'][] | MiEmoji[],
+	) : Promise<Packed<'EmojiDetailed'>[]> {
+		if (emojis.length === 0) {
+			return [];
+		}
+		
+		if (typeof emojis[0] === 'string') {
+			const res = await this.emojisRepository.findBy({ id: In(emojis as MiEmoji['id'][]) });
+			return res.map(this.packDetailedNoQuery);
+		}
+
+		return (emojis as MiEmoji[]).map(this.packDetailedNoQuery);
 	}
 }
 

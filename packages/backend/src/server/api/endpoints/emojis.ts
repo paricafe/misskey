@@ -55,9 +55,8 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				.orderBy('LOWER(emoji.category)', 'ASC')
 				.addOrderBy('LOWER(emoji.name)', 'ASC')
 				.getMany();
-
 			return {
-				emojis: await this.emojiEntityService.packSimpleMany(emojis),
+				emojis: emojis.map(this.emojiEntityService.packSimpleNoQuery),
 			};
 		});
 	}
