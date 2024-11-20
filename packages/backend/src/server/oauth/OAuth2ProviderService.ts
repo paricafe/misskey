@@ -142,6 +142,7 @@ function getClient(BASE_URL: string, authorization: string | undefined): Megalod
 export class OAuth2ProviderService {
     #logger: Logger;
     #server = oauth2orize.createServer();
+    #clientCache = new MemoryKVCache<ClientInformation>(60 * 60 * 1000); // 1 hour
 
     constructor(
         @Inject(DI.config)
@@ -150,6 +151,7 @@ export class OAuth2ProviderService {
         loggerService: LoggerService,
     ) {
         this.#logger = loggerService.getLogger('oauth');
+        this.#server.grant(oauth2Pkce.extensions());
     }
 
     // https://datatracker.ietf.org/doc/html/rfc8414.html
@@ -161,7 +163,7 @@ export class OAuth2ProviderService {
             token_endpoint: new URL('/oauth/token', this.config.url),
             scopes_supported: kinds,
             response_types_supported: ['code'],
-            grant_types_supported: ['authorization_code'],
+            grant_types_supported: ['authorization_code', 'client_credentials'],
             service_documentation: 'https://misskey-hub.net',
             code_challenge_methods_supported: ['S256'],
             authorization_response_iss_parameter_supported: true,
@@ -212,6 +214,7 @@ export class OAuth2ProviderService {
 
         fastify.register(multer.contentParser);
 
+        // Handle both Misskey and Mastodon OAuth flows
         fastify.get('/authorize', async (request, reply) => {
             const query: any = request.query;
             let param = "mastodon=true";
@@ -219,6 +222,7 @@ export class OAuth2ProviderService {
             if (query.redirect_uri) param += `&redirect_uri=${query.redirect_uri}`;
             const client = query.client_id ? query.client_id : "";
 
+            // Misskey OAuth validation
             if (client) {
                 try {
                     const clientUrl = validateClientId(Buffer.from(client.toString(), 'base64').toString());
@@ -228,7 +232,15 @@ export class OAuth2ProviderService {
                             throw new AuthorizationError('client_id resolves to disallowed IP range.', 'invalid_request');
                         }
                     }
-                    await discoverClientInformation(this.#logger, this.httpRequestService, clientUrl.href);
+
+                    // Cache client information
+                    const clientInfo = await this.#clientCache.fetch(
+                        clientUrl.href,
+                        () => discoverClientInformation(this.#logger, this.httpRequestService, clientUrl.href),
+                    );
+
+                    // Store client info for token endpoint
+                    await this.#clientCache.set(`client:${query.code_challenge}`, clientInfo);
                 } catch (err) {
                     reply.code(400).send({ error: err.message });
                     return;
@@ -240,19 +252,14 @@ export class OAuth2ProviderService {
             );
         });
 
-        fastify.get('/authorize/', async (request, reply) => {
-            const query: any = request.query;
-            let param = "mastodon=true";
-            if (query.state) param += `&state=${query.state}`;
-            if (query.redirect_uri) param += `&redirect_uri=${query.redirect_uri}`;
-            const client = query.client_id ? query.client_id : "";
-            reply.redirect(
-                `${Buffer.from(client.toString(), 'base64').toString()}?${param}`,
-            );
+        fastify.get('/authorize/', (request, reply) => {
+            return this.handleAuthorize(request, reply);
         });
 
         fastify.post('/token', { preHandler: upload.none() }, async (request, reply) => {
             const body: any = request.body || request.query;
+
+            // Handle client_credentials grant type
             if (body.grant_type === "client_credentials") {
                 const ret = {
                     access_token: uuid(),
@@ -261,33 +268,47 @@ export class OAuth2ProviderService {
                     created_at: Math.floor(new Date().getTime() / 1000),
                 };
                 reply.send(ret);
+                return;
             }
+
             let client_id: any = body.client_id;
             const BASE_URL = `${request.protocol}://${request.hostname}`;
             const client = getClient(BASE_URL, '');
-            let token = null;
-            if (body.code) {
-                token = body.code;
-            }
+            let token = body.code || null;
+
+            // Normalize client_id
             if (client_id instanceof Array) {
                 client_id = client_id.toString();
             } else if (!client_id) {
                 client_id = null;
             }
 
-            if (body.grant_type === 'authorization_code' && !body.code_verifier) {
-                reply.code(400).send({
-                    error: 'invalid_request',
-                    error_description: 'code_verifier is required for authorization_code grant type'
-                });
-                return;
+            // PKCE Validation for authorization_code grant
+            if (body.grant_type === 'authorization_code') {
+                if (!body.code_verifier) {
+                    reply.code(400).send({
+                        error: 'invalid_request',
+                        error_description: 'code_verifier is required for authorization_code grant type'
+                    });
+                    return;
+                }
+
+                // Verify the stored client information matches
+                const storedClientInfo = await this.#clientCache.get(`client:${body.code_verifier}`);
+                if (!storedClientInfo) {
+                    reply.code(400).send({
+                        error: 'invalid_grant',
+                        error_description: 'Invalid authorization code'
+                    });
+                    return;
+                }
             }
 
             try {
                 const atData = await client.fetchAccessToken(
                     client_id,
                     body.client_secret,
-                    token ? token : "",
+                    token || "",
                 );
                 const ret = {
                     access_token: atData.accessToken,
@@ -311,5 +332,16 @@ export class OAuth2ProviderService {
                 },
             });
         });
+    }
+
+    private async handleAuthorize(request: any, reply: any) {
+        const query: any = request.query;
+        let param = "mastodon=true";
+        if (query.state) param += `&state=${query.state}`;
+        if (query.redirect_uri) param += `&redirect_uri=${query.redirect_uri}`;
+        const client = query.client_id ? query.client_id : "";
+        reply.redirect(
+            `${Buffer.from(client.toString(), 'base64').toString()}?${param}`,
+        );
     }
 }
