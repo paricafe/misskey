@@ -134,6 +134,7 @@
 		"json5": "2.2.3",
 		"jsonld": "8.3.2",
 		"jsrsasign": "11.1.0",
+		"megalodon": "workspace:*",
 		"meilisearch": "0.45.0",
 		"juice": "11.0.0",
 		"mfm-js": "0.24.0",

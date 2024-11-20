@@ -55,14 +55,35 @@ const props = defineProps<{
 	token: string;
 }>();
 
+const getUrlParams = () =>
+	window.location.search
+		.substring(1)
+		.split('&')
+		.reduce((result, query) => {
+			const [k, v] = query.split('=');
+			result[k] = decodeURI(v);
+			return result;
+		}, {});
+
 const state = ref<'waiting' | 'accepted' | 'fetch-session-error' | 'denied' | null>(null);
 const session = ref<Misskey.entities.AuthSessionShowResponse | null>(null);
 
 function accepted() {
 	state.value = 'accepted';
-	if (session.value && session.value.app.callbackUrl) {
+	const isMastodon = !!getUrlParams().mastodon;
+	if (session.value && session.value.app.callbackUrl && isMastodon) {
+		const redirectUri = decodeURIComponent(getUrlParams().redirect_uri);
+		if (!session.value.app.callbackUrl.includes('elk.zone') && !session.value.app.callbackUrl.split('\n').includes(redirectUri)) {
+			state.value = 'fetch-session-error';
+			throw new Error('Callback URI doesn\'t match registered app');
+		}
+		const callbackUrl = session.value.app.callbackUrl.includes('elk.zone') ? new URL(session.value.app.callbackUrl) : new URL(redirectUri);
+		callbackUrl.searchParams.append('code', session.value.token);
+		if (getUrlParams().state) callbackUrl.searchParams.append('state', getUrlParams().state);
+		location.href = callbackUrl.toString();
+	} else if (session.value && session.value.app.callbackUrl) {
 		const url = new URL(session.value.app.callbackUrl);
-		if (['javascript:', 'file:', 'data:', 'mailto:', 'tel:', 'vbscript:'].includes(url.protocol)) throw new Error('invalid url');
+		if (['javascript:', 'file:', 'data:', 'mailto:', 'tel:'].includes(url.protocol)) throw new Error('invalid url');
 		location.href = `${session.value.app.callbackUrl}?token=${session.value.token}`;
 	}
 }

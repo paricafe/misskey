@@ -25,6 +25,7 @@ import { SignupApiService } from './api/SignupApiService.js';
 import { StreamingApiServerService } from './api/StreamingApiServerService.js';
 import { OpenApiServerService } from './api/openapi/OpenApiServerService.js';
 import { ClientServerService } from './web/ClientServerService.js';
+import { MastoConverters } from './api/mastodon/converters.js';
 import { FeedService } from './web/FeedService.js';
 import { UrlPreviewService } from './web/UrlPreviewService.js';
 import { ClientLoggerService } from './web/ClientLoggerService.js';
@@ -43,6 +44,7 @@ import { LocalTimelineChannelService } from './api/stream/channels/local-timelin
 import { QueueStatsChannelService } from './api/stream/channels/queue-stats.js';
 import { ServerStatsChannelService } from './api/stream/channels/server-stats.js';
 import { UserListChannelService } from './api/stream/channels/user-list.js';
+import { MastodonApiServerService } from './api/mastodon/MastodonApiServerService.js';
 import { RoleTimelineChannelService } from './api/stream/channels/role-timeline.js';
 import { ReversiChannelService } from './api/stream/channels/reversi.js';
 import { ReversiGameChannelService } from './api/stream/channels/reversi-game.js';
@@ -93,7 +95,9 @@ import { SigninWithPasskeyApiService } from './api/SigninWithPasskeyApiService.j
 		ServerStatsChannelService,
 		UserListChannelService,
 		OpenApiServerService,
+		MastodonApiServerService,
 		OAuth2ProviderService,
+		MastoConverters,
 	],
 	exports: [
 		ServerService,
