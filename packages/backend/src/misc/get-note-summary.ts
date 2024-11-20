@@ -24,12 +24,12 @@ export const getNoteSummary = (note: Packed<'Note'>): string => {
 	if (note.cw != null) {
 		summary += `CW: ${note.cw}`;
 	} else if (note.text) {
-		summary += note.text ? note.text : '';
+		summary += note.text;
 	}
 
 	// ファイルが添付されているとき
-	if ((note.files ?? []).length !== 0) {
-		summary += ` (📎${note.files!.length})`;
+	if (note.files && note.files.length !== 0) {
+		summary += ` (📎${note.files.length})`;
 	}
 
 	// 投票が添付されているとき

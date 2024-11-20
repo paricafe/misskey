@@ -66,7 +66,11 @@ export class NoteReadService implements OnApplicationShutdown {
 			noteUserId: note.userId,
 		};
 
-		await this.noteUnreadsRepository.insert(unread);
+		/* we may be called from NoteEditService, for a note that's
+			already present in the `note_unread` table: `upsert` makes sure
+			we don't throw a "duplicate key" error, while still updating
+			the other columns if they've changed */
+		await this.noteUnreadsRepository.upsert(unread, ['userId', 'noteId']);
 
 		// 2秒経っても既読にならなかったら「未読の投稿がありますよ」イベントを発行する
 		setTimeout(2000, 'unread note', { signal: this.#shutdownController.signal }).then(async () => {

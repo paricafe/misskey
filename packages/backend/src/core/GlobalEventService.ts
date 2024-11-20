@@ -138,6 +138,10 @@ export interface NoteEventTypes {
 		reaction: string;
 		userId: MiUser['id'];
 	};
+	replied: {
+		id: MiNote['id'];
+		userId: MiUser['id'];
+	};
 }
 type NoteStreamEventTypes = {
 	[key in keyof NoteEventTypes]: {
