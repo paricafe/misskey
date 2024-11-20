@@ -5,13 +5,13 @@
 
 import { Inject, Injectable } from '@nestjs/common';
 import { Entity } from 'megalodon';
-import mfm from '@transfem-org/sfm-js';
+import * as mfm from 'mfm-js';
 import { DI } from '@/di-symbols.js';
 import { MfmService } from '@/core/MfmService.js';
 import type { Config } from '@/config.js';
 import type { IMentionedRemoteUsers } from '@/models/Note.js';
 import type { MiUser } from '@/models/User.js';
-import type { NoteEditRepository, NotesRepository, UserProfilesRepository, UsersRepository } from '@/models/_.js';
+import type { NotesRepository, UserProfilesRepository, UsersRepository } from '@/models/_.js';
 import { awaitAll } from '@/misc/prelude/await-all.js';
 import { CustomEmojiService } from '@/core/CustomEmojiService.js';
 import { DriveFileEntityService } from '@/core/entities/DriveFileEntityService.js';
@@ -43,9 +43,6 @@ export class MastoConverters {
 
 		@Inject(DI.userProfilesRepository)
 		private userProfilesRepository: UserProfilesRepository,
-
-		@Inject(DI.noteEditRepository)
-		private noteEditRepository: NoteEditRepository,
 
 		private mfmService: MfmService,
 		private getterService: GetterService,
@@ -176,25 +173,9 @@ export class MastoConverters {
 		}
 
 		const noteUser = await this.getUser(note.userId).then(async (p) => await this.convertAccount(p));
-		const edits = await this.noteEditRepository.find({ where: { noteId: note.id }, order: { id: 'ASC' } });
 		const history: Promise<any>[] = [];
 
 		let lastDate = this.idService.parse(note.id).date;
-		for (const edit of edits) {
-			const files = this.driveFileEntityService.packManyByIds(edit.fileIds);
-			const item = {
-				account: noteUser,
-				content: this.mfmService.toMastoApiHtml(mfm.parse(edit.newText ?? ''), JSON.parse(note.mentionedRemoteUsers)).then(p => p ?? ''),
-				created_at: lastDate.toISOString(),
-				emojis: [],
-				sensitive: files.then(files => files.length > 0 ? files.some((f) => f.isSensitive) : false),
-				spoiler_text: edit.cw ?? '',
-				poll: null,
-				media_attachments: files.then(files => files.length > 0 ? files.map((f) => this.encodeFile(f)) : []),
-			};
-			lastDate = edit.updatedAt;
-			history.push(awaitAll(item));
-		}
 
 		return await Promise.all(history);
 	}

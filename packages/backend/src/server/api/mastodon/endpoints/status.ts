@@ -11,7 +11,7 @@ import { limitToInt } from './timeline.js';
 import type { Entity } from 'megalodon';
 import type { FastifyInstance } from 'fastify';
 import type { Config } from '@/config.js';
-import { NoteEditRepository, NotesRepository, UsersRepository } from '@/models/_.js';
+import { NotesRepository, UsersRepository } from '@/models/_.js';
 import { UserEntityService } from '@/core/entities/UserEntityService.js';
 
 function normalizeQuery(data: any) {

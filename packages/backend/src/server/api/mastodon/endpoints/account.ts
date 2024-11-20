@@ -7,7 +7,7 @@ import { MastoConverters, convertRelationship } from '../converters.js';
 import { argsToBools, limitToInt } from './timeline.js';
 import type { MegalodonInterface } from 'megalodon';
 import type { FastifyRequest } from 'fastify';
-import { NoteEditRepository, NotesRepository, UsersRepository } from '@/models/_.js';
+import { NotesRepository, UsersRepository } from '@/models/_.js';
 import { UserEntityService } from '@/core/entities/UserEntityService.js';
 import type { Config } from '@/config.js';
 import { Injectable } from '@nestjs/common';
