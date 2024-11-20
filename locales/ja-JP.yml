@@ -2829,6 +2829,7 @@ _followRequest:
   recieved: "受け取った申請"
   sent: "送った申請"
 
+pariMisskeyAbout: "Pari Cafe使用のブランチは、原版に対してカスタマイズを行っています。"
 timeTravel: "Time Travel"
 timeTravelDescription: "Show posts before this date."
 undoPostForm: "Undo"

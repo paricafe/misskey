@@ -271,16 +271,6 @@ const lang = ref(miLocalStorage.getItem('lang'));
 const useSystemFont = ref(miLocalStorage.getItem('useSystemFont') != null);
 const dataSaver = ref(defaultStore.state.dataSaver);
 
-async function reloadAsk() {
-	const { canceled } = await os.confirm({
-		type: 'info',
-		text: i18n.ts.reloadToApplySetting,
-	});
-	if (canceled) return;
-
-	unisonReload();
-}
-
 const hemisphere = computed(defaultStore.makeGetterSetter('hemisphere'));
 const overridedDeviceKind = computed(defaultStore.makeGetterSetter('overridedDeviceKind'));
 const serverDisconnectedBehavior = computed(defaultStore.makeGetterSetter('serverDisconnectedBehavior'));

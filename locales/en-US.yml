@@ -2818,6 +2818,7 @@ _selfXssPrevention:
 _followRequest:
   recieved: "Requests received"
   sent: "Requests sent"
+pariMisskeyAbout: "Pari Cafe uses a branch that has been customized for the original version."
 timeTravel: "Time Travel"
 timeTravelDescription: "Show posts before this date."
 undoPostForm: "Undo"

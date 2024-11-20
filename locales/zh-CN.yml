@@ -2823,6 +2823,7 @@ _selfXssPrevention:
 _followRequest:
   recieved: "已收到申请"
   sent: "已发送申请"
+pariMisskeyAbout: "Pari Cafe使用的分支基于原版进行了定制。"
 timeTravel: "时光机"
 timeTravelDescription: "显示该日期以前的帖子"
 pariPlusInfo: "Pari Plus! 定制 Misskey~!"

@@ -2821,6 +2821,7 @@ _selfXssPrevention:
 _followRequest:
   recieved: "收到的請求"
   sent: "送出的請求"
+pariMisskeyAbout: "Pari Cafe使用的分支是基於原版進行了定制。"
 timeTravel: "時光機"
 timeTravelDescription: "回到指定的日期"
 pariPlusInfo: "Pari Plus! 自訂 Misskey~!"

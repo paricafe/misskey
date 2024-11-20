@@ -23,7 +23,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 				</div>
 				<div style="text-align: center;">
 					{{ i18n.ts._aboutMisskey.about }}<br>
-					Pari Cafe使用的分支基于原版进行了定制。 <br>
+					{{ i18n.ts.pariMisskeyAbout }}<br>
 					<a href="https://misskey-hub.net/docs/misskey.html" target="_blank" class="_link">{{ i18n.ts.learnMore }}</a>
 				</div>
 				<div v-if="$i != null" style="text-align: center;">
