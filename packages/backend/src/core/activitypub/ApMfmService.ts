@@ -35,7 +35,7 @@ export class ApMfmService {
 			noMisskeyContent = true;
 		}
 
-		const content = this.mfmService.toHtml(parsed, JSON.parse(note.mentionedRemoteUsers));
+		const content = this.mfmService.toHtml(parsed, note.mentionedRemoteUsers ? JSON.parse(note.mentionedRemoteUsers) : []);
 
 		return {
 			content,

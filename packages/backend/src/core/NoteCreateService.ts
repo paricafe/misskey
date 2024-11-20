@@ -52,8 +52,10 @@ import { FeaturedService } from '@/core/FeaturedService.js';
 import { FanoutTimelineService } from '@/core/FanoutTimelineService.js';
 import { UtilityService } from '@/core/UtilityService.js';
 import { UserBlockingService } from '@/core/UserBlockingService.js';
+import { CacheService } from '@/core/CacheService.js';
 import { isReply } from '@/misc/is-reply.js';
 import { trackPromise } from '@/misc/promise-tracker.js';
+import { isUserRelated } from '@/misc/is-user-related.js';
 import { IdentifiableError } from '@/misc/identifiable-error.js';
 import { CollapsedQueue } from '@/misc/collapsed-queue.js';
 
@@ -217,6 +219,7 @@ export class NoteCreateService implements OnApplicationShutdown {
 		private instanceChart: InstanceChart,
 		private utilityService: UtilityService,
 		private userBlockingService: UserBlockingService,
+		private cacheService: CacheService,
 	) {
 		this.updateNotesCountQueue = new CollapsedQueue(process.env.NODE_ENV !== 'test' ? 60 * 1000 * 5 : 0, this.collapseNotesCount, this.performUpdateNotesCount);
 	}
@@ -450,6 +453,14 @@ export class NoteCreateService implements OnApplicationShutdown {
 			userHost: user.host,
 		});
 
+		// should really not happen, but better safe than sorry
+		if (data.reply?.id === insert.id) {
+			throw new Error("A note can't reply to itself");
+		}
+		if (data.renote?.id === insert.id) {
+			throw new Error("A note can't renote itself");
+		}
+
 		if (data.uri != null) insert.uri = data.uri;
 		if (data.url != null) insert.url = data.url;
 
@@ -630,6 +641,10 @@ export class NoteCreateService implements OnApplicationShutdown {
 
 			// If has in reply to note
 			if (data.reply) {
+				this.globalEventService.publishNoteStream(data.reply.id, 'replied', {
+					id: note.id,
+					userId: user.id,
+				});
 				// 通知
 				if (data.reply.userHost === null) {
 					const isThreadMuted = await this.noteThreadMutingsRepository.exists({
@@ -639,7 +654,15 @@ export class NoteCreateService implements OnApplicationShutdown {
 						},
 					});
 
-					if (!isThreadMuted) {
+					const [
+						userIdsWhoMeMuting,
+					] = data.reply.userId ? await Promise.all([
+						this.cacheService.userMutingsCache.fetch(data.reply.userId),
+					]) : [new Set<string>()];
+
+					const muted = isUserRelated(note, userIdsWhoMeMuting);
+
+					if (!isThreadMuted && !muted) {
 						nm.push(data.reply.userId, 'reply');
 						this.globalEventService.publishMainStream(data.reply.userId, 'reply', noteObj);
 
@@ -659,7 +682,24 @@ export class NoteCreateService implements OnApplicationShutdown {
 
 				// Notify
 				if (data.renote.userHost === null) {
-					nm.push(data.renote.userId, type);
+					const isThreadMuted = await this.noteThreadMutingsRepository.exists({
+						where: {
+							userId: data.renote.userId,
+							threadId: data.renote.threadId ?? data.renote.id,
+						},
+					});
+
+					const [
+						userIdsWhoMeMuting,
+					] = data.renote.userId ? await Promise.all([
+						this.cacheService.userMutingsCache.fetch(data.renote.userId),
+					]) : [new Set<string>()];
+
+					const muted = isUserRelated(note, userIdsWhoMeMuting);
+
+					if (!isThreadMuted && !muted) {
+						nm.push(data.renote.userId, type);
+					}
 				}
 
 				// Publish event
@@ -788,7 +828,15 @@ export class NoteCreateService implements OnApplicationShutdown {
 				},
 			});
 
-			if (isThreadMuted) {
+			const [
+				userIdsWhoMeMuting,
+			] = u.id ? await Promise.all([
+				this.cacheService.userMutingsCache.fetch(u.id),
+			]) : [new Set<string>()];
+
+			const muted = isUserRelated(note, userIdsWhoMeMuting);
+
+			if (isThreadMuted || muted) {
 				continue;
 			}
 
