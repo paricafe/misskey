@@ -8,7 +8,7 @@ import megalodon, { Entity, MegalodonInterface } from 'megalodon';
 import querystring from 'querystring';
 import { IsNull } from 'typeorm';
 import multer from 'fastify-multer';
-import type { AccessTokensRepository, NoteEditRepository, NotesRepository, UserProfilesRepository, UsersRepository, MiMeta } from '@/models/_.js';
+import type { AccessTokensRepository, NotesRepository, UserProfilesRepository, UsersRepository, MiMeta } from '@/models/_.js';
 import { DI } from '@/di-symbols.js';
 import { bindThis } from '@/decorators.js';
 import type { Config } from '@/config.js';
@@ -38,8 +38,6 @@ export class MastodonApiServerService {
         private notesRepository: NotesRepository,
 		@Inject(DI.userProfilesRepository)
 		private userProfilesRepository: UserProfilesRepository,
-		@Inject(DI.noteEditRepository)
-		private noteEditRepository: NoteEditRepository,
 		@Inject(DI.accessTokensRepository)
 		private accessTokensRepository: AccessTokensRepository,
         @Inject(DI.config)
