@@ -35,12 +35,14 @@ ARG NODE_ENV=production
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store,sharing=locked \
     pnpm i --frozen-lockfile --aggregate-output
 
-# megalodon
-RUN cd packages/megalodon && pnpm add -D jest-worker @types/jest
-
 COPY --link . ./
 
 RUN git submodule update --init
+
+RUN cd packages/megalodon && \
+    pnpm add -D jest-worker @types/jest && \
+    rm -rf test/
+
 RUN pnpm build
 RUN rm -rf .git/
 
@@ -105,7 +107,7 @@ COPY --chown=misskey:misskey --from=native-builder /misskey/packages/misskey-js/
 COPY --chown=misskey:misskey --from=native-builder /misskey/packages/misskey-reversi/built ./packages/misskey-reversi/built
 COPY --chown=misskey:misskey --from=native-builder /misskey/packages/misskey-bubble-game/built ./packages/misskey-bubble-game/built
 COPY --chown=misskey:misskey --from=native-builder /misskey/packages/backend/built ./packages/backend/built
-COPY --chown=misskey:misskey --from=native-builder /misskey/packages/megalodon/built ./packages/megalodon/built
+COPY --chown=misskey:misskey --from=native-builder /misskey/packages/megalodon/lib ./packages/megalodon/lib
 COPY --chown=misskey:misskey --from=native-builder /misskey/fluent-emojis /misskey/fluent-emojis
 COPY --chown=misskey:misskey . ./
 
