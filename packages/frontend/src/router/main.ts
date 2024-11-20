@@ -25,6 +25,10 @@ export function setupRouter(app: App, routerFactory: ((path: string) => IRouter)
 		window.history.pushState({ key: ctx.key }, '', ctx.path);
 	});
 
+	mainRouter.addListener('same', () => {
+		window.scroll({ top: 0, behavior: 'smooth' });
+	});
+
 	mainRouter.addListener('replace', ctx => {
 		window.history.replaceState({ key: ctx.key }, '', ctx.path);
 	});
