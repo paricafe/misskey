@@ -58,7 +58,6 @@ import { trackPromise } from '@/misc/promise-tracker.js';
 import { isUserRelated } from '@/misc/is-user-related.js';
 import { IdentifiableError } from '@/misc/identifiable-error.js';
 import { CollapsedQueue } from '@/misc/collapsed-queue.js';
-import { CacheService } from '@/core/CacheService.js';
 
 type NotificationType = 'reply' | 'renote' | 'quote' | 'mention';
 
