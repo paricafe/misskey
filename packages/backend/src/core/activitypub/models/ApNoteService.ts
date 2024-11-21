@@ -156,16 +156,16 @@ export class ApNoteService {
 		}
 
 		if (!checkHttps(note.id)) {
-			throw new UnrecoverableError(`unexpected schema of note url ${url}: ${entryUri}`);
+			throw new UnrecoverableError(`unexpected schema of note.id ${note.id} in ${entryUri}`);
 		}
 
 		if (url != null) {
 			if (!checkHttps(url)) {
-				throw new UnrecoverableError('unexpected schema of note url: ' + url);
+				throw new UnrecoverableError(`unexpected schema of note.url ${url} in ${entryUri}`);
 			}
 
 			// if (this.utilityService.punyHost(url) !== this.utilityService.punyHost(note.id)) {
-			// 	throw new Error(`note url & uri host mismatch: note url: ${url}, note uri: ${note.id}`);
+			// 	throw new Error(`note url <> uri host mismatch: ${url} <> ${note.id} in ${entryUri}`);
 			// }
 		}
 
@@ -173,7 +173,7 @@ export class ApNoteService {
 
 		// 投稿者をフェッチ
 		if (note.attributedTo == null) {
-			throw new UnrecoverableError(`invalid note.attributedTo ${note.attributedTo}: ${entryUri}`);
+			throw new UnrecoverableError(`invalid note.attributedTo ${note.attributedTo} in ${entryUri}`);
 		}
 
 		const uri = getOneApId(note.attributedTo);
@@ -248,13 +248,13 @@ export class ApNoteService {
 				.then(x => {
 					if (x == null) {
 						this.logger.warn('Specified inReplyTo, but not found');
-						throw new Error(`could not fetch inReplyTo ${note.inReplyTo}: ${entryUri}`);
+						throw new Error(`could not fetch inReplyTo ${note.inReplyTo} for note ${entryUri}`);
 					}
 
 					return x;
 				})
 				.catch(async err => {
-					this.logger.warn(`error ${err.statusCode ?? err} fetching inReplyTo ${note.inReplyTo}: ${entryUri}`);
+					this.logger.warn(`error ${err.statusCode ?? err} fetching inReplyTo ${note.inReplyTo} for note ${entryUri}`);
 					throw err;
 				})
 			: null;
@@ -345,7 +345,7 @@ export class ApNoteService {
 			this.logger.info('The note is already inserted while creating itself, reading again');
 			const duplicate = await this.fetchNote(value);
 			if (!duplicate) {
-				throw new Error(`The note creation failed with duplication error even when there is no duplication, ${entryUri}`);
+				throw new Error(`The note creation failed with duplication error even when there is no duplication: ${entryUri}`);
 			}
 			return duplicate;
 		}

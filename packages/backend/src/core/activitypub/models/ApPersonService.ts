@@ -141,26 +141,27 @@ export class ApPersonService implements OnModuleInit {
 		const expectHost = this.utilityService.punyHost(uri);
 
 		if (!isActor(x)) {
-			throw new UnrecoverableError(`invalid Actor type '${x.type}': ${uri}`);
+			throw new UnrecoverableError(`invalid Actor type '${x.type}' in ${uri}`);
 		}
 
 		if (!(typeof x.id === 'string' && x.id.length > 0)) {
-			throw new UnrecoverableError(`invalid Actor - wrong id: ${uri}`);
+			throw new UnrecoverableError(`invalid Actor ${uri} - wrong id type`);
 		}
 
 		if (!(typeof x.inbox === 'string' && x.inbox.length > 0)) {
-			throw new UnrecoverableError(`invalid Actor - wrong inbox: ${uri}`);
+			throw new UnrecoverableError(`invalid Actor ${uri} - wrong inbox type`);
 		}
 
-		if (this.utilityService.punyHost(x.inbox) !== expectHost) {
-			throw new UnrecoverableError(`invalid Actor - inbox has different host: ${uri}`);
+		const inboxHost = this.utilityService.punyHost(x.inbox);
+		if (inboxHost !== expectHost) {
+			throw new UnrecoverableError(`invalid Actor ${uri} - wrong inbox ${inboxHost}`);
 		}
 
 		const sharedInboxObject = x.sharedInbox ?? (x.endpoints ? x.endpoints.sharedInbox : undefined);
 		if (sharedInboxObject != null) {
 			const sharedInbox = getApId(sharedInboxObject);
 			if (!(typeof sharedInbox === 'string' && sharedInbox.length > 0 && this.utilityService.punyHost(sharedInbox) === expectHost)) {
-				throw new Error('invalid Actor: wrong shared inbox');
+				throw new UnrecoverableError(`invalid Actor ${uri} - wrong shared inbox ${sharedInbox}`);
 			}
 		}
 
@@ -170,16 +171,16 @@ export class ApPersonService implements OnModuleInit {
 				const collectionUri = getApId(xCollection);
 				if (typeof collectionUri === 'string' && collectionUri.length > 0) {
 					if (this.utilityService.punyHost(collectionUri) !== expectHost) {
-						throw new UnrecoverableError(`invalid Actor - ${collection} has different host: ${uri}`);
+						throw new UnrecoverableError(`invalid Actor ${uri} - wrong ${collection} ${collectionUri}`);
 					}
 				} else if (collectionUri != null) {
-					throw new UnrecoverableError(`invalid Actor: wrong ${collection} in ${uri}`);
+					throw new UnrecoverableError(`invalid Actor ${uri}: wrong ${collection} type`);
 				}
 			}
 		}
 
 		if (!(typeof x.preferredUsername === 'string' && x.preferredUsername.length > 0 && x.preferredUsername.length <= 128 && /^\w([\w-.]*\w)?$/.test(x.preferredUsername))) {
-			throw new UnrecoverableError(`invalid Actor - wrong username: ${uri}`);
+			throw new UnrecoverableError(`invalid Actor ${uri} - wrong username`);
 		}
 
 		// These fields are only informational, and some AP software allows these
@@ -187,7 +188,7 @@ export class ApPersonService implements OnModuleInit {
 		// we can at least see these users and their activities.
 		if (x.name) {
 			if (!(typeof x.name === 'string' && x.name.length > 0)) {
-				throw new UnrecoverableError(`invalid Actor - wrong name: ${uri}`);
+				throw new UnrecoverableError(`invalid Actor ${uri} - wrong name`);
 			}
 			x.name = truncate(x.name, nameLength);
 		} else if (x.name === '') {
@@ -196,24 +197,24 @@ export class ApPersonService implements OnModuleInit {
 		}
 		if (x.summary) {
 			if (!(typeof x.summary === 'string' && x.summary.length > 0)) {
-				throw new UnrecoverableError(`invalid Actor - wrong summary: ${uri}`);
+				throw new UnrecoverableError(`invalid Actor ${uri} - wrong summary`);
 			}
 			x.summary = truncate(x.summary, summaryLength);
 		}
 
 		const idHost = this.utilityService.punyHost(x.id);
 		if (idHost !== expectHost) {
-			throw new UnrecoverableError(`invalid Actor - id has different host: ${uri}`);
+			throw new UnrecoverableError(`invalid Actor ${uri} - wrong id ${x.id}`);
 		}
 
 		if (x.publicKey) {
 			if (typeof x.publicKey.id !== 'string') {
-				throw new UnrecoverableError(`invalid Actor - publicKey.id is not a string: ${uri}`);
+				throw new UnrecoverableError(`invalid Actor ${uri} - wrong publicKey.id type`);
 			}
 
 			const publicKeyIdHost = this.utilityService.punyHost(x.publicKey.id);
 			if (publicKeyIdHost !== expectHost) {
-				throw new UnrecoverableError(`invalid Actor - publicKey.id has different host: ${uri}`);
+				throw new UnrecoverableError(`invalid Actor ${uri} - wrong publicKey.id ${x.publicKey.id}`);
 			}
 		}
 
@@ -311,7 +312,7 @@ export class ApPersonService implements OnModuleInit {
 		if (resolver == null) resolver = this.apResolverService.createResolver();
 
 		const object = await resolver.resolve(uri);
-		if (object.id == null) throw new UnrecoverableError(`null object.id: ${uri}`);
+		if (object.id == null) throw new UnrecoverableError(`null object.id in ${uri}`);
 
 		const person = this.validateActor(object, uri);
 
@@ -348,11 +349,11 @@ export class ApPersonService implements OnModuleInit {
 
 		if (url != null) {
 			if (!checkHttps(url)) {
-				throw new UnrecoverableError(`unexpected schema of person url ${url}: ${uri}`);
+				throw new UnrecoverableError(`unexpected schema of person url ${url} in ${uri}`);
 			}
 
 			if (this.utilityService.punyHost(url) !== this.utilityService.punyHost(person.id)) {
-				throw new UnrecoverableError(`person url <> uri host mismatch: ${url} <> ${person.id}`);
+				throw new UnrecoverableError(`person url <> uri host mismatch: ${url} <> ${person.id} in ${uri}`);
 			}
 		}
 
@@ -561,11 +562,11 @@ export class ApPersonService implements OnModuleInit {
 
 		if (url != null) {
 			if (!checkHttps(url)) {
-				throw new UnrecoverableError(`unexpected schema of person url ${url}: ${uri}`);
+				throw new UnrecoverableError(`unexpected schema of person url ${url} in ${uri}`);
 			}
 
 			if (this.utilityService.punyHost(url) !== this.utilityService.punyHost(person.id)) {
-				throw new UnrecoverableError(`person url <> uri host mismatch: ${url} <> ${person.id}`);
+				throw new UnrecoverableError(`person url <> uri host mismatch: ${url} <> ${person.id} in ${uri}`);
 			}
 		}
 
@@ -732,7 +733,7 @@ export class ApPersonService implements OnModuleInit {
 		});
 		if (!collection) return;
 
-		if (!isCollectionOrOrderedCollection(collection)) throw new UnrecoverableError(`featured ${user.featured} is not Collection or OrderedCollection: ${user.uri}`);
+		if (!isCollectionOrOrderedCollection(collection)) throw new UnrecoverableError(`featured ${user.featured} is not Collection or OrderedCollection in ${user.uri}`);
 
 		// Resolve to Object(may be Note) arrays
 		const unresolvedItems = isCollection(collection) ? collection.items : collection.orderedItems;

@@ -52,7 +52,7 @@ export class ApQuestionService {
 		if (!isQuestion(question)) throw new UnrecoverableError(`invalid type ${getApType(question)}: ${getNullableApId(question)}`);
 
 		const multiple = question.oneOf === undefined;
-		if (multiple && question.anyOf === undefined) throw new Error(`invalid question - neither oneOf nor anyOf is defined: ${getNullableApId(question)}`);
+		if (multiple && question.anyOf === undefined) throw new UnrecoverableError(`invalid question - neither oneOf nor anyOf is defined: ${getNullableApId(question)}`);
 
 		const expiresAt = question.endTime ? new Date(question.endTime) : question.closed ? new Date(question.closed) : null;
 

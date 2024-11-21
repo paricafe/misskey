@@ -428,7 +428,7 @@ export class ApInboxService {
 		if (isPost(object)) {
 			await this.createNote(resolver, actor, object, false, activity);
 		} else {
-			return `skip: Unsupported type for Create: ${getApType(object)} (object ${getNullableApId(object)})`;
+			return `skip: Unsupported type for Create: ${getApType(object)} ${getNullableApId(object)}`;
 		}
 	}
 
@@ -815,7 +815,7 @@ export class ApInboxService {
 			await this.apNoteService.updateNote(object, resolver).catch(err => console.error(err));
 			return 'ok: Note updated';
 		} else {
-			return `skip: Unsupported type for Update: ${getApType(object)} (object ${getNullableApId(object)})`;
+			return `skip: Unsupported type for Update: ${getApType(object)} ${getNullableApId(object)}`;
 		}
 	}
 
