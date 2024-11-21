@@ -164,7 +164,7 @@ export class ApInboxService {
 		} else if (isAnnounce(activity)) {
 			return await this.announce(actor, activity, resolver);
 		} else if (isLike(activity)) {
-			return await this.like(actor, activity);
+			return await this.like(actor, activity, resolver);
 		} else if (isUndo(activity)) {
 			return await this.undo(actor, activity, resolver);
 		} else if (isBlock(activity)) {
@@ -196,10 +196,13 @@ export class ApInboxService {
 	}
 
 	@bindThis
-	private async like(actor: MiRemoteUser, activity: ILike): Promise<string> {
+	private async like(actor: MiRemoteUser, activity: ILike, resolver?: Resolver): Promise<string> {
 		const targetUri = getApId(activity.object);
 
-		const note = await this.apNoteService.fetchNote(targetUri);
+		const object = fromTuple(activity.object);
+		if (!object) return 'skip: activity has no object property';
+
+		const note = await this.apNoteService.resolveNote(object, { resolver });
 		if (!note) return `skip: target note not found ${targetUri}`;
 
 		await this.apNoteService.extractEmojis(activity.tag ?? [], actor.host).catch(() => null);
