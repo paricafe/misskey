@@ -14,121 +14,21 @@ import * as swos from '@/scripts/operations.js';
 
 const STATIC_CACHE_NAME = `misskey-static-${_VERSION_}`;
 const PATHS_TO_CACHE = ['/assets/', '/static-assets/', '/emoji/', '/twemoji/', '/fluent-emoji/', '/vite/'];
-const STORAGE_QUOTA = 2 * 1024 * 1024 * 1024; // 2GB in bytes
-const EMOJI_PATH = '/emoji/';
-
-async function requestStorageQuota() {
-	try {
-			if (!('storage' in navigator)) {
-					throw new Error('Storage API not supported');
-			}
-
-			if ('persist' in navigator) {
-					const isPersisted = await navigator.storage.persist();
-					console.log(`Persisted storage granted: ${isPersisted}`);
-			}
-
-			if ('estimate' in navigator.storage) {
-					const estimate = await navigator.storage.estimate();
-					const currentQuota = estimate.quota || 0;
-					const currentUsage = estimate.usage || 0;
-
-					console.log(`Current storage: ${currentUsage} of ${currentQuota} bytes used`);
-
-					if ('requestQuota' in navigator.storage) {
-							try {
-									const grantedQuota = await navigator.storage.requestQuota(STORAGE_QUOTA);
-									console.log(`Granted quota: ${grantedQuota} bytes`);
-							} catch (quotaError) {
-									console.warn('Failed to request additional quota:', quotaError);
-							}
-					}
-
-					return {
-							quota: currentQuota,
-							usage: currentUsage
-					};
-			} else {
-					console.warn('Storage estimate API not supported');
-					return {
-							quota: 0,
-							usage: 0
-					};
-			}
-	} catch (error) {
-			console.error('Failed to request storage quota:', error);
-			return {
-					quota: 0,
-					usage: 0
-			};
-	}
-}
-
-async function manageStorageSpace(newRequestSize = 0) {
-	try {
-			if (!('storage' in navigator)) {
-					console.warn('Storage API not supported');
-					return;
-			}
-
-			const estimate = await navigator.storage.estimate();
-			const currentUsage = estimate.usage || 0;
-			const currentQuota = estimate.quota || STORAGE_QUOTA;
-
-			if (currentUsage + newRequestSize > currentQuota) {
-					console.log(`Storage space needed. Current usage: ${currentUsage}, Need: ${newRequestSize}, Quota: ${currentQuota}`);
-
-					const cache = await caches.open(STATIC_CACHE_NAME);
-					const keys = await cache.keys();
-
-					const emojiKeys = keys.filter(request => request.url.includes(EMOJI_PATH));
-					console.log(`Found ${emojiKeys.length} emoji caches to manage`);
-
-					if (emojiKeys.length > 0) {
-							for (const key of emojiKeys) {
-									await cache.delete(key);
-									console.log(`Deleted cache for: ${key.url}`);
-
-									const newEstimate = await navigator.storage.estimate();
-									const newUsage = newEstimate.usage || 0;
-
-									if (newUsage + newRequestSize <= currentQuota) {
-											console.log(`Sufficient space cleared. New usage: ${newUsage}`);
-											break;
-									}
-							}
-					} else {
-							console.warn('No emoji caches available for cleanup');
-					}
-			}
-	} catch (error) {
-			console.error('Failed to manage storage space:', error);
-	}
-}
 
 async function cacheWithFallback(cache, paths) {
-	for (const path of paths) {
-			try {
-					const response = await fetch(new Request(path, { credentials: 'same-origin' }));
-					const blob = await response.clone().blob();
-
-					await manageStorageSpace(blob.size);
-
-					await cache.put(new Request(path, { credentials: 'same-origin' }), response);
-			} catch (error) {
-					console.error(`Failed to cache ${path}:`, error);
-			}
-	}
+    for (const path of paths) {
+        try {
+            await cache.add(new Request(path, { credentials: 'same-origin' }));
+        } catch (error) {}
+    }
 }
 
 globalThis.addEventListener('install', (ev) => {
-	ev.waitUntil((async () => {
-			await requestStorageQuota();
-
-			const cache = await caches.open(STATIC_CACHE_NAME);
-			await cacheWithFallback(cache, PATHS_TO_CACHE);
-			await globalThis.skipWaiting();
-	})());
+    ev.waitUntil((async () => {
+        const cache = await caches.open(STATIC_CACHE_NAME);
+        await cacheWithFallback(cache, PATHS_TO_CACHE);
+        await globalThis.skipWaiting();
+    })());
 });
 
 globalThis.addEventListener('activate', ev => {
@@ -155,31 +55,27 @@ async function offlineContentHTML() {
 }
 
 globalThis.addEventListener('fetch', ev => {
-	const shouldCache = PATHS_TO_CACHE.some(path => ev.request.url.includes(path));
+    const shouldCache = PATHS_TO_CACHE.some(path => ev.request.url.includes(path));
 
-	if (shouldCache) {
-			ev.respondWith(
-					caches.match(ev.request)
-							.then(async response => {
-									if (response) return response;
+    if (shouldCache) {
+        ev.respondWith(
+            caches.match(ev.request)
+                .then(response => {
+                    if (response) return response;
 
-									const fetchResponse = await fetch(ev.request);
-									if (!fetchResponse || fetchResponse.status !== 200 || fetchResponse.type !== 'basic') {
-											return fetchResponse;
-									}
-
-									const blob = await fetchResponse.clone().blob();
-									await manageStorageSpace(blob.size);
-
-									const responseToCache = fetchResponse.clone();
-									const cache = await caches.open(STATIC_CACHE_NAME);
-									await cache.put(ev.request, responseToCache);
-
-									return fetchResponse;
-							})
-			);
-			return;
-	}
+                    return fetch(ev.request).then(response => {
+                        if (!response || response.status !== 200 || response.type !== 'basic') return response;
+                        const responseToCache = response.clone();
+                        caches.open(STATIC_CACHE_NAME)
+                            .then(cache => {
+                                cache.put(ev.request, responseToCache);
+                            });
+                        return response;
+                    });
+                })
+        );
+        return;
+    }
 
     let isHTMLRequest = false;
     if (ev.request.headers.get('sec-fetch-dest') === 'document') {
@@ -271,6 +167,9 @@ globalThis.addEventListener('notificationclick', (ev: ServiceWorkerGlobalScopeEv
                         break;
                     case 'showFollowRequests':
                         client = await swos.openClient('push', '/my/follow-requests', loginId);
+                        break;
+                    case 'edited':
+                        if ('note' in data.body) client = await swos.openPost({ reply: data.body.note }, loginId);
                         break;
                     default:
                         switch (data.body.type) {
