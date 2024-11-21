@@ -37,6 +37,9 @@ export interface IObject {
 	tag?: IObject | IObject[];
 	sensitive?: boolean;
 	updated?: string;
+	visibility?: string;
+	mentionedUsers?: any[];
+	visibleUsers?: any[];
 }
 
 /**

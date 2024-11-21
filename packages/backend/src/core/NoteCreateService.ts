@@ -7,6 +7,7 @@ import { setImmediate } from 'node:timers/promises';
 import * as mfm from 'mfm-js';
 import { In, DataSource, IsNull, LessThan } from 'typeorm';
 import * as Redis from 'ioredis';
+import * as Bull from 'bullmq';
 import { Inject, Injectable, OnApplicationShutdown } from '@nestjs/common';
 import { extractMentions } from '@/misc/extract-mentions.js';
 import { extractCustomEmojisFromMfm } from '@/misc/extract-custom-emojis-from-mfm.js';
@@ -295,7 +296,7 @@ export class NoteCreateService implements OnApplicationShutdown {
 				case 'followers':
 					// 他人のfollowers noteはreject
 					if (data.renote.userId !== user.id) {
-						throw new Error('Renote target is not public or home');
+						throw new Bull.UnrecoverableError('Renote target is not public or home');
 					}
 
 					// Renote対象がfollowersならfollowersにする
@@ -303,7 +304,7 @@ export class NoteCreateService implements OnApplicationShutdown {
 					break;
 				case 'specified':
 					// specified / direct noteはreject
-					throw new Error('Renote target is not public or home');
+					throw new Bull.UnrecoverableError('Renote target is not public or home');
 			}
 		}
 
