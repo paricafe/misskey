@@ -154,11 +154,24 @@ export class ApPersonService implements OnModuleInit {
 			throw new Error('invalid Actor: inbox has different host');
 		}
 
+		const sharedInboxObject = x.sharedInbox ?? (x.endpoints ? x.endpoints.sharedInbox : undefined);
+		if (sharedInboxObject != null) {
+			const sharedInbox = getApId(sharedInboxObject);
+			if (!(typeof sharedInbox === 'string' && sharedInbox.length > 0 && this.utilityService.punyHost(sharedInbox) === expectHost)) {
+				throw new Error('invalid Actor: wrong shared inbox');
+			}
+		}
+
 		for (const collection of ['outbox', 'followers', 'following'] as (keyof IActor)[]) {
-			const collectionUri = (x as IActor)[collection];
-			if (typeof collectionUri === 'string' && collectionUri.length > 0) {
-				if (this.utilityService.punyHost(collectionUri) !== expectHost) {
-					throw new Error(`invalid Actor: ${collection} has different host`);
+			const xCollection = (x as IActor)[collection];
+			if (xCollection != null) {
+				const collectionUri = getApId(xCollection);
+				if (typeof collectionUri === 'string' && collectionUri.length > 0) {
+					if (this.utilityService.punyHost(collectionUri) !== expectHost) {
+						throw new Error(`invalid Actor: ${collection} has different host`);
+					}
+				} else if (collectionUri != null) {
+					throw new Error(`invalid Actor: wrong ${collection}`);
 				}
 			}
 		}
@@ -244,7 +257,7 @@ export class ApPersonService implements OnModuleInit {
 			if (Array.isArray(img)) {
 				img = img.find(item => item && item.url) ?? null;
 			}
-			
+
 			// if we have an explicitly missing image, return an
 			// explicitly-null set of values
 			if ((img == null) || (typeof img === 'object' && img.url == null)) {
@@ -287,7 +300,8 @@ export class ApPersonService implements OnModuleInit {
 	public async createPerson(uri: string, resolver?: Resolver): Promise<MiRemoteUser> {
 		if (typeof uri !== 'string') throw new Error('uri is not string');
 
-		if (uri.startsWith(this.config.url)) {
+		const host = this.utilityService.punyHost(uri);
+		if (host === this.utilityService.toPuny(this.config.host)) {
 			throw new StatusError('cannot resolve local user', 400, 'cannot resolve local user');
 		}
 
@@ -300,8 +314,6 @@ export class ApPersonService implements OnModuleInit {
 		const person = this.validateActor(object, uri);
 
 		this.logger.info(`Creating the Person: ${person.id}`);
-
-		const host = this.utilityService.punyHost(object.id);
 
 		const fields = this.analyzeAttachments(person.attachment ?? []);
 
@@ -328,8 +340,18 @@ export class ApPersonService implements OnModuleInit {
 
 		const url = getOneApHrefNullable(person.url);
 
-		if (url && !checkHttps(url)) {
-			throw new Error('unexpected schema of person url: ' + url);
+		if (person.id == null) {
+			throw new Error('Refusing to create person without id');
+		}
+
+		if (url != null) {
+			if (!checkHttps(url)) {
+				throw new Error('unexpected schema of person url: ' + url);
+			}
+
+			if (this.utilityService.punyHost(url) !== this.utilityService.punyHost(person.id)) {
+				throw new Error(`person url <> uri host mismatch: ${url} <> ${person.id}`);
+			}
 		}
 
 		// Create user
@@ -481,7 +503,7 @@ export class ApPersonService implements OnModuleInit {
 		if (typeof uri !== 'string') throw new Error('uri is not string');
 
 		// URIがこのサーバーを指しているならスキップ
-		if (uri.startsWith(`${this.config.url}/`)) return;
+		if (this.utilityService.isUriLocal(uri)) return;
 
 		//#region このサーバーに既に登録されているか
 		const exist = await this.fetchPerson(uri) as MiRemoteUser | null;
@@ -530,8 +552,18 @@ export class ApPersonService implements OnModuleInit {
 
 		const url = getOneApHrefNullable(person.url);
 
-		if (url && !checkHttps(url)) {
-			throw new Error('unexpected schema of person url: ' + url);
+		if (person.id == null) {
+			throw new Error('Refusing to update person without id');
+		}
+
+		if (url != null) {
+			if (!checkHttps(url)) {
+				throw new Error('unexpected schema of person url: ' + url);
+			}
+
+			if (this.utilityService.punyHost(url) !== this.utilityService.punyHost(person.id)) {
+				throw new Error(`person url <> uri host mismatch: ${url} <> ${person.id}`);
+			}
 		}
 
 		const updates = {
@@ -744,7 +776,7 @@ export class ApPersonService implements OnModuleInit {
 			await this.updatePerson(src.movedToUri, undefined, undefined, [...movePreventUris, src.uri]);
 			dst = await this.fetchPerson(src.movedToUri) ?? dst;
 		} else {
-			if (src.movedToUri.startsWith(`${this.config.url}/`)) {
+			if (this.utilityService.isUriLocal(src.movedToUri)) {
 				// ローカルユーザーっぽいのにfetchPersonで見つからないということはmovedToUriが間違っている
 				return 'failed: movedTo is local but not found';
 			}
