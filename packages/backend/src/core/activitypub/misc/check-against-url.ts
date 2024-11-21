@@ -4,24 +4,16 @@
  */
 import type { IObject } from '../type.js';
 
-function getHrefFrom(one: IObject|string): string | undefined {
-	if (typeof(one) === 'string') return one;
-	return one.href;
-}
-
 export function assertActivityMatchesUrls(activity: IObject, urls: string[]) {
 	const idOk = activity.id !== undefined && urls.includes(activity.id);
-	if (idOk) return;
 
-	const url = activity.url;
-	if (url) {
-		// `activity.url` can be an `ApObject = IObject | string | (IObject
-		// | string)[]`, we have to look inside it
-		const activityUrls = Array.isArray(url) ? url.map(getHrefFrom) : [getHrefFrom(url)];
-		const goodUrl = activityUrls.find(u => u && urls.includes(u));
+	// technically `activity.url` could be an `ApObject = IObject |
+	// string | (IObject | string)[]`, but if it's a complicated thing
+	// and the `activity.id` doesn't match, I think we're fine
+	// rejecting the activity
+	const urlOk = typeof(activity.url) === 'string' && urls.includes(activity.url);
 
-		if (goodUrl) return;
+	if (!idOk && !urlOk) {
+		throw new Error(`bad Activity: neither id(${activity?.id}) nor url(${activity?.url}) match location(${urls})`);
 	}
-
-	throw new Error(`bad Activity: neither id(${activity?.id}) nor url(${JSON.stringify(activity?.url)}) match location(${urls})`);
 }

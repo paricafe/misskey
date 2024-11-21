@@ -779,8 +779,8 @@ function emitUpdReaction(emoji: string, delta: number) {
 		.footer {
 			visibility: hidden;
 			position: absolute;
-			top: 0px;
-			right: 0px;
+			bottom: 1px;
+			right: 1px;
 			padding: 0 4px;
 			margin-bottom: 0 !important;
 			background: var(--MI_THEME-popup);

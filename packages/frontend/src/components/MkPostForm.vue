@@ -916,12 +916,6 @@ async function post(ev?: MouseEvent) {
 		}
 		nextTick(() => {
 			deleteDraft();
-			if (props.reply) {
-				props.reply.repliesCount = (props.reply.repliesCount || 0) + 1;
-			}
-			if (props.quote) {
-				props.renote.renoteCount = (props.renote.renoteCount || 0) + 1;
-			}
 			emit('posted');
 			if (postAccount.value != null ? postAccount.value.id : null) {
 				postAccount.value = null;
