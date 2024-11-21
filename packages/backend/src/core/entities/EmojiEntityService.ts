@@ -11,37 +11,13 @@ import type { } from '@/models/Blocking.js';
 import type { MiEmoji } from '@/models/Emoji.js';
 import { bindThis } from '@/decorators.js';
 import { In } from 'typeorm';
-import type { Config } from '@/config.js';
 
 @Injectable()
 export class EmojiEntityService {
 	constructor(
 		@Inject(DI.emojisRepository)
 		private emojisRepository: EmojisRepository,
-
-		@Inject(DI.config)
-		private config: Config,
 	) {
-	}
-
-	private stripProxyIfOrigin(url: string): string {
-		try {
-			const u = new URL(url);
-			let origin = u.origin;
-			if (u.origin === new URL(this.config.mediaProxy).origin) {
-				const innerUrl = u.searchParams.get('url');
-				if (innerUrl) {
-					origin = new URL(innerUrl).origin;
-				}
-			}
-			if (origin === u.origin) {
-				return url;
-			}
-		} catch (e) {
-			return url;
-		}
-
-		return url;
 	}
 
 	@bindThis
@@ -53,7 +29,7 @@ export class EmojiEntityService {
 			name: emoji.name,
 			category: emoji.category,
 			// || emoji.originalUrl してるのは後方互換性のため（publicUrlはstringなので??はだめ）
-			url: this.stripProxyIfOrigin(emoji.publicUrl || emoji.originalUrl),
+			url: emoji.publicUrl || emoji.originalUrl,
 			localOnly: emoji.localOnly ? true : undefined,
 			isSensitive: emoji.isSensitive ? true : undefined,
 			roleIdsThatCanBeUsedThisEmojiAsReaction: emoji.roleIdsThatCanBeUsedThisEmojiAsReaction.length > 0 ? emoji.roleIdsThatCanBeUsedThisEmojiAsReaction : undefined,
@@ -96,7 +72,7 @@ export class EmojiEntityService {
 			category: emoji.category,
 			host: emoji.host,
 			// || emoji.originalUrl してるのは後方互換性のため（publicUrlはstringなので??はだめ）
-			url: this.stripProxyIfOrigin(emoji.publicUrl || emoji.originalUrl),
+			url: emoji.publicUrl || emoji.originalUrl,
 			license: emoji.license,
 			isSensitive: emoji.isSensitive,
 			localOnly: emoji.localOnly,

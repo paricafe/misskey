@@ -35,11 +35,6 @@ import { makeHstsHook } from './hsts.js';
 
 const _dirname = fileURLToPath(new URL('.', import.meta.url));
 
-// This function is used to determine if a path is safe to redirect to.
-function redirectSafePath(path: string): boolean {
-	return ['/files/', '/identicon/', '/proxy/', '/static-assets/', '/vite/', '/embed_vite/'].some(prefix => path.startsWith(prefix));
-}
-
 @Injectable()
 export class ServerService implements OnApplicationShutdown {
 	private logger: Logger;
@@ -144,7 +139,7 @@ export class ServerService implements OnApplicationShutdown {
 				name: name,
 			});
 
-			reply.header('Content-Security-Policy', 'default-src \'none\'');
+			reply.header('Content-Security-Policy', 'default-src \'none\'; style-src \'unsafe-inline\'');
 
 			if (emoji == null) {
 				if ('fallback' in request.query) {
@@ -155,26 +150,16 @@ export class ServerService implements OnApplicationShutdown {
 				}
 			}
 
-			const dbUrl = emoji?.publicUrl || emoji?.originalUrl;
-			const dbUrlParsed = new URL(dbUrl);
-			const instanceUrl = new URL(this.config.url);
-			if (dbUrlParsed.origin === instanceUrl.origin) {
-				if (!redirectSafePath(dbUrlParsed.pathname)) {
-					return await reply.status(508);
-				}
-				return await reply.redirect(dbUrl, 301);
-			}
-
 			let url: URL;
 			if ('badge' in request.query) {
 				url = new URL(`${this.config.mediaProxy}/emoji.png`);
 				// || emoji.originalUrl してるのは後方互換性のため（publicUrlはstringなので??はだめ）
-				url.searchParams.set('url', dbUrl);
+				url.searchParams.set('url', emoji.publicUrl || emoji.originalUrl);
 				url.searchParams.set('badge', '1');
 			} else {
 				url = new URL(`${this.config.mediaProxy}/emoji.webp`);
 				// || emoji.originalUrl してるのは後方互換性のため（publicUrlはstringなので??はだめ）
-				url.searchParams.set('url', dbUrl);
+				url.searchParams.set('url', emoji.publicUrl || emoji.originalUrl);
 				url.searchParams.set('emoji', '1');
 				if ('static' in request.query) url.searchParams.set('static', '1');
 			}
@@ -198,16 +183,6 @@ export class ServerService implements OnApplicationShutdown {
 			reply.header('Cache-Control', 'public, max-age=86400');
 
 			if (user) {
-				const dbUrl = user?.avatarUrl ?? this.userEntityService.getIdenticonUrl(user);
-				const dbUrlParsed = new URL(dbUrl);
-				const instanceUrl = new URL(this.config.url);
-				if (dbUrlParsed.origin === instanceUrl.origin) {
-					if (!redirectSafePath(dbUrlParsed.pathname)) {
-						return await reply.status(508);
-					}
-					return await reply.redirect(dbUrl, 301);
-				}
-
 				reply.redirect(user.avatarUrl ?? this.userEntityService.getIdenticonUrl(user));
 			} else {
 				reply.redirect('/static-assets/user-unknown.png');
