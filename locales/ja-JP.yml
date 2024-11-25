@@ -1858,6 +1858,8 @@ _signup:
   almostThere: "ほとんど完了です"
   emailAddressInfo: "あなたが使っているメールアドレスを入力してください。メールアドレスが公開されることはありません。"
   emailSent: "入力されたメールアドレス({email})宛に確認のメールが送信されました。メールに記載されたリンクにアクセスすると、アカウントの作成が完了します。メールに記載されているリンクの有効期限は30分です。"
+  approvalPending: "アカウントが作成され、承認待ちの状態です。"
+  reasonInfo: "このサーバーに参加したい理由を入力してください。"
 
 _accountDelete:
   accountDelete: "アカウントの削除"
@@ -2614,6 +2616,7 @@ _moderationLogTypes:
   updateRole: "ロールを更新"
   assignRole: "ロールへアサイン"
   unassignRole: "ロールのアサイン解除"
+  approve: "承認済み"
   suspend: "凍結"
   unsuspend: "凍結解除"
   addCustomEmoji: "カスタム絵文字追加"
@@ -2828,6 +2831,22 @@ _selfXssPrevention:
 _followRequest:
   recieved: "受け取った申請"
   sent: "送った申請"
+
+approvals: "承認"
+registerApproveConfirm: "登録を承認しますか？"
+registerApproveConfirmDescription: "この操作は取り消せません。承認後、このユーザーに登録が承認された旨が記載されたメールが送信されます。"
+approvalRequiredForSignup: "アカウント登録を承認制にする"
+signupPendingApprovals: "アカウント登録の承認"
+pendingUserApprovals: "承認待ちのユーザーがいます。"
+approveAccount: "承認する"
+denyAccount: "拒否してアカウント削除"
+approved: "承認済み"
+notApproved: "未承認"
+approvalStatus: "承認状況"
+approvalRequiredToRegister: "現在このサーバーは承認制です。参加したい理由を記入し、承認された方のみ登録できます。"
+registerReason: "登録理由"
+registerHasNotBeenApprovedYet: "サーバーへの登録はまだ承認されていません。しばらくしてから再度お試しください。登録時にメールアドレスを記入した場合は、登録が承認されたらメールでお知らせします。"
+registerApprovalEmailRecommended: "サーバーへの登録が承認されたかどうかの通知を行うために、併せてアカウント登録にメールアドレスを必須にすることを強く推奨します。"
 
 pariMisskeyAbout: "Pari Cafe使用のブランチは、原版に対してカスタマイズを行っています。"
 timeTravel: "Time Travel"

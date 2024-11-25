@@ -89,6 +89,8 @@ function generateDummyUser(override?: Partial<MiUser>): MiUser {
 		uri: null,
 		followersUri: null,
 		token: null,
+		approved: true,
+		signupReason: null,
 		...override,
 	};
 }

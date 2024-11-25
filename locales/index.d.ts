@@ -7173,6 +7173,14 @@ export interface Locale extends ILocale {
          * 入力されたメールアドレス({email})宛に確認のメールが送信されました。メールに記載されたリンクにアクセスすると、アカウントの作成が完了します。メールに記載されているリンクの有効期限は30分です。
          */
         "emailSent": ParameterizedString<"email">;
+        /**
+         * Your account has been created and is awaiting approval.
+         */
+        "approvalPending": string;
+        /**
+         * Please enter a reason as to why you want to join the instance.
+         */
+        "reasonInfo": string;
     };
     "_accountDelete": {
         /**
@@ -10031,6 +10039,10 @@ export interface Locale extends ILocale {
          * ギャラリーの投稿を削除
          */
         "deleteGalleryPost": string;
+        /**
+         * Approved
+         */
+        "approve": string;
     };
     "_fileViewer": {
         /**
@@ -10578,6 +10590,10 @@ export interface Locale extends ILocale {
          */
         "codeGeneratedDescription": string;
     };
+    /**
+     * Approvals
+     */
+    "approvals": string;
     "_selfXssPrevention": {
         /**
          * 警告

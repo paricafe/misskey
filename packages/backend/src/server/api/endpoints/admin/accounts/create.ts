@@ -94,6 +94,7 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				username: ps.username,
 				password: ps.password,
 				ignorePreservedUsernames: true,
+				approved: true,
 			});
 
 			const res = await this.userEntityService.pack(account, account, {

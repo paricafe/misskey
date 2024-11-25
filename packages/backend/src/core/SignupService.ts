@@ -52,9 +52,11 @@ export class SignupService {
 		password?: string | null;
 		passwordHash?: MiUserProfile['password'] | null;
 		host?: string | null;
+		reason?: string | null;
 		ignorePreservedUsernames?: boolean;
+		approved?: boolean;
 	}) {
-		const { username, password, passwordHash, host } = opts;
+		const { username, password, passwordHash, host, reason } = opts;
 		let hash = passwordHash;
 
 		// Validate username
@@ -130,6 +132,8 @@ export class SignupService {
 				host: this.utilityService.toPunyNullable(host),
 				token: secret,
 				isRoot: isTheFirstUser,
+				approved: isTheFirstUser || (opts.approved ?? !this.meta.approvalRequiredForSignup),
+				signupReason: reason,
 			}));
 
 			await transactionalEntityManager.save(new MiUserKeypair({

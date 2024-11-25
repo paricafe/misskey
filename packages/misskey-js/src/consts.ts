@@ -77,6 +77,8 @@ export const permissions = [
 	'read:admin:show-moderation-log',
 	'read:admin:show-user',
 	'write:admin:suspend-user',
+	'write:admin:approve-user',
+	'write:admin:decline-user',
 	'write:admin:unset-user-avatar',
 	'write:admin:unset-user-banner',
 	'write:admin:unsuspend-user',
@@ -115,6 +117,7 @@ export const permissions = [
 export const moderationLogTypes = [
 	'updateServerSettings',
 	'suspend',
+	'approve',
 	'unsuspend',
 	'updateUserNote',
 	'addCustomEmoji',
@@ -191,6 +194,16 @@ export type ModerationLogPayloads = {
 		after: MetaDetailed | null;
 	};
 	suspend: {
+		userId: string;
+		userUsername: string;
+		userHost: string | null;
+	};
+	approve: {
+		userId: string;
+		userUsername: string;
+		userHost: string | null;
+	};
+	decline: {
 		userId: string;
 		userUsername: string;
 		userHost: string | null;
