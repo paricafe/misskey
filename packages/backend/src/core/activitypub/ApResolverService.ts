@@ -131,9 +131,9 @@ export class Resolver {
 			throw new Error('invalid AP object: missing id');
 		}
 
-		if (this.utilityService.punyHost(object.id) !== this.utilityService.punyHost(value)) {
-			throw new Error(`invalid AP object ${value}: id ${object.id} has different host`);
-		}
+		// if (this.utilityService.punyHost(object.id) !== this.utilityService.punyHost(value)) {
+		// 	throw new Error(`invalid AP object ${value}: id ${object.id} has different host`);
+		// }
 
 		return object;
 	}
