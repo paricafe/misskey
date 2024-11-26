@@ -165,9 +165,9 @@ export class ApNoteService {
 				throw new Error('unexpected schema of note url: ' + url);
 			}
 
-			if (this.utilityService.punyHost(url) !== this.utilityService.punyHost(note.id)) {
-				throw new Error(`note url & uri host mismatch: note url: ${url}, note uri: ${note.id}`);
-			}
+			// if (this.utilityService.punyHost(url) !== this.utilityService.punyHost(note.id)) {
+			// 	throw new Error(`note url & uri host mismatch: note url: ${url}, note uri: ${note.id}`);
+			// }
 		}
 
 		this.logger.info(`Creating the Note: ${note.id}`);
