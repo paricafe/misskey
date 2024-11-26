@@ -40,10 +40,11 @@ import { i18n } from '@/i18n.js';
 import * as os from '@/os.js';
 import { misskeyApi } from '@/scripts/misskey-api.js';
 const props = defineProps<{
-	user: Misskey.entities.User;
-}>();
+		user: Misskey.entities.User;
+	}>();
 const reason = ref('');
 const email = ref('');
+
 function getReason() {
 	return misskeyApi('admin/show-user', {
 		userId: props.user.id,
@@ -52,32 +53,25 @@ function getReason() {
 		email.value = info.email;
 	});
 }
+
 getReason();
 const emits = defineEmits<{
-	(event: 'deleted', value: string): void;
-}>();
+		(event: 'deleted', value: string): void;
+	}>();
+
 async function deleteAccount() {
 	const confirm = await os.confirm({
 		type: 'warning',
 		text: i18n.ts.deleteAccountConfirm,
 	});
 	if (confirm.canceled) return;
-	const typed = await os.inputText({
-		text: i18n.t('typeToConfirm', { x: props.user.username }),
+
+	await os.apiWithDialog('admin/decline-user', {
+		userId: props.user.id,
 	});
-	if (typed.canceled) return;
-	if (typed.result === props.user.username) {
-		await os.apiWithDialog('admin/delete-account', {
-			userId: props.user.id,
-		});
-		emits('deleted', props.user.id);
-	} else {
-		os.alert({
-			type: 'error',
-			text: 'input not match',
-		});
-	}
+	emits('deleted', props.user.id);
 }
+
 async function approveAccount() {
 	const confirm = await os.confirm({
 		type: 'warning',
@@ -90,23 +84,23 @@ async function approveAccount() {
 }
 </script>
 
-<style lang="scss" module>
-.root {
-	text-align: left;
-}
-.items {
-	display: grid;
-	grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-	grid-gap: 12px;
-}
-.label {
-	font-size: 0.85em;
-	padding: 0 0 8px 0;
-	user-select: none;
-	opacity: 0.7;
-}
-.buttons {
-	display: flex;
-	gap: 8px;
-}
-</style>
+	<style lang="scss" module>
+	.root {
+		text-align: left;
+	}
+	.items {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+		grid-gap: 12px;
+	}
+	.label {
+		font-size: 0.85em;
+		padding: 0 0 8px 0;
+		user-select: none;
+		opacity: 0.7;
+	}
+	.buttons {
+		display: flex;
+		gap: 8px;
+	}
+	</style>
