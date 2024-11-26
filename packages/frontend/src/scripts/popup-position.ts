@@ -15,6 +15,8 @@ export function calcPopupPosition(el: HTMLElement, props: {
 	const contentWidth = el.offsetWidth;
 	const contentHeight = el.offsetHeight;
 
+	const HORIZONTAL_MARGIN = 1;
+
 	let rect: DOMRect;
 
 	if (props.anchorElement) {
@@ -36,8 +38,10 @@ export function calcPopupPosition(el: HTMLElement, props: {
 		left -= (el.offsetWidth / 2);
 
 		if (left + contentWidth - window.scrollX > window.innerWidth) {
-			left = window.innerWidth - contentWidth + window.scrollX - 1;
+			left = window.innerWidth - contentWidth + window.scrollX - HORIZONTAL_MARGIN;
 		}
+
+		left = Math.max(HORIZONTAL_MARGIN, left);
 
 		return [left, top];
 	};
@@ -57,8 +61,10 @@ export function calcPopupPosition(el: HTMLElement, props: {
 		left -= (el.offsetWidth / 2);
 
 		if (left + contentWidth - window.scrollX > window.innerWidth) {
-			left = window.innerWidth - contentWidth + window.scrollX - 1;
+			left = window.innerWidth - contentWidth + window.scrollX - HORIZONTAL_MARGIN;
 		}
+
+		left = Math.max(HORIZONTAL_MARGIN, left);
 
 		return [left, top];
 	};
@@ -75,10 +81,12 @@ export function calcPopupPosition(el: HTMLElement, props: {
 			top = props.y;
 		}
 
+		left = Math.max(HORIZONTAL_MARGIN, left);
+
 		top -= (el.offsetHeight / 2);
 
 		if (top + contentHeight - window.scrollY > window.innerHeight) {
-			top = window.innerHeight - contentHeight + window.scrollY - 1;
+			top = window.innerHeight - contentHeight + window.scrollY - HORIZONTAL_MARGIN;
 		}
 
 		return [left, top];
@@ -106,8 +114,10 @@ export function calcPopupPosition(el: HTMLElement, props: {
 			top -= (el.offsetHeight / 2);
 		}
 
+		left = Math.max(HORIZONTAL_MARGIN, left);
+
 		if (top + contentHeight - window.scrollY > window.innerHeight) {
-			top = window.innerHeight - contentHeight + window.scrollY - 1;
+			top = window.innerHeight - contentHeight + window.scrollY - HORIZONTAL_MARGIN;
 		}
 
 		return [left, top];
