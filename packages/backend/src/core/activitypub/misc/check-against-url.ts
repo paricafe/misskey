@@ -2,18 +2,29 @@
  * SPDX-FileCopyrightText: dakkar and sharkey-project
  * SPDX-License-Identifier: AGPL-3.0-only
  */
+
 import type { IObject } from '../type.js';
 
+function getHrefsFrom(one: IObject | string | undefined | (IObject | string | undefined)[]): (string | undefined)[] {
+	if (Array.isArray(one)) {
+		return one.flatMap(h => getHrefsFrom(h));
+	}
+	return [
+		typeof(one) === 'object' ? one.href : one,
+	];
+}
+
 export function assertActivityMatchesUrls(activity: IObject, urls: string[]) {
-	const idOk = activity.id !== undefined && urls.includes(activity.id);
+	const expectedUrls = new Set(urls
+		.filter(u => URL.canParse(u))
+		.map(u => new URL(u).href),
+	);
 
-	// technically `activity.url` could be an `ApObject = IObject |
-	// string | (IObject | string)[]`, but if it's a complicated thing
-	// and the `activity.id` doesn't match, I think we're fine
-	// rejecting the activity
-	const urlOk = typeof(activity.url) === 'string' && urls.includes(activity.url);
+	const actualUrls = [activity.id, ...getHrefsFrom(activity.url)]
+		.filter(u => u && URL.canParse(u))
+		.map(u => new URL(u as string).href);
 
-	if (!idOk && !urlOk) {
-		throw new Error(`bad Activity: neither id(${activity?.id}) nor url(${activity?.url}) match location(${urls})`);
+	if (!actualUrls.some(u => expectedUrls.has(u))) {
+		throw new Error(`bad Activity: neither id(${activity.id}) nor url(${JSON.stringify(activity.url)}) match location(${urls})`);
 	}
 }
