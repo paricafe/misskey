@@ -84,23 +84,23 @@ async function approveAccount() {
 }
 </script>
 
-	<style lang="scss" module>
-	.root {
-		text-align: left;
-	}
-	.items {
-		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-		grid-gap: 12px;
-	}
-	.label {
-		font-size: 0.85em;
-		padding: 0 0 8px 0;
-		user-select: none;
-		opacity: 0.7;
-	}
-	.buttons {
-		display: flex;
-		gap: 8px;
-	}
-	</style>
+<style lang="scss" module>
+.root {
+	text-align: left;
+}
+.items {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+	grid-gap: 12px;
+}
+.label {
+	font-size: 0.85em;
+	padding: 0 0 8px 0;
+	user-select: none;
+	opacity: 0.7;
+}
+.buttons {
+	display: flex;
+	gap: 8px;
+}
+</style>
