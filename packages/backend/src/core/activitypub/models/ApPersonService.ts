@@ -730,9 +730,10 @@ export class ApPersonService implements OnModuleInit {
 
 		// Resolve and regist Notes
 		const limit = promiseLimit<MiNote | null>(2);
+		const maxPinned = (await this.roleService.getUserPolicies(user.id)).pinLimit;
 		const featuredNotes = await Promise.all(items
 			.filter(item => getApType(item) === 'Note')	// TODO: Noteでなくてもいいかも
-			.slice(0, 5)
+			.slice(0, maxPinned)
 			.map(item => limit(() => this.apNoteService.resolveNote(item, {
 				resolver: _resolver,
 				sentFrom: new URL(user.uri),
