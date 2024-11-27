@@ -60,7 +60,7 @@ export type RouterEvent = {
 		beforePath: string;
 		path: string;
 		route: RouteDef | null;
-		props: Map<string, string> | null;
+		props: Map<string, string | boolean> | null;
 		key: string;
 	}) => void;
 	same: () => void;
@@ -258,7 +258,7 @@ export class Router extends EventEmitter<RouterEvent> implements IRouter {
 							continue forEachRouteLoop;
 						}
 					} else {
-						if (parts[0] == null && !p.optional) {
+						if (!parts[0] && !p.optional) {
 							continue forEachRouteLoop;
 						}
 						if (p.wildcard) {
@@ -269,7 +269,7 @@ export class Router extends EventEmitter<RouterEvent> implements IRouter {
 							break pathMatchLoop;
 						} else {
 							if (p.startsWith) {
-								if (parts[0] == null || !parts[0].startsWith(p.startsWith)) continue forEachRouteLoop;
+								if (!parts[0] || !parts[0].startsWith(p.startsWith)) continue forEachRouteLoop;
 
 								props.set(p.name, safeURIDecode(parts[0].substring(p.startsWith.length)));
 								parts.shift();
