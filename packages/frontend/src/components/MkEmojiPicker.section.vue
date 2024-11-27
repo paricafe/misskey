@@ -9,12 +9,12 @@ SPDX-License-Identifier: AGPL-3.0-only
 <section v-if="!hasChildSection" v-panel style="border-radius: 6px; border-bottom: 0.5px solid var(--MI_THEME-divider);">
 	<header class="_acrylic" @click="shown = !shown">
 		<i class="toggle ti-fw" :class="shown ? 'ti ti-chevron-down' : 'ti ti-chevron-up'"></i>
-		<span class="emoji-example">
+		<span v-if="emojiExample" class="emoji-example">
 			<MkCustomEmoji v-if="emojiExample[0] === ':'" class="emoji" :name="emojiExample" :normal="true" :fallbackToImage="true"/>
 			<MkEmoji v-else class="emoji" :emoji="emojiExample" :normal="true"/>
 		</span>
 		<slot></slot>
-		(<i class="ph-smiley-sticker ph-bold ph-lg"></i>:{{ emojis.length }})
+		(<i class="ti ti-mood-smile"></i>:{{ emojis.length }})
 	</header>
 	<div v-if="shown" class="body">
 		<button
@@ -86,7 +86,7 @@ const emit = defineEmits<{
 }>();
 
 const emojis = computed(() => Array.isArray(props.emojis) ? props.emojis : props.emojis.value);
-const emojiExample = computed(() => emojis.value[0]);
+const emojiExample = computed(() => emojis.value[0] || '');
 
 const shown = ref(!!props.initialShown);
 
