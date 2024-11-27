@@ -1,5 +1,5 @@
 import { computed, ref, watch } from 'vue';
-import type { Ref, ComputedRef } from 'vue';
+import type { Ref } from 'vue';
 import { miLocalStorage } from '@/local-storage.js';
 import { i18n } from '@/i18n.js';
 
@@ -62,7 +62,7 @@ async function loadFontStyle(fontId: string) {
 
 export function getDefaultFontSettings() {
 	const def_arr = miLocalStorage.getItem('defaultFontFace')?.split('_');
-	const fontFace = ref(def_arr?.[0] ?? 'system-ui');
+	const fontFace = ref(def_arr?.[0] ?? 'maokentangyuan');
 	const fontFaceType = ref(def_arr?.[1] ?? '');
 	const availableTypes = computed(() => getFontOptionsList(fontFace.value));
 
