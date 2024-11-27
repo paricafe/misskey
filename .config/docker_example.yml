@@ -147,6 +147,13 @@ redis:
 
 id: 'aidx'
 
+#   ┌──────────┐
+#───┘ Metrics  └──────────────────────────────────────────
+
+#prometheusMetrics:
+# enable: false
+# scrapeToken: '' # Set non-empty to require a bearer token for scraping
+
 #   ┌────────────────┐
 #───┘ Error tracking └──────────────────────────────────────────
 

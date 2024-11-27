@@ -8,6 +8,7 @@
  */
 
 import cluster from 'node:cluster';
+import * as prom from 'prom-client';
 import { EventEmitter } from 'node:events';
 import chalk from 'chalk';
 import Xev from 'xev';
@@ -16,6 +17,15 @@ import { envOption } from '../env.js';
 import { masterMain } from './master.js';
 import { workerMain } from './worker.js';
 import { readyRef } from './ready.js';
+
+const workerRegistry = new prom.AggregatorRegistry<prom.PrometheusContentType>();
+
+prom.collectDefaultMetrics({
+	labels: {
+		cluster_type: `${cluster.isPrimary ? 'master' : 'worker'}`,
+		worker_id: cluster.worker?.id.toString() || 'none'
+	}
+});
 
 import 'reflect-metadata';
 
@@ -69,7 +79,7 @@ process.on('exit', code => {
 //#endregion
 
 if (cluster.isPrimary || envOption.disableClustering) {
-	await masterMain();
+	await masterMain(workerRegistry);
 
 	if (cluster.isPrimary) {
 		ev.mount();

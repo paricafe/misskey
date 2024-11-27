@@ -32,6 +32,7 @@ import { ClientServerService } from './web/ClientServerService.js';
 import { OpenApiServerService } from './api/openapi/OpenApiServerService.js';
 import { OAuth2ProviderService } from './oauth/OAuth2ProviderService.js';
 import { makeHstsHook } from './hsts.js';
+import { MetricsService } from './api/MetricsService.js';
 
 const _dirname = fileURLToPath(new URL('.', import.meta.url));
 
@@ -69,6 +70,7 @@ export class ServerService implements OnApplicationShutdown {
 		private globalEventService: GlobalEventService,
 		private loggerService: LoggerService,
 		private oauth2ProviderService: OAuth2ProviderService,
+		private metricsService: MetricsService,
 	) {
 		this.logger = this.loggerService.getLogger('server', 'gray');
 	}
@@ -225,6 +227,8 @@ export class ServerService implements OnApplicationShutdown {
 		});
 
 		fastify.register(this.clientServerService.createServer);
+
+		fastify.register(this.metricsService.createServer);
 
 		this.streamingApiServerService.attach(fastify.server);
 
