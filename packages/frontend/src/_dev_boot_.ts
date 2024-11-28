@@ -62,7 +62,7 @@ async function main() {
 	}
 	//#endregion
 
-	const fontSize = localStorage.getItem('fontSize') || 1;
+	const fontSize = localStorage.getItem('fontSize') ?? 2;
 	if (fontSize) {
 		document.documentElement.classList.add('f-' + fontSize);
 	}
