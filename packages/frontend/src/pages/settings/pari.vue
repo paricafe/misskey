@@ -110,7 +110,7 @@ import FormSection from '@/components/form/section.vue';
 const defaultFont = getDefaultFontSettings();
 console.log(defaultFont);
 
-const fontSizeNumber = ref(Number(miLocalStorage.getItem('fontSize') ?? 2));
+const fontSizeNumber = ref(Number(miLocalStorage.getItem('fontSize') ?? 1));
 const fontSizeNumberOld = ref(fontSizeNumber.value);
 
 const fontSizePx = computed(() => fontSizeNumber.value + 14);
