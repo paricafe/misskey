@@ -62,11 +62,11 @@ async function loadFontStyle(fontId: string) {
 
 export function getDefaultFontSettings() {
 	const def_arr = miLocalStorage.getItem('defaultFontFace')?.split('_');
-	const fontFace = ref(def_arr?.[0] ?? 'maokentangyuan');
+	const fontFace = ref(def_arr?.[0] ?? 'system-ui');
 	const fontFaceType = ref(def_arr?.[1] ?? '');
 	const availableTypes = computed(() => getFontOptionsList(fontFace.value));
 
-	async function setDafaultFont() {
+	async function setDefaultFont() {
 		for (const klass of [...document.documentElement.classList.values()]) {
 			if (klass.startsWith('default-font-')) {
 				document.documentElement.classList.remove(klass);
@@ -87,11 +87,11 @@ export function getDefaultFontSettings() {
 		if (optionsList.length !== 0) {
 			fontFaceType.value = optionsList.find((v) => v.default)?.id ?? '';
 		} else {
-			setDafaultFont();
+			setDefaultFont();
 		}
 	});
 	watch(fontFaceType, () => {
-		setDafaultFont();
+		setDefaultFont();
 	});
 
 	return ref({
