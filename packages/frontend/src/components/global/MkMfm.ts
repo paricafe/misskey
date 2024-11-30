@@ -383,6 +383,9 @@ export default function (props: MfmProps, { emit }: { emit: SetupContext<MfmEven
 					to: isNote ? `/tags/${encodeURIComponent(token.props.hashtag)}` : `/user-tags/${encodeURIComponent(token.props.hashtag)}`,
 					style: 'color:var(--MI_THEME-hashtag);',
 					behavior: props.linkNavigationBehavior,
+					onClick(ev: MouseEvent): void {
+						ev.stopPropagation();
+					},
 				}, `#${token.props.hashtag}`)];
 			}
 
