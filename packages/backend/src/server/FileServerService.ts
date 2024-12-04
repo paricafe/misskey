@@ -171,6 +171,9 @@ export class FileServerService {
 					}
 				}
 
+				// set Content-Length before we chunk, so it can properly override when chunking.
+				reply.header('Content-Length', file.file.size);
+
 				if (!image) {
 					if (request.headers.range && file.file.size > 0) {
 						const range = request.headers.range as string;
@@ -214,7 +217,6 @@ export class FileServerService {
 				}
 
 				reply.header('Content-Type', FILE_TYPE_BROWSERSAFE.includes(image.type) ? image.type : 'application/octet-stream');
-				reply.header('Content-Length', file.file.size);
 				reply.header('Cache-Control', 'max-age=31536000, immutable');
 				reply.header('Content-Disposition',
 					contentDisposition(
