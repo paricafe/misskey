@@ -24,6 +24,7 @@ import { miLocalStorage } from '@/local-storage.js';
 import { fetchCustomEmojis } from '@/custom-emojis.js';
 import { setupRouter } from '@/router/main.js';
 import { createMainRouter } from '@/router/definition.js';
+import { loadFontStyle } from '@/scripts/load-font.js';
 
 export async function common(createVue: () => App<Element>) {
 	console.info(`Misskey v${version}`);
@@ -234,13 +235,8 @@ export async function common(createVue: () => App<Element>) {
 	//#region Load default font
 	const def_arr = miLocalStorage.getItem('defaultFontFace')?.split('_');
 	const fontId = def_arr?.[0];
-	if (fontId && fontId !== 'system-ui') {
-		try {
-			await import(`@/styles-font/${fontId}.scss`);
-			document.documentElement.classList.add(`default-font-${def_arr.join('_')}`);
-		} catch (e) {
-			console.warn(`Failed to load font style: ${fontId}`, e);
-		}
+	if (fontId) {
+		loadFontStyle(fontId);
 	}
 	//#endregion
 
