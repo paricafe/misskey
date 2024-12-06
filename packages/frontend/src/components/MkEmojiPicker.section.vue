@@ -10,7 +10,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 	<header class="_acrylic" @click="shown = !shown">
 		<i class="toggle ti-fw" :class="shown ? 'ti ti-chevron-down' : 'ti ti-chevron-up'"></i>
 		<span v-if="emojiExample" class="emoji-example">
-			<MkCustomEmoji v-if="emojiExample[0] === ':'" class="emoji" :name="emojiExample" :normal="true" :fallbackToImage="true"/>
+			<MkCustomEmoji v-if="emojiExample?.[0] === ':'" class="emoji" :name="emojiExample" :normal="true" :fallbackToImage="true"/>
 			<MkEmoji v-else class="emoji" :emoji="emojiExample" :normal="true"/>
 		</span>
 		<slot></slot>
@@ -86,7 +86,7 @@ const emit = defineEmits<{
 }>();
 
 const emojis = computed(() => Array.isArray(props.emojis) ? props.emojis : props.emojis.value);
-const emojiExample = computed(() => emojis.value[0] || '');
+const emojiExample = computed(() => emojis.value.at(0));
 
 const shown = ref(!!props.initialShown);
 
