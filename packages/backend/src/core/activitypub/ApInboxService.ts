@@ -29,9 +29,9 @@ import { bindThis } from '@/decorators.js';
 import type { MiRemoteUser } from '@/models/User.js';
 import { GlobalEventService } from '@/core/GlobalEventService.js';
 import { AbuseReportService } from '@/core/AbuseReportService.js';
-import { IdentifiableError } from '@/misc/identifiable-error.js';
 import { fromTuple } from '@/misc/from-tuple.js';
-import { getApHrefNullable, getApId, getApIds, getApType, isAccept, isActor, isAdd, isAnnounce, isApObject, isBlock, isCollection, isCollectionOrOrderedCollection, isCreate, isDelete, isFlag, isFollow, isLike, isMove, isPost, isReject, isRemove, isTombstone, isUndo, isUpdate, validActor, validPost } from './type.js';
+import { IdentifiableError } from '@/misc/identifiable-error.js';
+import { getApHrefNullable, getApId, getApIds, getApType, getNullableApId, isAccept, isActor, isAdd, isAnnounce, isApObject, isBlock, isCollection, isCollectionOrOrderedCollection, isCreate, isDelete, isFlag, isFollow, isLike, isMove, isPost, isReject, isRemove, isTombstone, isUndo, isUpdate, validActor, validPost } from './type.js';
 import { ApNoteService } from './models/ApNoteService.js';
 import { ApLoggerService } from './ApLoggerService.js';
 import { ApDbResolverService } from './ApDbResolverService.js';
@@ -164,7 +164,7 @@ export class ApInboxService {
 		} else if (isAnnounce(activity)) {
 			return await this.announce(actor, activity, resolver);
 		} else if (isLike(activity)) {
-			return await this.like(actor, activity);
+			return await this.like(actor, activity, resolver);
 		} else if (isUndo(activity)) {
 			return await this.undo(actor, activity, resolver);
 		} else if (isBlock(activity)) {
@@ -196,10 +196,13 @@ export class ApInboxService {
 	}
 
 	@bindThis
-	private async like(actor: MiRemoteUser, activity: ILike): Promise<string> {
+	private async like(actor: MiRemoteUser, activity: ILike, resolver?: Resolver): Promise<string> {
 		const targetUri = getApId(activity.object);
 
-		const note = await this.apNoteService.fetchNote(targetUri);
+		const object = fromTuple(activity.object);
+		if (!object) return 'skip: activity has no object property';
+
+		const note = await this.apNoteService.resolveNote(object, { resolver });
 		if (!note) return `skip: target note not found ${targetUri}`;
 
 		await this.apNoteService.extractEmojis(activity.tag ?? [], actor.host).catch(() => null);
@@ -337,7 +340,7 @@ export class ApInboxService {
 				// 対象が4xxならスキップ
 				if (err instanceof StatusError) {
 					if (!err.isRetryable) {
-						return `Ignored announce target ${target.id} - ${err.statusCode}`;
+						return `skip: ignored announce target ${target.id} - ${err.statusCode}`;
 					}
 					return `Error in announce target ${target.id} - ${err.statusCode}`;
 				}
@@ -425,7 +428,7 @@ export class ApInboxService {
 		if (isPost(object)) {
 			await this.createNote(resolver, actor, object, false, activity);
 		} else {
-			return `Unknown type: ${getApType(object)}`;
+			return `skip: Unsupported type for Create: ${getApType(object)} ${getNullableApId(object)}`;
 		}
 	}
 
@@ -457,7 +460,7 @@ export class ApInboxService {
 			return 'ok';
 		} catch (err) {
 			if (err instanceof StatusError && !err.isRetryable) {
-				return `skip ${err.statusCode}`;
+				return `skip: ${err.statusCode}`;
 			} else {
 				throw err;
 			}
@@ -544,7 +547,7 @@ export class ApInboxService {
 			const note = await this.apDbResolverService.getNoteFromApId(uri);
 
 			if (note == null) {
-				return 'message not found';
+				return 'skip: ignoring deleted note on both ends';
 			}
 
 			if (note.userId !== actor.id) {
@@ -677,7 +680,7 @@ export class ApInboxService {
 		if (isAnnounce(object)) return await this.undoAnnounce(actor, object);
 		if (isAccept(object)) return await this.undoAccept(actor, object);
 
-		return `skip: unknown object type ${getApType(object)}`;
+		return `skip: unknown activity type ${getApType(object)}`;
 	}
 
 	@bindThis
@@ -812,7 +815,7 @@ export class ApInboxService {
 			await this.apNoteService.updateNote(object, resolver).catch(err => console.error(err));
 			return 'ok: Note updated';
 		} else {
-			return `skip: Unknown type: ${getApType(object)}`;
+			return `skip: Unsupported type for Update: ${getApType(object)} ${getNullableApId(object)}`;
 		}
 	}
 

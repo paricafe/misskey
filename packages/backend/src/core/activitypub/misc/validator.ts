@@ -9,7 +9,7 @@ export function validateContentTypeSetAsActivityPub(response: Response): void {
 	const contentType = (response.headers.get('content-type') ?? '').toLowerCase();
 
 	if (contentType === '') {
-		throw new Error('Validate content type of AP response: No content-type header');
+		throw new Error(`invalid content type of AP response - no content-type header: ${response.url}`);
 	}
 	if (
 		contentType.startsWith('application/activity+json') ||
@@ -17,7 +17,7 @@ export function validateContentTypeSetAsActivityPub(response: Response): void {
 	) {
 		return;
 	}
-	throw new Error('Validate content type of AP response: Content type is not application/activity+json or application/ld+json');
+	throw new Error(`invalid content type of AP response - content type is not application/activity+json or application/ld+json: ${response.url}`);
 }
 
 const plusJsonSuffixRegex = /^\s*(application|text)\/[a-zA-Z0-9\.\-\+]+\+json\s*(;|$)/;
@@ -26,7 +26,7 @@ export function validateContentTypeSetAsJsonLD(response: Response): void {
 	const contentType = (response.headers.get('content-type') ?? '').toLowerCase();
 
 	if (contentType === '') {
-		throw new Error('Validate content type of JSON LD: No content-type header');
+		throw new Error(`invalid content type of JSON LD - no content-type header: ${response.url}`);
 	}
 	if (
 		contentType.startsWith('application/ld+json') ||
@@ -35,5 +35,5 @@ export function validateContentTypeSetAsJsonLD(response: Response): void {
 	) {
 		return;
 	}
-	throw new Error('Validate content type of JSON LD: Content type is not application/ld+json or application/json');
+	throw new Error(`invalid content type of JSON LD - content type is not application/ld+json or application/json: ${response.url}`);
 }

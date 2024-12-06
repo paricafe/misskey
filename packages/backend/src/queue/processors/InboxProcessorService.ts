@@ -191,7 +191,8 @@ export class InboxProcessorService implements OnApplicationShutdown {
 				throw new Bull.UnrecoverableError(`skip: signerHost(${signerHost}) !== activity.id host(${activityIdHost}`);
 			}
 		} else {
-			throw new Bull.UnrecoverableError('skip: activity id is not a string');
+			// Activity ID should only be string or undefined.
+			delete activity.id;
 		}
 
 		this.apRequestChart.inbox();
@@ -221,7 +222,11 @@ export class InboxProcessorService implements OnApplicationShutdown {
 		try {
 			const result = await this.apInboxService.performActivity(authUser.user, activity);
 			if (result && !result.startsWith('ok')) {
-				this.logger.warn(`inbox activity ignored (maybe): id=${activity.id} reason=${result}`);
+				if (result.startsWith('skip:')) {
+					this.logger.info(`inbox activity ignored: id=${activity.id} reason=${result}`);
+				} else {
+					this.logger.warn(`inbox activity failed: id=${activity.id} reason=${result}`);
+				}
 				return result;
 			}
 		} catch (e) {

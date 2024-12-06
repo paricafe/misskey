@@ -5,7 +5,7 @@
 
 import { Inject, Injectable } from '@nestjs/common';
 import { IsNull, Not } from 'typeorm';
-import * as Bull from 'bullmq';
+import { UnrecoverableError } from 'bullmq';
 import type { MiLocalUser, MiRemoteUser } from '@/models/User.js';
 import { InstanceActorService } from '@/core/InstanceActorService.js';
 import type { NotesRepository, PollsRepository, NoteReactionsRepository, UsersRepository, FollowRequestsRepository, MiMeta } from '@/models/_.js';
@@ -16,12 +16,12 @@ import { UtilityService } from '@/core/UtilityService.js';
 import { bindThis } from '@/decorators.js';
 import { LoggerService } from '@/core/LoggerService.js';
 import type Logger from '@/logger.js';
+import { fromTuple } from '@/misc/from-tuple.js';
 import { isCollectionOrOrderedCollection } from './type.js';
 import { ApDbResolverService } from './ApDbResolverService.js';
 import { ApRendererService } from './ApRendererService.js';
 import { ApRequestService } from './ApRequestService.js';
 import type { IObject, ICollection, IOrderedCollection } from './type.js';
-import { fromTuple } from '@/misc/from-tuple.js';
 
 export class Resolver {
 	private history: Set<string>;
@@ -68,7 +68,7 @@ export class Resolver {
 		if (isCollectionOrOrderedCollection(collection)) {
 			return collection;
 		} else {
-			throw new Error(`unrecognized collection type: ${collection.type}`);
+			throw new UnrecoverableError(`unrecognized collection type: ${collection.type}`);
 		}
 	}
 
@@ -85,15 +85,15 @@ export class Resolver {
 			// URLs with fragment parts cannot be resolved correctly because
 			// the fragment part does not get transmitted over HTTP(S).
 			// Avoid strange behaviour by not trying to resolve these at all.
-			throw new Error(`cannot resolve URL with fragment: ${value}`);
+			throw new UnrecoverableError(`cannot resolve URL with fragment: ${value}`);
 		}
 
 		if (this.history.has(value)) {
-			throw new Error('cannot resolve already resolved one');
+			throw new Error(`cannot resolve already resolved URL: ${value}`);
 		}
 
 		if (this.history.size > this.recursionLimit) {
-			throw new Bull.UnrecoverableError(`hit recursion limit: ${this.utilityService.extractDbHost(value)}`);
+			throw new Error(`hit recursion limit: ${value}`);
 		}
 
 		this.history.add(value);
@@ -104,7 +104,7 @@ export class Resolver {
 		}
 
 		if (!this.utilityService.isFederationAllowedHost(host)) {
-			throw new Bull.UnrecoverableError('Instance is blocked');
+			throw new UnrecoverableError(`instance is blocked: ${value}`);
 		}
 
 		if (this.config.signToActivityPubGet && !this.user) {
@@ -120,7 +120,7 @@ export class Resolver {
 				!(object['@context'] as unknown[]).includes('https://www.w3.org/ns/activitystreams') :
 				object['@context'] !== 'https://www.w3.org/ns/activitystreams'
 		) {
-			throw new Error('invalid response');
+			throw new UnrecoverableError(`invalid AP object ${value}: does not have ActivityStreams context`);
 		}
 
 		// HttpRequestService / ApRequestService have already checked that
@@ -128,12 +128,12 @@ export class Resolver {
 		// object after redirects; here we double-check that no redirects
 		// bounced between hosts
 		if (object.id == null) {
-			throw new Error('invalid AP object: missing id');
+			throw new UnrecoverableError(`invalid AP object ${value}: missing id`);
 		}
 
-		// if (this.utilityService.punyHost(object.id) !== this.utilityService.punyHost(value)) {
-		// 	throw new Error(`invalid AP object ${value}: id ${object.id} has different host`);
-		// }
+		if (this.utilityService.punyHost(object.id) !== this.utilityService.punyHost(value)) {
+			throw new UnrecoverableError(`invalid AP object ${value}: id ${object.id} has different host`);
+		}
 
 		return object;
 	}
@@ -141,7 +141,7 @@ export class Resolver {
 	@bindThis
 	private resolveLocal(url: string): Promise<IObject> {
 		const parsed = this.apDbResolverService.parseUri(url);
-		if (!parsed.local) throw new Error('resolveLocal: not local');
+		if (!parsed.local) throw new UnrecoverableError(`resolveLocal - not a local URL: ${url}`);
 
 		switch (parsed.type) {
 			case 'notes':
@@ -170,7 +170,7 @@ export class Resolver {
 			case 'follows':
 				return this.followRequestsRepository.findOneBy({ id: parsed.id })
 					.then(async followRequest => {
-						if (followRequest == null) throw new Error('resolveLocal: invalid follow request ID');
+						if (followRequest == null) throw new UnrecoverableError(`resolveLocal - invalid follow request ID ${parsed.id}: ${url}`);
 						const [follower, followee] = await Promise.all([
 							this.usersRepository.findOneBy({
 								id: followRequest.followerId,
@@ -182,12 +182,12 @@ export class Resolver {
 							}),
 						]);
 						if (follower == null || followee == null) {
-							throw new Error('resolveLocal: follower or followee does not exist');
+							throw new Error(`resolveLocal - follower or followee does not exist: ${url}`);
 						}
 						return this.apRendererService.addContext(this.apRendererService.renderFollow(follower as MiLocalUser | MiRemoteUser, followee as MiLocalUser | MiRemoteUser, url));
 					});
 			default:
-				throw new Error(`resolveLocal: type ${parsed.type} unhandled`);
+				throw new UnrecoverableError(`resolveLocal: type ${parsed.type} unhandled: ${url}`);
 		}
 	}
 }

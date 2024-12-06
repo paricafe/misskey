@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { UnrecoverableError } from 'bullmq';
 import type { IObject } from '../type.js';
 
 function getHrefsFrom(one: IObject | string | undefined | (IObject | string | undefined)[]): (string | undefined)[] {
@@ -25,6 +26,6 @@ export function assertActivityMatchesUrls(activity: IObject, urls: string[]) {
 		.map(u => new URL(u as string).href);
 
 	if (!actualUrls.some(u => expectedUrls.has(u))) {
-		throw new Error(`bad Activity: neither id(${activity.id}) nor url(${JSON.stringify(activity.url)}) match location(${urls})`);
+		throw new UnrecoverableError(`bad Activity: neither id(${activity.id}) nor url(${JSON.stringify(activity.url)}) match location(${urls})`);
 	}
 }

@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { UnrecoverableError } from 'bullmq';
 import { fromTuple } from '@/misc/from-tuple.js';
 
 export type Obj = { [x: string]: any };
@@ -68,7 +69,19 @@ export function getApId(value: string | IObject | [string | IObject]): string {
 
 	if (typeof value === 'string') return value;
 	if (typeof value.id === 'string') return value.id;
-	throw new Error('cannot determine id');
+	throw new UnrecoverableError('cannot determine id');
+}
+
+/**
+ * Get ActivityStreams Object id, or null if not present
+ */
+export function getNullableApId(value: string | IObject | [string | IObject]): string | null {
+	// eslint-disable-next-line no-param-reassign
+	value = fromTuple(value);
+
+	if (typeof value === 'string') return value;
+	if (typeof value.id === 'string') return value.id;
+	return null;
 }
 
 /**
