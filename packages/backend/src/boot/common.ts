@@ -4,6 +4,7 @@
  */
 
 import { NestFactory } from '@nestjs/core';
+import * as prom from 'prom-client';
 import { ChartManagementService } from '@/core/chart/ChartManagementService.js';
 import { QueueProcessorService } from '@/queue/QueueProcessorService.js';
 import { NestLogger } from '@/NestLogger.js';
@@ -12,8 +13,9 @@ import { QueueStatsService } from '@/daemons/QueueStatsService.js';
 import { ServerStatsService } from '@/daemons/ServerStatsService.js';
 import { ServerService } from '@/server/ServerService.js';
 import { MainModule } from '@/MainModule.js';
+import { MetricsService } from '@/server/api/MetricsService.js';
 
-export async function server() {
+export async function server(workerRegistry?: prom.AggregatorRegistry<prom.PrometheusContentType>) {
 	const app = await NestFactory.createApplicationContext(MainModule, {
 		logger: new NestLogger(),
 	});
@@ -22,6 +24,9 @@ export async function server() {
 	await serverService.launch();
 
 	if (process.env.NODE_ENV !== 'test') {
+		if (workerRegistry) {
+			app.get(MetricsService).setWorkerRegistry(workerRegistry);
+		}
 		app.get(ChartManagementService).start();
 		app.get(QueueStatsService).start();
 		app.get(ServerStatsService).start();

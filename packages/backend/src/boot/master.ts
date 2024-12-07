@@ -7,6 +7,7 @@ import * as fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
 import * as os from 'node:os';
+import * as prom from 'prom-client';
 import cluster from 'node:cluster';
 import chalk from 'chalk';
 import chalkTemplate from 'chalk-template';
@@ -18,6 +19,7 @@ import type { Config } from '@/config.js';
 import { showMachineInfo } from '@/misc/show-machine-info.js';
 import { envOption } from '@/env.js';
 import { jobQueue, server } from './common.js';
+import { metricGauge } from '@/server/api/MetricsService.js';
 
 const _filename = fileURLToPath(import.meta.url);
 const _dirname = dirname(_filename);
@@ -27,7 +29,25 @@ const meta = JSON.parse(fs.readFileSync(`${_dirname}/../../../../built/meta.json
 const logger = new Logger('core', 'cyan');
 const bootLogger = logger.createSubLogger('boot', 'magenta');
 
-const themeColor = chalk.hex('#f7c3de');
+const themeColor = chalk.hex('#86b300');
+
+const mBuildInfo = metricGauge({
+	name: 'misskey_build_info',
+	help: 'Misskey build information',
+	labelNames: ['gitCommit', 'gitDescribe', 'node_version']
+});
+
+mBuildInfo?.set({
+	gitCommit: meta.gitCommit || 'unknown',
+	gitDescribe: meta.gitDescribe || 'unknown',
+	node_version: process.version
+}, 1);
+
+const mStartupTime = metricGauge({
+	name: 'misskey_startup_time',
+	help: 'Misskey startup time',
+	labelNames: ['pid']
+});
 
 function greet() {
 	if (!envOption.quiet) {
@@ -54,7 +74,7 @@ function greet() {
 /**
  * Init master process
  */
-export async function masterMain() {
+export async function masterMain(workerRegistry?: prom.AggregatorRegistry<prom.PrometheusContentType>) {
 	let config!: Config;
 
 	// initialize app
@@ -64,6 +84,7 @@ export async function masterMain() {
 		await showMachineInfo(bootLogger);
 		showNodejsVersion();
 		config = loadConfigBoot();
+
 		//await connectDb();
 		if (config.pidFile) fs.writeFileSync(config.pidFile, process.pid.toString());
 	} catch (e) {
@@ -91,13 +112,15 @@ export async function masterMain() {
 		});
 	}
 
+	mStartupTime?.set({ pid: process.pid }, Date.now());
+
 	if (envOption.disableClustering) {
 		if (envOption.onlyServer) {
-			await server();
+			await server(workerRegistry);
 		} else if (envOption.onlyQueue) {
 			await jobQueue();
 		} else {
-			await server();
+			await server(workerRegistry);
 			await jobQueue();
 		}
 	} else {
@@ -106,7 +129,7 @@ export async function masterMain() {
 		} else if (envOption.onlyQueue) {
 			// nop
 		} else {
-			await server();
+			await server(workerRegistry);
 		}
 
 		await spawnWorkers(config.clusterLimit);
