@@ -98,7 +98,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 								:enableEmojiMenu="true"
 								:enableEmojiMenuReaction="true"
 							/>
-							<div v-if="defaultStore.state.autoTranslateButton && $i.policies.canUseTranslator && appearNote.text && isUnexpectedLanguage" style="padding-top: 5px; color: var(--MI_THEME-accent);">
+							<div v-if="autoTranslateButton && $i.policies.canUseTranslator && appearNote.text && isUnexpectedLanguage" style="padding-top: 5px; color: var(--MI_THEME-accent);">
 								<button v-if="!(translating || translation)" ref="translateButton" class="_button" @click.stop="translate()"><i class="ti ti-language-hiragana"></i>{{ i18n.ts.translate }}</button>
 								<button v-else class="_button" @click.stop="translation= null">{{ i18n.ts.close }}</button>
 							</div>
@@ -320,24 +320,26 @@ const renoteCollapsed = ref(
 
 const defaultLike = computed(() => defaultStore.state.like ?? '❤️');
 
+const autoTranslateButton = ref(defaultStore.state.autoTranslateButton);
+
 const inReplyToCollapsed = ref(defaultStore.state.collapseNotesRepliedTo);
 const disableReactionsViewer = ref(defaultStore.reactiveState.disableReactionsViewer);
 
 const collapsedUnexpectedLangs = ref(defaultStore.reactiveState.collapsedUnexpectedLangs);
 const expectedLangs = computed(() => {
-	if (!collapsedUnexpectedLangs.value) return new Set();
+	if (!collapsedUnexpectedLangs.value && !autoTranslateButton.value) return new Set();
 	return new Set([
 		(miLocalStorage.getItem('lang') ?? navigator.language).slice(0, 2),
 		navigator.language.slice(0, 2),
 	]);
 });
 const noteLanguage = computed(() => {
-	if (!collapsedUnexpectedLangs.value) return '';
+	if (!collapsedUnexpectedLangs.value && !autoTranslateButton.value) return '';
 	if (!appearNote.value.text || appearNote.value.text.length < 10) return '';
 	return detectLanguage(appearNote.value.text);
 });
 const isUnexpectedLanguage = computed(() => {
-	if (!collapsedUnexpectedLangs.value) return false;
+	if (!collapsedUnexpectedLangs.value && !autoTranslateButton.value) return false;
 	const lang = noteLanguage.value;
 	return lang !== '' && !expectedLangs.value.has(lang);
 });

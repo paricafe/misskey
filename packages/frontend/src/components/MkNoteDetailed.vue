@@ -103,7 +103,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 					:enableEmojiMenuReaction="true"
 				/>
 				<a v-if="appearNote.renote != null" :class="$style.rn">RN:</a>
-				<div v-if="defaultStore.state.autoTranslateButton && $i.policies.canUseTranslator && appearNote.text && isUnexpectedLanguage" style="padding-top: 5px; color: var(--MI_THEME-accent);">
+				<div v-if="autoTranslateButton && $i.policies.canUseTranslator && appearNote.text && isUnexpectedLanguage" style="padding-top: 5px; color: var(--MI_THEME-accent);">
 					<button v-if="!(translating || translation)" ref="translateButton" class="_button" @click.stop="translate()"><i class="ti ti-language-hiragana"></i>{{ i18n.ts.translate }}</button>
 					<button v-else class="_button" @click.stop="translation= null">{{ i18n.ts.close }}</button>
 				</div>
@@ -359,6 +359,7 @@ const showingNoteHistoryRef = ref<ShowingNoteHistoryState>(null);
 
 const disableReactionsViewer = ref(defaultStore.reactiveState.disableReactionsViewer);
 
+const autoTranslateButton = ref(defaultStore.state.autoTranslateButton);
 
 const expectedLangs = computed(() => new Set([
   (miLocalStorage.getItem('lang') ?? navigator.language).slice(0, 2),
