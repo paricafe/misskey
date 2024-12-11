@@ -214,7 +214,6 @@ import MkCwButton from '@/components/MkCwButton.vue';
 import MkPoll from '@/components/MkPoll.vue';
 import MkUsersTooltip from '@/components/MkUsersTooltip.vue';
 import MkUrlPreview from '@/components/MkUrlPreview.vue';
-import MkInstanceTicker from '@/components/MkInstanceTicker.vue';
 import { pleaseLogin, type OpenOnRemoteOptions } from '@/scripts/please-login.js';
 import { checkWordMute } from '@/scripts/check-word-mute.js';
 import { notePage } from '@/filters/note.js';
@@ -311,7 +310,6 @@ const muted = ref(checkMute(appearNote.value, $i?.mutedWords));
 const hardMuted = ref(props.withHardMute && checkMute(appearNote.value, $i?.hardMutedWords, true));
 const translation = ref<Misskey.entities.NotesTranslateResponse | null>(null);
 const translating = ref(false);
-const showTicker = (defaultStore.state.instanceTicker === 'always') || (defaultStore.state.instanceTicker === 'remote' && appearNote.value.user.instance);
 const canRenote = computed(() => ['public', 'home'].includes(appearNote.value.visibility) || (appearNote.value.visibility === 'followers' && appearNote.value.userId === $i?.id));
 const renoteCollapsed = ref(
 	defaultStore.state.collapseRenotes && isRenote && (
@@ -326,15 +324,20 @@ const inReplyToCollapsed = ref(defaultStore.state.collapseNotesRepliedTo);
 const disableReactionsViewer = ref(defaultStore.reactiveState.disableReactionsViewer);
 
 const collapsedUnexpectedLangs = ref(defaultStore.reactiveState.collapsedUnexpectedLangs);
-const expectedLangs = computed(() => new Set([
-	(miLocalStorage.getItem('lang') ?? navigator.language).slice(0, 2),
-	navigator.language.slice(0, 2),
-]));
+const expectedLangs = computed(() => {
+	if (!collapsedUnexpectedLangs.value) return new Set();
+	return new Set([
+		(miLocalStorage.getItem('lang') ?? navigator.language).slice(0, 2),
+		navigator.language.slice(0, 2),
+	]);
+});
 const noteLanguage = computed(() => {
+	if (!collapsedUnexpectedLangs.value) return '';
 	if (!appearNote.value.text || appearNote.value.text.length < 10) return '';
 	return detectLanguage(appearNote.value.text);
 });
 const isUnexpectedLanguage = computed(() => {
+	if (!collapsedUnexpectedLangs.value) return false;
 	const lang = noteLanguage.value;
 	return lang !== '' && !expectedLangs.value.has(lang);
 });
