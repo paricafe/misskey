@@ -13,7 +13,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 	:class="[$style.root, { [$style.showActionsOnlyHover]: defaultStore.state.showNoteActionsOnlyHover, [$style.skipRender]: defaultStore.state.skipNoteRender || defaultStore.state.enableRenderingOptimization }]"
 	:tabindex="isDeleted ? '-1' : '0'"
 >
-	<div v-if="collapsedUnexpectedLangs && isUnexpectedLanguage && !languageExpanded && !isRenote" :class="$style.collapsedLanguage">
+	<div v-show="collapsedUnexpectedLangs && isUnexpectedLanguage && !languageExpanded && !isRenote" :class="$style.collapsedLanguage">
 		<MkAvatar :class="$style.collapsedLanguageAvatar" :user="appearNote.user" link preview/>
 		<Mfm
 			:text="getNoteSummary(appearNote)"
@@ -25,7 +25,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 			@click.stop="languageExpanded = true"
 		/>
 	</div>
-	<template v-else>
+	<div v-show="!(collapsedUnexpectedLangs && isUnexpectedLanguage && !languageExpanded && !isRenote)">
 		<div v-if="appearNote.reply && inReplyToCollapsed && !isRenote" :class="$style.collapsedInReplyTo">
 			<MkAvatar :class="$style.collapsedInReplyToAvatar" :user="appearNote.reply.user" link preview/>
 			<Mfm :text="getNoteSummary(appearNote.reply)" :plain="true" :nowrap="true" :author="appearNote.reply.user" :nyaize="'respect'" :class="$style.collapsedInReplyToText" @click.stop="inReplyToCollapsed = false"/>
@@ -170,7 +170,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 				</footer>
 			</div>
 		</article>
-	</template>
+	</div>
 </div>
 <div v-else-if="!hardMuted" :class="$style.muted" @click="muted = false">
 	<I18n v-if="muted === 'sensitiveMute'" :src="i18n.ts.userSaysSomethingSensitive" tag="small">
