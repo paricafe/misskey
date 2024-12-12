@@ -576,6 +576,8 @@ html[data-color-scheme=dark] ._woodenFrame {
 
 // MFM -----------------------------
 
+bdi.block { display: block }
+
 ._mfm_blur_ {
 	filter: blur(6px);
 	transition: filter 0.3s;
