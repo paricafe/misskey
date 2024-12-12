@@ -9,7 +9,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 	v-show="!isDeleted"
 	ref="rootEl"
 	v-hotkey="keymap"
-	:data-note-id="note.id"
 	:class="[$style.root, { [$style.showActionsOnlyHover]: defaultStore.state.showNoteActionsOnlyHover, [$style.skipRender]: defaultStore.state.skipNoteRender || defaultStore.state.enableRenderingOptimization }]"
 	:tabindex="isDeleted ? '-1' : '0'"
 >
@@ -36,8 +35,8 @@ SPDX-License-Identifier: AGPL-3.0-only
 		<!--<div v-if="appearNote._featuredId_" class="tip"><i class="ti ti-bolt"></i> {{ i18n.ts.featured }}</div>-->
 		<div v-if="isRenote" :class="$style.renote">
 			<div v-if="note.channel" :class="$style.colorBar" :style="{ background: note.channel.color }"></div>
-			<MkAvatar :class="$style.renoteAvatar" :user="note.user" link preview/>
 			<i class="ti ti-repeat" style="margin-right: 4px;"></i>
+			<MkAvatar :class="$style.renoteAvatar" :user="note.user" link preview/>
 			<I18n :src="i18n.ts.renotedBy" tag="span" :class="$style.renoteText">
 				<template #user>
 					<MkA v-user-preview="note.userId" :class="$style.renoteUserName" :to="userPage(note.user)">
