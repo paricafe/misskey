@@ -10,7 +10,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 	ref="rootEl"
 	v-hotkey="keymap"
 	:data-note-id="note.id"
-	:class="[$style.root, { [$style.showActionsOnlyHover]: defaultStore.state.showNoteActionsOnlyHover, [$style.skipRender]: defaultStore.state.skipNoteRender }]"
+	:class="[$style.root, { [$style.showActionsOnlyHover]: defaultStore.state.showNoteActionsOnlyHover, [$style.skipRender]: defaultStore.state.skipNoteRender || defaultStore.state.enableRenderingOptimization }]"
 	:tabindex="isDeleted ? '-1' : '0'"
 >
 	<div v-show="collapsedUnexpectedLangs && isUnexpectedLanguage && !languageExpanded && !isRenote" :class="$style.collapsedLanguage">
@@ -71,7 +71,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 					<MkNoteHeader :note="appearNote" :mini="true" @click.stop/>
 				</div>
 			</div>
-			<div :class="[{ [$style.noteClickToOpen]: defaultStore.state.noteClickToOpen, [$style.skipRender]: defaultStore.state.enableRenderingOptimization }]" @click.stop="defaultStore.state.noteClickToOpen ? noteClickToOpen(appearNote.id) : undefined">
+			<div :class="[{ [$style.noteClickToOpen]: defaultStore.state.noteClickToOpen }]" @click.stop="defaultStore.state.noteClickToOpen ? noteClickToOpen(appearNote.id) : undefined">
 				<div style="container-type: inline-size;">
 					<p v-if="appearNote.cw != null" :class="$style.cw">
 						<Mfm
