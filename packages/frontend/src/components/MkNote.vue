@@ -276,7 +276,7 @@ onMounted(() => {
 		nextTick(() => {
 			setTimeout(() => {
 				shouldSkipRender.value = false;
-			}, 100);
+			}, 300);
 		});
 	}
 });
