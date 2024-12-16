@@ -41,7 +41,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 			<span v-if="note.localOnly" style="margin-left: 0.5em;" :title="i18n.ts._visibility['disableFederation']"><i class="ti ti-rocket-off"></i></span>
 			<span v-if="note.channel" style="margin-left: 0.5em;" :title="note.channel.name"><i class="ti ti-device-tv"></i></span>
 		</div>
-		<div :class="$style.info"><MkInstanceTicker v-if="showTicker" :style="{ cursor: defaultStore.state.clickToShowInstanceTickerWindow ? 'pointer' : 'default' }" :host="note.user.host"/></div>
+		<div :class="$style.info"><MkInstanceTicker v-if="showTicker" :style="{ cursor: defaultStore.state.clickToShowInstanceTickerWindow ? 'pointer' : 'default' }" :instance="note.user.instance" :host="note.user.host"/></div>
 	</div>
 </header>
 </template>
