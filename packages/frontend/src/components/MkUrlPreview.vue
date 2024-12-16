@@ -98,11 +98,11 @@ SPDX-License-Identifier: AGPL-3.0-only
 <script lang="ts" setup>
 import { defineAsyncComponent, onDeactivated, onUnmounted, ref } from 'vue';
 import * as Misskey from 'misskey-js';
-import MkNoteSimple from './MkNoteSimple.vue';
-import { misskeyApi } from '@/scripts/misskey-api.js';
 import { url as local } from '@@/js/config.js';
 import { versatileLang } from '@@/js/intl-const.js';
+import MkNoteSimple from './MkNoteSimple.vue';
 import type { summaly } from '@misskey-dev/summaly';
+import { misskeyApi } from '@/scripts/misskey-api.js';
 import { i18n } from '@/i18n.js';
 import * as os from '@/os.js';
 import { deviceKind } from '@/scripts/device-kind.js';

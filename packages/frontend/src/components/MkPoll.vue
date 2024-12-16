@@ -6,7 +6,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 <template>
 <div :class="{ [$style.done]: closed || isVoted }">
 	<ul :class="$style.choices">
-		<li v-for="(choice, i) in poll.choices" :key="i" :class="$style.choice" @click="vote(i)">
+		<li v-for="(choice, i) in poll.choices" :key="i" :class="$style.choice" @click.stop="vote(i)">
 			<div :class="$style.bg" :style="{ 'width': `${showResult ? (choice.votes / total * 100) : 0}%` }"></div>
 			<span :class="$style.fg">
 				<template v-if="choice.isVoted"><i class="ti ti-check" style="margin-right: 4px; color: var(--MI_THEME-accent);"></i></template>

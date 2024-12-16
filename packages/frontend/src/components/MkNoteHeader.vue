@@ -4,46 +4,46 @@ SPDX-License-Identifier: AGPL-3.0-only
 -->
 
 <template>
-	<header :class="$style.root">
-		<div :class="$style.section">
-			<div style="display: flex;">
-				<div v-if="mock" :class="$style.name">
-					<MkUserName :user="note.user"/>
-				</div>
-				<MkA v-else v-user-preview="note.user.id" :class="$style.name" :to="userPage(note.user)">
-					<MkUserName :user="note.user"/>
-				</MkA>
-				<div v-if="note.user.isBot" :class="$style.isBot">bot</div>
-				<div v-if="note.user.badgeRoles" :class="$style.badgeRoles">
-					<img v-for="(role, i) in note.user.badgeRoles" :key="i" v-tooltip="role.name" :class="$style.badgeRole" :src="role.iconUrl!"/>
-				</div>
+<header :class="$style.root">
+	<div :class="$style.section">
+		<div style="display: flex;">
+			<div v-if="mock" :class="$style.name">
+				<MkUserName :user="note.user"/>
 			</div>
-		   	<div :class="$style.username"><MkAcct :user="note.user"/></div>
-	    </div>
-		<div :class="$style.section">
-			<div :class="$style.info">
-				<span v-if="note.updatedAt" style="margin-right: 0.5em;" :title="i18n.ts.edited"><i class="ti ti-pencil"></i></span>
-				<div v-if="mock">
-					<MkTime :time="note.createdAt" colored/>
-				</div>
-				<MkA v-else :to="notePage(note)" @mouseenter="setDetail(true)" @mouseleave="setDetail(false)" :style="{ textDecoration: 'none', userSelect: 'none' }">
-					<MkTime
-                        :time="note.createdAt"
-                        :mode="(defaultStore.state.showDetailTimeWhenHover && isDetail) ? 'detail' : undefined"
-                        colored
-                    />
-				</MkA>
-				<span v-if="note.visibility !== 'public'" style="margin-left: 0.5em;" :title="i18n.ts._visibility[note.visibility]">
-					<i v-if="note.visibility === 'home'" class="ti ti-home"></i>
-					<i v-else-if="note.visibility === 'followers'" class="ti ti-lock"></i>
-					<i v-else-if="note.visibility === 'specified'" ref="specified" class="ti ti-mail"></i>
-				</span>
-				<span v-if="note.localOnly" style="margin-left: 0.5em;" :title="i18n.ts._visibility['disableFederation']"><i class="ti ti-rocket-off"></i></span>
-				<span v-if="note.channel" style="margin-left: 0.5em;" :title="note.channel.name"><i class="ti ti-device-tv"></i></span>
+			<MkA v-else v-user-preview="note.user.id" :class="$style.name" :to="userPage(note.user)" @click.stop>
+				<MkUserName :user="note.user"/>
+			</MkA>
+			<div v-if="note.user.isBot" :class="$style.isBot">bot</div>
+			<div v-if="note.user.badgeRoles" :class="$style.badgeRoles">
+				<img v-for="(role, i) in note.user.badgeRoles" :key="i" v-tooltip="role.name" :class="$style.badgeRole" :src="role.iconUrl!"/>
 			</div>
-			<div :class="$style.info"><MkInstanceTicker v-if="showTicker" :style="{ cursor: defaultStore.state.clickToShowInstanceTickerWindow ? 'pointer' : 'default' }" :instance="note.user.instance" :host="note.user.host"/></div>
-	  </div>
-	</header>
+		</div>
+		<div :class="$style.username"><MkAcct :user="note.user"/></div>
+	</div>
+	<div :class="$style.section">
+		<div :class="$style.info">
+			<span v-if="note.updatedAt" style="margin-right: 0.5em;" :title="i18n.ts.edited"><i class="ti ti-pencil"></i></span>
+			<div v-if="mock">
+				<MkTime :time="note.createdAt" colored/>
+			</div>
+			<MkA v-else :to="notePage(note)" :style="{ textDecoration: 'none', userSelect: 'none' }" @mouseenter="setDetail(true)" @mouseleave="setDetail(false)">
+				<MkTime
+					:time="note.createdAt"
+					:mode="(defaultStore.state.showDetailTimeWhenHover && isDetail) ? 'detail' : undefined"
+					colored
+				/>
+			</MkA>
+			<span v-if="note.visibility !== 'public'" style="margin-left: 0.5em;" :title="i18n.ts._visibility[note.visibility]">
+				<i v-if="note.visibility === 'home'" class="ti ti-home"></i>
+				<i v-else-if="note.visibility === 'followers'" class="ti ti-lock"></i>
+				<i v-else-if="note.visibility === 'specified'" ref="specified" class="ti ti-mail"></i>
+			</span>
+			<span v-if="note.localOnly" style="margin-left: 0.5em;" :title="i18n.ts._visibility['disableFederation']"><i class="ti ti-rocket-off"></i></span>
+			<span v-if="note.channel" style="margin-left: 0.5em;" :title="note.channel.name"><i class="ti ti-device-tv"></i></span>
+		</div>
+		<div :class="$style.info"><MkInstanceTicker v-if="showTicker" :style="{ cursor: defaultStore.state.clickToShowInstanceTickerWindow ? 'pointer' : 'default' }" :host="note.user.host"/></div>
+	</div>
+</header>
 </template>
 
 <script lang="ts" setup>
@@ -57,7 +57,7 @@ import MkInstanceTicker from '@/components/MkInstanceTicker.vue';
 
 const isDetail = ref(false);
 const setDetail = (value) => {
-    isDetail.value = value;
+	isDetail.value = value;
 };
 
 const props = defineProps<{

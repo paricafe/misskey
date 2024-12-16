@@ -14,7 +14,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 	</div>
 	<details v-if="note.files && note.files.length > 0">
 		<summary>({{ i18n.tsx.withNFiles({ n: note.files.length }) }})</summary>
-		<MkMediaList :mediaList="note.files"/>
+		<MkMediaList :mediaList="note.files" @click.stop/>
 	</details>
 	<details v-if="note.poll">
 		<summary>{{ i18n.ts.poll }}</summary>
@@ -32,10 +32,10 @@ SPDX-License-Identifier: AGPL-3.0-only
 <script lang="ts" setup>
 import { ref } from 'vue';
 import * as Misskey from 'misskey-js';
+import { shouldCollapsed } from '@@/js/collapsed.js';
 import MkMediaList from '@/components/MkMediaList.vue';
 import MkPoll from '@/components/MkPoll.vue';
 import { i18n } from '@/i18n.js';
-import { shouldCollapsed } from '@@/js/collapsed.js';
 import { defaultStore } from '@/store.js';
 import { useRouter } from '@/router/supplier.js';
 
