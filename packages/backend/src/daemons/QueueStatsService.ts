@@ -33,7 +33,7 @@ export class QueueStatsService implements OnApplicationShutdown {
 	 * Report queue stats regularly
 	 */
 	@bindThis
-	public async start(): Promise<void> {
+	public start(): void {
 		const log = [] as any[];
 
 		ev.on('requestQueueStatsLog', x => {
@@ -82,7 +82,7 @@ export class QueueStatsService implements OnApplicationShutdown {
 			activeInboxJobs = 0;
 		};
 
-		await tick();
+		tick();
 
 		this.intervalId = setInterval(tick, interval);
 	}

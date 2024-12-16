@@ -12,24 +12,20 @@ import { QueueStatsService } from '@/daemons/QueueStatsService.js';
 import { ServerStatsService } from '@/daemons/ServerStatsService.js';
 import { ServerService } from '@/server/ServerService.js';
 import { MainModule } from '@/MainModule.js';
-import { envOption } from '@/env.js';
 
 export async function server() {
 	const app = await NestFactory.createApplicationContext(MainModule, {
 		logger: new NestLogger(),
 	});
 
-	if (process.env.NODE_ENV !== 'test') {
-		await app.get(ChartManagementService).start();
-	}
-	if (!envOption.noDaemons) {
-		await app.get(QueueStatsService).start();
-		await app.get(ServerStatsService).start();
-	}
-
-	// Start server last so the other services can register hooks first
 	const serverService = app.get(ServerService);
 	await serverService.launch();
+
+	if (process.env.NODE_ENV !== 'test') {
+		app.get(ChartManagementService).start();
+		app.get(QueueStatsService).start();
+		app.get(ServerStatsService).start();
+	}
 
 	return app;
 }
@@ -39,8 +35,8 @@ export async function jobQueue() {
 		logger: new NestLogger(),
 	});
 
-	await jobQueue.get(QueueProcessorService).start();
-	await jobQueue.get(ChartManagementService).start();
+	jobQueue.get(QueueProcessorService).start();
+	jobQueue.get(ChartManagementService).start();
 
 	return jobQueue;
 }
