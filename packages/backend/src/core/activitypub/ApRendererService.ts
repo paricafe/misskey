@@ -185,6 +185,9 @@ export class ApRendererService {
 				// || emoji.originalUrl してるのは後方互換性のため（publicUrlはstringなので??はだめ）
 				url: emoji.publicUrl || emoji.originalUrl,
 			},
+			_misskey_license: {
+				freeText: emoji.license
+			},
 		};
 	}
 

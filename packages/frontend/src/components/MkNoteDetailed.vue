@@ -74,7 +74,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 						<i class="ti ti-rocket-off"></i>
 					</span>
 				</div>
-				<MkInstanceTicker v-if="showTicker" :style="{ cursor: defaultStore.state.clickToShowInstanceTickerWindow ? 'pointer' : 'default' }" :instance="appearNote.user.instance" :host="note.user.host"/>
+				<MkInstanceTicker v-if="showTicker" :style="{ cursor: defaultStore.state.clickToShowInstanceTickerWindow ? 'pointer' : 'default' }" :instance="appearNote.user.instance" :host="appearNote.user.host"/>
 			</div>
 		</header>
 		<div :class="$style.noteContent">
@@ -117,7 +117,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 				<div v-if="appearNote.files && appearNote.files.length > 0">
 					<MkMediaList ref="galleryEl" :mediaList="appearNote.files"/>
 				</div>
-				<MkPoll v-if="appearNote.poll" ref="pollViewer" :noteId="appearNote.id" :poll="appearNote.poll" :class="$style.poll"/>
+				<MkPoll v-if="appearNote.poll" ref="pollViewer" :noteId="appearNote.id" :poll="appearNote.poll" :class="$style.poll" :author="appearNote.user" :emojiUrls="appearNote.emojis"/>
 				<div v-if="isEnabledUrlPreview">
 					<MkUrlPreview v-for="url in urls" :key="url" :url="url" :compact="true" :detail="true" style="margin-top: 6px;"/>
 				</div>

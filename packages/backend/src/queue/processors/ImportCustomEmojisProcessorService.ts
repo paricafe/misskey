@@ -88,6 +88,7 @@ export class ImportCustomEmojisProcessorService {
 				await this.emojisRepository.delete({
 					name: nameNfc,
 				});
+
 				try {
 					const driveFile = await this.driveService.addFile({
 						user: null,
@@ -96,11 +97,13 @@ export class ImportCustomEmojisProcessorService {
 						force: true,
 					});
 					await this.customEmojiService.add({
-						name: nameNfc,
-						category: emojiInfo.category?.normalize('NFC'),
+						originalUrl: driveFile.url,
+						publicUrl: driveFile.webpublicUrl ?? driveFile.url,
+						fileType: driveFile.webpublicType ?? driveFile.type,
+						name: emojiInfo.name,
+						category: emojiInfo.category,
 						host: null,
-						aliases: emojiInfo.aliases?.map((a: string) => a.normalize('NFC')),
-						driveFile,
+						aliases: emojiInfo.aliases,
 						license: emojiInfo.license,
 						isSensitive: emojiInfo.isSensitive,
 						localOnly: emojiInfo.localOnly,

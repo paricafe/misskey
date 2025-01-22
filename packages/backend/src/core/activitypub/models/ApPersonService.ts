@@ -160,8 +160,12 @@ export class ApPersonService implements OnModuleInit {
 		const sharedInboxObject = x.sharedInbox ?? (x.endpoints ? x.endpoints.sharedInbox : undefined);
 		if (sharedInboxObject != null) {
 			const sharedInbox = getApId(sharedInboxObject);
-			if (!(typeof sharedInbox === 'string' && sharedInbox.length > 0 && this.utilityService.punyHost(sharedInbox) === expectHost)) {
-				throw new UnrecoverableError(`invalid Actor ${uri} - wrong shared inbox ${sharedInbox}`);
+			if (!(typeof sharedInbox === 'string' && sharedInbox.length > 0 && new URL(sharedInbox).host === expectHost)) {
+				this.logger.warn(`invalid Actor: skipping wrong shared inbox, expected host: ${expectHost}, actual URL: ${sharedInbox}`);
+				x.sharedInbox = undefined;
+				if (x.endpoints?.sharedInbox) {
+					x.endpoints.sharedInbox = undefined;
+				}
 			}
 		}
 
@@ -347,14 +351,8 @@ export class ApPersonService implements OnModuleInit {
 			throw new UnrecoverableError(`Refusing to create person without id: ${uri}`);
 		}
 
-		if (url != null) {
-			if (!checkHttps(url)) {
-				throw new UnrecoverableError(`unexpected schema of person url ${url} in ${uri}`);
-			}
-
-			if (this.utilityService.punyHost(url) !== this.utilityService.punyHost(person.id)) {
-				throw new UnrecoverableError(`person url <> uri host mismatch: ${url} <> ${person.id} in ${uri}`);
-			}
+		if (url && !checkHttps(url)) {
+			throw new Error('unexpected schema of person url: ' + url);
 		}
 
 		// Create user
