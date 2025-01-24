@@ -4,7 +4,7 @@
  */
 
 import { Inject, Injectable } from '@nestjs/common';
-import { Brackets, In } from 'typeorm';
+import { In, SelectQueryBuilder } from 'typeorm';
 import { DI } from '@/di-symbols.js';
 import { type Config, FulltextSearchProvider } from '@/config.js';
 import { bindThis } from '@/decorators.js';
@@ -220,15 +220,9 @@ export class SearchService {
 			.leftJoinAndSelect('renote.user', 'renoteUser');
 
 		if (this.config.fulltextSearch?.provider === 'sqlPgroonga') {
-			query.andWhere(new Brackets(qb => {
-				qb.where('note.text &@ :q', { q })
-				  .orWhere('note.cw &@ :q', { q });
-			}));
+			query.andWhere('note.text &@ :q', { q });
 		} else {
-			query.andWhere(new Brackets(qb => {
-				qb.where('LOWER(note.text) LIKE :q', { q: `%${sqlLikeEscape(q.toLowerCase())}%` })
-				  .orWhere('LOWER(note.cw) LIKE :q', { q: `%${sqlLikeEscape(q.toLowerCase())}%` });
-			}));
+			query.andWhere('LOWER(note.text) LIKE :q', { q: `%${ sqlLikeEscape(q.toLowerCase()) }%` });
 		}
 
 		if (opts.host) {
