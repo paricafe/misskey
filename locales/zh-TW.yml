@@ -2928,8 +2928,6 @@ collapsedUnexpectedLangs: "省略顯示非期望語言的貼文"
 emojiAutoSpacing: "在插入 Emoji 時自動添加前後間距"
 autoSpacing: "自動間距"
 autoSpacingDescription: "在CJK字符和英文字符中添加間距"
-insertNewNotes: "在當前位置插入新貼文"
-insertNewNotesDescription: "將剛剛收到的貼文插入到正在瀏覽的位置。"
 clickToShowInstanceTickerWindow: "點擊 InstanceTicker 顯示實例資訊視窗"
 defaultLike: "默認回應表情"
 _dataRequest:

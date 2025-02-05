@@ -2929,8 +2929,6 @@ collapsedUnexpectedLangs: "折叠非期望语言的帖文"
 emojiAutoSpacing: "在插入 Emoji 时自动添加空格"
 autoSpacing: "自动空格"
 autoSpacingDescription: "在CJK字符和英文字符中添加空格"
-insertNewNotes: "在当前位置插入新帖文"
-insertNewNotesDescription: "將新收到的帖文插入到正在浏览的位置。"
 clickToShowInstanceTickerWindow: "点击 InstanceTicker 显示实例信息窗口"
 defaultLike: "默认回应表情"
 _dataRequest:

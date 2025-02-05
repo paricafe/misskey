@@ -563,10 +563,6 @@ export const defaultStore = markRaw(new Storage('base', {
 		where: 'device',
 		default: true,
 	},
-	insertNewNotes: {
-		where: 'device',
-		default: false,
-	},
 	clickToShowInstanceTickerWindow: {
 		where: 'device',
 		default: true,

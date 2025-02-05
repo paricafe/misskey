@@ -1375,7 +1375,7 @@ _announcement:
 _initialAccountSetting:
   accountCreated: "アカウントの作成が完了しました！"
   letsStartAccountSetup: "さっそくアカウントの初期設定を行いましょう。"
-  letsFillYourProfile: "まずはあなたのプロフィールを設定しまし���う。"
+  letsFillYourProfile: "まずはあなたのプロフィールを設定しましょう。"
   profileSetting: "プロフィール設定"
   privacySetting: "プライバシー設定"
   theseSettingsCanEditLater: "これらの設定は後から変更できます。"
@@ -2941,8 +2941,6 @@ collapsedUnexpectedLangs: "Collapse notes using unexpected languages"
 emojiAutoSpacing: "Automatically add spaces when inserting emoji"
 autoSpacing: "Auto Spacing"
 autoSpacingDescription: "Adding spaces between CJK and English characters"
-insertNewNotes: "Insert new notes at current position"
-insertNewNotesDescription: "Insert new notes at the current position while scrolling timeline."
 clickToShowInstanceTickerWindow: "Click InstanceTicker to show instance info"
 defaultLike: "Default like reaction"
 _dataRequest:

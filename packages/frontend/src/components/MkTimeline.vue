@@ -82,11 +82,7 @@ function prepend(note) {
 		note._shouldInsertAd_ = true;
 	}
 
-	if (defaultStore.state.insertNewNotes) {
-		tlComponent.value.pagingComponent?.insertNote(note);
-	} else {
-		tlComponent.value.pagingComponent?.prepend(note);
-	}
+	tlComponent.value.pagingComponent?.prepend(note);
 
 	emit('note');
 
