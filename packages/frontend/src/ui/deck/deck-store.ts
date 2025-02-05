@@ -10,7 +10,7 @@ import type { BasicTimelineType } from '@/timelines.js';
 import { Storage } from '@/pizzax.js';
 import { misskeyApi } from '@/scripts/misskey-api.js';
 import { deepClone } from '@/scripts/clone.js';
-import { SoundStore } from '@/store.js';
+import type { SoundStore } from '@/store.js';
 
 type ColumnWidget = {
 	name: string;
@@ -112,8 +112,7 @@ export const loadDeck = async () => {
 	deckStore.set('layout', deck.layout);
 };
 
-// TODO: deckがloadされていない状態でsaveすると意図せず上書きが発生するので対策する
-export const saveDeck = throttle(1000, async () => {
+export async function forceSaveDeck() {
 	await misskeyApi('i/registry/set', {
 		scope: ['client', 'deck', 'profiles'],
 		key: deckStore.state.profile,
@@ -122,6 +121,11 @@ export const saveDeck = throttle(1000, async () => {
 			layout: deckStore.reactiveState.layout.value,
 		},
 	});
+}
+
+// TODO: deckがloadされていない状態でsaveすると意図せず上書きが発生するので対策する
+export const saveDeck = throttle(1000, () => {
+	forceSaveDeck();
 });
 
 export async function getProfiles(): Promise<string[]> {
