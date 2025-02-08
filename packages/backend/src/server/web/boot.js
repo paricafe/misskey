@@ -156,6 +156,22 @@
 			await new Promise(resolve => window.addEventListener('DOMContentLoaded', resolve));
 		}
 
+		const locale = JSON.parse(localStorage.getItem('locale') || '{}');
+
+		const messages = Object.assign({
+			title: 'Failed to initialize Misskey',
+			solution: 'The following actions may solve the problem.',
+			solution1: 'Update your os and browser',
+			solution2: 'Disable an adblocker',
+			solution3: 'Clear the browser cache',
+			solution4: '(Tor Browser) Set dom.webaudio.enabled to true',
+			otherOption: 'Other options',
+			otherOption1: 'Clear preferences and cache',
+			otherOption2: 'Start the simple client',
+			otherOption3: 'Start the repair tool',
+		}, locale?._bootErrors || {});
+		const reload = locale?.reload || 'Reload';
+
 		let errorsElement = document.getElementById('errors');
 
 		if (!errorsElement) {
@@ -165,32 +181,32 @@
 				<path d="M12 9v2m0 4v.01"></path>
 				<path d="M5 19h14a2 2 0 0 0 1.84 -2.75l-7.1 -12.25a2 2 0 0 0 -3.5 0l-7.1 12.25a2 2 0 0 0 1.75 2.75"></path>
 			</svg>
-			<h1>Failed to load<br>加載失敗しました</h1>
+			<h1>${messages.title}</h1>
 			<button class="button-big" onclick="location.reload(true);">
-				<span class="button-label-big">Reload / 重新加載</span>
+				<span class="button-label-big">${reload}</span>
 			</button>
-			<p><b>The following actions may solve the problem. / 執行以下操作可能會有所幫助。</b></p>
-			<p>Clear the browser cache / 清除瀏覽器緩存</p>
-			<p>Update your os and browser / 將您的瀏覽器和操作系統更新到最新版本</p>
-			<p>Disable an adblocker / 禁用廣告攔截器</p>
-			<p>&#40;Tor Browser&#41; Set dom.webaudio.enabled to true / 將dom.webaudio.enabled設定為true</p>
+			<p><b>${messages.solution}</b></p>
+			<p>${messages.solution1}</p>
+			<p>${messages.solution2}</p>
+			<p>${messages.solution3}</p>
+			<p>${messages.solution4}</p>
 			<details style="color: #e1aac6;">
-				<summary>Other options / 其他選項</summary>
+				<summary>${messages.otherOption}</summary>
 				<a href="/flush">
 					<button class="button-small">
-						<span class="button-label-small">Clear preferences and cache</span>
+						<span class="button-label-small">${messages.otherOption1}</span>
 					</button>
 				</a>
 				<br>
 				<a href="/cli">
 					<button class="button-small">
-						<span class="button-label-small">Start the simple client</span>
+						<span class="button-label-small">${messages.otherOption2}</span>
 					</button>
 				</a>
 				<br>
 				<a href="/bios">
 					<button class="button-small">
-						<span class="button-label-small">Start the repair tool</span>
+						<span class="button-label-small">${messages.otherOption3}</span>
 					</button>
 				</a>
 			</details>
