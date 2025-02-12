@@ -32,13 +32,6 @@ const externalPackages = [
 				: id;
 		},
 	},
-	{
-		name: 'tinyld',
-		match: /^tinyld$/,
-		path(): string {
-			return `/static-assets/js/tinyld.normal.node.mjs`
-		},
-	},
 ];
 
 const hash = (str: string, seed = 0): number => {

@@ -64,7 +64,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 		<div class="_gaps_m">
 			<div class="label">{{ i18n.ts.pariPlusNoteSettings }}</div>
 			<div class="_gaps_s">
-				<MkSwitch v-model="autoTranslateButton">{{ i18n.ts.autoTranslateButton }}</MkSwitch>
+				<MkSwitch v-model="enableTranslateButton">{{ i18n.ts.enableTranslateButton }}</MkSwitch>
 				<MkSwitch v-model="showDetailTimeWhenHover">{{ i18n.ts.showDetailTimeWhenHover }}</MkSwitch>
 				<MkSwitch v-model="noteClickToOpen">{{ i18n.ts.noteClickToOpen }}</MkSwitch>
 				<MkSwitch v-model="enableFallbackReactButton">{{ i18n.ts.enableFallbackReactButton }}</MkSwitch>
@@ -72,7 +72,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 				<MkSwitch v-model="enableUndoClearPostForm">{{ i18n.ts.enableUndoClearPostForm }}</MkSwitch>
 				<MkSwitch v-model="collapseNotesRepliedTo">{{ i18n.ts.collapseNotesRepliedTo }}</MkSwitch>
 				<MkSwitch v-model="disableReactionsViewer">{{ i18n.ts.disableReactionsViewer }}</MkSwitch>
-				<MkSwitch v-model="collapsedUnexpectedLangs">{{ i18n.ts.collapsedUnexpectedLangs }}</MkSwitch>
 				<MkSwitch v-model="emojiAutoSpacing">{{ i18n.ts.emojiAutoSpacing }}</MkSwitch>
 				<MkSwitch v-model="clickToShowInstanceTickerWindow">{{ i18n.ts.clickToShowInstanceTickerWindow }}</MkSwitch>
 				<MkSelect v-model="autoSpacingBehaviour">
@@ -120,7 +119,7 @@ function saveFontSize() {
 
 const enableRenderingOptimization = computed(defaultStore.makeGetterSetter('enableRenderingOptimization'));
 
-const autoTranslateButton = computed(defaultStore.makeGetterSetter('autoTranslateButton'));
+const enableTranslateButton = computed(defaultStore.makeGetterSetter('enableTranslateButton'));
 const showDetailTimeWhenHover = computed(defaultStore.makeGetterSetter('showDetailTimeWhenHover'));
 const noteClickToOpen = computed(defaultStore.makeGetterSetter('noteClickToOpen'));
 const enableFallbackReactButton = computed(defaultStore.makeGetterSetter('enableFallbackReactButton'));
@@ -129,7 +128,6 @@ const enableUndoClearPostForm = computed(defaultStore.makeGetterSetter('enableUn
 const autoSpacingBehaviour = computed(defaultStore.makeGetterSetter('autoSpacingBehaviour'));
 const collapseNotesRepliedTo = computed(defaultStore.makeGetterSetter('collapseNotesRepliedTo'));
 const disableReactionsViewer = computed(defaultStore.makeGetterSetter('disableReactionsViewer'));
-const collapsedUnexpectedLangs = computed(defaultStore.makeGetterSetter('collapsedUnexpectedLangs'));
 const emojiAutoSpacing = computed(defaultStore.makeGetterSetter('emojiAutoSpacing'));
 const clickToShowInstanceTickerWindow = computed(defaultStore.makeGetterSetter('clickToShowInstanceTickerWindow'));
 

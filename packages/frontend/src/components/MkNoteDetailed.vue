@@ -103,7 +103,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 					:enableEmojiMenuReaction="true"
 				/>
 				<a v-if="appearNote.renote != null" :class="$style.rn">RN:</a>
-				<div v-if="autoTranslateButton && $i.policies.canUseTranslator && appearNote.text && isUnexpectedLanguage" style="padding-top: 5px; color: var(--MI_THEME-accent);">
+				<div v-if="enableTranslateButton && $i.policies.canUseTranslator && appearNote.text" style="padding-top: 5px; color: var(--MI_THEME-accent);">
 					<button v-if="!(translating || translation)" ref="translateButton" class="_button" @click.stop="translate()"><i class="ti ti-language-hiragana"></i>{{ i18n.ts.translate }}</button>
 					<button v-else class="_button" @click.stop="translation= null">{{ i18n.ts.close }}</button>
 				</div>
@@ -292,7 +292,6 @@ import { isEnabledUrlPreview } from '@/instance.js';
 import { getAppearNote } from '@/scripts/get-appear-note.js';
 import type { Keymap } from '@/scripts/hotkey.js';
 import { miLocalStorage } from '@/local-storage.js';
-import detectLanguage from '@/scripts/detect-language.js';
 import { spacingNote } from '@/scripts/autospacing.js';
 
 const props = withDefaults(defineProps<{
@@ -360,20 +359,7 @@ const showingNoteHistoryRef = ref<ShowingNoteHistoryState>(null);
 
 const disableReactionsViewer = ref(defaultStore.reactiveState.disableReactionsViewer);
 
-const autoTranslateButton = ref(defaultStore.state.autoTranslateButton);
-
-const expectedLangs = computed(() => new Set([
-  (miLocalStorage.getItem('lang') ?? navigator.language).slice(0, 2),
-  navigator.language.slice(0, 2)
-]));
-const noteLanguage = computed(() => {
-  if (!appearNote.value.text || appearNote.value.text.length < 10) return '';
-  return detectLanguage(appearNote.value.text);
-});
-const isUnexpectedLanguage = computed(() => {
-  const lang = noteLanguage.value;
-  return lang !== '' && !expectedLangs.value.has(lang);
-});
+const enableTranslateButton = ref(defaultStore.state.enableTranslateButton);
 
 const pleaseLoginContext = computed<OpenOnRemoteOptions>(() => ({
 	type: 'lookup',
