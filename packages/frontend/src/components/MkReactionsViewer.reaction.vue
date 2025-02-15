@@ -127,6 +127,7 @@ async function toggleReaction() {
 			});
 			if (confirm.canceled) return;
 		}
+	}
 
 	if (oldReaction) {
 		const confirm = await os.confirm({
