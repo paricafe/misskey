@@ -109,15 +109,8 @@ async function toggleReaction() {
 			return;
 		}
 
-		misskeyApi('notes/reactions/delete', {
+		await misskeyApi('notes/reactions/delete', {
 			noteId: props.note.id,
-		}).then(() => {
-			if (oldReaction !== props.reaction) {
-				misskeyApi('notes/reactions/create', {
-					noteId: props.note.id,
-					reaction: props.reaction,
-				});
-			}
 		});
 	} else {
 		if (defaultStore.state.confirmOnReact) {
@@ -127,14 +120,25 @@ async function toggleReaction() {
 			});
 			if (confirm.canceled) return;
 		}
-	}
 
-	if (oldReaction) {
-		const confirm = await os.confirm({
-			type: 'warning',
-			text: i18n.ts.changeReactionConfirm,
-		});
-		if (confirm.canceled) return;
+		if (oldReaction) {
+			const confirm = await os.confirm({
+				type: 'warning',
+				text: i18n.ts.changeReactionConfirm,
+			});
+			if (confirm.canceled) return;
+
+			sound.playMisskeySfx('reaction');
+
+			if (mock) {
+				emit('reactionToggled', props.reaction, (props.count + 1));
+				return;
+			}
+
+			await misskeyApi('notes/reactions/delete', {
+				noteId: props.note.id,
+			});
+		}
 
 		sound.playMisskeySfx('reaction');
 
@@ -143,25 +147,14 @@ async function toggleReaction() {
 			return;
 		}
 
-		await misskeyApi('notes/reactions/delete', {
+		misskeyApi('notes/reactions/create', {
 			noteId: props.note.id,
+			reaction: baseReaction.value,
 		});
-	}
 
-	sound.playMisskeySfx('reaction');
-
-	if (mock) {
-		emit('reactionToggled', props.reaction, (props.count + 1));
-		return;
-	}
-
-	misskeyApi('notes/reactions/create', {
-		noteId: props.note.id,
-		reaction: baseReaction.value,
-	});
-
-	if (props.note.text && props.note.text.length > 100 && (Date.now() - new Date(props.note.createdAt).getTime() < 1000 * 3)) {
-		claimAchievement('reactWithoutRead');
+		if (props.note.text && props.note.text.length > 100 && (Date.now() - new Date(props.note.createdAt).getTime() < 1000 * 3)) {
+			claimAchievement('reactWithoutRead');
+		}
 	}
 }
 
