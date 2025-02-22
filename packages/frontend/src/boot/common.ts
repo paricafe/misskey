@@ -4,9 +4,9 @@
  */
 
 import { computed, watch, version as vueVersion } from 'vue';
-import type { App } from 'vue';
 import { compareVersions } from 'compare-versions';
 import { version, lang, updateLocale, locale } from '@@/js/config.js';
+import type { App } from 'vue';
 import widgets from '@/widgets/index.js';
 import directives from '@/directives/index.js';
 import components from '@/components/index.js';

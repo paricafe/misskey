@@ -5,9 +5,10 @@
 
 import { createApp, defineAsyncComponent, markRaw } from 'vue';
 import { ui } from '@@/js/config.js';
-import { common } from './common.js';
 import * as Misskey from 'misskey-js';
+import { common } from './common.js';
 import type { Component } from 'vue';
+import type { Keymap } from '@/scripts/hotkey.js';
 import { i18n } from '@/i18n.js';
 import { alert, confirm, popup, post, toast } from '@/os.js';
 import { useStream } from '@/stream.js';
@@ -23,7 +24,6 @@ import { deckStore } from '@/ui/deck/deck-store.js';
 import { emojiPicker } from '@/scripts/emoji-picker.js';
 import { mainRouter } from '@/router/main.js';
 import { makeHotkey } from '@/scripts/hotkey.js';
-import type { Keymap } from '@/scripts/hotkey.js';
 import { addCustomEmoji, removeCustomEmojis, updateCustomEmojis } from '@/custom-emojis.js';
 
 export async function mainBoot() {
@@ -319,7 +319,7 @@ export async function mainBoot() {
 		//	}
 		//}
 		//miLocalStorage.setItem('lastUsed', Date.now().toString());
-        /*
+		/*
 		const latestDonationInfoShownAt = miLocalStorage.getItem('latestDonationInfoShownAt');
 		const neverShowDonationInfo = miLocalStorage.getItem('neverShowDonationInfo');
 		if (neverShowDonationInfo !== 'true' && (createdAt.getTime() < (Date.now() - (1000 * 60 * 60 * 24 * 3))) && !location.pathname.startsWith('/miauth')) {
@@ -388,7 +388,7 @@ export async function mainBoot() {
 
 		main.on('unreadAntenna', () => {
 			updateAccountPartial({ hasUnreadAntenna: true });
-			sound.playMisskeySfx('antenna');
+			sound.playMisskeySfx('note');
 		});
 
 		main.on('readAllAnnouncements', () => {
