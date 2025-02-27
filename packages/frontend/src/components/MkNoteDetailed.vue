@@ -296,7 +296,7 @@ import { spacingNote } from '@/scripts/autospacing.js';
 
 const props = withDefaults(defineProps<{
 	note: Misskey.entities.Note;
-	initialTab: string;
+	initialTab?: string;
 }>(), {
 	initialTab: 'replies',
 });
