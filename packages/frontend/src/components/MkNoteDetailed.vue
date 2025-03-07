@@ -528,7 +528,7 @@ function react(): void {
 			reaction: defaultLike.value,
 		});
 		const el = reactButton.value;
-		if (el) {
+		if (el && defaultStore.state.animation) {
 			const rect = el.getBoundingClientRect();
 			const x = rect.left + (el.offsetWidth / 2);
 			const y = rect.top + (el.offsetHeight / 2);

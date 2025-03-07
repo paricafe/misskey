@@ -4971,7 +4971,7 @@ export interface Locale extends ILocale {
      */
     "disableStreamingTimeline": string;
     /**
-     * 通知をグルーピングして表示する
+     * 通知をグルーピング
      */
     "useGroupedNotifications": string;
     /**
@@ -5266,6 +5266,22 @@ export interface Locale extends ILocale {
      * " {emoji} " をリアクションしますか？
      */
     "reactAreYouSure": ParameterizedString<"emoji">;
+    /**
+     * このメディアをセンシティブとして設定しますか？
+     */
+    "markAsSensitiveConfirm": string;
+    /**
+     * このメディアのセンシティブ指定を解除しますか？
+     */
+    "unmarkAsSensitiveConfirm": string;
+    /**
+     * 環境設定
+     */
+    "preferences": string;
+    /**
+     * アクセシビリティ
+     */
+    "accessibility": string;
     "_accountSettings": {
         /**
          * コンテンツの表示にログインを必須にする
@@ -10079,6 +10095,10 @@ export interface Locale extends ILocale {
          * Approved
          */
         "approve": string;
+				/**
+         * プロキシアカウントの説明を更新
+         */
+        "updateProxyAccountDescription": string;
     };
     "_fileViewer": {
         /**
@@ -10936,6 +10956,28 @@ export interface Locale extends ILocale {
             "description": string;
         };
     };
+		"_dataRequest": {
+			/**
+			 * lable
+			 * 			*/
+			"lable": string;
+			/**
+			 * title
+			 * 			*/
+			"title": string;
+			/**
+			 * warning
+			 * 			*/
+			"warn": string;
+			/**
+			 * text
+			 * 			*/
+			"text": string;
+			/**
+			 * button
+			 * 			*/
+			"button": string;
+		};
     "_captcha": {
         /**
          * CAPTCHAを通過してください
