@@ -213,7 +213,7 @@ export const defaultStore = markRaw(new Storage('base', {
 	},
 	serverDisconnectedBehavior: {
 		where: 'device',
-		default: null as null | 'quiet' | 'reload' | 'dialog',
+		default: 'null' as 'null' | 'quiet' | 'reload' | 'dialog',
 	},
 	nsfw: {
 		where: 'device',
