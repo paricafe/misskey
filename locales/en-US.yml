@@ -1315,6 +1315,32 @@ confirmOnReact: "Confirm when reacting"
 reactAreYouSure: "Would you like to add a \"{emoji}\" reaction?"
 markAsSensitiveConfirm: "Do you want to set this media as sensitive?"
 unmarkAsSensitiveConfirm: "Do you want to remove the sensitive designation for this media?"
+preferences: "Preferences"
+accessibility: "Accessibility"
+preferencesProfile: "Preferences Profile"
+copyPreferenceId: "Copy Preference ID"
+resetToDefaultValue: "Reset to Default Value"
+overrideByAccount: "Override by Account"
+untitled: "Untitled"
+noName: "No Name"
+skip: "Skip"
+restore: "Restore"
+
+_preferencesProfile:
+  profileName: "Profile Name"
+  profileNameDescription: "Please set a name to identify this device."
+  profileNameDescription2: "Example: 'Main PC', 'Smartphone', etc."
+
+_preferencesBackup:
+  autoBackup: "Auto Backup"
+  restoreFromBackup: "Restore from Backup"
+  noBackupsFoundTitle: "No Backups Found"
+  noBackupsFoundDescription: "No automatically created backups were found, but if you have manually saved backup files, you can import and restore them."
+  selectBackupToRestore: "Please select a backup to restore"
+  youNeedToNameYourProfileToEnableAutoBackup: "You need to set a profile name to enable auto backup."
+  autoPreferencesBackupIsNotEnabledForThisDevice: "Auto preferences backup is not enabled for this device."
+  backupFound: "Preferences backup found"
+
 _accountSettings:
   requireSigninToViewContents: "Require sign-in to view contents"
   requireSigninToViewContentsDescription1: "Require login to view all notes and other content you have created. This will have the effect of preventing crawlers from collecting your information."
@@ -2888,7 +2914,7 @@ _embedCodeGen:
   generateCode: "Generate embed code"
   codeGenerated: "The code has been generated"
   codeGeneratedDescription: "Paste the generated code into your website to embed the content."
-_selfXssPrevention: 
+_selfXssPrevention:
   warning: "WARNING"
   title: "\"Paste something on this screen\" is all a scam."
   description1: "If you paste something here, a malicious user could hijack your account or steal your personal information."
