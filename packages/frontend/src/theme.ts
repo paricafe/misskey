@@ -34,6 +34,10 @@ export const themeProps = Object.keys(lightTheme.props).filter(key => !key.start
 
 export const getBuiltinThemes = () => Promise.all(
 	[
+		'p-light2',
+		'p-light',
+		'shw-light',
+		'stpv-light',
 		'l-light',
 		'l-coffee',
 		'l-apricot',
@@ -44,6 +48,9 @@ export const getBuiltinThemes = () => Promise.all(
 		'l-sushi',
 		'l-u0',
 
+		'p-dark2',
+		'p-dark',
+		'stpv-dark',
 		'd-dark',
 		'd-persimmon',
 		'd-astro',
@@ -54,14 +61,6 @@ export const getBuiltinThemes = () => Promise.all(
 		'd-cherry',
 		'd-ice',
 		'd-u0',
-
-		'p-light',
-		'p-dark',
-		'p-light2',
-		'p-dark2',
-		'shw-light',
-		'stpv-light',
-		'stpv-dark',
 	].map(name => import(`@@/themes/${name}.json5`).then(({ default: _default }): Theme => _default)),
 );
 
