@@ -185,17 +185,17 @@ import MkFolder from '@/components/MkFolder.vue';
 import MkSwitch from '@/components/MkSwitch.vue';
 import MkRadios from '@/components/MkRadios.vue';
 import * as os from '@/os.js';
-import { misskeyApi } from '@/scripts/misskey-api.js';
-import { selectFile } from '@/scripts/select-file.js';
+import { misskeyApi } from '@/utility/misskey-api.js';
+import { selectFile } from '@/utility/select-file.js';
 import { i18n } from '@/i18n.js';
-import { definePageMetadata } from '@/scripts/page-metadata.js';
+import { definePage } from '@/page.js';
 import { $i } from '@/account.js';
-import { defaultStore } from '@/store.js';
+import { store } from '@/store.js';
 
 const excludeMutingUsers = ref(false);
 const excludeInactiveUsers = ref(false);
 const noteType = ref(null);
-const withReplies = ref(defaultStore.state.defaultWithReplies);
+const withReplies = ref(store.s.defaultWithReplies);
 
 const onExportSuccess = () => {
 	os.alert({
@@ -308,7 +308,7 @@ const importAntennas = async (ev) => {
 
 //const headerTabs = computed(() => []);
 
-definePageMetadata(() => ({
+definePage(() => ({
 	title: i18n.ts.importAndExport,
 	icon: 'ti ti-package',
 }));

@@ -8,39 +8,42 @@ SPDX-License-Identifier: AGPL-3.0-only
 	ref="buttonEl"
 	v-ripple="canToggle"
 	class="_button"
-	:class="[$style.root, { [$style.reacted]: isReacted, [$style.canToggle]: canToggle, [$style.small]: defaultStore.state.reactionsDisplaySize === 'small', [$style.large]: defaultStore.state.reactionsDisplaySize === 'large' }]"
-	@click.stop="toggleReaction()"
+	:class="[$style.root, { [$style.reacted]: note.myReaction == reaction, [$style.canToggle]: canToggle, [$style.small]: prefer.s.reactionsDisplaySize === 'small', [$style.large]: prefer.s.reactionsDisplaySize === 'large' }]"
+	@click="toggleReaction()"
 	@contextmenu.prevent.stop="menu"
 >
-	<MkReactionIcon :class="defaultStore.state.limitWidthOfReaction ? $style.limitWidth : ''" :reaction="reaction" :emojiUrl="note.reactionEmojis[reaction.substring(1, reaction.length - 1)]"/>
+	<MkReactionIcon :class="prefer.s.limitWidthOfReaction ? $style.limitWidth : ''" :reaction="reaction" :emojiUrl="note.reactionEmojis[reaction.substring(1, reaction.length - 1)]"/>
 	<span :class="$style.count">{{ count }}</span>
 </button>
 </template>
 
 <script lang="ts" setup>
-import { computed, inject, onMounted, onBeforeMount, shallowRef, watch } from 'vue';
+import { computed, inject, onBeforeMount, shallowRef, watch } from 'vue';
 import * as Misskey from 'misskey-js';
 import { getUnicodeEmoji } from '@@/js/emojilist.js';
 import MkCustomEmojiDetailedDialog from './MkCustomEmojiDetailedDialog.vue';
 import XDetails from '@/components/MkReactionsViewer.details.vue';
 import MkReactionIcon from '@/components/MkReactionIcon.vue';
 import * as os from '@/os.js';
-import { misskeyApi, misskeyApiGet } from '@/scripts/misskey-api.js';
-import { useTooltip } from '@/scripts/use-tooltip.js';
+import { misskeyApi, misskeyApiGet } from '@/utility/misskey-api.js';
+import { useTooltip } from '@/utility/use-tooltip.js';
 import { $i } from '@/account.js';
 import MkReactionEffect from '@/components/MkReactionEffect.vue';
-import { claimAchievement } from '@/scripts/achievements.js';
-import { defaultStore } from '@/store.js';
+import { claimAchievement } from '@/utility/achievements.js';
 import { i18n } from '@/i18n.js';
-import * as sound from '@/scripts/sound.js';
+import * as sound from '@/utility/sound.js';
 import { customEmojisMap } from '@/custom-emojis.js';
+import { prefer } from '@/preferences.js';
 
 const localEmojiSet = new Set(Array.from(customEmojisMap.keys()));
 const reactionCache = new Map<string, { hasNative: boolean; base: string }>();
 
 function getReactionInfo(reaction: string) {
 	if (reactionCache.has(reaction)) {
-		return reactionCache.get(reaction)!;
+		const cachedReaction = reactionCache.get(reaction);
+		if (cachedReaction) {
+			return cachedReaction;
+		}
 	}
 
 	let hasNative: boolean;
@@ -113,7 +116,7 @@ async function toggleReaction() {
 			noteId: props.note.id,
 		});
 	} else {
-		if (defaultStore.state.confirmOnReact) {
+		if (prefer.s.confirmOnReact) {
 			const confirm = await os.confirm({
 				type: 'question',
 				text: i18n.tsx.reactAreYouSure({ emoji: props.reaction.replace('@.', '') }),
@@ -177,7 +180,7 @@ async function menu(ev) {
 }
 
 function anime() {
-	if (document.hidden || !defaultStore.state.animation || buttonEl.value == null) return;
+	if (document.hidden || !prefer.s.animation || buttonEl.value == null) return;
 
 	const rect = buttonEl.value.getBoundingClientRect();
 	const x = rect.left + 16;

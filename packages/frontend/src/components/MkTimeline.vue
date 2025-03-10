@@ -9,7 +9,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 		v-if="paginationQuery"
 		ref="tlComponent"
 		:pagination="paginationQuery"
-		:noGap="!defaultStore.state.showGapBetweenNotesInTimeline"
+		:noGap="!prefer.s.showGapBetweenNotesInTimeline"
 		@queue="emit('queue', $event)"
 		@status="prComponent?.setDisabled($event)"
 	/>
@@ -24,10 +24,10 @@ import type { Paging } from '@/components/MkPagination.vue';
 import MkNotes from '@/components/MkNotes.vue';
 import MkPullToRefresh from '@/components/MkPullToRefresh.vue';
 import { useStream } from '@/stream.js';
-import * as sound from '@/scripts/sound.js';
+import * as sound from '@/utility/sound.js';
 import { $i } from '@/account.js';
 import { instance } from '@/instance.js';
-import { defaultStore } from '@/store.js';
+import { prefer } from '@/preferences.js';
 
 const props = withDefaults(defineProps<{
 	src: BasicTimelineType | 'mentions' | 'directs' | 'list' | 'antenna' | 'channel' | 'role';
@@ -245,7 +245,7 @@ function updatePaginationQuery(untilDate?: Date) {
 }
 
 function refreshEndpointAndChannel() {
-	if (!defaultStore.state.disableStreamingTimeline) {
+	if (!prefer.s.disableStreamingTimeline) {
 		disconnectChannel();
 		connectChannel();
 	}

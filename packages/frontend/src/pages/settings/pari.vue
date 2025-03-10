@@ -88,12 +88,12 @@ SPDX-License-Identifier: AGPL-3.0-only
 </template>
 
 <script lang="ts" setup>
-import { computed, ref, watch } from 'vue';
+import { computed, ref } from 'vue';
 import { i18n } from '@/i18n.js';
-import { definePageMetadata } from '@/scripts/page-metadata.js';
-import { defaultStore } from '@/store.js';
+import { definePage } from '@/page.js';
+import { store } from '@/store.js';
 import { miLocalStorage } from '@/local-storage.js';
-import { getDefaultFontSettings } from '@/scripts/font-settings.js';
+import { getDefaultFontSettings } from '@/utility/font-settings.js';
 import MkSwitch from '@/components/MkSwitch.vue';
 import MkSelect from '@/components/MkSelect.vue';
 import MkRadios from '@/components/MkRadios.vue';
@@ -117,21 +117,21 @@ function saveFontSize() {
 	fontSizeNumberOld.value = fontSizeNumber.value;
 }
 
-const enableRenderingOptimization = computed(defaultStore.makeGetterSetter('enableRenderingOptimization'));
+const enableRenderingOptimization = computed(store.makeGetterSetter('enableRenderingOptimization'));
 
-const enableTranslateButton = computed(defaultStore.makeGetterSetter('enableTranslateButton'));
-const showDetailTimeWhenHover = computed(defaultStore.makeGetterSetter('showDetailTimeWhenHover'));
-const noteClickToOpen = computed(defaultStore.makeGetterSetter('noteClickToOpen'));
-const enableFallbackReactButton = computed(defaultStore.makeGetterSetter('enableFallbackReactButton'));
-const enableMFMCheatsheet = computed(defaultStore.makeGetterSetter('enableMFMCheatsheet'));
-const enableUndoClearPostForm = computed(defaultStore.makeGetterSetter('enableUndoClearPostForm'));
-const autoSpacingBehaviour = computed(defaultStore.makeGetterSetter('autoSpacingBehaviour'));
-const collapseNotesRepliedTo = computed(defaultStore.makeGetterSetter('collapseNotesRepliedTo'));
-const disableReactionsViewer = computed(defaultStore.makeGetterSetter('disableReactionsViewer'));
-const emojiAutoSpacing = computed(defaultStore.makeGetterSetter('emojiAutoSpacing'));
-const clickToShowInstanceTickerWindow = computed(defaultStore.makeGetterSetter('clickToShowInstanceTickerWindow'));
+const enableTranslateButton = computed(store.makeGetterSetter('enableTranslateButton'));
+const showDetailTimeWhenHover = computed(store.makeGetterSetter('showDetailTimeWhenHover'));
+const noteClickToOpen = computed(store.makeGetterSetter('noteClickToOpen'));
+const enableFallbackReactButton = computed(store.makeGetterSetter('enableFallbackReactButton'));
+const enableMFMCheatsheet = computed(store.makeGetterSetter('enableMFMCheatsheet'));
+const enableUndoClearPostForm = computed(store.makeGetterSetter('enableUndoClearPostForm'));
+const autoSpacingBehaviour = computed(store.makeGetterSetter('autoSpacingBehaviour'));
+const collapseNotesRepliedTo = computed(store.makeGetterSetter('collapseNotesRepliedTo'));
+const disableReactionsViewer = computed(store.makeGetterSetter('disableReactionsViewer'));
+const emojiAutoSpacing = computed(store.makeGetterSetter('emojiAutoSpacing'));
+const clickToShowInstanceTickerWindow = computed(store.makeGetterSetter('clickToShowInstanceTickerWindow'));
 
-definePageMetadata(() => ({
+definePage(() => ({
 	title: 'Pari Plus!',
 	icon: 'ti ti-plus',
 }));

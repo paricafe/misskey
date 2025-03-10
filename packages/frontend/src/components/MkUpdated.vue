@@ -9,19 +9,19 @@ SPDX-License-Identifier: AGPL-3.0-only
 		<div :class="$style.title"><MkSparkle>{{ i18n.ts.misskeyUpdated }}</MkSparkle></div>
 		<div :class="$style.version">✨{{ version }}🚀</div>
 		<MkButton full @click="whatIsNew">{{ i18n.ts.whatIsNew }}</MkButton>
-		<MkButton :class="$style.gotIt" primary full @click="modal?.close()">{{ i18n.ts.gotIt }}</MkButton>
+		<MkButton :class="$style.gotIt" primary full @click.stop="modal?.close()">{{ i18n.ts.gotIt }}</MkButton>
 	</div>
 </MkModal>
 </template>
 
 <script lang="ts" setup>
 import { onMounted, shallowRef } from 'vue';
+import { version } from '@@/js/config.js';
 import MkModal from '@/components/MkModal.vue';
 import MkButton from '@/components/MkButton.vue';
 import MkSparkle from '@/components/MkSparkle.vue';
-import { version } from '@@/js/config.js';
 import { i18n } from '@/i18n.js';
-import { confetti } from '@/scripts/confetti.js';
+import { confetti } from '@/utility/confetti.js';
 import { useRouter } from '@/router/supplier';
 
 const modal = shallowRef<InstanceType<typeof MkModal>>();

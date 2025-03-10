@@ -5,8 +5,8 @@
 
 import { shallowRef, computed, markRaw, watch } from 'vue';
 import * as Misskey from 'misskey-js';
-import { misskeyApi, misskeyApiGet } from '@/scripts/misskey-api.js';
-import { get, set } from '@/scripts/idb-proxy.js';
+import { misskeyApi, misskeyApiGet } from '@/utility/misskey-api.js';
+import { get, set } from '@/utility/idb-proxy.js';
 
 const CACHE_EXPIRE_TIME = 12 * 60 * 60 * 1000;
 const BATCH_SIZE = 1000;

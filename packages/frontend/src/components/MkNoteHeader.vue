@@ -52,8 +52,11 @@ import * as Misskey from 'misskey-js';
 import { i18n } from '@/i18n.js';
 import { notePage } from '@/filters/note.js';
 import { userPage } from '@/filters/user.js';
+<<<<<<< HEAD
 import { defaultStore } from '@/store.js';
 import MkInstanceTicker from '@/components/MkInstanceTicker.vue';
+=======
+>>>>>>> develop
 
 const isDetail = ref(false);
 const setDetail = (value) => {

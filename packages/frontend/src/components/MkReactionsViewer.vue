@@ -5,11 +5,11 @@ SPDX-License-Identifier: AGPL-3.0-only
 
 <template>
 <TransitionGroup
-	:enterActiveClass="defaultStore.state.animation ? $style.transition_x_enterActive : ''"
-	:leaveActiveClass="defaultStore.state.animation ? $style.transition_x_leaveActive : ''"
-	:enterFromClass="defaultStore.state.animation ? $style.transition_x_enterFrom : ''"
-	:leaveToClass="defaultStore.state.animation ? $style.transition_x_leaveTo : ''"
-	:moveClass="defaultStore.state.animation ? $style.transition_x_move : ''"
+	:enterActiveClass="prefer.s.animation ? $style.transition_x_enterActive : ''"
+	:leaveActiveClass="prefer.s.animation ? $style.transition_x_leaveActive : ''"
+	:enterFromClass="prefer.s.animation ? $style.transition_x_enterFrom : ''"
+	:leaveToClass="prefer.s.animation ? $style.transition_x_leaveTo : ''"
+	:moveClass="prefer.s.animation ? $style.transition_x_move : ''"
 	tag="div" :class="$style.root"
 >
 	<XReaction v-for="[reaction, count] in mergedReactions" :key="reaction" :reaction="reaction" :count="count" :isInitial="initialReactions.has(reaction)" :note="note" @reactionToggled="onMockToggleReaction"/>
@@ -21,30 +21,33 @@ SPDX-License-Identifier: AGPL-3.0-only
 import * as Misskey from 'misskey-js';
 import { inject, watch, ref, computed, onBeforeMount } from 'vue';
 import XReaction from '@/components/MkReactionsViewer.reaction.vue';
-import { defaultStore } from '@/store.js';
+import { prefer } from '@/preferences.js';
 import { customEmojisMap } from '@/custom-emojis.js';
 
 const localEmojiSet = new Set(Array.from(customEmojisMap.keys()));
 const emojiCache = new Map<string, boolean>();
 
 function hasLocalEmoji(reaction: string): boolean {
-  if (emojiCache.has(reaction)) return emojiCache.get(reaction)!;
-  
-  let result: boolean;
-  if (!reaction.includes(':')) {
-    result = true;
-  } else {
-    const emojiName = reaction.split('@')[0].split(':')[1];
-    result = localEmojiSet.has(emojiName);
-  }
-  
-  emojiCache.set(reaction, result);
-  return result;
+	if (emojiCache.has(reaction)) {
+		const cachedResult = emojiCache.get(reaction);
+		if (cachedResult !== undefined) return cachedResult;
+	}
+
+	let result: boolean;
+	if (!reaction.includes(':')) {
+		result = true;
+	} else {
+		const emojiName = reaction.split('@')[0].split(':')[1];
+		result = localEmojiSet.has(emojiName);
+	}
+
+	emojiCache.set(reaction, result);
+	return result;
 }
 
 function getBaseReaction(reaction: string): string {
-  if (!reaction.includes(':')) return reaction;
-  return `:${reaction.split('@')[0].split(':')[1]}:`;
+	if (!reaction.includes(':')) return reaction;
+	return `:${reaction.split('@')[0].split(':')[1]}:`;
 }
 
 const props = withDefaults(defineProps<{
@@ -66,27 +69,27 @@ const reactions = ref<[string, number][]>([]);
 const hasMoreReactions = ref(false);
 
 const mergedReactions = computed(() => {
-  const reactionMap = new Map();
-  
-  reactions.value.forEach(([reaction, count]) => {
-    if (!hasLocalEmoji(reaction)) {
-      if (reactionMap.has(reaction)) {
-        reactionMap.set(reaction, reactionMap.get(reaction) + count);
-      } else {
-        reactionMap.set(reaction, count);
-      }
-      return;
-    }
-    
-    const baseReaction = getBaseReaction(reaction);
-    if (reactionMap.has(baseReaction)) {
-      reactionMap.set(baseReaction, reactionMap.get(baseReaction) + count);
-    } else {
-      reactionMap.set(baseReaction, count);
-    }
-  });
+	const reactionMap = new Map();
 
-  return Array.from(reactionMap.entries());
+	reactions.value.forEach(([reaction, count]) => {
+		if (!hasLocalEmoji(reaction)) {
+			if (reactionMap.has(reaction)) {
+				reactionMap.set(reaction, reactionMap.get(reaction) + count);
+			} else {
+				reactionMap.set(reaction, count);
+			}
+			return;
+		}
+
+		const baseReaction = getBaseReaction(reaction);
+		if (reactionMap.has(baseReaction)) {
+			reactionMap.set(baseReaction, reactionMap.get(baseReaction) + count);
+		} else {
+			reactionMap.set(baseReaction, count);
+		}
+	});
+
+	return Array.from(reactionMap.entries());
 });
 
 if (props.note.myReaction && !Object.keys(reactions.value).includes(props.note.myReaction)) {
@@ -94,9 +97,9 @@ if (props.note.myReaction && !Object.keys(reactions.value).includes(props.note.m
 }
 
 onBeforeMount(() => {
-  Object.keys(props.note.reactions).forEach(reaction => {
-    hasLocalEmoji(reaction);
-  });
+	Object.keys(props.note.reactions).forEach(reaction => {
+		hasLocalEmoji(reaction);
+	});
 });
 
 function onMockToggleReaction(emoji: string, count: number) {
@@ -125,7 +128,7 @@ watch([() => props.note.reactions, () => props.maxNumber], ([newSource, maxNumbe
 		...newReactions,
 		...Object.entries(newSource)
 			.sort(([, a], [, b]) => b - a)
-			.filter(([y], i) => i < maxNumber && !newReactionsNames.includes(y)),
+			.filter(([y], i) => i < maxNumber && !newReactionsNames.includes(y)) as [string, number][],
 	];
 
 	newReactions = newReactions.slice(0, props.maxNumber);
