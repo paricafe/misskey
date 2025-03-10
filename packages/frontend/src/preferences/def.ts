@@ -53,14 +53,10 @@ export const PREF_DEF = {
 		default: [] as Theme[],
 	},
 	lightTheme: {
-		default: {
-			id: 'pari-light-2',
-		} as Theme | null,
+		default: null as Theme | null,
 	},
 	darkTheme: {
-		default: {
-			id: 'pari-dark-2',
-		} as Theme | null,
+		default: null as Theme | null,
 	},
 	syncDeviceDarkMode: {
 		default: true,
