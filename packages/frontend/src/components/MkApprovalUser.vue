@@ -38,10 +38,10 @@ import MkFolder from '@/components/MkFolder.vue';
 import MkButton from '@/components/MkButton.vue';
 import { i18n } from '@/i18n.js';
 import * as os from '@/os.js';
-import { misskeyApi } from '@/scripts/misskey-api.js';
+import { misskeyApi } from '@/utility/misskey-api.js';
 const props = defineProps<{
-		user: Misskey.entities.User;
-	}>();
+	user: Misskey.entities.User;
+}>();
 const reason = ref('');
 const email = ref('');
 
@@ -56,8 +56,8 @@ function getReason() {
 
 getReason();
 const emits = defineEmits<{
-		(event: 'deleted', value: string): void;
-	}>();
+	(event: 'deleted', value: string): void;
+}>();
 
 async function deleteAccount() {
 	const confirm = await os.confirm({
@@ -75,8 +75,8 @@ async function deleteAccount() {
 async function approveAccount() {
 	const confirm = await os.confirm({
 		type: 'warning',
-		title: i18n.ts.registerApproveConfirm,
-		text: i18n.ts.registerApproveConfirmDescription,
+		title: i18n.ts.registerApproveConfirm as string,
+		text: i18n.ts.registerApproveConfirmDescription as string,
 	});
 	if (confirm.canceled) return;
 	await misskeyApi('admin/approve-user', { userId: props.user.id });
