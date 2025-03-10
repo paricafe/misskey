@@ -1317,6 +1317,32 @@ markAsSensitiveConfirm: "要将此媒体标记为敏感吗？"
 unmarkAsSensitiveConfirm: "要将此媒体解除敏感标记吗？"
 preferences: "设置"
 accessibility: "辅助功能"
+preferences: "偏好设置"
+accessibility: "无障碍"
+preferencesProfile: "设置配置文件"
+copyPreferenceId: "复制设置ID"
+resetToDefaultValue: "恢复默认值"
+overrideByAccount: "账号覆盖"
+untitled: "无标题"
+noName: "无名称"
+skip: "跳过"
+restore: "恢复"
+
+_preferencesProfile:
+  profileName: "配置文件名称"
+  profileNameDescription: "请设置一个名称以识别此设备。"
+  profileNameDescription2: "例如：「主PC」、「手机」等"
+
+_preferencesBackup:
+  autoBackup: "自动备份"
+  restoreFromBackup: "从备份恢复"
+  noBackupsFoundTitle: "未找到备份"
+  noBackupsFoundDescription: "未找到自动创建的备份，但如果您手动保存了备份文件，可以导入并恢复它们。"
+  selectBackupToRestore: "请选择要恢复的备份"
+  youNeedToNameYourProfileToEnableAutoBackup: "需要设置配置文件名称才能启用自动备份。"
+  autoPreferencesBackupIsNotEnabledForThisDevice: "此设备未启用设置自动备份。"
+  backupFound: "找到设置备份"
+
 _accountSettings:
   requireSigninToViewContents: "需要登录才能显示内容"
   requireSigninToViewContentsDescription1: "您发布的所有帖子将变成需要登入后才会显示。有望防止爬虫收集各种信息。"
