@@ -23,10 +23,10 @@ export type Theme = {
 	props: Record<string, string>;
 	codeHighlighter?: {
 		base: BundledTheme;
-		overrides?: Record<string, any>;
+		overrides?: Record<string, unknown>;
 	} | {
 		base: '_none_';
-		overrides: Record<string, any>;
+		overrides: Record<string, unknown>;
 	};
 };
 
@@ -59,9 +59,9 @@ export const getBuiltinThemes = () => Promise.all(
 		'p-dark',
 		'p-light2',
 		'p-dark2',
-		"shw-light",
-		"stpv-light",
-		"stpv-dark"
+		'shw-light',
+		'stpv-light',
+		'stpv-dark',
 	].map(name => import(`@@/themes/${name}.json5`).then(({ default: _default }): Theme => _default)),
 );
 
@@ -130,8 +130,8 @@ export function compile(theme: Theme): Record<string, string> {
 			return getColor(theme.props[val]);
 		} else if (val[0] === ':') { // func
 			const parts = val.split('<');
-			const func = parts.shift().substring(1);
-			const arg = parseFloat(parts.shift());
+			const func = (parts.shift() ?? '').substring(1);
+			const arg = parseFloat(parts.shift() ?? '0');
 			const color = getColor(parts.join('<'));
 
 			switch (func) {
@@ -162,10 +162,10 @@ function genValue(c: tinycolor.Instance): string {
 	return c.toRgbString();
 }
 
-export function validateTheme(theme: Record<string, any>): boolean {
+export function validateTheme(theme: Record<string, unknown>): boolean {
 	if (theme.id == null || typeof theme.id !== 'string') return false;
 	if (theme.name == null || typeof theme.name !== 'string') return false;
-	if (theme.base == null || !['light', 'dark'].includes(theme.base)) return false;
+	if (theme.base == null || typeof theme.base !== 'string' || !['light', 'dark'].includes(theme.base)) return false;
 	if (theme.props == null || typeof theme.props !== 'object') return false;
 	return true;
 }
@@ -190,11 +190,10 @@ export function parseThemeCode(code: string): Theme {
 
 export function previewTheme(code: string): void {
 	const theme = parseThemeCode(code);
-	if (theme) applyTheme(theme, false);
+	applyTheme(theme, false);
 }
 
 export async function installTheme(code: string): Promise<void> {
 	const theme = parseThemeCode(code);
-	if (!theme) return;
 	await addTheme(theme);
 }
