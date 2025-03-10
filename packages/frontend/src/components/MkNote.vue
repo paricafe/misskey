@@ -9,7 +9,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 	v-show="!isDeleted"
 	ref="rootEl"
 	v-hotkey="keymap"
-	:class="[$style.root, { [$style.showActionsOnlyHover]: prefer.s.showNoteActionsOnlyHover, [$style.skipRender]: prefer.s.skipNoteRender || store.s.enableRenderingOptimization }]"
+	:class="[$style.root, { [$style.showActionsOnlyHover]: prefer.s.showNoteActionsOnlyHover, [$style.skipRender]: prefer.s.skipNoteRender || prefer.s.enableRenderingOptimization }]"
 	:tabindex="isDeleted ? '-1' : '0'"
 >
 	<div v-if="appearNote.reply && inReplyToCollapsed && !isRenote" :class="$style.collapsedInReplyTo">
@@ -57,7 +57,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 				<MkNoteHeader :note="appearNote" :mini="true" @click.stop/>
 			</div>
 		</div>
-		<div :class="[{ [$style.noteClickToOpen]: store.s.noteClickToOpen }]" @click.stop="store.s.noteClickToOpen ? noteClickToOpen(appearNote.id) : undefined">
+		<div :class="[{ [$style.noteClickToOpen]: prefer.s.noteClickToOpen }]" @click.stop="prefer.s.noteClickToOpen ? noteClickToOpen(appearNote.id) : undefined">
 			<div style="container-type: inline-size;">
 				<p v-if="appearNote.cw != null" :class="$style.cw">
 					<Mfm
@@ -137,7 +137,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 				<button v-else :class="$style.footerButton" class="_button" disabled>
 					<i class="ti ti-ban"></i>
 				</button>
-				<button v-if="store.s.enableFallbackReactButton && appearNote.myReaction == null && appearNote.reactionAcceptance !== 'likeOnly' && !disableReactionsViewer" ref="likeButton" :class="$style.footerButton" class="_button" @click.stop="like()">
+				<button v-if="prefer.s.enableFallbackReactButton && appearNote.myReaction == null && appearNote.reactionAcceptance !== 'likeOnly' && !disableReactionsViewer" ref="likeButton" :class="$style.footerButton" class="_button" @click.stop="like()">
 					<i class="ti ti-heart"></i>
 				</button>
 				<button ref="reactButton" :class="$style.footerButton" class="_button" @click.stop="toggleReact()">
@@ -240,7 +240,6 @@ import { getPluginHandlers } from '@/plugin.js';
 import { useRouter } from '@/router/supplier.js';
 import { miLocalStorage } from '@/local-storage.js';
 import { spacingNote } from '@/utility/autospacing.js';
-import { store } from '@/store.js';
 
 const props = withDefaults(defineProps<{
 	note: Misskey.entities.Note;
@@ -318,12 +317,12 @@ const renoteCollapsed = ref(
 	),
 );
 
-const defaultLike = computed(() => store.s.like ?? '❤️');
+const defaultLike = computed(() => prefer.s.like ?? '❤️');
 
-const enableTranslateButton = ref(store.s.enableTranslateButton);
+const enableTranslateButton = ref(prefer.s.enableTranslateButton);
 
-const inReplyToCollapsed = ref(store.s.collapseNotesRepliedTo);
-const disableReactionsViewer = ref(store.s.disableReactionsViewer);
+const inReplyToCollapsed = ref(prefer.s.collapseNotesRepliedTo);
+const disableReactionsViewer = ref(prefer.s.disableReactionsViewer);
 
 const pleaseLoginContext = computed<OpenOnRemoteOptions>(() => ({
 	type: 'lookup',

@@ -74,7 +74,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 						<i class="ti ti-rocket-off"></i>
 					</span>
 				</div>
-				<MkInstanceTicker v-if="showTicker" :style="{ cursor: store.s.clickToShowInstanceTickerWindow ? 'pointer' : 'default' }" :instance="appearNote.user.instance" :host="appearNote.user.host"/>
+				<MkInstanceTicker v-if="showTicker" :style="{ cursor: prefer.s.clickToShowInstanceTickerWindow ? 'pointer' : 'default' }" :instance="appearNote.user.instance" :host="appearNote.user.host"/>
 			</div>
 		</header>
 		<div :class="$style.noteContent">
@@ -294,7 +294,6 @@ import { prefer } from '@/preferences.js';
 import { getPluginHandlers } from '@/plugin.js';
 import { miLocalStorage } from '@/local-storage.js';
 import { spacingNote } from '@/utility/autospacing.js';
-import { store } from '@/store.js';
 
 const props = withDefaults(defineProps<{
 	note: Misskey.entities.Note;
@@ -351,7 +350,7 @@ const showTicker = (prefer.s.instanceTicker === 'always') || (prefer.s.instanceT
 const conversation = ref<Misskey.entities.Note[]>([]);
 const replies = ref<Misskey.entities.Note[]>([]);
 const canRenote = computed(() => ['public', 'home'].includes(appearNote.value.visibility) || appearNote.value.userId === $i?.id);
-const defaultLike = computed(() => store.s.like ?? '❤️');
+const defaultLike = computed(() => prefer.s.like ?? '❤️');
 
 type ShowingNoteHistoryState = {
 	createdAt: string | null;
@@ -360,9 +359,9 @@ type ShowingNoteHistoryState = {
 } | null;
 const showingNoteHistoryRef = ref<ShowingNoteHistoryState>(null);
 
-const disableReactionsViewer = ref(store.s.disableReactionsViewer);
+const disableReactionsViewer = ref(prefer.s.disableReactionsViewer);
 
-const enableTranslateButton = ref(store.s.enableTranslateButton);
+const enableTranslateButton = ref(prefer.s.enableTranslateButton);
 
 const pleaseLoginContext = computed<OpenOnRemoteOptions>(() => ({
 	type: 'lookup',

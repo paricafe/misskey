@@ -1,5 +1,5 @@
 import * as misskey from 'misskey-js';
-import { store } from '@/store.js';
+import { prefer } from '@/preferences.js';
 
 const NO_SPACEING_LIST = [
 	'A股',
@@ -45,12 +45,12 @@ function restoreHashtags(text: string): string {
 }
 
 export function autoSpacing(plainText: string) {
-	if (store.r.autoSpacingBehaviour.value == null) return plainText;
+	if (prefer.r.autoSpacingBehaviour.value == null) return plainText;
 
 	const textWithPlaceholders = preserveHashtags(plainText);
 
 	const rep = (matched: string, c1: string, c2: string, position: number) => {
-		if (store.r.autoSpacingBehaviour.value === 'all') return `${c1} ${c2}`;
+		if (prefer.r.autoSpacingBehaviour.value === 'all') return `${c1} ${c2}`;
 		const context = plainText
 			.slice(Math.max(0, position - LIST_WINDOW), position + LIST_WINDOW)
 			.toUpperCase();

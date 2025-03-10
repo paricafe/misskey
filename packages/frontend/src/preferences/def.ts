@@ -111,7 +111,7 @@ export const PREF_DEF = {
 		}[],
 	},
 	serverDisconnectedBehavior: {
-		default: 'quiet' as 'quiet' | 'reload' | 'dialog',
+		default: 'doNothing' as 'doNothing' | 'quiet' | 'reload' | 'dialog',
 	},
 	nsfw: {
 		default: 'respect' as 'respect' | 'force' | 'ignore',
@@ -129,10 +129,10 @@ export const PREF_DEF = {
 		default: true,
 	},
 	showReactionsCount: {
-		default: false,
+		default: true,
 	},
 	enableQuickAddMfmFunction: {
-		default: false,
+		default: true,
 	},
 	loadRawImages: {
 		default: false,
@@ -150,7 +150,7 @@ export const PREF_DEF = {
 		default: 'auto' as 'auto' | 'popup' | 'drawer',
 	},
 	useBlurEffectForModal: {
-		default: DEFAULT_DEVICE_KIND === 'desktop',
+		default: true,
 	},
 	useBlurEffect: {
 		default: DEFAULT_DEVICE_KIND === 'desktop',
@@ -165,22 +165,22 @@ export const PREF_DEF = {
 		default: true,
 	},
 	useReactionPickerForContextMenu: {
-		default: false,
+		default: true,
 	},
 	showGapBetweenNotesInTimeline: {
-		default: false,
+		default: true,
 	},
 	instanceTicker: {
 		default: 'remote' as 'none' | 'remote' | 'always',
 	},
 	emojiPickerScale: {
-		default: 1,
+		default: 2,
 	},
 	emojiPickerWidth: {
-		default: 1,
+		default: 2,
 	},
 	emojiPickerHeight: {
-		default: 2,
+		default: 4,
 	},
 	emojiPickerStyle: {
 		default: 'auto' as 'auto' | 'popup' | 'drawer',
@@ -219,13 +219,16 @@ export const PREF_DEF = {
 		default: 'expand' as 'expand' | '16_9' | '1_1' | '2_3',
 	},
 	notificationPosition: {
-		default: 'rightBottom' as 'leftTop' | 'leftBottom' | 'rightTop' | 'rightBottom',
+		default: 'rightBottom' as 'leftTop' | 'leftBottom' | 'rightTop' | 'rightBottom' | 'close',
 	},
 	notificationStackAxis: {
 		default: 'horizontal' as 'vertical' | 'horizontal',
 	},
+	notificationClickable: {
+		default: false,
+	},
 	enableCondensedLine: {
-		default: true,
+		default: false,
 	},
 	keepScreenOn: {
 		default: false,
@@ -248,7 +251,7 @@ export const PREF_DEF = {
 		default: hemisphere as 'N' | 'S',
 	},
 	enableSeasonalScreenEffect: {
-		default: false,
+		default: DEFAULT_DEVICE_KIND === 'desktop',
 	},
 	enableHorizontalSwipe: {
 		default: true,
@@ -269,7 +272,7 @@ export const PREF_DEF = {
 		default: 'app' as 'app' | 'appWithShift' | 'native',
 	},
 	skipNoteRender: {
-		default: true,
+		default: false,
 	},
 	showSoftWordMutedWord: {
 		default: false,
@@ -318,6 +321,45 @@ export const PREF_DEF = {
 			bgmVolume: 0.25,
 			sfxVolume: 1,
 		},
+	},
+	enableRenderingOptimization: {
+		default: true,
+	},
+	enableTranslateButton: {
+		default: false,
+	},
+	showDetailTimeWhenHover: {
+		default: true,
+	},
+	noteClickToOpen: {
+		default: true,
+	},
+	enableFallbackReactButton: {
+		default: true,
+	},
+	enableMFMCheatsheet: {
+		default: true,
+	},
+	enableUndoClearPostForm: {
+		default: true,
+	},
+	autoSpacingBehaviour: {
+		default: null as 'all' | 'special' | null,
+	},
+	collapseNotesRepliedTo: {
+		default: false,
+	},
+	disableReactionsViewer: {
+		default: false,
+	},
+	collapsedUnexpectedLangs: {
+		default: false,
+	},
+	emojiAutoSpacing: {
+		default: true,
+	},
+	clickToShowInstanceTickerWindow: {
+		default: true,
 	},
 } satisfies Record<string, {
 	default: any;

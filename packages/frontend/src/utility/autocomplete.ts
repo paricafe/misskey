@@ -8,7 +8,7 @@ import getCaretCoordinates from 'textarea-caret';
 import { toASCII } from 'punycode.js';
 import type { Ref } from 'vue';
 import { popup } from '@/os.js';
-import { store } from '@/store.js';
+import { prefer } from '@/preferences.js';
 
 export type SuggestionType = 'user' | 'hashtag' | 'emoji' | 'mfmTag' | 'mfmParam';
 
@@ -277,7 +277,7 @@ export class Autocomplete {
 			const trimmedBefore = before.substring(0, before.lastIndexOf(':'));
 			const after = source.substring(caret ?? 0);
 
-			if (store.s.emojiAutoSpacing) {
+			if (prefer.s.emojiAutoSpacing) {
 				const needSpaceBefore = trimmedBefore.length > 0 && !trimmedBefore.endsWith(' ');
 				const needSpaceAfter = !after.startsWith(' ');
 

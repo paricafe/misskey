@@ -12,7 +12,9 @@ SPDX-License-Identifier: AGPL-3.0-only
 		<div class="_gaps_m">
 			<div class="label">{{ i18n.ts.pariPlusSystemSettings }}</div>
 			<div class="_gaps_s">
-				<MkSwitch v-model="enableRenderingOptimization">{{ i18n.ts.enableRenderingOptimization }}</MkSwitch>
+				<MkPreferenceContainer k="enableRenderingOptimization">
+					<MkSwitch v-model="enableRenderingOptimization">{{ i18n.ts.enableRenderingOptimization }}</MkSwitch>
+				</MkPreferenceContainer>
 			</div>
 		</div>
 	</FormSection>
@@ -64,24 +66,46 @@ SPDX-License-Identifier: AGPL-3.0-only
 		<div class="_gaps_m">
 			<div class="label">{{ i18n.ts.pariPlusNoteSettings }}</div>
 			<div class="_gaps_s">
-				<MkSwitch v-model="enableTranslateButton">{{ i18n.ts.enableTranslateButton }}</MkSwitch>
-				<MkSwitch v-model="showDetailTimeWhenHover">{{ i18n.ts.showDetailTimeWhenHover }}</MkSwitch>
-				<MkSwitch v-model="noteClickToOpen">{{ i18n.ts.noteClickToOpen }}</MkSwitch>
-				<MkSwitch v-model="enableFallbackReactButton">{{ i18n.ts.enableFallbackReactButton }}</MkSwitch>
-				<MkSwitch v-model="enableMFMCheatsheet">{{ i18n.ts.enableMFMCheatsheet }}</MkSwitch>
-				<MkSwitch v-model="enableUndoClearPostForm">{{ i18n.ts.enableUndoClearPostForm }}</MkSwitch>
-				<MkSwitch v-model="collapseNotesRepliedTo">{{ i18n.ts.collapseNotesRepliedTo }}</MkSwitch>
-				<MkSwitch v-model="disableReactionsViewer">{{ i18n.ts.disableReactionsViewer }}</MkSwitch>
-				<MkSwitch v-model="emojiAutoSpacing">{{ i18n.ts.emojiAutoSpacing }}</MkSwitch>
-				<MkSwitch v-model="clickToShowInstanceTickerWindow">{{ i18n.ts.clickToShowInstanceTickerWindow }}</MkSwitch>
-				<MkSelect v-model="autoSpacingBehaviour">
-					<template #label>{{ i18n.ts.autoSpacing }}</template>
-					<option :value="null">{{ i18n.ts.disabled }}</option>
-					<option value="special">Auto</option>
-					<option value="all">{{ i18n.ts.all }}</option>
-					<template #caption>{{ i18n.ts.autoSpacingDescription }}</template>
-				</MkSelect>
-		    </div>
+				<MkPreferenceContainer k="enableTranslateButton">
+					<MkSwitch v-model="enableTranslateButton">{{ i18n.ts.enableTranslateButton }}</MkSwitch>
+				</MkPreferenceContainer>
+				<MkPreferenceContainer k="showDetailTimeWhenHover">
+					<MkSwitch v-model="showDetailTimeWhenHover">{{ i18n.ts.showDetailTimeWhenHover }}</MkSwitch>
+				</MkPreferenceContainer>
+				<MkPreferenceContainer k="noteClickToOpen">
+					<MkSwitch v-model="noteClickToOpen">{{ i18n.ts.noteClickToOpen }}</MkSwitch>
+				</MkPreferenceContainer>
+				<MkPreferenceContainer k="enableFallbackReactButton">
+					<MkSwitch v-model="enableFallbackReactButton">{{ i18n.ts.enableFallbackReactButton }}</MkSwitch>
+				</MkPreferenceContainer>
+				<MkPreferenceContainer k="enableMFMCheatsheet">
+					<MkSwitch v-model="enableMFMCheatsheet">{{ i18n.ts.enableMFMCheatsheet }}</MkSwitch>
+				</MkPreferenceContainer>
+				<MkPreferenceContainer k="enableUndoClearPostForm">
+					<MkSwitch v-model="enableUndoClearPostForm">{{ i18n.ts.enableUndoClearPostForm }}</MkSwitch>
+				</MkPreferenceContainer>
+				<MkPreferenceContainer k="collapseNotesRepliedTo">
+					<MkSwitch v-model="collapseNotesRepliedTo">{{ i18n.ts.collapseNotesRepliedTo }}</MkSwitch>
+				</MkPreferenceContainer>
+				<MkPreferenceContainer k="disableReactionsViewer">
+					<MkSwitch v-model="disableReactionsViewer">{{ i18n.ts.disableReactionsViewer }}</MkSwitch>
+				</MkPreferenceContainer>
+				<MkPreferenceContainer k="emojiAutoSpacing">
+					<MkSwitch v-model="emojiAutoSpacing">{{ i18n.ts.emojiAutoSpacing }}</MkSwitch>
+				</MkPreferenceContainer>
+				<MkPreferenceContainer k="clickToShowInstanceTickerWindow">
+					<MkSwitch v-model="clickToShowInstanceTickerWindow">{{ i18n.ts.clickToShowInstanceTickerWindow }}</MkSwitch>
+				</MkPreferenceContainer>
+				<MkPreferenceContainer k="autoSpacingBehaviour">
+					<MkSelect v-model="autoSpacingBehaviour">
+						<template #label>{{ i18n.ts.autoSpacing }}</template>
+						<option :value="null">{{ i18n.ts.disabled }}</option>
+						<option value="special">Auto</option>
+						<option value="all">{{ i18n.ts.all }}</option>
+						<template #caption>{{ i18n.ts.autoSpacingDescription }}</template>
+					</MkSelect>
+				</MkPreferenceContainer>
+			</div>
 		</div>
 	</FormSection>
 </div>
@@ -91,7 +115,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 import { computed, ref } from 'vue';
 import { i18n } from '@/i18n.js';
 import { definePage } from '@/page.js';
-import { store } from '@/store.js';
+import { prefer } from '@/preferences.js';
 import { miLocalStorage } from '@/local-storage.js';
 import { getDefaultFontSettings } from '@/utility/font-settings.js';
 import MkSwitch from '@/components/MkSwitch.vue';
@@ -101,6 +125,7 @@ import MkInfo from '@/components/MkInfo.vue';
 import MkRange from '@/components/MkRange.vue';
 import MkButton from '@/components/MkButton.vue';
 import FormSection from '@/components/form/section.vue';
+import MkPreferenceContainer from '@/components/MkPreferenceContainer.vue';
 
 const defaultFont = getDefaultFontSettings();
 console.log(defaultFont);
@@ -117,19 +142,19 @@ function saveFontSize() {
 	fontSizeNumberOld.value = fontSizeNumber.value;
 }
 
-const enableRenderingOptimization = computed(store.makeGetterSetter('enableRenderingOptimization'));
+const enableRenderingOptimization = prefer.model('enableRenderingOptimization');
 
-const enableTranslateButton = computed(store.makeGetterSetter('enableTranslateButton'));
-const showDetailTimeWhenHover = computed(store.makeGetterSetter('showDetailTimeWhenHover'));
-const noteClickToOpen = computed(store.makeGetterSetter('noteClickToOpen'));
-const enableFallbackReactButton = computed(store.makeGetterSetter('enableFallbackReactButton'));
-const enableMFMCheatsheet = computed(store.makeGetterSetter('enableMFMCheatsheet'));
-const enableUndoClearPostForm = computed(store.makeGetterSetter('enableUndoClearPostForm'));
-const autoSpacingBehaviour = computed(store.makeGetterSetter('autoSpacingBehaviour'));
-const collapseNotesRepliedTo = computed(store.makeGetterSetter('collapseNotesRepliedTo'));
-const disableReactionsViewer = computed(store.makeGetterSetter('disableReactionsViewer'));
-const emojiAutoSpacing = computed(store.makeGetterSetter('emojiAutoSpacing'));
-const clickToShowInstanceTickerWindow = computed(store.makeGetterSetter('clickToShowInstanceTickerWindow'));
+const enableTranslateButton = prefer.model('enableTranslateButton');
+const showDetailTimeWhenHover = prefer.model('showDetailTimeWhenHover');
+const noteClickToOpen = prefer.model('noteClickToOpen');
+const enableFallbackReactButton = prefer.model('enableFallbackReactButton');
+const enableMFMCheatsheet = prefer.model('enableMFMCheatsheet');
+const enableUndoClearPostForm = prefer.model('enableUndoClearPostForm');
+const autoSpacingBehaviour = prefer.model('autoSpacingBehaviour');
+const collapseNotesRepliedTo = prefer.model('collapseNotesRepliedTo');
+const disableReactionsViewer = prefer.model('disableReactionsViewer');
+const emojiAutoSpacing = prefer.model('emojiAutoSpacing');
+const clickToShowInstanceTickerWindow = prefer.model('clickToShowInstanceTickerWindow');
 
 definePage(() => ({
 	title: 'Pari Plus!',

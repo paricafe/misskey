@@ -178,7 +178,7 @@ const removeReaction = (reaction: string, ev: MouseEvent) => remove(pinnedEmojis
 const chooseReaction = (ev: MouseEvent) => pickEmoji(pinnedEmojisForReaction, ev);
 const setDefaultReaction = () => setDefault(pinnedEmojisForReaction);
 
-const like = computed(defaultStore.makeGetterSetter('like'));
+const like = computed(store.makeGetterSetter('like'));
 
 const removeEmoji = (reaction: string, ev: MouseEvent) => remove(pinnedEmojis, reaction, ev);
 const chooseEmoji = (ev: MouseEvent) => pickEmoji(pinnedEmojis, ev);
@@ -252,12 +252,12 @@ function chooseNewLike(ev: MouseEvent) {
 	os.pickEmoji(getHTMLElement(ev), {
 		showPinned: false,
 	}).then(async emoji => {
-		defaultStore.set('like', emoji as string);
+		store.set('like', emoji as string);
 	});
 }
 
 async function resetLike() {
-	defaultStore.set('like', null);
+	store.set('like', null);
 }
 
 function getHTMLElement(ev: MouseEvent): HTMLElement {

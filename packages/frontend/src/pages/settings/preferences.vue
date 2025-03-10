@@ -256,7 +256,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 						<MkPreferenceContainer k="serverDisconnectedBehavior">
 							<MkSelect v-model="serverDisconnectedBehavior">
 								<template #label><SearchLabel>{{ i18n.ts.whenServerDisconnected }}</SearchLabel></template>
-								<option value="null">{{ i18n.ts.doNothing }}</option>
+								<option value="doNothing">{{ i18n.ts.doNothing }}</option>
 								<option value="reload">{{ i18n.ts._serverDisconnectedBehavior.reload }}</option>
 								<option value="dialog">{{ i18n.ts._serverDisconnectedBehavior.dialog }}</option>
 								<option value="quiet">{{ i18n.ts._serverDisconnectedBehavior.quiet }}</option>

@@ -210,7 +210,7 @@ export const store = markRaw(new Storage('base', {
 	},
 	serverDisconnectedBehavior: {
 		where: 'device',
-		default: 'null' as 'null' | 'quiet' | 'reload' | 'dialog',
+		default: 'doNothing' as 'doNothing' | 'quiet' | 'reload' | 'dialog',
 	},
 	nsfw: {
 		where: 'device',
