@@ -115,7 +115,7 @@ export const store = markRaw(new Storage('base', {
 	},
 	defaultWithReplies: {
 		where: 'account',
-		default: false,
+		default: true,
 	},
 	pluginTokens: {
 		where: 'deviceAccount',
