@@ -102,7 +102,7 @@ import { url as local } from '@@/js/config.js';
 import { versatileLang } from '@@/js/intl-const.js';
 import MkNoteSimple from './MkNoteSimple.vue';
 import type { summaly } from '@misskey-dev/summaly';
-import { misskeyApi } from '@/scripts/misskey-api.js';
+import { misskeyApi } from '@/utility/misskey-api.js';
 import { i18n } from '@/i18n.js';
 import * as os from '@/os.js';
 import { deviceKind } from '@/utility/device-kind.js';
