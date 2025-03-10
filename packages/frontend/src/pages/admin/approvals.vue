@@ -28,7 +28,7 @@ import XHeader from './_header_.vue';
 import MkPagination from '@/components/MkPagination.vue';
 import MkApprovalUser from '@/components/MkApprovalUser.vue';
 import { i18n } from '@/i18n.js';
-import { definePageMetadata } from '@/scripts/page-metadata.js';
+import { definePage } from '@/page.js';
 let paginationComponent = shallowRef<InstanceType<typeof MkPagination>>();
 const pagination = {
 	endpoint: 'admin/show-users' as const,
@@ -40,15 +40,17 @@ const pagination = {
 	})),
 	offsetMode: true,
 };
+
 function deleted(id: string) {
 	if (paginationComponent.value) {
 		paginationComponent.value.items.delete(id);
 	}
 }
+
 const headerActions = computed(() => []);
 const headerTabs = computed(() => []);
-definePageMetadata(computed(() => ({
-	title: i18n.ts.signupPendingApprovals,
+definePage(computed(() => ({
+	title: i18n.ts.signupPendingApprovals.toString(),
 	icon: 'ti ti-user-check',
 })));
 </script>
