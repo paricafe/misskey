@@ -28,7 +28,7 @@ import { miLocalStorage } from '@/local-storage.js';
 import { fetchCustomEmojis } from '@/custom-emojis.js';
 import { setupRouter } from '@/router/main.js';
 import { createMainRouter } from '@/router/definition.js';
-import { loadFontStyle } from '@/scripts/load-font.js';
+import { loadFontStyle } from '@/utility/load-font.js';
 import { prefer } from '@/preferences.js';
 
 export async function common(createVue: () => App<Element>) {
