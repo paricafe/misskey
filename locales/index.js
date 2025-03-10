@@ -80,8 +80,8 @@ export function build() {
 				case 'ja-KS':
 				case 'en-US': return merge(locales['ja-JP'], v);
 				default: return merge(
-					locales['ja-JP'],
 					locales['en-US'],
+					locales['ja-JP'],
 					locales[`${lang}-${primaries[lang]}`] ?? {},
 					v
 				);
