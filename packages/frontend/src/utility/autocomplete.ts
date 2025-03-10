@@ -8,7 +8,7 @@ import getCaretCoordinates from 'textarea-caret';
 import { toASCII } from 'punycode.js';
 import type { Ref } from 'vue';
 import { popup } from '@/os.js';
-import { defaultStore } from '@/store.js';
+import { store } from '@/store.js';
 
 export type SuggestionType = 'user' | 'hashtag' | 'emoji' | 'mfmTag' | 'mfmParam';
 
@@ -16,11 +16,11 @@ export class Autocomplete {
 	private suggestion: {
 		x: Ref<number>;
 		y: Ref<number>;
-		q: Ref<any>;
+		q: Ref<unknown>;
 		close: () => void;
 	} | null;
 	private textarea: HTMLInputElement | HTMLTextAreaElement;
-	private currentType: string;
+	private currentType = '';
 	private textRef: Ref<string | number | null>;
 	private opening: boolean;
 	private onlyType: SuggestionType[];
@@ -76,7 +76,7 @@ export class Autocomplete {
 	 */
 	private onInput() {
 		const caretPos = this.textarea.selectionStart;
-		const text = this.text.substring(0, caretPos).split('\n').pop()!;
+		const text = this.text.substring(0, caretPos ?? 0).split('\n').pop() ?? '';
 
 		const mentionIndex = text.lastIndexOf('@');
 		const hashtagIndex = text.lastIndexOf('#');
@@ -101,7 +101,7 @@ export class Autocomplete {
 		const isHashtag = hashtagIndex !== -1;
 		const isMfmParam = mfmParamIndex !== -1 && afterLastMfmParam?.includes('.') && !afterLastMfmParam.includes(' ');
 		const isMfmTag = mfmTagIndex !== -1 && !isMfmParam;
-		const isEmoji = emojiIndex !== -1 && text.split(/:[a-z0-9_+\-]+:/).pop()!.includes(':');
+		const isEmoji = emojiIndex !== -1 && text.split(/:[a-z0-9_+\-]+:/).pop()?.includes(':');
 
 		let opened = false;
 
@@ -165,7 +165,7 @@ export class Autocomplete {
 	/**
 	 * サジェストを提示します。
 	 */
-	private async open(type: string, q: any) {
+	private async open(type: string, q: unknown) {
 		if (type !== this.currentType) {
 			this.close();
 		}
@@ -193,8 +193,8 @@ export class Autocomplete {
 			const _y = ref(y);
 			const _q = ref(q);
 
-			const { dispose } = await popup(defineAsyncComponent(() => import('@/components/MkAutocomplete.vue')), {
-				textarea: this.textarea,
+			const { dispose } = popup(defineAsyncComponent(() => import('@/components/MkAutocomplete.vue')), {
+				textarea: this.textarea as HTMLTextAreaElement,
 				close: this.close,
 				type: type,
 				q: _q,
@@ -240,9 +240,9 @@ export class Autocomplete {
 		if (type === 'user') {
 			const source = this.text;
 
-			const before = source.substring(0, caret);
+			const before = source.substring(0, caret ?? 0);
 			const trimmedBefore = before.substring(0, before.lastIndexOf('@'));
-			const after = source.substring(caret);
+			const after = source.substring(caret ?? 0);
 
 			const acct = value.host === null ? value.username : `${value.username}@${toASCII(value.host)}`;
 
@@ -258,9 +258,9 @@ export class Autocomplete {
 		} else if (type === 'hashtag') {
 			const source = this.text;
 
-			const before = source.substring(0, caret);
+			const before = source.substring(0, caret ?? 0);
 			const trimmedBefore = before.substring(0, before.lastIndexOf('#'));
-			const after = source.substring(caret);
+			const after = source.substring(caret ?? 0);
 
 			// 挿入
 			this.text = `${trimmedBefore}#${value} ${after}`;
@@ -273,11 +273,11 @@ export class Autocomplete {
 			});
 		} else if (type === 'emoji') {
 			const source = this.text;
-			const before = source.substring(0, caret);
+			const before = source.substring(0, caret ?? 0);
 			const trimmedBefore = before.substring(0, before.lastIndexOf(':'));
-			const after = source.substring(caret);
+			const after = source.substring(caret ?? 0);
 
-			if (defaultStore.state.emojiAutoSpacing) {
+			if (store.s.emojiAutoSpacing) {
 				const needSpaceBefore = trimmedBefore.length > 0 && !trimmedBefore.endsWith(' ');
 				const needSpaceAfter = !after.startsWith(' ');
 
@@ -307,9 +307,9 @@ export class Autocomplete {
 		} else if (type === 'mfmTag') {
 			const source = this.text;
 
-			const before = source.substring(0, caret);
+			const before = source.substring(0, caret ?? 0);
 			const trimmedBefore = before.substring(0, before.lastIndexOf('$'));
-			const after = source.substring(caret);
+			const after = source.substring(caret ?? 0);
 
 			// 挿入
 			this.text = `${trimmedBefore}$[${value} ]${after}`;
@@ -323,9 +323,9 @@ export class Autocomplete {
 		} else if (type === 'mfmParam') {
 			const source = this.text;
 
-			const before = source.substring(0, caret);
+			const before = source.substring(0, caret ?? 0);
 			const trimmedBefore = before.substring(0, before.lastIndexOf('.'));
-			const after = source.substring(caret);
+			const after = source.substring(caret ?? 0);
 
 			// 挿入
 			this.text = `${trimmedBefore}.${value}${after}`;
