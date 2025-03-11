@@ -11,6 +11,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 	:leaveToClass="prefer.s.animation ? $style.transition_x_leaveTo : ''"
 	:moveClass="prefer.s.animation ? $style.transition_x_move : ''"
 	tag="div" :class="$style.root"
+	@click.stop
 >
 	<XReaction v-for="[reaction, count] in reactions" :key="reaction" :reaction="reaction" :count="count" :isInitial="initialReactions.has(reaction)" :note="note" @reactionToggled="onMockToggleReaction"/>
 	<slot v-if="hasMoreReactions" name="more"/>
