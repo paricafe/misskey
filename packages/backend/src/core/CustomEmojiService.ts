@@ -141,31 +141,33 @@ export class CustomEmojiService implements OnApplicationShutdown {
 	public async update(data: (
 		{ id: MiEmoji['id'], name?: string; } | { name: string; id?: MiEmoji['id'], }
 		) & {
-		originalUrl?: string;
-		publicUrl?: string;
-		fileType?: string;
-		category?: string | null;
-		aliases?: string[];
-		license?: string | null;
-		isSensitive?: boolean;
-		localOnly?: boolean;
-		roleIdsThatCanBeUsedThisEmojiAsReaction?: MiRole['id'][];
-	}, moderator?: MiUser): Promise<
+			originalUrl?: string;
+			publicUrl?: string;
+			fileType?: string;
+			category?: string | null;
+			aliases?: string[];
+			license?: string | null;
+			isSensitive?: boolean;
+			localOnly?: boolean;
+			roleIdsThatCanBeUsedThisEmojiAsReaction?: MiRole['id'][];
+		}, moderator?: MiUser): Promise<
 		null
 		| 'NO_SUCH_EMOJI'
 		| 'SAME_NAME_EMOJI_EXISTS'
-	> {
+		> {
 		const emoji = data.id
 			? await this.getEmojiById(data.id)
-			: await this.getEmojiByName(data.name!);
+			: data.name ? await this.getEmojiByName(data.name) : null;
 		if (emoji === null) return 'NO_SUCH_EMOJI';
 		const id = emoji.id;
 
 		// IDと絵文字名が両方指定されている場合は絵文字名の変更を行うため重複チェックが必要
 		const doNameUpdate = data.id && data.name && (data.name !== emoji.name);
 		if (doNameUpdate) {
-			const isDuplicate = await this.checkDuplicate(data.name!);
-			if (isDuplicate) return 'SAME_NAME_EMOJI_EXISTS';
+			if (data.name) {
+				const isDuplicate = await this.checkDuplicate(data.name);
+				if (isDuplicate) return 'SAME_NAME_EMOJI_EXISTS';
+			}
 		}
 
 		await this.emojisRepository.update(emoji.id, {
