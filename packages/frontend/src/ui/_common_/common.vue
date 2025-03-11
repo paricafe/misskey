@@ -21,6 +21,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 		[$style.notificationsPosition_leftBottom]: prefer.s.notificationPosition === 'leftBottom',
 		[$style.notificationsPosition_rightTop]: prefer.s.notificationPosition === 'rightTop',
 		[$style.notificationsPosition_rightBottom]: prefer.s.notificationPosition === 'rightBottom',
+		[$style.notificationsPosition_close]: prefer.s.notificationPosition === 'close',
 		[$style.notificationsStackAxis_vertical]: prefer.s.notificationStackAxis === 'vertical',
 		[$style.notificationsStackAxis_horizontal]: prefer.s.notificationStackAxis === 'horizontal',
 	}]"
@@ -145,6 +146,10 @@ function getPointerEvents() {
 	&.notificationsPosition_rightBottom {
 		bottom: calc(var(--MI-minBottomSpacing) + var(--MI-margin));
 		right: 0;
+	}
+
+	&.notificationsPosition_close {
+		display: none;
 	}
 
 	&.notificationsStackAxis_vertical {

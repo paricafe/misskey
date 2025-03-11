@@ -187,6 +187,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 								<option value="rightTop"><i class="ti ti-align-box-right-top"></i> {{ i18n.ts.rightTop }}</option>
 								<option value="leftBottom"><i class="ti ti-align-box-left-bottom"></i> {{ i18n.ts.leftBottom }}</option>
 								<option value="rightBottom"><i class="ti ti-align-box-right-bottom"></i> {{ i18n.ts.rightBottom }}</option>
+								<option value="close"><i class="ti ti-x"></i> {{ i18n.ts.close }}</option>
 							</MkRadios>
 						</MkPreferenceContainer>
 					</SearchMarker>
