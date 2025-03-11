@@ -1369,6 +1369,7 @@ _accountSettings:
   makeNotesHiddenBefore: "Make past notes private"
   makeNotesHiddenBeforeDescription: "While this feature is enabled, notes that are past the set date and time or have been visible only to you. When it is deactivated, the note publication status will also be restored."
   mayNotEffectForFederatedNotes: "Notes federated to a remote server may not be affected."
+  mayNotEffectSomeSituations: "These restrictions are simplified measures. They may not apply in some situations, such as when viewing on remote servers or during moderation."
   notesHavePassedSpecifiedPeriod: "Note that the specified time has passed"
   notesOlderThanSpecifiedDateAndTime: "Notes before the specified date and time"
 
