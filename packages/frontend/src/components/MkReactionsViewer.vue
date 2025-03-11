@@ -70,37 +70,62 @@ function onMockToggleReaction(emoji: string, count: number) {
 
 watch([() => props.note.reactions, () => props.maxNumber], ([newSource, maxNumber]) => {
 	initialReactions.value = new Set(Object.keys(newSource));
+
+	const normalizedCounts = new Map<string, number>();
+	const normalizedOriginals = new Map<string, string>();
+
+	for (const [reaction, count] of Object.entries(newSource)) {
+		const normalized = normalizeReaction(reaction);
+		const currentCount = normalizedCounts.get(normalized) || 0;
+		normalizedCounts.set(normalized, currentCount + count);
+
+		if (!normalizedOriginals.has(normalized) || !reaction.includes('@')) {
+			normalizedOriginals.set(normalized, reaction);
+		}
+	}
+
 	let newReactions: [string, number][] = [];
-	hasMoreReactions.value = Object.keys(newSource).length > maxNumber;
 
 	for (let i = 0; i < reactions.value.length; i++) {
-		const reaction = reactions.value[i][0];
-		if (reaction in newSource && newSource[reaction] !== 0) {
-			reactions.value[i][1] = newSource[reaction];
-			newReactions.push(reactions.value[i]);
+		const [reaction] = reactions.value[i];
+		const normalized = normalizeReaction(reaction);
+
+		if (normalizedCounts.has(normalized) && normalizedCounts.get(normalized)! > 0) {
+			newReactions.push([
+				normalizedOriginals.get(normalized)!,
+				normalizedCounts.get(normalized)!,
+			]);
+			normalizedCounts.delete(normalized);
 		}
 	}
 
-	const newReactionsNames = newReactions.map(([x]) => x);
-	newReactions = [
-		...newReactions,
-		...Object.entries(newSource)
-			.sort(([, a], [, b]) => b - a)
-			.filter(([y], i) => i < maxNumber && !newReactionsNames.includes(y)),
-	];
+	const remainingEntries = Array.from(normalizedCounts.entries())
+		.filter(([, count]) => count > 0)
+		.sort(([, a], [, b]) => b - a);
 
-	newReactions = newReactions.slice(0, props.maxNumber);
+	for (const [normalized, count] of remainingEntries) {
+		if (newReactions.length < maxNumber) {
+			newReactions.push([normalizedOriginals.get(normalized)!, count]);
+		}
+	}
 
-	if (props.note.myReaction && !newReactions.map(([x]) => x).includes(props.note.myReaction)) {
+	hasMoreReactions.value = Object.keys(newSource).length > maxNumber;
+
+	if (props.note.myReaction) {
 		const normalizedMyReaction = normalizeReaction(props.note.myReaction);
-		const alreadyIncluded = newReactions.some(([x]) => normalizeReaction(x) === normalizedMyReaction);
+		const alreadyIncluded = newReactions.some(([x]) =>
+			normalizeReaction(x) === normalizedMyReaction,
+		);
 
-		if (!alreadyIncluded) {
-			newReactions.push([props.note.myReaction, newSource[props.note.myReaction]]);
+		if (!alreadyIncluded && newSource[props.note.myReaction]) {
+			newReactions.push([
+				props.note.myReaction,
+				newSource[props.note.myReaction],
+			]);
 		}
 	}
 
-	reactions.value = newReactions;
+	reactions.value = newReactions.slice(0, props.maxNumber);
 }, { immediate: true, deep: true });
 </script>
 
