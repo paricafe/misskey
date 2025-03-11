@@ -186,8 +186,10 @@ SPDX-License-Identifier: AGPL-3.0-only
 <script lang="ts" setup>
 import { ref, computed } from 'vue';
 import MkButton from '@/components/MkButton.vue';
+import FormInfo from '@/components/MkInfo.vue';
 import MkFolder from '@/components/MkFolder.vue';
 import MkSwitch from '@/components/MkSwitch.vue';
+import MkRadios from '@/components/MkRadios.vue';
 import * as os from '@/os.js';
 import { misskeyApi } from '@/utility/misskey-api.js';
 import { selectFile } from '@/utility/select-file.js';
