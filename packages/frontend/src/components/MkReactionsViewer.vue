@@ -41,6 +41,16 @@ const initialReactions = ref(new Set<string>());
 const reactions = ref<[string, number][]>([]);
 const hasMoreReactions = ref(false);
 
+function normalizeReaction(reaction) {
+	if (reaction.startsWith(':') && reaction.endsWith(':')) {
+		const match = reaction.match(/^:([^@]+)(?:@[^:]+)?:$/);
+		if (match) {
+			return `:${match[1]}:`;
+		}
+	}
+	return reaction;
+}
+
 watch(() => props.note.myReaction, (newMyReaction) => {
 	if (newMyReaction && !Object.keys(reactions.value).includes(newMyReaction)) {
 		reactions.value[newMyReaction] = props.note.reactions[newMyReaction];
@@ -50,7 +60,9 @@ watch(() => props.note.myReaction, (newMyReaction) => {
 function onMockToggleReaction(emoji: string, count: number) {
 	if (!mock) return;
 
-	const i = reactions.value.findIndex((item) => item[0] === emoji);
+	const i = reactions.value.findIndex((item) => {
+		return normalizeReaction(item[0]) === normalizeReaction(emoji);
+	});
 	if (i < 0) return;
 
 	emit('mockUpdateMyReaction', emoji, (count - reactions.value[i][1]));
@@ -80,7 +92,12 @@ watch([() => props.note.reactions, () => props.maxNumber], ([newSource, maxNumbe
 	newReactions = newReactions.slice(0, props.maxNumber);
 
 	if (props.note.myReaction && !newReactions.map(([x]) => x).includes(props.note.myReaction)) {
-		newReactions.push([props.note.myReaction, newSource[props.note.myReaction]]);
+		const normalizedMyReaction = normalizeReaction(props.note.myReaction);
+		const alreadyIncluded = newReactions.some(([x]) => normalizeReaction(x) === normalizedMyReaction);
+
+		if (!alreadyIncluded) {
+			newReactions.push([props.note.myReaction, newSource[props.note.myReaction]]);
+		}
 	}
 
 	reactions.value = newReactions;

@@ -41,9 +41,11 @@ const emit = defineEmits<{
 }>();
 
 function getReactionName(reaction: string): string {
-	const trimLocal = reaction.replace('@.', '');
-	if (trimLocal.startsWith(':')) {
-		return trimLocal;
+	if (reaction.startsWith(':')) {
+		const match = reaction.match(/^:([^@]+)(?:@[^:]+)?:$/);
+		if (match) {
+			return `:${match[1]}:`;
+		}
 	}
 	return getEmojiName(reaction);
 }

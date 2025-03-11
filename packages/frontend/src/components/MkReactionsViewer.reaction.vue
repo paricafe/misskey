@@ -64,13 +64,16 @@ async function toggleReaction() {
 
 	const oldReaction = props.note.myReaction;
 	if (oldReaction) {
+		const normalizedOldReaction = normalizeReaction(oldReaction);
+		const normalizedNewReaction = normalizeReaction(props.reaction);
+
 		const confirm = await os.confirm({
 			type: 'warning',
-			text: oldReaction !== props.reaction ? i18n.ts.changeReactionConfirm : i18n.ts.cancelReactionConfirm,
+			text: normalizedOldReaction !== normalizedNewReaction ? i18n.ts.changeReactionConfirm : i18n.ts.cancelReactionConfirm,
 		});
 		if (confirm.canceled) return;
 
-		if (oldReaction !== props.reaction) {
+		if (normalizedOldReaction !== normalizedNewReaction) {
 			sound.playMisskeySfx('reaction');
 		}
 
@@ -82,7 +85,7 @@ async function toggleReaction() {
 		misskeyApi('notes/reactions/delete', {
 			noteId: props.note.id,
 		}).then(() => {
-			if (oldReaction !== props.reaction) {
+			if (normalizedOldReaction !== normalizedNewReaction) {
 				misskeyApi('notes/reactions/create', {
 					noteId: props.note.id,
 					reaction: props.reaction,
@@ -174,6 +177,16 @@ if (!mock) {
 			closed: () => dispose(),
 		});
 	}, 100);
+}
+
+function normalizeReaction(reaction) {
+	if (reaction.startsWith(':') && reaction.endsWith(':')) {
+		const match = reaction.match(/^:([^@]+)(?:@[^:]+)?:$/);
+		if (match) {
+			return `:${match[1]}:`;
+		}
+	}
+	return reaction;
 }
 </script>
 
