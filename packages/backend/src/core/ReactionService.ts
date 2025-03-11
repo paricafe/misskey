@@ -355,8 +355,8 @@ export class ReactionService {
 	 */
 	@bindThis
 	public convertLegacyReaction(reaction: string): string {
-		reaction = this.decodeReaction(reaction).reaction;
-		if (Object.keys(legacies).includes(reaction)) return legacies[reaction];
+		const decodedReaction = this.decodeReaction(reaction).reaction;
+		if (Object.keys(legacies).includes(decodedReaction)) return legacies[decodedReaction];
 		return reaction;
 	}
 
@@ -417,10 +417,10 @@ export class ReactionService {
 
 		if (custom) {
 			const name = custom[1];
-			const host = custom[2] ?? null;
+			const host = custom[2];
 
 			return {
-				reaction: `:${name}@${host ?? '.'}:`,	// ローカル分は@以降を省略するのではなく.にする
+				reaction: `:${name}@${host || '.'}:`,	// ローカル分は@以降を省略するのではなく.にする
 				name,
 				host,
 			};
