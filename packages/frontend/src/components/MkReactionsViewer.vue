@@ -12,43 +12,16 @@ SPDX-License-Identifier: AGPL-3.0-only
 	:moveClass="prefer.s.animation ? $style.transition_x_move : ''"
 	tag="div" :class="$style.root"
 >
-	<XReaction v-for="[reaction, count] in mergedReactions" :key="reaction" :reaction="reaction" :count="count" :isInitial="initialReactions.has(reaction)" :note="note" @reactionToggled="onMockToggleReaction"/>
+	<XReaction v-for="[reaction, count] in reactions" :key="reaction" :reaction="reaction" :count="count" :isInitial="initialReactions.has(reaction)" :note="note" @reactionToggled="onMockToggleReaction"/>
 	<slot v-if="hasMoreReactions" name="more"/>
 </TransitionGroup>
 </template>
 
 <script lang="ts" setup>
 import * as Misskey from 'misskey-js';
-import { inject, watch, ref, computed, onBeforeMount } from 'vue';
+import { inject, watch, ref } from 'vue';
 import XReaction from '@/components/MkReactionsViewer.reaction.vue';
 import { prefer } from '@/preferences.js';
-import { customEmojisMap } from '@/custom-emojis.js';
-
-const localEmojiSet = new Set(Array.from(customEmojisMap.keys()));
-const emojiCache = new Map<string, boolean>();
-
-function hasLocalEmoji(reaction: string): boolean {
-	if (emojiCache.has(reaction)) {
-		const cachedResult = emojiCache.get(reaction);
-		if (cachedResult !== undefined) return cachedResult;
-	}
-
-	let result: boolean;
-	if (!reaction.includes(':')) {
-		result = true;
-	} else {
-		const emojiName = reaction.split('@')[0].split(':')[1];
-		result = localEmojiSet.has(emojiName);
-	}
-
-	emojiCache.set(reaction, result);
-	return result;
-}
-
-function getBaseReaction(reaction: string): string {
-	if (!reaction.includes(':')) return reaction;
-	return `:${reaction.split('@')[0].split(':')[1]}:`;
-}
 
 const props = withDefaults(defineProps<{
 	note: Misskey.entities.Note;
@@ -63,44 +36,16 @@ const emit = defineEmits<{
 	(ev: 'mockUpdateMyReaction', emoji: string, delta: number): void;
 }>();
 
-const initialReactions = new Set(Object.keys(props.note.reactions));
+const initialReactions = ref(new Set<string>());
 
 const reactions = ref<[string, number][]>([]);
 const hasMoreReactions = ref(false);
 
-const mergedReactions = computed(() => {
-	const reactionMap = new Map();
-
-	reactions.value.forEach(([reaction, count]) => {
-		if (!hasLocalEmoji(reaction)) {
-			if (reactionMap.has(reaction)) {
-				reactionMap.set(reaction, reactionMap.get(reaction) + count);
-			} else {
-				reactionMap.set(reaction, count);
-			}
-			return;
-		}
-
-		const baseReaction = getBaseReaction(reaction);
-		if (reactionMap.has(baseReaction)) {
-			reactionMap.set(baseReaction, reactionMap.get(baseReaction) + count);
-		} else {
-			reactionMap.set(baseReaction, count);
-		}
-	});
-
-	return Array.from(reactionMap.entries());
-});
-
-if (props.note.myReaction && !Object.keys(reactions.value).includes(props.note.myReaction)) {
-	reactions.value[props.note.myReaction] = props.note.reactions[props.note.myReaction];
-}
-
-onBeforeMount(() => {
-	Object.keys(props.note.reactions).forEach(reaction => {
-		hasLocalEmoji(reaction);
-	});
-});
+watch(() => props.note.myReaction, (newMyReaction) => {
+	if (newMyReaction && !Object.keys(reactions.value).includes(newMyReaction)) {
+		reactions.value[newMyReaction] = props.note.reactions[newMyReaction];
+	}
+}, { immediate: true });
 
 function onMockToggleReaction(emoji: string, count: number) {
 	if (!mock) return;
@@ -112,6 +57,7 @@ function onMockToggleReaction(emoji: string, count: number) {
 }
 
 watch([() => props.note.reactions, () => props.maxNumber], ([newSource, maxNumber]) => {
+	initialReactions.value = new Set(Object.keys(newSource));
 	let newReactions: [string, number][] = [];
 	hasMoreReactions.value = Object.keys(newSource).length > maxNumber;
 
@@ -128,7 +74,7 @@ watch([() => props.note.reactions, () => props.maxNumber], ([newSource, maxNumbe
 		...newReactions,
 		...Object.entries(newSource)
 			.sort(([, a], [, b]) => b - a)
-			.filter(([y], i) => i < maxNumber && !newReactionsNames.includes(y)) as [string, number][],
+			.filter(([y], i) => i < maxNumber && !newReactionsNames.includes(y)),
 	];
 
 	newReactions = newReactions.slice(0, props.maxNumber);

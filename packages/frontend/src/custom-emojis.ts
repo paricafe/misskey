@@ -8,128 +8,69 @@ import * as Misskey from 'misskey-js';
 import { misskeyApi, misskeyApiGet } from '@/utility/misskey-api.js';
 import { get, set } from '@/utility/idb-proxy.js';
 
-const CACHE_EXPIRE_TIME = 12 * 60 * 60 * 1000;
-const BATCH_SIZE = 1000;
-
 const storageCache = await get('emojis');
-export const customEmojis = shallowRef<Misskey.entities.EmojiSimple[]>(
-	Array.isArray(storageCache) ? storageCache : [],
-);
-
-const categoriesMap = new Map<string, Misskey.entities.EmojiSimple[]>();
-
-export const customEmojiCategories = computed<[...string[], null]>(() => {
-	if (categoriesMap.size === 0 && customEmojis.value.length > 0) {
-		for (const emoji of customEmojis.value) {
-			const category = emoji.category && emoji.category !== 'null'
-				? emoji.category
-				: 'null';
-
-			if (!categoriesMap.has(category)) {
-				categoriesMap.set(category, []);
-			}
-			categoriesMap.get(category)?.push(emoji);
+export const customEmojis = shallowRef<Misskey.entities.EmojiSimple[]>(Array.isArray(storageCache) ? storageCache : []);
+export const customEmojiCategories = computed<[ ...string[], null ]>(() => {
+	const categories = new Set<string>();
+	for (const emoji of customEmojis.value) {
+		if (emoji.category && emoji.category !== 'null') {
+			categories.add(emoji.category);
 		}
 	}
-	return markRaw([...Array.from(categoriesMap.keys()), null]);
+	return markRaw([...Array.from(categories), null]);
 });
 
 export const customEmojisMap = new Map<string, Misskey.entities.EmojiSimple>();
-
-function batchUpdateMap(emojis: Misskey.entities.EmojiSimple[]): void {
-	customEmojisMap.clear();
-	categoriesMap.clear();
-
-	for (let i = 0; i < emojis.length; i += BATCH_SIZE) {
-		const batch = emojis.slice(i, i + BATCH_SIZE);
-		for (const emoji of batch) {
-			customEmojisMap.set(emoji.name, emoji);
-		}
-	}
-}
-
 watch(customEmojis, emojis => {
-	batchUpdateMap(emojis);
+	customEmojisMap.clear();
+	for (const emoji of emojis) {
+		customEmojisMap.set(emoji.name, emoji);
+	}
 }, { immediate: true });
 
-export function addCustomEmoji(emoji: Misskey.entities.EmojiSimple): void {
-	const newEmojis = [emoji, ...customEmojis.value];
-	customEmojis.value = newEmojis;
-	customEmojisMap.set(emoji.name, emoji);
-	void set('emojis', newEmojis);
+export function addCustomEmoji(emoji: Misskey.entities.EmojiSimple) {
+	customEmojis.value = [emoji, ...customEmojis.value];
+	set('emojis', customEmojis.value);
 }
 
-export function updateCustomEmojis(emojis: Misskey.entities.EmojiSimple[]): void {
-	const updateMap = new Map(emojis.map(emoji => [emoji.name, emoji]));
-
-	const newEmojis = customEmojis.value.map(item =>
-		updateMap.get(item.name) ?? item,
-	);
-
-	customEmojis.value = newEmojis;
-	batchUpdateMap(newEmojis);
-	void set('emojis', newEmojis);
+export function updateCustomEmojis(emojis: Misskey.entities.EmojiSimple[]) {
+	customEmojis.value = customEmojis.value.map(item => emojis.find(search => search.name === item.name) ?? item);
+	set('emojis', customEmojis.value);
 }
 
-export function removeCustomEmojis(emojis: Misskey.entities.EmojiSimple[]): void {
-	const removedNames = new Set(emojis.map(e => e.name));
-
-	const filteredEmojis = customEmojis.value.filter(
-		item => !removedNames.has(item.name),
-	);
-
-	customEmojis.value = filteredEmojis;
-	batchUpdateMap(filteredEmojis);
-	void set('emojis', filteredEmojis);
+export function removeCustomEmojis(emojis: Misskey.entities.EmojiSimple[]) {
+	customEmojis.value = customEmojis.value.filter(item => !emojis.some(search => search.name === item.name));
+	set('emojis', customEmojis.value);
 }
 
-export async function fetchCustomEmojis(force = false): Promise<void> {
+export async function fetchCustomEmojis(force = false) {
 	const now = Date.now();
 
-	if (!force) {
+	let res;
+	if (force) {
+		res = await misskeyApi('emojis', {});
+	} else {
 		const lastFetchedAt = await get('lastEmojisFetchedAt');
-		if (lastFetchedAt && (now - lastFetchedAt) < CACHE_EXPIRE_TIME) {
-			return;
-		}
+		if (lastFetchedAt && (now - lastFetchedAt) < 1000 * 60 * 60) return;
+		res = await misskeyApiGet('emojis', {});
 	}
 
-	try {
-		const res = await (force ? misskeyApi : misskeyApiGet)('emojis', {});
-
-		if (res.emojis.length > 0) {
-			customEmojis.value = res.emojis;
-			await Promise.all([
-				set('emojis', res.emojis),
-				set('lastEmojisFetchedAt', now),
-			]);
-		}
-	} catch (error) {
-		console.error('Failed to fetch emojis:', error);
-	}
+	customEmojis.value = res.emojis;
+	set('emojis', res.emojis);
+	set('lastEmojisFetchedAt', now);
 }
 
-const tagsCache = new Map<string, string[]>();
+let cachedTags;
+export function getCustomEmojiTags() {
+	if (cachedTags) return cachedTags;
 
-export function getCustomEmojiTags(): string[] {
-	const cacheKey = `${customEmojis.value.length}`;
-
-	if (tagsCache.has(cacheKey)) {
-		const cached = tagsCache.get(cacheKey);
-		if (cached) return cached;
-	}
-
-	const tags = new Set<string>();
-
-	for (let i = 0; i < customEmojis.value.length; i += BATCH_SIZE) {
-		const batch = customEmojis.value.slice(i, i + BATCH_SIZE);
-		for (const emoji of batch) {
-			for (const tag of emoji.aliases) {
-				tags.add(tag);
-			}
+	const tags = new Set();
+	for (const emoji of customEmojis.value) {
+		for (const tag of emoji.aliases) {
+			tags.add(tag);
 		}
 	}
-
-	const result = Array.from(tags);
-	tagsCache.set(cacheKey, result);
-	return result;
+	const res = Array.from(tags);
+	cachedTags = res;
+	return res;
 }
