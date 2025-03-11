@@ -132,19 +132,30 @@ export class ReactionService {
 		} else if (_reaction != null) {
 			const custom = reaction.match(isCustomEmojiRegexp);
 			if (custom) {
+				const name = custom[1];
 				const reacterHost = this.utilityService.toPunyNullable(user.host);
 
-				const name = custom[1];
-				const emoji = reacterHost == null
-					? (await this.customEmojiService.localEmojisCache.fetch()).get(name)
-					: await this.emojisRepository.findOneBy({
-						host: reacterHost,
-						name,
-					});
+				let emoji = null;
+				let useLocalEmoji = false;
+
+				if (reacterHost != null) {
+					const localEmoji = (await this.customEmojiService.localEmojisCache.fetch()).get(name);
+					if (localEmoji) {
+						emoji = localEmoji;
+						useLocalEmoji = true;
+					} else {
+						emoji = await this.emojisRepository.findOneBy({
+							host: reacterHost,
+							name,
+						});
+					}
+				} else {
+					emoji = (await this.customEmojiService.localEmojisCache.fetch()).get(name);
+				}
 
 				if (emoji) {
 					if (emoji.roleIdsThatCanBeUsedThisEmojiAsReaction.length === 0 || (await this.roleService.getUserRoles(user.id)).some(r => emoji.roleIdsThatCanBeUsedThisEmojiAsReaction.includes(r.id))) {
-						reaction = reacterHost ? `:${name}@${reacterHost}:` : `:${name}:`;
+						reaction = useLocalEmoji ? `:${name}:` : (reacterHost ? `:${name}@${reacterHost}:` : `:${name}:`);
 
 						// センシティブ
 						if ((note.reactionAcceptance === 'nonSensitiveOnly' || note.reactionAcceptance === 'nonSensitiveOnlyForLocalLikeOnlyForRemote') && emoji.isSensitive) {
