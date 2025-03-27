@@ -63,8 +63,8 @@ SPDX-License-Identifier: AGPL-3.0-only
 					<div class="_buttons" style="padding-top: 8px;">
 						<MkButton rounded :small="true" inline @click="chooseNewLike">
 							<template v-if="defaultLike">
-								<MkCustomEmoji v-if="defaultLike.startsWith(':')" style="max-height: 2em; font-size: 1.1em;" :useOriginalSize="false" :name="defaultLike" :normal="true" :noStyle="true" />
-								<MkEmoji v-else :emoji="defaultLike" style="max-height: 2em; font-size: 1.1em;" :normal="true" :noStyle="true" />
+								<MkCustomEmoji v-if="defaultLike.startsWith(':')" style="max-height: 2em; font-size: 1.1em;" :useOriginalSize="false" :name="defaultLike" :normal="true" :noStyle="true"/>
+								<MkEmoji v-else :emoji="defaultLike" style="max-height: 2em; font-size: 1.1em;" :normal="true" :noStyle="true"/>
 							</template>
 							<template v-else>
 								<i class="ti ti-plus"></i>
@@ -140,7 +140,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 </template>
 
 <script lang="ts" setup>
-import { computed, nextTick, ref, watch } from 'vue';
+import { ref, watch } from 'vue';
 import { v4 as uuid } from 'uuid';
 import XPalette from './emoji-palette.palette.vue';
 import MkRadios from '@/components/MkRadios.vue';
@@ -164,7 +164,11 @@ const emojiPickerStyle = prefer.model('emojiPickerStyle');
 
 const palettesSyncEnabled = ref(prefer.isSyncEnabled('emojiPalettes'));
 
-const defaultLike = computed<string | null>(() => prefer.s.defaultLike);
+const defaultLike = ref<string | null>(prefer.s.defaultLike);
+
+watch(() => prefer.s.defaultLike, (newValue) => {
+	defaultLike.value = newValue;
+});
 
 function changePalettesSyncEnabled(value: boolean) {
 	if (value) {
@@ -241,12 +245,15 @@ function chooseNewLike(ev: MouseEvent) {
 	os.pickEmoji(getHTMLElement(ev), {
 		showPinned: false,
 	}).then(async emoji => {
-		prefer.commit('defaultLike', emoji);
-		await nextTick();
+		if (emoji) {
+			defaultLike.value = emoji;
+			prefer.commit('defaultLike', emoji);
+		}
 	});
 }
 
 async function resetLike() {
+	defaultLike.value = null;
 	prefer.commit('defaultLike', null);
 }
 
