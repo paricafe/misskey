@@ -58,8 +58,8 @@ SPDX-License-Identifier: AGPL-3.0-only
 
 		<SearchMarker :keywords="['emoji', 'picker', 'default']">
 			<FormSection>
+				<template #label><SearchLabel>{{ i18n.ts.defaultLike }}</SearchLabel></template>
 				<MkPreferenceContainer k="defaultLike">
-					<template #label><SearchLabel>{{ i18n.ts.defaultLike }}</SearchLabel></template>
 					<div class="_buttons" style="padding-top: 8px;">
 						<MkButton rounded :small="true" inline @click="chooseNewLike">
 							<template v-if="defaultLike">
