@@ -8,7 +8,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 	ref="buttonEl"
 	v-ripple="canToggle"
 	class="_button"
-	:class="[$style.root, { [$style.reacted]: isReacted, [$style.canToggle]: canToggle, [$style.small]: prefer.s.reactionsDisplaySize === 'small', [$style.large]: prefer.s.reactionsDisplaySize === 'large' }]"
+	:class="[$style.root, { [$style.reacted]: note.myReaction == reaction, [$style.canToggle]: canToggle, [$style.small]: prefer.s.reactionsDisplaySize === 'small', [$style.large]: prefer.s.reactionsDisplaySize === 'large' }]"
 	@click.stop="toggleReaction()"
 	@contextmenu.prevent.stop="menu"
 >
@@ -60,27 +60,18 @@ const canToggle = computed(() => {
 });
 const canGetInfo = computed(() => !props.reaction.match(/@\w/) && props.reaction.includes(':'));
 
-const isReacted = computed(() => {
-	if (!props.note.myReaction) return false;
-
-	return normalizeReaction(props.note.myReaction) === normalizeReaction(props.reaction);
-});
-
 async function toggleReaction() {
 	if (!canToggle.value) return;
 
 	const oldReaction = props.note.myReaction;
 	if (oldReaction) {
-		const normalizedOldReaction = normalizeReaction(oldReaction);
-		const normalizedNewReaction = normalizeReaction(props.reaction);
-
 		const confirm = await os.confirm({
 			type: 'warning',
-			text: normalizedOldReaction !== normalizedNewReaction ? i18n.ts.changeReactionConfirm : i18n.ts.cancelReactionConfirm,
+			text: oldReaction !== props.reaction ? i18n.ts.changeReactionConfirm : i18n.ts.cancelReactionConfirm,
 		});
 		if (confirm.canceled) return;
 
-		if (normalizedOldReaction !== normalizedNewReaction) {
+		if (oldReaction !== props.reaction) {
 			sound.playMisskeySfx('reaction');
 		}
 
@@ -92,7 +83,7 @@ async function toggleReaction() {
 		misskeyApi('notes/reactions/delete', {
 			noteId: props.note.id,
 		}).then(() => {
-			if (normalizedOldReaction !== normalizedNewReaction) {
+			if (oldReaction !== props.reaction) {
 				misskeyApi('notes/reactions/create', {
 					noteId: props.note.id,
 					reaction: props.reaction,
@@ -184,16 +175,6 @@ if (!mock) {
 			closed: () => dispose(),
 		});
 	}, 100);
-}
-
-function normalizeReaction(reaction) {
-	if (reaction.startsWith(':') && reaction.endsWith(':')) {
-		const match = reaction.match(/^:([^@]+)(?:@[^:]+)?:$/);
-		if (match) {
-			return `:${match[1]}:`;
-		}
-	}
-	return reaction;
 }
 </script>
 
