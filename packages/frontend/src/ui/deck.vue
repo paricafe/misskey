@@ -14,6 +14,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 			<!-- sectionを利用しているのは、deck.vue側でcolumnに対してfirst-of-typeを効かせるため -->
 			<section
 				v-for="ids in layout"
+				:key="ids.join('-')"
 				:class="$style.section"
 				:style="columns.filter(c => ids.includes(c.id)).some(c => c.flexible) ? { flex: 1, minWidth: '350px' } : { width: Math.max(...columns.filter(c => ids.includes(c.id)).map(c => c.width)) + 'px' }"
 				@wheel.self="onWheel"
@@ -55,11 +56,11 @@ SPDX-License-Identifier: AGPL-3.0-only
 	</div>
 
 	<div v-if="isMobile" :class="$style.nav">
-		<button :class="$style.navButton" class="_button" @click="drawerMenuShowing = true"><i :class="$style.navButtonIcon" class="ti ti-menu-2"></i><span v-if="menuIndicated" :class="$style.navButtonIndicator"><i class="_indicatorCircle"></i></span></button>
+		<button :class="$style.navButton" class="_button" @click="drawerMenuShowing = true"><i :class="$style.navButtonIcon" class="ti ti-menu-2"></i><span v-if="menuIndicated" :class="$style.navButtonIndicator" class="_blink"><i class="_indicatorCircle"></i></span></button>
 		<button :class="$style.navButton" class="_button" @click="mainRouter.replace('/')"><i :class="$style.navButtonIcon" class="ti ti-home"></i></button>
 		<button :class="$style.navButton" class="_button" @click="mainRouter.replace('/my/notifications')">
 			<i :class="$style.navButtonIcon" class="ti ti-bell"></i>
-			<span v-if="$i?.hasUnreadNotification" :class="$style.navButtonIndicator">
+			<span v-if="$i?.hasUnreadNotification" :class="$style.navButtonIndicator" class="_blink">
 				<span class="_indicateCounter" :class="$style.itemIndicateValueIcon">{{ $i.unreadNotificationsCount > 99 ? '99+' : $i.unreadNotificationsCount }}</span>
 			</span>
 		</button>

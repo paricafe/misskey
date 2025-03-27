@@ -111,7 +111,7 @@ function top() {
 function onContextmenu(ev: MouseEvent) {
 	if (isLink(ev.target)) return;
 	if (['INPUT', 'TEXTAREA', 'IMG', 'VIDEO', 'CANVAS'].includes(ev.target.tagName) || ev.target.attributes['contenteditable']) return;
-	if (window.getSelection()?.toString() !== '') return;
+	if (window.getSelection().toString() !== '') return;
 	const path = mainRouter.getCurrentFullPath();
 	os.contextMenu([{
 		type: 'label',
