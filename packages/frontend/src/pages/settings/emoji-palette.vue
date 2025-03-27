@@ -254,7 +254,7 @@ function chooseNewLike(ev: MouseEvent) {
 
 async function resetLike() {
 	defaultLike.value = null;
-	prefer.commit('defaultLike', null);
+	prefer.commit('defaultLike', '❤️');
 }
 
 definePage(() => ({

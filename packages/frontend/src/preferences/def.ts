@@ -297,7 +297,7 @@ export const PREF_DEF = {
 		default: hemisphere as 'N' | 'S',
 	},
 	enableSeasonalScreenEffect: {
-		default: DEFAULT_DEVICE_KIND === 'desktop',
+		default: false,
 	},
 	enableHorizontalSwipe: {
 		default: true,
@@ -327,7 +327,7 @@ export const PREF_DEF = {
 		default: false,
 	},
 	defaultFollowWithReplies: {
-		default: false,
+		default: true,
 	},
 	makeEveryTextElementsSelectable: {
 		default: DEFAULT_DEVICE_KIND === 'desktop',
@@ -391,7 +391,7 @@ export const PREF_DEF = {
 		},
 	},
 	defaultLike: {
-		default: null as string | null,
+		default: '❤️',
 	},
 	enableRenderingOptimization: {
 		default: true,
