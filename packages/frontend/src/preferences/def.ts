@@ -157,7 +157,7 @@ export const PREF_DEF = {
 		}[],
 	},
 	serverDisconnectedBehavior: {
-		default: 'doNothing' as 'doNothing' | 'quiet' | 'reload' | 'dialog',
+		default: 'ignore' as 'ignore' | 'quiet' | 'reload' | 'dialog',
 	},
 	nsfw: {
 		default: 'respect' as 'respect' | 'force' | 'ignore',
