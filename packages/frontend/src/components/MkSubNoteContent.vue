@@ -37,7 +37,7 @@ import MkMediaList from '@/components/MkMediaList.vue';
 import MkPoll from '@/components/MkPoll.vue';
 import { i18n } from '@/i18n.js';
 import { prefer } from '@/preferences.js';
-import { useRouter } from '@/router/supplier.js';
+import { useRouter } from '@/router.js';
 
 const props = defineProps<{
 	note: Misskey.entities.Note;
