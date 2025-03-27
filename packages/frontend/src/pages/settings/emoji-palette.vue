@@ -56,44 +56,27 @@ SPDX-License-Identifier: AGPL-3.0-only
 			</div>
 		</FormSection>
 
-		<SearchMaker :keywords="['emoji', 'picker', 'default']">
+		<SearchMarker :keywords="['emoji', 'picker', 'default']">
 			<FormSection>
 				<MkPreferenceContainer k="defaultLike">
-					<FromSlot>
-						<template #label>
-							<SearchLabel>{{ i18n.ts.defaultLike }}</SearchLabel>
-						</template>
-						<div class="_buttons" style="padding-top: 8px;">
-							<MkButton rounded :small="true" inline @click="chooseNewLike">
-								<template v-if="defaultLike">
-									<MkCustomEmoji
-										v-if="defaultLike.startsWith(':')"
-										style="max-height: 2em; font-size: 1.1em;"
-										:useOriginalSize="false"
-										:name="defaultLike"
-										:normal="true"
-										:noStyle="true"
-									/>
-									<MkEmoji
-										v-else
-										:emoji="defaultLike"
-										style="max-height: 2em; font-size: 1.1em;"
-										:normal="true"
-										:noStyle="true"
-									/>
-								</template>
-								<template v-else>
-									<i class="ti ti-plus"></i>
-								</template>
-							</MkButton>
-							<MkButton v-if="defaultLike" rounded :small="true" inline @click="resetLike">
-								<i class="ti ti-refresh"></i>
-							</MkButton>
-						</div>
-					</FromSlot>
+					<template #label><SearchLabel>{{ i18n.ts.defaultLike }}</SearchLabel></template>
+					<div class="_buttons" style="padding-top: 8px;">
+						<MkButton rounded :small="true" inline @click="chooseNewLike">
+							<template v-if="defaultLike">
+								<MkCustomEmoji v-if="defaultLike.startsWith(':')" style="max-height: 2em; font-size: 1.1em;" :useOriginalSize="false" :name="defaultLike" :normal="true" :noStyle="true" />
+								<MkEmoji v-else :emoji="defaultLike" style="max-height: 2em; font-size: 1.1em;" :normal="true" :noStyle="true" />
+							</template>
+							<template v-else>
+								<i class="ti ti-plus"></i>
+							</template>
+						</MkButton>
+						<MkButton v-if="defaultLike" rounded :small="true" inline @click="resetLike">
+							<i class="ti ti-refresh"></i>
+						</MkButton>
+					</div>
 				</MkPreferenceContainer>
 			</FormSection>
-		</SearchMaker>
+		</SearchMarker>
 
 		<SearchMarker :keywords="['emoji', 'picker', 'display']">
 			<FormSection>
@@ -157,7 +140,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 </template>
 
 <script lang="ts" setup>
-import { computed, ref, watch } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import { v4 as uuid } from 'uuid';
 import XPalette from './emoji-palette.palette.vue';
 import MkRadios from '@/components/MkRadios.vue';
@@ -259,6 +242,7 @@ function chooseNewLike(ev: MouseEvent) {
 		showPinned: false,
 	}).then(async emoji => {
 		prefer.commit('defaultLike', emoji);
+		await nextTick();
 	});
 }
 
