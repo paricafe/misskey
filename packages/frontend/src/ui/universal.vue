@@ -180,12 +180,6 @@ onMounted(() => {
 });
 
 const onContextmenu = (ev) => {
-	const isLink = (el: HTMLElement) => {
-		if (el.tagName === 'A') return true;
-		if (el.parentElement) {
-			return isLink(el.parentElement);
-		}
-	};
 	if (isLink(ev.target)) return;
 	if (['INPUT', 'TEXTAREA', 'IMG', 'VIDEO', 'CANVAS'].includes(ev.target.tagName) || ev.target.attributes['contenteditable']) return;
 	if (window.getSelection()?.toString() !== '') return;
@@ -284,7 +278,7 @@ $widgets-hide-threshold: 1090px;
 .transition_widgetsDrawer_enterFrom,
 .transition_widgetsDrawer_leaveTo {
 	opacity: 0;
-	transform: translateX(-240px);
+	transform: translateX(240px);
 }
 
 .root {
@@ -425,7 +419,7 @@ $widgets-hide-threshold: 1090px;
 .widgetsDrawer {
 	position: fixed;
 	top: 0;
-	left: 0;
+	right: 0;
 	z-index: 1001;
 	width: 310px;
 	height: 100dvh;
