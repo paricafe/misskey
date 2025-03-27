@@ -170,7 +170,7 @@ if (!mock) {
 			reaction: props.reaction,
 			users,
 			count: props.count,
-			targetElement: buttonEl.value as HTMLElement,
+			targetElement: buttonEl.value,
 		}, {
 			closed: () => dispose(),
 		});

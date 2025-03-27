@@ -19,7 +19,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 
 <script lang="ts" setup>
 import * as Misskey from 'misskey-js';
-import { inject, watch, ref, onMounted } from 'vue';
+import { inject, watch, ref } from 'vue';
 import XReaction from '@/components/MkReactionsViewer.reaction.vue';
 import { prefer } from '@/preferences.js';
 import { DI } from '@/di.js';
@@ -37,9 +37,14 @@ const emit = defineEmits<{
 	(ev: 'mockUpdateMyReaction', emoji: string, delta: number): void;
 }>();
 
-const initialReactions = ref(new Set());
+const initialReactions = new Set(Object.keys(props.note.reactions));
+
 const reactions = ref<[string, number][]>([]);
 const hasMoreReactions = ref(false);
+
+if (props.note.myReaction && !Object.keys(reactions.value).includes(props.note.myReaction)) {
+	reactions.value[props.note.myReaction] = props.note.reactions[props.note.myReaction];
+}
 
 function onMockToggleReaction(emoji: string, count: number) {
 	if (!mock) return;
@@ -50,18 +55,9 @@ function onMockToggleReaction(emoji: string, count: number) {
 	emit('mockUpdateMyReaction', emoji, (count - reactions.value[i][1]));
 }
 
-onMounted(() => {
-	initialReactions.value = new Set(Object.keys(props.note.reactions));
-});
-
 watch([() => props.note.reactions, () => props.maxNumber], ([newSource, maxNumber]) => {
 	let newReactions: [string, number][] = [];
 	hasMoreReactions.value = Object.keys(newSource).length > maxNumber;
-
-	if (props.note.myReaction && props.note.myReaction in newSource &&
-		!reactions.value.some(([r]) => r === props.note.myReaction)) {
-		reactions.value.push([props.note.myReaction, newSource[props.note.myReaction]]);
-	}
 
 	for (let i = 0; i < reactions.value.length; i++) {
 		const reaction = reactions.value[i][0];
