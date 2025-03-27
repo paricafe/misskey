@@ -252,7 +252,8 @@ const props = withDefaults(defineProps<{
 	mock: false,
 });
 
-provide(DI.mock, props.mock);
+const mockValue = computed(() => props.mock);
+provide(DI.mock, mockValue.value);
 
 const emit = defineEmits<{
 	(ev: 'reaction', emoji: string): void;
@@ -297,7 +298,7 @@ const renoteTime = useTemplateRef('renoteTime');
 const reactButton = useTemplateRef('reactButton');
 const clipButton = useTemplateRef('clipButton');
 const likeButton = useTemplateRef('likeButton');
-const appearNote = computed(() => getAppearNote(note.value));
+const appearNote = computed(() => spacingNote(getAppearNote(note.value)));
 const galleryEl = useTemplateRef('galleryEl');
 const isMyRenote = $i && ($i.id === note.value.userId);
 const showContent = ref(false);
@@ -476,7 +477,7 @@ if (!props.mock) {
 }
 
 function noteClickToOpen(id: string) {
-	const selection = document.getSelection();
+	const selection = window.document.getSelection();
 	if (selection?.toString().length === 0) {
 		router.push(`/notes/${id}`);
 	}

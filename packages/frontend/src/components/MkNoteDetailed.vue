@@ -338,7 +338,7 @@ const reactButton = useTemplateRef('reactButton');
 const clipButton = useTemplateRef('clipButton');
 const likeButton = useTemplateRef('likeButton');
 const historyMenuButton = useTemplateRef('historyMenuButton');
-const appearNote = computed(() => getAppearNote(note.value));
+const appearNote = computed(() => spacingNote(getAppearNote(note.value)));
 const galleryEl = useTemplateRef('galleryEl');
 const isMyRenote = $i && ($i.id === note.value.userId);
 const showContent = ref(false);
