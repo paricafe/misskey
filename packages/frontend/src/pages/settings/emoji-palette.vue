@@ -68,7 +68,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 								<template v-if="defaultLike">
 									<MkCustomEmoji
 										v-if="defaultLike.startsWith(':')"
-										style="max-height: 3em; font-size: 1.1em;"
+										style="max-height: 2em; font-size: 1.1em;"
 										:useOriginalSize="false"
 										:name="defaultLike"
 										:normal="true"
@@ -77,7 +77,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 									<MkEmoji
 										v-else
 										:emoji="defaultLike"
-										style="max-height: 3em; font-size: 1.1em;"
+										style="max-height: 2em; font-size: 1.1em;"
 										:normal="true"
 										:noStyle="true"
 									/>
