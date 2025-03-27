@@ -391,7 +391,7 @@ export const PREF_DEF = {
 		},
 	},
 	defaultLike: {
-		default: null,
+		default: null as string | null,
 	},
 	enableRenderingOptimization: {
 		default: true,

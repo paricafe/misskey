@@ -56,17 +56,39 @@ SPDX-License-Identifier: AGPL-3.0-only
 			</div>
 		</FormSection>
 
-		<SearchMaker :keywords="['emoji', 'picker']">
+		<SearchMaker :keywords="['emoji', 'picker', 'default']">
 			<FormSection>
 				<MkPreferenceContainer k="defaultLike">
 					<FromSlot>
-						<template #label>{{ i18n.ts.defaultLike }}</template>
-						<MkCustomEmoji v-if="like && like.startsWith(':')" style="max-height: 3em; font-size: 1.1em;" :useOriginalSize="false" :name="like" :normal="true" :noStyle="true"/>
-						<MkEmoji v-else-if="like && !like.startsWith(':')" :emoji="like" style="max-height: 3em; font-size: 1.1em;" :normal="true" :noStyle="true"/>
-						<span v-else-if="!like">{{ i18n.ts.notSet }}</span>
+						<template #label>
+							<SearchLabel>{{ i18n.ts.defaultLike }}</SearchLabel>
+						</template>
 						<div class="_buttons" style="padding-top: 8px;">
-							<MkButton rounded :small="true" inline @click="chooseNewLike"><i class="ti ti-plus"></i></MkButton>
-							<MkButton rounded :small="true" inline @click="resetLike"><i class="ti ti-refresh"></i></MkButton>
+							<MkButton rounded :small="true" inline @click="chooseNewLike">
+								<template v-if="defaultLike">
+									<MkCustomEmoji
+										v-if="defaultLike.startsWith(':')"
+										style="max-height: 3em; font-size: 1.1em;"
+										:useOriginalSize="false"
+										:name="defaultLike"
+										:normal="true"
+										:noStyle="true"
+									/>
+									<MkEmoji
+										v-else
+										:emoji="defaultLike"
+										style="max-height: 3em; font-size: 1.1em;"
+										:normal="true"
+										:noStyle="true"
+									/>
+								</template>
+								<template v-else>
+									<i class="ti ti-plus"></i>
+								</template>
+							</MkButton>
+							<MkButton v-if="defaultLike" rounded :small="true" inline @click="resetLike">
+								<i class="ti ti-refresh"></i>
+							</MkButton>
 						</div>
 					</FromSlot>
 				</MkPreferenceContainer>
@@ -145,7 +167,6 @@ import MkSelect from '@/components/MkSelect.vue';
 import * as os from '@/os.js';
 import { i18n } from '@/i18n.js';
 import { definePage } from '@/page.js';
-import MkFolder from '@/components/MkFolder.vue';
 import { prefer } from '@/preferences.js';
 import MkPreferenceContainer from '@/components/MkPreferenceContainer.vue';
 import MkSwitch from '@/components/MkSwitch.vue';
