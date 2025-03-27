@@ -22,7 +22,7 @@ import MkButton from '@/components/MkButton.vue';
 import MkSparkle from '@/components/MkSparkle.vue';
 import { i18n } from '@/i18n.js';
 import { confetti } from '@/utility/confetti.js';
-import { useRouter } from '@/router/supplier';
+import { useRouter } from '@/router.js';
 
 const modal = useTemplateRef('modal');
 
