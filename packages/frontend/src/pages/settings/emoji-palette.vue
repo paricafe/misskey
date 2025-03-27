@@ -253,7 +253,7 @@ function chooseNewLike(ev: MouseEvent) {
 }
 
 async function resetLike() {
-	defaultLike.value = null;
+	defaultLike.value = '❤️';
 	prefer.commit('defaultLike', '❤️');
 }
 
