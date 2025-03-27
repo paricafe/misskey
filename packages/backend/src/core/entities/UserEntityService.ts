@@ -32,7 +32,6 @@ import type {
 	MiUserNotePining,
 	MiUserProfile,
 	MutingsRepository,
-	NoteUnreadsRepository,
 	RenoteMutingsRepository,
 	UserMemoRepository,
 	UserNotePiningsRepository,
@@ -49,9 +48,9 @@ import type { AnnouncementService } from '@/core/AnnouncementService.js';
 import type { CustomEmojiService } from '@/core/CustomEmojiService.js';
 import { AvatarDecorationService } from '@/core/AvatarDecorationService.js';
 import { CacheService } from '@/core/CacheService.js';
+import { ChatService } from '@/core/ChatService.js';
 import type { OnModuleInit } from '@nestjs/common';
 import type { NoteEntityService } from './NoteEntityService.js';
-import type { DriveFileEntityService } from './DriveFileEntityService.js';
 import type { PageEntityService } from './PageEntityService.js';
 
 const Ajv = _Ajv.default;
@@ -96,6 +95,7 @@ export class UserEntityService implements OnModuleInit {
 	private idService: IdService;
 	private avatarDecorationService: AvatarDecorationService;
 	private cacheService: CacheService;
+	private chatService: ChatService;
 
 	constructor(
 		private moduleRef: ModuleRef,
@@ -130,9 +130,6 @@ export class UserEntityService implements OnModuleInit {
 		@Inject(DI.renoteMutingsRepository)
 		private renoteMutingsRepository: RenoteMutingsRepository,
 
-		@Inject(DI.noteUnreadsRepository)
-		private noteUnreadsRepository: NoteUnreadsRepository,
-
 		@Inject(DI.userNotePiningsRepository)
 		private userNotePiningsRepository: UserNotePiningsRepository,
 
@@ -155,6 +152,7 @@ export class UserEntityService implements OnModuleInit {
 		this.idService = this.moduleRef.get('IdService');
 		this.avatarDecorationService = this.moduleRef.get('AvatarDecorationService');
 		this.cacheService = this.moduleRef.get('CacheService');
+		this.chatService = this.moduleRef.get('ChatService');
 	}
 
 	//#region Validators
@@ -497,7 +495,6 @@ export class UserEntityService implements OnModuleInit {
 							flipH: ud.flipH || undefined,
 							offsetX: ud.offsetX || undefined,
 							offsetY: ud.offsetY || undefined,
-							showBelow: ud.showBelow || undefined,
 							url: decorations.find(d => d.id === ud.id)!.url,
 						})))
 				: [];
@@ -587,6 +584,7 @@ export class UserEntityService implements OnModuleInit {
 				publicReactions: this.isLocalUser(user) ? profile!.publicReactions : false, // https://github.com/misskey-dev/misskey/issues/12964
 				followersVisibility: profile!.followersVisibility,
 				followingVisibility: profile!.followingVisibility,
+				chatScope: user.chatScope,
 				roles: this.roleService.getUserRoles(user.id).then(roles => roles.filter(role => role.isPublic).sort((a, b) => b.displayOrder - a.displayOrder).map(role => ({
 					id: role.id,
 					name: role.name,
@@ -627,14 +625,9 @@ export class UserEntityService implements OnModuleInit {
 				isDeleted: user.isDeleted,
 				twoFactorBackupCodesStock: profile?.twoFactorBackupSecret?.length === 5 ? 'full' : (profile?.twoFactorBackupSecret?.length ?? 0) > 0 ? 'partial' : 'none',
 				hideOnlineStatus: user.hideOnlineStatus,
-				hasUnreadSpecifiedNotes: this.noteUnreadsRepository.count({
-					where: { userId: user.id, isSpecified: true },
-					take: 1,
-				}).then(count => count > 0),
-				hasUnreadMentions: this.noteUnreadsRepository.count({
-					where: { userId: user.id, isMentioned: true },
-					take: 1,
-				}).then(count => count > 0),
+				hasUnreadSpecifiedNotes: false, // 後方互換性のため
+				hasUnreadMentions: false, // 後方互換性のため
+				hasUnreadChatMessages: this.chatService.hasUnreadMessages(user.id),
 				hasUnreadAnnouncement: unreadAnnouncements!.length > 0,
 				unreadAnnouncements,
 				hasUnreadAntenna: this.getHasUnreadAntenna(user.id),

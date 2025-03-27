@@ -6,7 +6,7 @@
 import { computed, reactive } from 'vue';
 import { ui } from '@@/js/config.js';
 import { clearCache } from './utility/clear-cache.js';
-import { $i } from '@/account.js';
+import { $i } from '@/i.js';
 import { miLocalStorage } from '@/local-storage.js';
 import { openInstanceMenu, openToolsMenu } from '@/ui/_common_/common.js';
 import { lookup } from '@/utility/lookup.js';
@@ -110,6 +110,12 @@ export const navbarItemDef = reactive({
 		icon: 'ti ti-device-tv',
 		to: '/channels',
 	},
+	chat: {
+		title: i18n.ts.chat,
+		icon: 'ti ti-messages',
+		to: '/chat',
+		indicated: computed(() => $i != null && $i.hasUnreadChatMessages),
+	},
 	achievements: {
 		title: i18n.ts.achievements,
 		icon: 'ti ti-medal',
@@ -167,7 +173,7 @@ export const navbarItemDef = reactive({
 		title: i18n.ts.reload,
 		icon: 'ti ti-refresh',
 		action: (ev) => {
-			location.reload();
+			window.location.reload();
 		},
 	},
 	profile: {

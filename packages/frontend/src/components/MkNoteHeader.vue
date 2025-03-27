@@ -54,6 +54,7 @@ import { notePage } from '@/filters/note.js';
 import { userPage } from '@/filters/user.js';
 import { prefer } from '@/preferences.js';
 import MkInstanceTicker from '@/components/MkInstanceTicker.vue';
+import { DI } from '@/di.js';
 
 const isDetail = ref(false);
 const setDetail = (value) => {
@@ -66,7 +67,7 @@ const props = defineProps<{
 
 const showTicker = (prefer.s.instanceTicker === 'always') || (prefer.s.instanceTicker === 'remote' && props.note.user.instance);
 
-const mock = inject<boolean>('mock', false);
+const mock = inject(DI.mock, false);
 </script>
 
 <style lang="scss" module>

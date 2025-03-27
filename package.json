@@ -1,6 +1,6 @@
 {
 	"name": "misskey",
-	"version": "2025.3.1-pari-alpha.9",
+	"version": "2025.3.1-pari-alpha.11",
 	"codename": "nasubi",
 	"repository": {
 		"type": "git",

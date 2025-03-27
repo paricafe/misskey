@@ -58,7 +58,27 @@ SPDX-License-Identifier: AGPL-3.0-only
 					</MkSwitch>
 				</MkPreferenceContainer>
 			</SearchMarker>
+
+			<SearchMarker :keywords="['text', 'selectable']">
+				<MkPreferenceContainer k="makeEveryTextElementsSelectable">
+					<MkSwitch v-model="makeEveryTextElementsSelectable">
+						<template #label><SearchLabel>{{ i18n.ts._settings.makeEveryTextElementsSelectable }}</SearchLabel></template>
+						<template #caption>{{ i18n.ts._settings.makeEveryTextElementsSelectable_description }}</template>
+					</MkSwitch>
+				</MkPreferenceContainer>
+			</SearchMarker>
 		</div>
+
+		<SearchMarker :keywords="['menu', 'style', 'popup', 'drawer']">
+			<MkPreferenceContainer k="menuStyle">
+				<MkSelect v-model="menuStyle">
+					<template #label><SearchLabel>{{ i18n.ts.menuStyle }}</SearchLabel></template>
+					<option value="auto">{{ i18n.ts.auto }}</option>
+					<option value="popup">{{ i18n.ts.popup }}</option>
+					<option value="drawer">{{ i18n.ts.drawer }}</option>
+				</MkSelect>
+			</MkPreferenceContainer>
+		</SearchMarker>
 
 		<SearchMarker :keywords="['contextmenu', 'system', 'native']">
 			<MkPreferenceContainer k="contextMenu">
@@ -69,6 +89,22 @@ SPDX-License-Identifier: AGPL-3.0-only
 					<option value="native">{{ i18n.ts._contextMenu.native }}</option>
 				</MkSelect>
 			</MkPreferenceContainer>
+		</SearchMarker>
+
+		<SearchMarker :keywords="['font', 'size']">
+			<MkRadios v-model="fontSize">
+				<template #label><SearchLabel>{{ i18n.ts.fontSize }}</SearchLabel></template>
+				<option :value="null"><span style="font-size: 14px;">Aa</span></option>
+				<option value="1"><span style="font-size: 15px;">Aa</span></option>
+				<option value="2"><span style="font-size: 16px;">Aa</span></option>
+				<option value="3"><span style="font-size: 17px;">Aa</span></option>
+			</MkRadios>
+		</SearchMarker>
+
+		<SearchMarker :keywords="['font', 'system', 'native']">
+			<MkSwitch v-model="useSystemFont">
+				<template #label><SearchLabel>{{ i18n.ts.useSystemFont }}</SearchLabel></template>
+			</MkSwitch>
 		</SearchMarker>
 	</div>
 </SearchMarker>
@@ -84,6 +120,8 @@ import { i18n } from '@/i18n.js';
 import { definePage } from '@/page.js';
 import MkPreferenceContainer from '@/components/MkPreferenceContainer.vue';
 import MkFeatureBanner from '@/components/MkFeatureBanner.vue';
+import { miLocalStorage } from '@/local-storage.js';
+import MkRadios from '@/components/MkRadios.vue';
 
 const reduceAnimation = prefer.model('animation', v => !v, v => !v);
 const animatedMfm = prefer.model('animatedMfm');
@@ -92,10 +130,34 @@ const keepScreenOn = prefer.model('keepScreenOn');
 const enableHorizontalSwipe = prefer.model('enableHorizontalSwipe');
 const useNativeUiForVideoAudioPlayer = prefer.model('useNativeUiForVideoAudioPlayer');
 const contextMenu = prefer.model('contextMenu');
+const menuStyle = prefer.model('menuStyle');
+const makeEveryTextElementsSelectable = prefer.model('makeEveryTextElementsSelectable');
+
+const fontSize = ref(miLocalStorage.getItem('fontSize'));
+const useSystemFont = ref(miLocalStorage.getItem('useSystemFont') != null);
+
+watch(fontSize, () => {
+	if (fontSize.value == null) {
+		miLocalStorage.removeItem('fontSize');
+	} else {
+		miLocalStorage.setItem('fontSize', fontSize.value);
+	}
+});
+
+watch(useSystemFont, () => {
+	if (useSystemFont.value) {
+		miLocalStorage.setItem('useSystemFont', 't');
+	} else {
+		miLocalStorage.removeItem('useSystemFont');
+	}
+});
 
 watch([
 	keepScreenOn,
 	contextMenu,
+	fontSize,
+	useSystemFont,
+	makeEveryTextElementsSelectable,
 ], async () => {
 	await reloadAsk({ reason: i18n.ts.reloadToApplySetting, unison: true });
 });

@@ -8,7 +8,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 	<MkPagination ref="pagingComponent" :pagination="pagination" @queue="onQueue">
 		<template #empty>
 			<div class="_fullinfo">
-				<img :src="infoImageUrl" class="_ghost"/>
+				<img :src="infoImageUrl" draggable="false"/>
 				<div>{{ i18n.ts.noNotifications }}</div>
 			</div>
 		</template>
@@ -24,7 +24,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 </template>
 
 <script lang="ts" setup>
-import { onUnmounted, onDeactivated, onMounted, computed, shallowRef, onActivated } from 'vue';
+import { onUnmounted, onDeactivated, onMounted, computed, useTemplateRef, onActivated } from 'vue';
 import * as Misskey from 'misskey-js';
 import type { notificationTypes } from '@@/js/const.js';
 import MkPagination from '@/components/MkPagination.vue';
@@ -42,7 +42,7 @@ const props = defineProps<{
 	excludeTypes?: typeof notificationTypes[number][];
 }>();
 
-const pagingComponent = shallowRef<InstanceType<typeof MkPagination>>();
+const pagingComponent = useTemplateRef('pagingComponent');
 
 const pagination = computed(() => prefer.r.useGroupedNotifications.value ? {
 	endpoint: 'i/notifications-grouped' as const,
@@ -60,7 +60,7 @@ const pagination = computed(() => prefer.r.useGroupedNotifications.value ? {
 
 function onNotification(notification) {
 	const isMuted = props.excludeTypes ? props.excludeTypes.includes(notification.type) : false;
-	if (isMuted || document.visibilityState === 'visible') {
+	if (isMuted || window.document.visibilityState === 'visible') {
 		useStream().send('readNotification');
 	}
 

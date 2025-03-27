@@ -9,7 +9,6 @@ export type Keys = (
 	'instance' |
 	'instanceCachedAt' |
 	'account' |
-	'accounts' |
 	'latestDonationInfoShownAt' |
 	'neverShowDonationInfo' |
 	'neverShowLocalOnlyInfo' |
@@ -30,7 +29,7 @@ export type Keys = (
 	'theme' |
 	'themeId' |
 	'customCss' |
-	'message_drafts' |
+	'chatMessageDrafts' |
 	'scratchpad' |
 	'debug' |
 	'preferences' |

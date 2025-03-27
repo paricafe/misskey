@@ -3,29 +3,27 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { v4 as uuid } from 'uuid';
 import type { PreferencesProfile, StorageProvider } from '@/preferences/manager.js';
 import { cloudBackup } from '@/preferences/utility.js';
 import { miLocalStorage } from '@/local-storage.js';
-import { isSameCond, ProfileManager } from '@/preferences/manager.js';
+import { isSameScope, PreferencesManager } from '@/preferences/manager.js';
 import { store } from '@/store.js';
-import { $i } from '@/account.js';
+import { $i } from '@/i.js';
 import { misskeyApi } from '@/utility/misskey-api.js';
+import { TAB_ID } from '@/tab-id.js';
 
-const TAB_ID = uuid();
-
-function createProfileManager(storageProvider: StorageProvider) {
+function createPrefManager(storageProvider: StorageProvider) {
 	let profile: PreferencesProfile;
 
 	const savedProfileRaw = miLocalStorage.getItem('preferences');
 	if (savedProfileRaw == null) {
-		profile = ProfileManager.newProfile();
+		profile = PreferencesManager.newProfile();
 		miLocalStorage.setItem('preferences', JSON.stringify(profile));
 	} else {
-		profile = ProfileManager.normalizeProfile(JSON.parse(savedProfileRaw));
+		profile = PreferencesManager.normalizeProfile(JSON.parse(savedProfileRaw));
 	}
 
-	return new ProfileManager(profile, storageProvider);
+	return new PreferencesManager(profile, storageProvider);
 }
 
 const syncGroup = 'default';
@@ -44,7 +42,7 @@ const storageProvider: StorageProvider = {
 				scope: ['client', 'preferences', 'sync'],
 				key: syncGroup + ':' + ctx.key,
 			}) as [any, any][];
-			const target = cloudData.find(([cond]) => isSameCond(cond, ctx.cond));
+			const target = cloudData.find(([scope]) => isSameScope(scope, ctx.scope));
 			if (target == null) return null;
 			return {
 				value: target[1],
@@ -73,12 +71,12 @@ const storageProvider: StorageProvider = {
 			}
 		}
 
-		const i = cloudData.findIndex(([cond]) => isSameCond(cond, ctx.cond));
+		const i = cloudData.findIndex(([scope]) => isSameScope(scope, ctx.scope));
 
 		if (i === -1) {
-			cloudData.push([ctx.cond, ctx.value]);
+			cloudData.push([ctx.scope, ctx.value]);
 		} else {
-			cloudData[i] = [ctx.cond, ctx.value];
+			cloudData[i] = [ctx.scope, ctx.value];
 		}
 
 		await misskeyApi('i/registry/set', {
@@ -104,7 +102,7 @@ const storageProvider: StorageProvider = {
 	},
 };
 
-export const prefer = createProfileManager(storageProvider);
+export const prefer = createPrefManager(storageProvider);
 
 let latestSyncedAt = Date.now();
 
@@ -118,7 +116,7 @@ function syncBetweenTabs() {
 	if (latestTab === TAB_ID) return;
 	if (latestAt <= latestSyncedAt) return;
 
-	prefer.rewriteProfile(ProfileManager.normalizeProfile(JSON.parse(miLocalStorage.getItem('preferences')!)));
+	prefer.rewriteProfile(PreferencesManager.normalizeProfile(JSON.parse(miLocalStorage.getItem('preferences')!)));
 
 	latestSyncedAt = Date.now();
 
@@ -127,8 +125,8 @@ function syncBetweenTabs() {
 
 window.setInterval(syncBetweenTabs, 5000);
 
-document.addEventListener('visibilitychange', () => {
-	if (document.visibilityState === 'visible') {
+window.document.addEventListener('visibilitychange', () => {
+	if (window.document.visibilityState === 'visible') {
 		syncBetweenTabs();
 	}
 });
@@ -138,7 +136,7 @@ let latestBackupAt = 0;
 window.setInterval(() => {
 	if ($i == null) return;
 	if (!store.s.enablePreferencesAutoCloudBackup) return;
-	if (document.visibilityState !== 'visible') return; // 同期されていない古い値がバックアップされるのを防ぐ
+	if (window.document.visibilityState !== 'visible') return; // 同期されていない古い値がバックアップされるのを防ぐ
 	if (prefer.profile.modifiedAt <= latestBackupAt) return;
 
 	cloudBackup().then(() => {
