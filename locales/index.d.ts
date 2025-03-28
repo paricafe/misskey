@@ -5362,6 +5362,10 @@ export interface Locale extends ILocale {
      * 通常これは自動で行われていますが、何らかの理由により上手く移行されなかった場合は手動で移行処理をトリガーできます。現在の設定情報は上書きされます。
      */
     "migrateOldSettings_description": string;
+    /**
+     * 圧縮
+     */
+    "compress": string;
     "_chat": {
         /**
          * まだメッセージはありません
@@ -5472,6 +5476,14 @@ export interface Locale extends ILocale {
          * ルームを削除
          */
         "deleteRoom": string;
+        /**
+         * このサーバー、またはこのアカウントでチャットは有効化されていません。
+         */
+        "chatNotAvailableForThisAccountOrServer": string;
+        /**
+         * 相手のアカウントでチャット機能が使えない状態になっています。
+         */
+        "chatNotAvailableInOtherAccount": string;
         /**
          * このユーザーとのチャットを開始できません
          */
