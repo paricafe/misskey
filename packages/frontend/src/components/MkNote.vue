@@ -83,7 +83,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 							:enableEmojiMenuReaction="true"
 							class="_selectable"
 						/>
-						<div v-if="enableTranslateButton && $i.policies.canUseTranslator && appearNote.text" style="padding-top: 5px; color: var(--MI_THEME-accent);">
+						<div v-if="enableTranslateButton && appearNote.text" style="padding-top: 5px; color: var(--MI_THEME-accent);">
 							<button v-if="!(translating || translation)" ref="translateButton" class="_button" @click.stop="translate()"><i class="ti ti-language-hiragana"></i>{{ i18n.ts.translate }}</button>
 							<button v-else class="_button" @click.stop="translation= null">{{ i18n.ts.close }}</button>
 						</div>
