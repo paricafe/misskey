@@ -232,9 +232,6 @@ html,
 body {
 	width: 100%;
 	height: 100%;
-	position: fixed;
-	top: 0;
-	left: 0;
 	overscroll-behavior: none;
 }
 
@@ -247,9 +244,6 @@ body {
 	width: 100%;
 	height: 100%;
 	overflow: clip;
-	position: absolute;
-	top: 0;
-	left: 0;
 }
 </style>
 
