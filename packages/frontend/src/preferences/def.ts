@@ -198,6 +198,9 @@ export const PREF_DEF = {
 	useBlurEffect: {
 		default: DEFAULT_DEVICE_KIND === 'desktop',
 	},
+	useStickyIcons: {
+		default: false,
+	},
 	showFixedPostForm: {
 		default: false,
 	},
