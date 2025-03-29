@@ -1,10 +1,6 @@
 {
 	"name": "misskey",
-<<<<<<< HEAD
 	"version": "2025.3.1-pari-alpha.15",
-=======
-	"version": "2025.3.2-beta.17",
->>>>>>> develop
 	"codename": "nasubi",
 	"repository": {
 		"type": "git",
