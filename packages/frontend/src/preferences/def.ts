@@ -402,9 +402,6 @@ export const PREF_DEF = {
 	defaultLike: {
 		default: '❤️',
 	},
-	enableRenderingOptimization: {
-		default: true,
-	},
 	enableTranslateButton: {
 		default: false,
 	},

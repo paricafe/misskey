@@ -12,9 +12,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 		<div class="_gaps_m">
 			<div class="label">{{ i18n.ts.pariPlusSystemSettings }}</div>
 			<div class="_gaps_s">
-				<MkPreferenceContainer k="enableRenderingOptimization">
-					<MkSwitch v-model="enableRenderingOptimization">{{ i18n.ts.enableRenderingOptimization }}</MkSwitch>
-				</MkPreferenceContainer>
 			</div>
 		</div>
 	</FormSection>
@@ -141,8 +138,6 @@ function saveFontSize() {
 	window.document.documentElement.classList.add('f-' + fontSizeNumber.value);
 	fontSizeNumberOld.value = fontSizeNumber.value;
 }
-
-const enableRenderingOptimization = prefer.model('enableRenderingOptimization');
 
 const enableTranslateButton = prefer.model('enableTranslateButton');
 const showDetailTimeWhenHover = prefer.model('showDetailTimeWhenHover');

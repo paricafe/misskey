@@ -9,7 +9,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 	v-show="!isDeleted"
 	ref="rootEl"
 	v-hotkey="keymap"
-	:class="[$style.root, { [$style.showActionsOnlyHover]: prefer.s.showNoteActionsOnlyHover, [$style.skipRender]: prefer.s.skipNoteRender || prefer.s.enableRenderingOptimization }]"
+	:class="[$style.root, { [$style.showActionsOnlyHover]: prefer.s.showNoteActionsOnlyHover, [$style.skipRender]: prefer.s.skipNoteRender }]"
 	:tabindex="isDeleted ? '-1' : '0'"
 >
 	<div v-if="appearNote.reply && inReplyToCollapsed && !isRenote" :class="$style.collapsedInReplyTo">
