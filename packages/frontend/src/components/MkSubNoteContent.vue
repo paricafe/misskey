@@ -46,7 +46,7 @@ const props = defineProps<{
 const router = useRouter();
 
 function noteClickToOpen(id: string) {
-	const selection = document.getSelection();
+	const selection = window.document.getSelection();
 	if (selection?.toString().length === 0) {
 		router.push(`/notes/${id}`);
 	}
