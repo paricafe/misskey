@@ -28,7 +28,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 						v-for="id in ids"
 						:ref="id"
 						:key="id"
-						:class="$style.column"
+						:class="[$style.column, { '_shadow': withWallpaper }]"
 						:column="columns.find(c => c.id === id)!"
 						:isStacked="ids.length > 1"
 						@headerWheel="onWheel"
@@ -36,7 +36,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 				</section>
 				<div v-if="layout.length === 0" class="_panel" :class="$style.onboarding">
 					<div>{{ i18n.ts._deck.introduction }}</div>
-					<MkButton primary style="margin: 1em auto;" @click="addColumn">{{ i18n.ts._deck.addColumn }}</MkButton>
 					<div>{{ i18n.ts._deck.introduction2 }}</div>
 				</div>
 			</div>
@@ -50,7 +49,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 					<button v-tooltip.noDelay.left="i18n.ts._deck.addColumn" :class="$style.sideMenuButton" class="_button" @click="addColumn"><i class="ti ti-plus"></i></button>
 				</div>
 				<div :class="$style.sideMenuBottom">
-					<button v-tooltip.noDelay.left="i18n.ts.settings" :class="$style.sideMenuButton" class="_button" @click="showSettings"><i class="ti ti-settings"></i></button>
+					<button v-tooltip.noDelay.left="i18n.ts.settings" :class="$style.sideMenuButton" class="_button" @click="showSettings"><i class="ti ti-settings-2"></i></button>
 				</div>
 			</div>
 		</div>
@@ -64,7 +63,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 				<button v-tooltip.noDelay.left="i18n.ts._deck.addColumn" :class="$style.bottomMenuButton" class="_button" @click="addColumn"><i class="ti ti-plus"></i></button>
 			</div>
 			<div :class="$style.bottomMenuRight">
-				<button v-tooltip.noDelay.left="i18n.ts.settings" :class="$style.bottomMenuButton" class="_button" @click="showSettings"><i class="ti ti-settings"></i></button>
+				<button v-tooltip.noDelay.left="i18n.ts.settings" :class="$style.bottomMenuButton" class="_button" @click="showSettings"><i class="ti ti-settings-2"></i></button>
 			</div>
 		</div>
 
