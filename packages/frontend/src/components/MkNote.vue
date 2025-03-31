@@ -443,7 +443,7 @@ if (!props.mock) {
 			showing,
 			users,
 			count: appearNote.value.renoteCount,
-			targetElement: renoteButton.value,
+			targetElement: renoteButton.value as HTMLElement,
 		}, {
 			closed: () => dispose(),
 		});
