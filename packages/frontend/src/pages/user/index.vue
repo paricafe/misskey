@@ -7,7 +7,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 <PageWithHeader v-model:tab="tab" :tabs="headerTabs" :actions="headerActions">
 	<div v-if="user">
 		<MkHorizontalSwipe v-model:tab="tab" :tabs="headerTabs">
-			<XHome v-if="tab === 'home'" :user="user" @unfoldFiles="() => { tab = 'files'; }"/>
+			<XHome v-if="tab === 'home'" :user="user" :disableNotes="false" @unfoldFiles="() => { tab = 'files'; }"/>
 			<MkSpacer v-else-if="tab === 'notes'" :contentMax="800" style="padding-top: 0">
 				<XTimeline :user="user"/>
 			</MkSpacer>
@@ -68,8 +68,6 @@ const user = ref<null | Misskey.entities.UserDetailed>(CTX_USER);
 const error = ref<any>(null);
 
 function fetchUser(): void {
-	if (props.acct == null) return;
-
 	const { username, host } = Misskey.acct.parse(props.acct);
 
 	if (CTX_USER && CTX_USER.username === username && CTX_USER.host === host) {
