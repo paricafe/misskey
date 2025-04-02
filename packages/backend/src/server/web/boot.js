@@ -132,11 +132,6 @@
 		document.documentElement.classList.add(`default-font-${defaultFontFace}`);
 	}
 
-	const wallpaper = localStorage.getItem('wallpaper');
-	if (wallpaper) {
-		document.documentElement.style.backgroundImage = `url(${wallpaper})`;
-	}
-
 	const customCss = localStorage.getItem('customCss');
 	if (customCss && customCss.length > 0) {
 		const style = document.createElement('style');
