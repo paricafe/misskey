@@ -5386,6 +5386,10 @@ export interface Locale extends ILocale {
      * 埋め込み
      */
     "embed": string;
+    /**
+     * 設定を移行しています。しばらくお待ちください... (後ほど、設定→その他→旧設定情報を移行 で手動で移行することもできます)
+     */
+    "settingsMigrating": string;
     "_chat": {
         /**
          * まだメッセージはありません
@@ -7365,6 +7369,14 @@ export interface Locale extends ILocale {
          * 数値が大きいほどUI上で先頭に表示されます。
          */
         "descriptionOfDisplayOrder": string;
+        /**
+         * アサイン状態を移行先アカウントにも引き継ぐ
+         */
+        "preserveAssignmentOnMoveAccount": string;
+        /**
+         * オンにすると、このロールが付与されたアカウントが移行された際に、移行先アカウントにもこのロールが引き継がれるようになります。
+         */
+        "preserveAssignmentOnMoveAccount_description": string;
         /**
          * モデレーターのメンバー編集を許可
          */
