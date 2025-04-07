@@ -5235,7 +5235,8 @@ export type components = {
       canImportMuting: boolean;
       canImportUserLists: boolean;
       canEditNote: boolean;
-      canChat: boolean;
+      /** @enum {string} */
+      chatAvailability: 'available' | 'readonly' | 'unavailable';
     };
     ReversiGameLite: {
       /** Format: id */
