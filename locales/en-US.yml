@@ -1343,6 +1343,8 @@ right: "Right"
 bottom: "Bottom"
 top: "Top"
 embed: "Embed"
+settingsMigrating: "Migrating settings. Please wait... (You can also migrate manually later via Settings → Others → Migrate legacy settings)"
+readonly: "Read-only"
 _chat:
   noMessagesYet: "No messages yet"
   newMessage: "New message"

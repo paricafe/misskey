@@ -1343,6 +1343,8 @@ right: "右"
 bottom: "下"
 top: "上"
 embed: "嵌入"
+settingsMigrating: "正在迁移设置。请稍候……（稍后也可以在 设置 → 其他 → 迁移旧设置信息 中手动迁移）"
+readonly: "只读"
 _chat:
   noMessagesYet: "还没有消息"
   newMessage: "新消息"
