@@ -112,7 +112,7 @@ watch(rootEl, () => {
 	max-width: 50px;
 	margin: auto;
 	align-content: center;
-	border-radius: 70%;
+	border-radius: 70% / 100%;
 	background: var(--MI_THEME-panel);
 	color: var(--MI_THEME-fg);
 
@@ -122,16 +122,11 @@ watch(rootEl, () => {
 
 	&:active {
 		background: hsl(from var(--MI_THEME-panel) h s calc(l - 2));
-
-		> .itemIcon {
-			color: var(--MI_THEME-accent);
-		}
 	}
 }
 
 .itemIcon {
 	font-size: 14px;
-	transition: color 0.2s;
 }
 
 .itemIndicator {
