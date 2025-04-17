@@ -77,14 +77,17 @@ watch(rootEl, () => {
 
 <style lang="scss" module>
 .root {
+	position: relative;
+	z-index: 1;
 	padding: 12px 12px max(12px, env(safe-area-inset-bottom, 0px)) 12px;
 	display: grid;
 	grid-template-columns: 1fr 1fr 1fr 1fr 1fr;
 	grid-gap: 8px;
 	width: 100%;
 	box-sizing: border-box;
-	background: var(--MI_THEME-bg);
-	border-top: solid 0.5px var(--MI_THEME-divider);
+	background: var(--MI_THEME-navBg);
+	color: var(--MI_THEME-navFg);
+	box-shadow: 0px 0px 6px 6px #0000000f;
 }
 
 .item {
@@ -109,7 +112,7 @@ watch(rootEl, () => {
 	padding: 0;
 	aspect-ratio: 1.5;
 	width: 100%;
-	max-width: 50px;
+	max-width: 45px;
 	margin: auto;
 	align-content: center;
 	border-radius: 70% / 100%;
@@ -121,7 +124,7 @@ watch(rootEl, () => {
 	}
 
 	&:active {
-		background: hsl(from var(--MI_THEME-panel) h s calc(l - 2));
+		background: var(--MI_THEME-panelHighlight);
 	}
 }
 
@@ -131,14 +134,16 @@ watch(rootEl, () => {
 
 .itemIndicator {
 	position: absolute;
-	top: 0;
+	bottom: -4px;
 	left: 0;
+	right: 0;
 	color: var(--MI_THEME-indicator);
-	font-size: 16px;
+	font-size: 10px;
+	pointer-events: none;
 
 	&:has(.itemIndicateValueIcon) {
 		animation: none;
-		font-size: 12px;
+		font-size: 8px;
 	}
 }
 </style>
