@@ -52,7 +52,7 @@ function noteClickToOpen(id: string) {
 	}
 }
 
-const isLong = computed(() => shouldCollapsed(props.note, []));
+const isLong = shouldCollapsed(props.note, []);
 
 const collapsed = ref(isLong);
 </script>
