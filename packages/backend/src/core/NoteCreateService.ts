@@ -409,6 +409,7 @@ export class NoteCreateService implements OnApplicationShutdown {
 		username: MiUser['username'];
 		host: MiUser['host'];
 		isBot: MiUser['isBot'];
+		isCat: MiUser['isCat'];
 	}, data: Option): Promise<MiNote> {
 		return this.create(user, data, true);
 	}
@@ -422,9 +423,7 @@ export class NoteCreateService implements OnApplicationShutdown {
 			renoteId: data.renote ? data.renote.id : null,
 			channelId: data.channel ? data.channel.id : null,
 			threadId: data.reply
-				? data.reply.threadId
-					? data.reply.threadId
-					: data.reply.id
+				? data.reply.threadId ?? data.reply.id
 				: null,
 			name: data.name,
 			text: data.text,
