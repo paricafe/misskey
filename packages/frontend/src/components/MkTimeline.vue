@@ -261,13 +261,13 @@ function updatePaginationQuery(untilDate?: Date) {
 	}
 
 	if (endpoint && query) {
-		paginationQuery.value = {
+		paginationQuery = {
 			endpoint: endpoint,
 			limit: 10,
 			params: query,
 		};
 	} else {
-		paginationQuery.value = null;
+		paginationQuery = null;
 	}
 }
 
