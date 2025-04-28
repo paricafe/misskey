@@ -148,7 +148,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 					<MkTime :time="appearNote.createdAt" mode="detail" colored/>
 				</MkA>
 			</div>
-			<MkReactionsViewer v-if="appearNote.reactionAcceptance !== 'likeOnly' && !disableReactionsViewer" ref="reactionsViewer" :note="appearNote"/>
+			<MkReactionsViewer v-if="appearNote.reactionAcceptance !== 'likeOnly'" ref="reactionsViewer" style="margin-top: 6px;" :note="appearNote"/>
 			<div :class="$style.footerButton">
 				<button class="_button" :class="$style.noteFooterButton" @click.stop="reply()">
 					<i class="ti ti-arrow-back-up"></i>
