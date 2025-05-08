@@ -72,11 +72,11 @@ function showInstanceTickerWindow() {
 
 	// text-shadowは重いから使うな
 
-	mask-image: linear-gradient(90deg,
-		rgb(0,0,0),
-		rgb(0,0,0) calc(100% - 16px),
-		rgba(0,0,0,0) 100%
-	);
+	// mask-image: linear-gradient(90deg,
+	// 	rgb(0,0,0),
+	// 	rgb(0,0,0) calc(100% - 16px),
+	// 	rgba(0,0,0,0) 100%
+	// );
 }
 
 .icon {
