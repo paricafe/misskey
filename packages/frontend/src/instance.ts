@@ -29,12 +29,6 @@ if (providedAt > cachedAt) {
 
 export const instance: Misskey.entities.MetaDetailed = reactive(cachedMeta ?? {});
 
-export const serverErrorImageUrl = computed(() => instance.serverErrorImageUrl ?? DEFAULT_SERVER_ERROR_IMAGE_URL);
-
-export const infoImageUrl = computed(() => instance.infoImageUrl ?? DEFAULT_INFO_IMAGE_URL);
-
-export const notFoundImageUrl = computed(() => instance.notFoundImageUrl ?? DEFAULT_NOT_FOUND_IMAGE_URL);
-
 export const isEnabledUrlPreview = computed(() => instance.enableUrlPreview ?? true);
 
 export async function fetchInstance(force = false): Promise<Misskey.entities.MetaDetailed> {
