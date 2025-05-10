@@ -84,6 +84,10 @@ export const store = markRaw(new Pizzax('base', {
 		where: 'device',
 		default: false,
 	},
+	realtimeMode: {
+		where: 'device',
+		default: true,
+	},
 	recentlyUsedEmojis: {
 		where: 'device',
 		default: [] as string[],
@@ -383,10 +387,6 @@ export const store = markRaw(new Pizzax('base', {
 		default: false,
 	},
 	keepScreenOn: {
-		where: 'device',
-		default: false,
-	},
-	disableStreamingTimeline: {
 		where: 'device',
 		default: false,
 	},

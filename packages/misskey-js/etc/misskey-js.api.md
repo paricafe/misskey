@@ -1972,6 +1972,8 @@ declare namespace entities {
         NotesSearchByTagResponse,
         NotesShowRequest,
         NotesShowResponse,
+        NotesShowPartialBulkRequest,
+        NotesShowPartialBulkResponse,
         NotesStateRequest,
         NotesStateResponse,
         NotesThreadMutingCreateRequest,
@@ -3076,6 +3078,12 @@ type NotesSearchRequest = operations['notes___search']['requestBody']['content']
 
 // @public (undocumented)
 type NotesSearchResponse = operations['notes___search']['responses']['200']['content']['application/json'];
+
+// @public (undocumented)
+type NotesShowPartialBulkRequest = operations['notes___show-partial-bulk']['requestBody']['content']['application/json'];
+
+// @public (undocumented)
+type NotesShowPartialBulkResponse = operations['notes___show-partial-bulk']['responses']['200']['content']['application/json'];
 
 // @public (undocumented)
 type NotesShowRequest = operations['notes___show']['requestBody']['content']['application/json'];
