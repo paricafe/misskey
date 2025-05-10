@@ -322,6 +322,7 @@ const likeButton = useTemplateRef('likeButton');
 const galleryEl = useTemplateRef('galleryEl');
 const isMyRenote = $i && ($i.id === note.userId);
 const showContent = ref(false);
+const isDeleted = ref(false);
 const parsed = computed(() => appearNote.text ? mfm.parse(appearNote.text) : null);
 const urls = computed(() => parsed.value ? extractUrlFromMfm(parsed.value).filter((url) => appearNote.renote?.url !== url && appearNote.renote?.uri !== url) : null);
 const isLong = shouldCollapsed(appearNote, urls.value ?? []);
@@ -683,7 +684,7 @@ async function translate(): Promise<void> {
 		return;
 	}
 	const res = await misskeyApi('notes/translate', {
-		noteId: appearNote.value.id,
+		noteId: appearNote.id,
 		targetLang: miLocalStorage.getItem('lang') ?? navigator.language,
 	});
 	translating.value = false;
@@ -705,6 +706,7 @@ function showRenoteMenu(): void {
 					noteId: note.id,
 				}).then(() => {
 					globalEvents.emit('noteDeleted', note.id);
+					isDeleted.value = true;
 				});
 			},
 		};
