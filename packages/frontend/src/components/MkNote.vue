@@ -937,10 +937,6 @@ function emitUpdReaction(emoji: string, delta: number) {
 	margin: 0 8px 0 0;
 }
 
-.collapsedRenoteTargetText {
-	opacity: 0.7;
-}
-
 .collapsedRenoteTargetText, .collapsedInReplyToText {
 	overflow: hidden;
 	flex-shrink: 1;
