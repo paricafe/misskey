@@ -70,7 +70,7 @@ const themeColorStyle = computed<CSSProperties>(() => {
 	const themeColor = (props.host == null ? localInstance.themeColor : props.instance?.themeColor) ?? '#777777';
 	const colors = getTickerColors(themeColor);
 	return {
-		background: `linear-gradient(90deg, ${colors.bg}, ${colors.bg}00)`,
+		background: colors.bg,
 		color: colors.fg,
 	};
 });
