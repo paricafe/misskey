@@ -442,16 +442,13 @@ provide(DI.mfmEmojiReactCallback, (reaction) => {
 if (!props.mock) {
 	useNoteCapture({
 		note: appearNote,
-<<<<<<< HEAD
 		pureNote: note,
 		isDeletedRef: isDeleted,
 		onReplyCallback: () => {
-			appearNote.value.repliesCount = (appearNote.value.repliesCount || 0) + 1;
+			appearNote.repliesCount = (appearNote.repliesCount || 0) + 1;
 		},
-=======
 		parentNote: note,
 		$note: $appearNote,
->>>>>>> origin/develop
 	});
 }
 
@@ -469,23 +466,14 @@ if (!props.mock) {
 		const { dispose } = os.popup(MkUsersTooltip, {
 			showing,
 			users,
-<<<<<<< HEAD
-			count: appearNote.value.renoteCount,
-			targetElement: renoteButton.value as HTMLElement,
-=======
 			count: appearNote.renoteCount,
 			targetElement: renoteButton.value,
->>>>>>> origin/develop
 		}, {
 			closed: () => dispose(),
 		});
 	});
 
-<<<<<<< HEAD
-	if (appearNote.value.reactionAcceptance === 'likeOnly' || disableReactionsViewer.value) {
-=======
-	if (appearNote.reactionAcceptance === 'likeOnly') {
->>>>>>> origin/develop
+	if (appearNote.reactionAcceptance === 'likeOnly' || disableReactionsViewer.value) {
 		useTooltip(reactButton, async (showing) => {
 			const reactions = await misskeyApiGet('notes/reactions', {
 				noteId: appearNote.id,
@@ -565,11 +553,7 @@ function like(): void {
 function react(): void {
 	pleaseLogin({ openOnRemote: pleaseLoginContext.value });
 	showMovedDialog();
-<<<<<<< HEAD
-	if (appearNote.value.reactionAcceptance === 'likeOnly' || disableReactionsViewer.value) {
-=======
-	if (appearNote.reactionAcceptance === 'likeOnly') {
->>>>>>> origin/develop
+	if (appearNote.reactionAcceptance === 'likeOnly' || disableReactionsViewer.value) {
 		sound.playMisskeySfx('reaction');
 
 		if (props.mock) {
@@ -577,18 +561,13 @@ function react(): void {
 		}
 
 		misskeyApi('notes/reactions/create', {
-<<<<<<< HEAD
-			noteId: appearNote.value.id,
-			reaction: defaultLike.value,
-=======
 			noteId: appearNote.id,
-			reaction: '❤️',
+			reaction: defaultLike.value,
 		}).then(() => {
 			noteEvents.emit(`reacted:${appearNote.id}`, {
 				userId: $i!.id,
-				reaction: '❤️',
+				reaction: defaultLike.value,
 			});
->>>>>>> origin/develop
 		});
 		const el = reactButton.value;
 		if (el && prefer.s.animation) {
