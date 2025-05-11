@@ -214,9 +214,6 @@ export const PREF_DEF = {
 	useReactionPickerForContextMenu: {
 		default: true,
 	},
-	showGapBetweenNotesInTimeline: {
-		default: true,
-	},
 	instanceTicker: {
 		default: 'remote' as 'none' | 'remote' | 'always',
 	},

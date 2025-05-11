@@ -298,10 +298,6 @@ export const store = markRaw(new Pizzax('base', {
 		where: 'device',
 		default: false,
 	},
-	showGapBetweenNotesInTimeline: {
-		where: 'device',
-		default: true,
-	},
 	instanceTicker: {
 		where: 'device',
 		default: 'remote' as 'none' | 'remote' | 'always',
