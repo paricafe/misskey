@@ -539,7 +539,7 @@ function like(): void {
 	sound.playMisskeySfx('reaction');
 	misskeyApi('notes/reactions/create', {
 		noteId: appearNote.id,
-		reaction: defaultLike.value,
+		reaction: defaultLike,
 	});
 	const el = likeButton.value as HTMLElement | null | undefined;
 	if (el) {

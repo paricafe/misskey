@@ -536,7 +536,7 @@ function like(): void {
 	}
 	misskeyApi('notes/reactions/create', {
 		noteId: appearNote.id,
-		reaction: defaultLike.value,
+		reaction: defaultLike,
 	});
 	const el = likeButton.value as HTMLElement | null | undefined;
 	if (el) {
@@ -561,7 +561,7 @@ function react(): void {
 
 		misskeyApi('notes/reactions/create', {
 			noteId: appearNote.id,
-			reaction: defaultLike.value,
+			reaction: defaultLike,
 		}).then(() => {
 			noteEvents.emit(`reacted:${appearNote.id}`, {
 				userId: $i!.id,
