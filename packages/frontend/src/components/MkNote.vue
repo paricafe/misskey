@@ -92,32 +92,8 @@ SPDX-License-Identifier: AGPL-3.0-only
 								</div>
 							</div>
 						</div>
-						<div v-if="appearNote.files && appearNote.files.length > 0">
-							<MkMediaList ref="galleryEl" :mediaList="appearNote.files" @click.stop/>
-						</div>
-						<MkPoll
-							v-if="appearNote.poll"
-							:noteId="appearNote.id"
-							:multiple="appearNote.poll.multiple"
-							:expiresAt="appearNote.poll.expiresAt"
-							:choices="$appearNote.pollChoices"
-							:author="appearNote.user"
-							:emojiUrls="appearNote.emojis"
-							:class="$style.poll"
-							@click.stop
-						/>
-						<div v-if="isEnabledUrlPreview">
-							<MkUrlPreview v-for="url in urls" :key="url" :url="url" :compact="true" :detail="false" :class="$style.urlPreview" @click.stop/>
-						</div>
-						<div v-if="appearNote.renote" :class="$style.quote"><MkNoteSimple :note="appearNote.renote" :class="$style.quoteNote" @click.stop/></div>
-						<button v-if="isLong && collapsed" :class="$style.collapsed" class="_button" @click.stop="collapsed = false">
-							<span :class="$style.collapsedLabel">{{ i18n.ts.showMore }}</span>
-						</button>
-						<button v-else-if="isLong && !collapsed" :class="$style.showLess" class="_button" @click.stop="collapsed = true">
-							<span :class="$style.showLessLabel">{{ i18n.ts.showLess }}</span>
-						</button>
 					</div>
-					<div v-if="appearNote.files && appearNote.files.length > 0" style="margin-top: 8px;">
+					<div v-if="appearNote.files && appearNote.files.length > 0" style="margin-top: 8px;" @click.stop>
 						<MkMediaList ref="galleryEl" :mediaList="appearNote.files"/>
 					</div>
 					<MkPoll
@@ -129,15 +105,16 @@ SPDX-License-Identifier: AGPL-3.0-only
 						:author="appearNote.user"
 						:emojiUrls="appearNote.emojis"
 						:class="$style.poll"
+						@click.stop
 					/>
 					<div v-if="isEnabledUrlPreview">
-						<MkUrlPreview v-for="url in urls" :key="url" :url="url" :compact="true" :detail="false" :class="$style.urlPreview"/>
+						<MkUrlPreview v-for="url in urls" :key="url" :url="url" :compact="true" :detail="false" :class="$style.urlPreview" @click.stop/>
 					</div>
 					<div v-if="appearNote.renote" :class="$style.quote"><MkNoteSimple :note="appearNote.renote" :class="$style.quoteNote"/></div>
-					<button v-if="isLong && collapsed" :class="$style.collapsed" class="_button" @click="collapsed = false">
+					<button v-if="isLong && collapsed" :class="$style.collapsed" class="_button" @click.stop="collapsed = false">
 						<span :class="$style.collapsedLabel">{{ i18n.ts.showMore }}</span>
 					</button>
-					<button v-else-if="isLong && !collapsed" :class="$style.showLess" class="_button" @click="collapsed = true">
+					<button v-else-if="isLong && !collapsed" :class="$style.showLess" class="_button" @click.stop="collapsed = true">
 						<span :class="$style.showLessLabel">{{ i18n.ts.showLess }}</span>
 					</button>
 				</div>
