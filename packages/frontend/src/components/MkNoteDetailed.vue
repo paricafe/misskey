@@ -542,7 +542,12 @@ function like(): void {
 	sound.playMisskeySfx('reaction');
 	misskeyApi('notes/reactions/create', {
 		noteId: appearNote.id,
-		reaction: defaultLike,
+		reaction: defaultLike.value,
+	}).then(() => {
+		noteEvents.emit(`reacted:${appearNote.id}`, {
+			userId: $i!.id,
+			reaction: defaultLike.value,
+		});
 	});
 	const el = likeButton.value as HTMLElement | null | undefined;
 	if (el) {
@@ -563,7 +568,7 @@ function react(): void {
 
 		misskeyApi('notes/reactions/create', {
 			noteId: appearNote.id,
-			reaction: defaultLike,
+			reaction: defaultLike.value,
 		}).then(() => {
 			noteEvents.emit(`reacted:${appearNote.id}`, {
 				userId: $i!.id,
