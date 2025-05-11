@@ -535,7 +535,7 @@ function like(): void {
 		return;
 	}
 	misskeyApi('notes/reactions/create', {
-		noteId: appearNote.value.id,
+		noteId: appearNote.id,
 		reaction: defaultLike.value,
 	});
 	const el = likeButton.value as HTMLElement | null | undefined;

@@ -538,7 +538,7 @@ function like(): void {
 	showMovedDialog();
 	sound.playMisskeySfx('reaction');
 	misskeyApi('notes/reactions/create', {
-		noteId: appearNote.value.id,
+		noteId: appearNote.id,
 		reaction: defaultLike.value,
 	});
 	const el = likeButton.value as HTMLElement | null | undefined;
@@ -654,7 +654,7 @@ const fullHistoryWithLatest = computed(() =>
 		cw: appearNote.cw,
 		displayText: i18n.ts.latestVersion,
 		clearState: true,
-	}, ...appearNote.history
+	}, ...(appearNote.history ?? [])
 		.map(h => ({
 			...h,
 			displayText: null,
@@ -664,7 +664,7 @@ const fullHistoryWithLatest = computed(() =>
 );
 
 function historyMenu(viaKeyboard = false): void {
-	const currentNoteUpdatedAtDate = new Date(showingNoteHistoryRef.value?.createdAt || appearNote.value.updatedAt).getTime();
+	const currentNoteUpdatedAtDate = new Date(showingNoteHistoryRef.value?.createdAt ?? appearNote.updatedAt ?? new Date()).getTime();
 	const menu = fullHistoryWithLatest.value
 		.sort((h1, h2) => new Date(h2.createdAt).getTime() - new Date(h1.createdAt).getTime())
 		.map(h => ({
