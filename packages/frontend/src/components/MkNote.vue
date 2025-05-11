@@ -117,7 +117,29 @@ SPDX-License-Identifier: AGPL-3.0-only
 							<span :class="$style.showLessLabel">{{ i18n.ts.showLess }}</span>
 						</button>
 					</div>
-					<MkA v-if="appearNote.channel && !inChannel" :class="$style.channel" :to="`/channels/${appearNote.channel.id}`"><i class="ti ti-device-tv"></i> {{ appearNote.channel.name }}</MkA>
+					<div v-if="appearNote.files && appearNote.files.length > 0" style="margin-top: 8px;">
+						<MkMediaList ref="galleryEl" :mediaList="appearNote.files"/>
+					</div>
+					<MkPoll
+						v-if="appearNote.poll"
+						:noteId="appearNote.id"
+						:multiple="appearNote.poll.multiple"
+						:expiresAt="appearNote.poll.expiresAt"
+						:choices="$appearNote.pollChoices"
+						:author="appearNote.user"
+						:emojiUrls="appearNote.emojis"
+						:class="$style.poll"
+					/>
+					<div v-if="isEnabledUrlPreview">
+						<MkUrlPreview v-for="url in urls" :key="url" :url="url" :compact="true" :detail="false" :class="$style.urlPreview"/>
+					</div>
+					<div v-if="appearNote.renote" :class="$style.quote"><MkNoteSimple :note="appearNote.renote" :class="$style.quoteNote"/></div>
+					<button v-if="isLong && collapsed" :class="$style.collapsed" class="_button" @click="collapsed = false">
+						<span :class="$style.collapsedLabel">{{ i18n.ts.showMore }}</span>
+					</button>
+					<button v-else-if="isLong && !collapsed" :class="$style.showLess" class="_button" @click="collapsed = true">
+						<span :class="$style.showLessLabel">{{ i18n.ts.showLess }}</span>
+					</button>
 				</div>
 				<MkReactionsViewer
 					v-if="appearNote.reactionAcceptance !== 'likeOnly' && !disableReactionsViewer"
@@ -438,8 +460,10 @@ provide(DI.mfmEmojiReactCallback, (reaction) => {
 	});
 });
 
+let subscribeManuallyToNoteCapture: () => void = () => { };
+
 if (!props.mock) {
-	useNoteCapture({
+	const { subscribe } = useNoteCapture({
 		note: appearNote,
 		pureNote: note,
 		isDeletedRef: isDeleted,
@@ -449,6 +473,7 @@ if (!props.mock) {
 		parentNote: note,
 		$note: $appearNote,
 	});
+	subscribeManuallyToNoteCapture = subscribe;
 }
 
 if (!props.mock) {
@@ -512,6 +537,8 @@ function renote(viaKeyboard = false) {
 	os.popupMenu(menu, renoteButton.value, {
 		viaKeyboard,
 	});
+
+	subscribeManuallyToNoteCapture();
 }
 
 function reply(): void {
@@ -629,6 +656,11 @@ function undoReact(): void {
 
 	misskeyApi('notes/reactions/delete', {
 		noteId: appearNote.id,
+	}).then(() => {
+		noteEvents.emit(`unreacted:${appearNote.id}`, {
+			userId: $i!.id,
+			reaction: oldReaction,
+		});
 	});
 }
 

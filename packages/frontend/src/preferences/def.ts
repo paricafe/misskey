@@ -202,6 +202,9 @@ export const PREF_DEF = {
 	useStickyIcons: {
 		default: false,
 	},
+	enableHighQualityImagePlaceholders: {
+		default: true,
+	},
 	showFixedPostForm: {
 		default: false,
 	},
