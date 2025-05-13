@@ -566,6 +566,12 @@ function react(): void {
 	if (appearNote.reactionAcceptance === 'likeOnly' || disableReactionsViewer.value) {
 		sound.playMisskeySfx('reaction');
 
+		const reaction = defaultLike.value;
+		if (!$appearNote.reactions[reaction]) $appearNote.reactions[reaction] = 0;
+		$appearNote.reactions[reaction]++;
+		$appearNote.reactionCount++;
+		$appearNote.myReaction = reaction;
+
 		misskeyApi('notes/reactions/create', {
 			noteId: appearNote.id,
 			reaction: defaultLike.value,
@@ -597,6 +603,11 @@ function react(): void {
 			}
 
 			sound.playMisskeySfx('reaction');
+
+			if (!$appearNote.reactions[reaction]) $appearNote.reactions[reaction] = 0;
+			$appearNote.reactions[reaction]++;
+			$appearNote.reactionCount++;
+			$appearNote.myReaction = reaction;
 
 			misskeyApi('notes/reactions/create', {
 				noteId: appearNote.id,
