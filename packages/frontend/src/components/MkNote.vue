@@ -568,12 +568,6 @@ function react(): void {
 			return;
 		}
 
-		const reaction = defaultLike.value;
-		if (!$appearNote.reactions[reaction]) $appearNote.reactions[reaction] = 0;
-		$appearNote.reactions[reaction]++;
-		$appearNote.reactionCount++;
-		$appearNote.myReaction = reaction;
-
 		misskeyApi('notes/reactions/create', {
 			noteId: appearNote.id,
 			reaction: defaultLike.value,
@@ -613,11 +607,6 @@ function react(): void {
 				$appearNote.myReaction = reaction;
 				return;
 			}
-
-			if (!$appearNote.reactions[reaction]) $appearNote.reactions[reaction] = 0;
-			$appearNote.reactions[reaction]++;
-			$appearNote.reactionCount++;
-			$appearNote.myReaction = reaction;
 
 			misskeyApi('notes/reactions/create', {
 				noteId: appearNote.id,
