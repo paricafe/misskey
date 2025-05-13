@@ -4,125 +4,305 @@ SPDX-License-Identifier: AGPL-3.0-only
 -->
 
 <template>
-<component
-	:is="prefer.s.animation ? TransitionGroup : 'div'"
-	:enterActiveClass="$style.transition_x_enterActive"
-	:leaveActiveClass="$style.transition_x_leaveActive"
-	:enterFromClass="$style.transition_x_enterFrom"
-	:leaveToClass="$style.transition_x_leaveTo"
-	:moveClass="$style.transition_x_move"
-	tag="div" :class="$style.root"
+<button
+	ref="buttonEl"
+	v-ripple="canToggle"
+	class="_button"
+	:class="[$style.root, { [$style.reacted]: myReaction == reaction, [$style.canToggle]: canToggle, [$style.small]: prefer.s.reactionsDisplaySize === 'small', [$style.large]: prefer.s.reactionsDisplaySize === 'large' }]"
+	@click="toggleReaction()"
+	@contextmenu.prevent.stop="menu"
 >
-	<XReaction
-		v-for="[reaction, count] in _reactions"
-		:key="reaction"
-		:reaction="reaction"
-		:reactionEmojis="props.reactionEmojis"
-		:count="count"
-		:isInitial="initialReactions.has(reaction)"
-		:noteId="props.noteId"
-		:myReaction="props.myReaction"
-		@reactionToggled="onMockToggleReaction"
-	/>
-	<slot v-if="hasMoreReactions" name="more"/>
-</component>
+	<MkReactionIcon style="pointer-events: none;" :class="prefer.s.limitWidthOfReaction ? $style.limitWidth : ''" :reaction="reaction" :emojiUrl="reactionEmojis[reaction.substring(1, reaction.length - 1)]"/>
+	<span :class="$style.count">{{ count }}</span>
+</button>
 </template>
 
 <script lang="ts" setup>
+import { computed, inject, onMounted, useTemplateRef, watch } from 'vue';
 import * as Misskey from 'misskey-js';
-import { inject, watch, ref } from 'vue';
-import { TransitionGroup } from 'vue';
-import XReaction from '@/components/MkReactionsViewer.reaction.vue';
+import { getUnicodeEmoji } from '@@/js/emojilist.js';
+import MkCustomEmojiDetailedDialog from './MkCustomEmojiDetailedDialog.vue';
+import type { MenuItem } from '@/types/menu';
+import XDetails from '@/components/MkReactionsViewer.details.vue';
+import MkReactionIcon from '@/components/MkReactionIcon.vue';
+import * as os from '@/os.js';
+import { misskeyApi, misskeyApiGet } from '@/utility/misskey-api.js';
+import { useTooltip } from '@/composables/use-tooltip.js';
+import { $i } from '@/i.js';
+import MkReactionEffect from '@/components/MkReactionEffect.vue';
+import { i18n } from '@/i18n.js';
+import * as sound from '@/utility/sound.js';
+import { checkReactionPermissions } from '@/utility/check-reaction-permissions.js';
+import { customEmojisMap } from '@/custom-emojis.js';
 import { prefer } from '@/preferences.js';
 import { DI } from '@/di.js';
+import { noteEvents } from '@/composables/use-note-capture.js';
+import { mute as muteEmoji, unmute as unmuteEmoji, checkMuted as isEmojiMuted } from '@/utility/emoji-mute.js';
 
-const props = withDefaults(defineProps<{
+const props = defineProps<{
 	noteId: Misskey.entities.Note['id'];
-	reactions: Misskey.entities.Note['reactions'];
+	reaction: string;
 	reactionEmojis: Misskey.entities.Note['reactionEmojis'];
 	myReaction: Misskey.entities.Note['myReaction'];
-	maxNumber?: number;
-}>(), {
-	maxNumber: Infinity,
-});
+	count: number;
+	isInitial: boolean;
+}>();
 
 const mock = inject(DI.mock, false);
 
 const emit = defineEmits<{
-	(ev: 'mockUpdateMyReaction', emoji: string, delta: number): void;
+	(ev: 'reactionToggled', emoji: string, newCount: number): void;
 }>();
 
-const initialReactions = new Set(Object.keys(props.reactions));
+const buttonEl = useTemplateRef('buttonEl');
 
-const _reactions = ref<[string, number][]>([]);
-const hasMoreReactions = ref(false);
+const emojiName = computed(() => props.reaction.replace(/:/g, '').replace(/@\./, ''));
+const emoji = computed(() => customEmojisMap.get(emojiName.value) ?? getUnicodeEmoji(props.reaction));
 
-if (props.myReaction && !Object.keys(_reactions.value).includes(props.myReaction)) {
-	_reactions.value[props.myReaction] = props.reactions[props.myReaction];
-}
+const canToggle = computed(() => {
+	// TODO
+	//return !props.reaction.match(/@\w/) && $i && emoji.value && checkReactionPermissions($i, props.note, emoji.value);
+	return !props.reaction.match(/@\w/) && $i && emoji.value;
+});
+const canGetInfo = computed(() => !props.reaction.match(/@\w/) && props.reaction.includes(':'));
+const isLocalCustomEmoji = props.reaction[0] === ':' && props.reaction.includes('@.');
 
-function onMockToggleReaction(emoji: string, count: number) {
-	if (!mock) return;
+async function toggleReaction() {
+	if (!canToggle.value) return;
 
-	const i = _reactions.value.findIndex((item) => item[0] === emoji);
-	if (i < 0) return;
+	const oldReaction = props.myReaction;
+	if (oldReaction) {
+		const confirm = await os.confirm({
+			type: 'warning',
+			text: oldReaction !== props.reaction ? i18n.ts.changeReactionConfirm : i18n.ts.cancelReactionConfirm,
+		});
+		if (confirm.canceled) return;
 
-	emit('mockUpdateMyReaction', emoji, (count - _reactions.value[i][1]));
-}
-
-watch([() => props.reactions, () => props.maxNumber], ([newSource, maxNumber]) => {
-	let newReactions: [string, number][] = [];
-	hasMoreReactions.value = Object.keys(newSource).length > maxNumber;
-
-	for (let i = 0; i < _reactions.value.length; i++) {
-		const reaction = _reactions.value[i][0];
-		if (reaction in newSource && newSource[reaction] !== 0) {
-			_reactions.value[i][1] = newSource[reaction];
-			newReactions.push(_reactions.value[i]);
+		if (oldReaction !== props.reaction) {
+			sound.playMisskeySfx('reaction');
 		}
+
+		if (mock) {
+			emit('reactionToggled', props.reaction, (props.count - 1));
+			return;
+		}
+
+		misskeyApi('notes/reactions/delete', {
+			noteId: props.noteId,
+		}).then(() => {
+			noteEvents.emit(`unreacted:${props.noteId}`, {
+				userId: $i!.id,
+				reaction: oldReaction,
+			});
+			if (oldReaction !== props.reaction) {
+				misskeyApi('notes/reactions/create', {
+					noteId: props.noteId,
+					reaction: props.reaction,
+				}).then(() => {
+					noteEvents.emit(`reacted:${props.noteId}`, {
+						userId: $i!.id,
+						reaction: props.reaction,
+						emoji: emoji.value,
+					});
+				});
+			}
+		});
+	} else {
+		if (prefer.s.confirmOnReact) {
+			const confirm = await os.confirm({
+				type: 'question',
+				text: i18n.tsx.reactAreYouSure({ emoji: props.reaction.replace('@.', '') }),
+			});
+
+			if (confirm.canceled) return;
+		}
+
+		sound.playMisskeySfx('reaction');
+
+		if (mock) {
+			emit('reactionToggled', props.reaction, (props.count + 1));
+			return;
+		}
+
+		misskeyApi('notes/reactions/create', {
+			noteId: props.noteId,
+			reaction: props.reaction,
+		}).then(() => {
+			noteEvents.emit(`reacted:${props.noteId}`, {
+				userId: $i!.id,
+				reaction: props.reaction,
+				emoji: emoji.value,
+			});
+		});
+		// TODO: 上位コンポーネントでやる
+		//if (props.note.text && props.note.text.length > 100 && (Date.now() - new Date(props.note.createdAt).getTime() < 1000 * 3)) {
+		//	claimAchievement('reactWithoutRead');
+		//}
+	}
+}
+
+async function menu(ev) {
+	let menuItems: MenuItem[] = [];
+
+	if (canGetInfo.value) {
+		menuItems.push({
+			text: i18n.ts.info,
+			icon: 'ti ti-info-circle',
+			action: async () => {
+				const { dispose } = os.popup(MkCustomEmojiDetailedDialog, {
+					emoji: await misskeyApiGet('emoji', {
+						name: props.reaction.replace(/:/g, '').replace(/@\./, ''),
+					}),
+				}, {
+					closed: () => dispose(),
+				});
+			},
+		});
 	}
 
-	const newReactionsNames = newReactions.map(([x]) => x);
-	newReactions = [
-		...newReactions,
-		...Object.entries(newSource)
-			.sort(([, a], [, b]) => b - a)
-			.filter(([y], i) => i < maxNumber && !newReactionsNames.includes(y)),
-	];
-
-	newReactions = newReactions.slice(0, props.maxNumber);
-
-	if (props.myReaction && !newReactions.map(([x]) => x).includes(props.myReaction)) {
-		newReactions.push([props.myReaction, newSource[props.myReaction]]);
+	if (isEmojiMuted(props.reaction).value) {
+		menuItems.push({
+			text: i18n.ts.emojiUnmute,
+			icon: 'ti ti-mood-smile',
+			action: () => {
+				os.confirm({
+					type: 'question',
+					title: i18n.tsx.unmuteX({ x: isLocalCustomEmoji ? `:${emojiName.value}:` : props.reaction }),
+				}).then(({ canceled }) => {
+					if (canceled) return;
+					unmuteEmoji(props.reaction);
+				});
+			},
+		});
+	} else {
+		menuItems.push({
+			text: i18n.ts.emojiMute,
+			icon: 'ti ti-mood-off',
+			action: () => {
+				os.confirm({
+					type: 'question',
+					title: i18n.tsx.muteX({ x: isLocalCustomEmoji ? `:${emojiName.value}:` : props.reaction }),
+				}).then(({ canceled }) => {
+					if (canceled) return;
+					muteEmoji(props.reaction);
+				});
+			},
+		});
 	}
 
-	_reactions.value = newReactions;
-}, { immediate: true, deep: true });
+	os.popupMenu(menuItems, ev.currentTarget ?? ev.target);
+}
+
+function anime() {
+	if (window.document.hidden || !prefer.s.animation || buttonEl.value == null) return;
+
+	const rect = buttonEl.value.getBoundingClientRect();
+	const x = rect.left + 16;
+	const y = rect.top + (buttonEl.value.offsetHeight / 2);
+	const { dispose } = os.popup(MkReactionEffect, { reaction: props.reaction, x, y }, {
+		end: () => dispose(),
+	});
+}
+
+watch(() => props.count, (newCount, oldCount) => {
+	if (oldCount < newCount) anime();
+});
+
+onMounted(() => {
+	if (!props.isInitial) anime();
+});
+
+if (!mock) {
+	useTooltip(buttonEl, async (showing) => {
+		const reactions = await misskeyApiGet('notes/reactions', {
+			noteId: props.noteId,
+			type: props.reaction,
+			limit: 10,
+			_cacheKey_: props.count,
+		});
+
+		const users = reactions.map(x => x.user);
+
+		const { dispose } = os.popup(XDetails, {
+			showing,
+			reaction: props.reaction,
+			users,
+			count: props.count,
+			targetElement: buttonEl.value,
+		}, {
+			closed: () => dispose(),
+		});
+	}, 100);
+}
 </script>
 
 <style lang="scss" module>
-.transition_x_move,
-.transition_x_enterActive,
-.transition_x_leaveActive {
-	transition: opacity 0.2s cubic-bezier(0,.5,.5,1), transform 0.2s cubic-bezier(0,.5,.5,1) !important;
-}
-.transition_x_enterFrom,
-.transition_x_leaveTo {
-	opacity: 0;
-	transform: scale(0.7);
-}
-.transition_x_leaveActive {
-	position: absolute;
-}
-
 .root {
-	display: flex;
-	flex-wrap: wrap;
+	display: inline-flex;
+	height: 42px;
+	padding: 0 6px;
+	font-size: 1.5em;
+	border-radius: 6px;
 	align-items: center;
-	gap: 4px;
+	justify-content: center;
 
-	&:empty {
-		display: none;
+	&.canToggle {
+		background: var(--MI_THEME-buttonBg);
+
+		&:hover {
+			background: rgba(0, 0, 0, 0.1);
+		}
 	}
+
+	&:not(.canToggle) {
+		cursor: default;
+	}
+
+	&.small {
+		height: 32px;
+		font-size: 1em;
+		border-radius: 4px;
+
+		> .count {
+			font-size: 0.9em;
+			line-height: 32px;
+		}
+	}
+
+	&.large {
+		height: 52px;
+		font-size: 2em;
+		border-radius: 8px;
+
+		> .count {
+			font-size: 0.6em;
+			line-height: 52px;
+		}
+	}
+
+	&.reacted, &.reacted:hover {
+		background: var(--MI_THEME-accentedBg);
+		color: var(--MI_THEME-accent);
+		box-shadow: 0 0 0 1px var(--MI_THEME-accent) inset;
+
+		> .count {
+			color: var(--MI_THEME-accent);
+		}
+
+		> .icon {
+			filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.5));
+		}
+	}
+}
+
+.limitWidth {
+	max-width: 70px;
+	object-fit: contain;
+}
+
+.count {
+	font-size: 0.7em;
+	line-height: 42px;
+	margin: 0 0 0 4px;
 }
 </style>
