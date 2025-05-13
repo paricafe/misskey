@@ -636,15 +636,6 @@ function undoReact(): void {
 		return;
 	}
 
-	$appearNote.myReaction = null;
-	if ($appearNote.reactions[oldReaction] !== undefined) {
-		$appearNote.reactions[oldReaction]--;
-		if ($appearNote.reactions[oldReaction] <= 0) {
-			delete $appearNote.reactions[oldReaction];
-		}
-	}
-	$appearNote.reactionCount = Math.max(0, $appearNote.reactionCount - 1);
-
 	misskeyApi('notes/reactions/delete', {
 		noteId: appearNote.id,
 	}).then(() => {

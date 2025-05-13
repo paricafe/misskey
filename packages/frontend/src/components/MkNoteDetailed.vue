@@ -619,16 +619,6 @@ function react(): void {
 function undoReact(targetNote: Misskey.entities.Note): void {
 	const oldReaction = targetNote.myReaction;
 	if (!oldReaction) return;
-
-	$appearNote.myReaction = null;
-	if ($appearNote.reactions[oldReaction] !== undefined) {
-		$appearNote.reactions[oldReaction]--;
-		if ($appearNote.reactions[oldReaction] <= 0) {
-			delete $appearNote.reactions[oldReaction];
-		}
-	}
-	$appearNote.reactionCount = Math.max(0, $appearNote.reactionCount - 1);
-
 	misskeyApi('notes/reactions/delete', {
 		noteId: targetNote.id,
 	}).then(() => {
