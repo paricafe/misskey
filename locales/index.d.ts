@@ -5785,6 +5785,10 @@ export interface Locale extends ILocale {
          * リアルタイムモードがオンのときは、この設定に関わらずリアルタイムでコンテンツが更新されます。
          */
         "contentsUpdateFrequency_description2": string;
+        /**
+         * URLプレビューを表示する
+         */
+        "showUrlPreview": string;
         "_chat": {
             /**
              * 送信者の名前を表示
@@ -10975,13 +10979,23 @@ export interface Locale extends ILocale {
              */
             "description": string;
         };
-        "_urlPreview": {
+        "_urlPreviewThumbnail": {
             /**
              * URLプレビューのサムネイルを非表示
              */
             "title": string;
             /**
              * URLプレビューのサムネイル画像が読み込まれなくなります。
+             */
+            "description": string;
+        };
+        "_disableUrlPreview": {
+            /**
+             * URLプレビューを無効化
+             */
+            "title": string;
+            /**
+             * URLプレビュー機能を無効化します。サムネイル画像だけと違い、リンク先の情報の読み込み自体を削減できます。
              */
             "description": string;
         };
@@ -11944,6 +11958,36 @@ export interface Locale extends ILocale {
              */
             "text3": string;
         };
+    };
+    "_clientPerformanceIssueTip": {
+        /**
+         * バッテリー消費が多いと感じたら
+         */
+        "title": string;
+        /**
+         * アドブロッカーを無効にしてください
+         */
+        "makeSureDisabledAdBlocker": string;
+        /**
+         * アドブロッカーはパフォーマンスに影響を及ぼすことがあります。OSの機能やブラウザの機能・アドオンなどでアドブロッカーが有効になっていないか確認してください。
+         */
+        "makeSureDisabledAdBlocker_description": string;
+        /**
+         * カスタムCSSを無効にしてください
+         */
+        "makeSureDisabledCustomCss": string;
+        /**
+         * スタイルを上書きするとパフォーマンスに影響を及ぼすことがあります。カスタムCSSや、スタイルを上書きする拡張機能が有効になっていないか確認してください。
+         */
+        "makeSureDisabledCustomCss_description": string;
+        /**
+         * 拡張機能を無効にしてください
+         */
+        "makeSureDisabledAddons": string;
+        /**
+         * 一部の拡張機能はクライアントの動作に干渉しパフォーマンスに影響を及ぼすことがあります。ブラウザの拡張機能を無効にして改善するか確認してください。
+         */
+        "makeSureDisabledAddons_description": string;
     };
 }
 declare const locales: {
