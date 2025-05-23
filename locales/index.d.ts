@@ -1211,6 +1211,10 @@ export interface Locale extends ILocale {
      */
     "uploadFromUrlMayTakeTime": string;
     /**
+     * {n}個のファイルをアップロード
+     */
+    "uploadNFiles": ParameterizedString<"n">;
+    /**
      * みつける
      */
     "explore": string;
@@ -2330,6 +2334,10 @@ export interface Locale extends ILocale {
      * サウンド
      */
     "sound": string;
+    /**
+     * 通知音の設定
+     */
+    "notificationSoundSettings": string;
     /**
      * 聴く
      */
@@ -4015,6 +4023,10 @@ export interface Locale extends ILocale {
      */
     "cannotUploadBecauseExceedsFileSizeLimit": string;
     /**
+     * 許可されていないファイル種別のためアップロードできません。
+     */
+    "cannotUploadBecauseUnallowedFileType": string;
+    /**
      * ベータ
      */
     "beta": string;
@@ -5449,6 +5461,22 @@ export interface Locale extends ILocale {
      * {x}のミュートを解除
      */
     "unmuteX": ParameterizedString<"x">;
+    /**
+     * 中止
+     */
+    "abort": string;
+    /**
+     * ヒントとコツ
+     */
+    "tip": string;
+    /**
+     * 全ての「ヒントとコツ」を再表示
+     */
+    "redisplayAllTips": string;
+    /**
+     * 全ての「ヒントとコツ」を非表示
+     */
+    "hideAllTips": string;
     "_chat": {
         /**
          * まだメッセージはありません
@@ -7726,6 +7754,14 @@ export interface Locale extends ILocale {
              * チャットを許可
              */
             "chatAvailability": string;
+            /**
+             * アップロード可能なファイル種別
+             */
+            "uploadableFileTypes": string;
+            /**
+             * MIMEタイプを指定します。改行で区切って複数指定できるほか、アスタリスク(*)でワイルドカード指定できます。(例: image/*)
+             */
+            "uploadableFileTypes_caption": string;
         };
         "_condition": {
             /**
@@ -8552,10 +8588,6 @@ export interface Locale extends ILocale {
              * 入力ボックスの縁取り
              */
             "inputBorder": string;
-            /**
-             * ドライブフォルダーの背景
-             */
-            "driveFolderBg": string;
             /**
              * バッジ
              */
@@ -11485,22 +11517,6 @@ export interface Locale extends ILocale {
                  */
                 "directoryToCategoryCaption": string;
                 /**
-                 * いずれかの方法で登録する絵文字を選択してください。
-                 */
-                "emojiInputAreaCaption": string;
-                /**
-                 * この枠に画像ファイルまたはディレクトリをドラッグ＆ドロップ
-                 */
-                "emojiInputAreaList1": string;
-                /**
-                 * このリンクをクリックしてPCから選択する
-                 */
-                "emojiInputAreaList2": string;
-                /**
-                 * このリンクをクリックしてドライブから選択する
-                 */
-                "emojiInputAreaList3": string;
-                /**
                  * リストに表示されている絵文字を新たなカスタム絵文字として登録します。よろしいですか？（負荷を避けるため、一度の操作で登録可能な絵文字は{count}件までです）
                  */
                 "confirmRegisterEmojisDescription": ParameterizedString<"count">;
@@ -11959,6 +11975,36 @@ export interface Locale extends ILocale {
             "text3": string;
         };
     };
+    "_uploader": {
+        /**
+         * {x}に圧縮
+         */
+        "compressedToX": ParameterizedString<"x">;
+        /**
+         * {x}%節約
+         */
+        "savedXPercent": ParameterizedString<"x">;
+        /**
+         * アップロードされていないファイルがありますが、中止しますか？
+         */
+        "abortConfirm": string;
+        /**
+         * アップロードされていないファイルがありますが、完了しますか？
+         */
+        "doneConfirm": string;
+        /**
+         * アップロード可能な最大ファイルサイズは{x}です。
+         */
+        "maxFileSizeIsX": ParameterizedString<"x">;
+        /**
+         * アップロード可能なファイル種別
+         */
+        "allowedTypes": string;
+        /**
+         * ファイルはまだアップロードされていません。このダイアログで、アップロード前の確認・リネーム・圧縮・クロッピングなどが行えます。準備が出来たら、「アップロード」ボタンを押してアップロードを開始できます。
+         */
+        "tip": string;
+    };
     "_clientPerformanceIssueTip": {
         /**
          * バッテリー消費が多いと感じたら
@@ -11988,6 +12034,18 @@ export interface Locale extends ILocale {
          * 一部の拡張機能はクライアントの動作に干渉しパフォーマンスに影響を及ぼすことがあります。ブラウザの拡張機能を無効にして改善するか確認してください。
          */
         "makeSureDisabledAddons_description": string;
+    };
+    "_clip": {
+        /**
+         * クリップは、ノートをまとめることができる機能です。
+         */
+        "tip": string;
+    };
+    "_userLists": {
+        /**
+         * 任意のユーザーが含まれるリストを作成できます。作成したリストはタイムラインとして表示可能です。
+         */
+        "tip": string;
     };
 }
 declare const locales: {

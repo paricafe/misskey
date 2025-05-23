@@ -197,7 +197,7 @@ export const PREF_DEF = {
 		default: true,
 	},
 	useBlurEffect: {
-		default: DEFAULT_DEVICE_KIND === 'desktop',
+		default: true,
 	},
 	useStickyIcons: {
 		default: false,
@@ -354,7 +354,7 @@ export const PREF_DEF = {
 	},
 
 	'sound.masterVolume': {
-		default: 0.3,
+		default: 0.5,
 	},
 	'sound.notUseSound': {
 		default: false,
@@ -457,6 +457,9 @@ export const PREF_DEF = {
 	},
 
 	'experimental.stackingRouterView': {
+		default: false,
+	},
+	'experimental.enableFolderPageView': {
 		default: false,
 	},
 } satisfies PreferencesDefinition;
