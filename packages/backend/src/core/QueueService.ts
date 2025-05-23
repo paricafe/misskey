@@ -17,6 +17,8 @@ import { bindThis } from '@/decorators.js';
 import type { Antenna } from '@/server/api/endpoints/i/import-antennas.js';
 import { ApRequestCreator } from '@/core/activitypub/ApRequestService.js';
 import { type SystemWebhookPayload } from '@/core/SystemWebhookService.js';
+import type { Packed } from '@/misc/json-schema.js';
+import { MiNote } from '@/models/Note.js';
 import { type UserWebhookPayload } from './UserWebhookService.js';
 import type {
 	DbJobData,
@@ -39,8 +41,6 @@ import type {
 } from './QueueModule.js';
 import type httpSignature from '@peertube/http-signature';
 import type * as Bull from 'bullmq';
-import { MiNote } from '@/models/Note.js';
-import type { Packed } from '@/misc/json-schema.js';
 
 export const QUEUE_TYPES = [
 	'system',
