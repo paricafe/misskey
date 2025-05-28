@@ -477,13 +477,14 @@ export class DriveService {
 		if (user && this.meta.sensitiveMediaDetection === 'remote' && this.userEntityService.isLocalUser(user)) skipNsfwCheck = true;
 
 		const info = await this.fileInfoService.getFileInfo(path, {
+			fileName: name,
 			skipSensitiveDetection: skipNsfwCheck,
 			sensitiveThreshold: // 感度が高いほどしきい値は低くすることになる
-			this.meta.sensitiveMediaDetectionSensitivity === 'veryHigh' ? 0.1 :
-			this.meta.sensitiveMediaDetectionSensitivity === 'high' ? 0.3 :
-			this.meta.sensitiveMediaDetectionSensitivity === 'low' ? 0.7 :
-			this.meta.sensitiveMediaDetectionSensitivity === 'veryLow' ? 0.9 :
-			0.5,
+				this.meta.sensitiveMediaDetectionSensitivity === 'veryHigh' ? 0.1 :
+				this.meta.sensitiveMediaDetectionSensitivity === 'high' ? 0.3 :
+				this.meta.sensitiveMediaDetectionSensitivity === 'low' ? 0.7 :
+				this.meta.sensitiveMediaDetectionSensitivity === 'veryLow' ? 0.9 :
+				0.5,
 			sensitiveThresholdForPorn: 0.75,
 			enableSensitiveMediaDetectionForVideos: this.meta.enableSensitiveMediaDetectionForVideos,
 		});
@@ -535,7 +536,7 @@ export class DriveService {
 				return info.type.mime === mimeType;
 			});
 			if (!isAllowed) {
-				throw new IdentifiableError('bd71c601-f9b0-4808-9137-a330647ced9b', 'Unallowed file type.');
+				throw new IdentifiableError('bd71c601-f9b0-4808-9137-a330647ced9b', `Unallowed file type: ${info.type.mime}`);
 			}
 
 			const driveCapacity = 1024 * 1024 * policies.driveCapacityMb;

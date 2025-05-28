@@ -7762,6 +7762,10 @@ export interface Locale extends ILocale {
              * MIMEタイプを指定します。改行で区切って複数指定できるほか、アスタリスク(*)でワイルドカード指定できます。(例: image/*)
              */
             "uploadableFileTypes_caption": string;
+            /**
+             * ファイルによっては種別を判定できないことがあります。そのようなファイルを許可する場合は {x} を指定に追加してください。
+             */
+            "uploadableFileTypes_caption2": ParameterizedString<"x">;
         };
         "_condition": {
             /**
@@ -11249,6 +11253,14 @@ export interface Locale extends ILocale {
          * URLプレビューを有効にする
          */
         "enable": string;
+        /**
+         * プレビュー先のリダイレクトを許可
+         */
+        "allowRedirect": string;
+        /**
+         * 入力されたURLがリダイレクトされる場合に、そのリダイレクト先をたどってプレビューを表示するかどうかを設定します。無効にするとサーバーリソースの節約になりますが、リダイレクト先の内容は表示されなくなります。
+         */
+        "allowRedirectDescription": string;
         /**
          * プレビュー取得時のタイムアウト(ms)
          */
