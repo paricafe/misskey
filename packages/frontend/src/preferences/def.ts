@@ -234,7 +234,7 @@ export const PREF_DEF = {
 		default: true,
 	},
 	useStickyIcons: {
-		default: false,
+		default: true,
 	},
 	enableHighQualityImagePlaceholders: {
 		default: true,
