@@ -5,7 +5,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 
 <template>
 <div
-	v-if="!muted && $i"
+	v-if="!muted"
 	v-show="!isDeleted"
 	ref="rootEl"
 	v-hotkey="keymap"
