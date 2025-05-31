@@ -57,43 +57,19 @@ const initialReactions = new Set(Object.keys(props.reactions));
 const _reactions = ref<[string, number][]>([]);
 const hasMoreReactions = ref(false);
 
-if (props.myReaction && !Object.keys(_reactions.value).includes(props.myReaction)) {
-	_reactions.value[props.myReaction] = props.reactions[props.myReaction];
-}
-
-function onMockToggleReaction(emoji: string, count: number) {
-	if (!mock) return;
-
-	const i = _reactions.value.findIndex((item) => item[0] === emoji);
-	if (i < 0) return;
-
-	emit('mockUpdateMyReaction', emoji, (count - _reactions.value[i][1]));
-}
-
 watch([() => props.reactions, () => props.maxNumber], ([newSource, maxNumber]) => {
 	let newReactions: [string, number][] = [];
 	hasMoreReactions.value = Object.keys(newSource).length > maxNumber;
 
-	for (let i = 0; i < _reactions.value.length; i++) {
-		const reaction = _reactions.value[i][0];
-		if (reaction in newSource && newSource[reaction] !== 0) {
-			_reactions.value[i][1] = newSource[reaction];
-			newReactions.push(_reactions.value[i]);
+	newReactions = Object.entries(newSource)
+		.filter(([, count]) => count !== 0)
+		.sort(([, a], [, b]) => b - a)
+		.slice(0, props.maxNumber);
+
+	if (props.myReaction && !newReactions.some(([x]) => x === props.myReaction) && props.myReaction in newSource) {
+		if (newSource[props.myReaction] > 0) {
+			newReactions.push([props.myReaction, newSource[props.myReaction]]);
 		}
-	}
-
-	const newReactionsNames = newReactions.map(([x]) => x);
-	newReactions = [
-		...newReactions,
-		...Object.entries(newSource)
-			.sort(([, a], [, b]) => b - a)
-			.filter(([y], i) => i < maxNumber && !newReactionsNames.includes(y)),
-	];
-
-	newReactions = newReactions.slice(0, props.maxNumber);
-
-	if (props.myReaction && !newReactions.map(([x]) => x).includes(props.myReaction)) {
-		newReactions.push([props.myReaction, newSource[props.myReaction]]);
 	}
 
 	_reactions.value = newReactions;
