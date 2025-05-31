@@ -183,7 +183,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 			<button v-else class="_button" :class="$style.noteFooterButton" disabled>
 				<i class="ti ti-ban"></i>
 			</button>
-			<button v-if="appearNote.myReaction == null && appearNote.reactionAcceptance !== 'likeOnly' && !disableReactionsViewer" ref="likeButton" :class="$style.noteFooterButton" class="_button" @mousedown="like()">
+			<button v-if="appearNote.myReaction == null && $appearNote.reactionAcceptance !== 'likeOnly' && !disableReactionsViewer" ref="likeButton" :class="$style.noteFooterButton" class="_button" @mousedown="like()">
 				<i class="ti ti-heart"></i>
 			</button>
 			<button ref="reactButton" :class="$style.noteFooterButton" class="_button" @click.stop="toggleReact()">
