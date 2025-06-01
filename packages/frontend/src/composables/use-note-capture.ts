@@ -18,6 +18,15 @@ export const noteEvents = new EventEmitter<{
 	[ev: `reacted:${string}`]: (ctx: { userId: Misskey.entities.User['id']; reaction: string; emoji?: { name: string; url: string; }; }) => void;
 	[ev: `unreacted:${string}`]: (ctx: { userId: Misskey.entities.User['id']; reaction: string; emoji?: { name: string; url: string; }; }) => void;
 	[ev: `pollVoted:${string}`]: (ctx: { userId: Misskey.entities.User['id']; choice: string; }) => void;
+	[ev: `updated:${string}`]: (ctx: {
+		cw: string | null;
+		text: string;
+		updatedAt: string;
+		tags?: string[];
+		emojis?: Record<string, string>;
+		fileIds?: string[];
+		files?: Misskey.entities.DriveFile[];
+	}) => void;
 }>();
 
 const fetchEvent = new EventEmitter<{
@@ -149,6 +158,19 @@ function realtimeSubscribe(props: {
 				break;
 			}
 
+			case 'updated': {
+				noteEvents.emit(`updated:${id}`, {
+					cw: body.cw,
+					text: body.text,
+					updatedAt: body.updatedAt,
+					tags: body.tags,
+					emojis: body.emojis,
+					fileIds: body.fileIds,
+					files: body.files,
+				});
+				break;
+			}
+
 			case 'deleted': {
 				globalEvents.emit('noteDeleted', id);
 				break;
@@ -219,6 +241,7 @@ export function useNoteCapture(props: {
 	noteEvents.on(`reacted:${note.id}`, onReacted);
 	noteEvents.on(`unreacted:${note.id}`, onUnreacted);
 	noteEvents.on(`pollVoted:${note.id}`, onPollVoted);
+	noteEvents.on(`updated:${note.id}`, onUpdated);
 
 	// 操作がダブっていないかどうかを簡易的に記録するためのMap
 	const reactionUserMap = new Map<Misskey.entities.User['id'], string | typeof noReaction>();
@@ -280,6 +303,32 @@ export function useNoteCapture(props: {
 		$note.pollChoices = choices;
 	}
 
+	function onUpdated(ctx: {
+		cw: string | null;
+		text: string;
+		updatedAt: string;
+		tags?: string[];
+		emojis?: Record<string, string>;
+		fileIds?: string[];
+		files?: Misskey.entities.DriveFile[];
+	}): void {
+		note.history = [
+			...(note.history || []),
+			{
+				createdAt: ctx.updatedAt,
+				cw: ctx.cw,
+				text: ctx.text,
+			},
+		];
+		note.updatedAt = ctx.updatedAt;
+		note.cw = ctx.cw;
+		note.text = ctx.text;
+		note.tags = ctx.tags;
+		note.emojis = ctx.emojis;
+		note.fileIds = ctx.fileIds;
+		note.files = ctx.files;
+	}
+
 	function subscribe() {
 		if (mock) {
 			// モックモードでは購読しない
@@ -302,6 +351,7 @@ export function useNoteCapture(props: {
 		noteEvents.off(`reacted:${note.id}`, onReacted);
 		noteEvents.off(`unreacted:${note.id}`, onUnreacted);
 		noteEvents.off(`pollVoted:${note.id}`, onPollVoted);
+		noteEvents.off(`updated:${note.id}`, onUpdated);
 	});
 
 	// 投稿からある程度経過している(=タイムラインを遡って表示した)ノートは、イベントが発生する可能性が低いためそもそも購読しない
