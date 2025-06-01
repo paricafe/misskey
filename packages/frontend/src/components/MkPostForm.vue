@@ -958,14 +958,14 @@ async function post(ev?: MouseEvent) {
 	}
 
 	posting.value = true;
-	misskeyApi(props.updateMode ? 'notes/update' : 'notes/create', postData, token).then((res) => {
+	misskeyApi(props.updateMode ? 'notes/update' : 'notes/create', postData, token).then((res: any) => {
 		if (props.freezeAfterPosted) {
 			posted.value = true;
 		} else {
 			clear();
 		}
 
-		if (props.updateMode) {
+		if (props.updateMode && res?.updatedNote) {
 			globalEvents.emit('noteUpdated', res.updatedNote);
 			noteEvents.emit(`updated:${res.updatedNote.id}`, res.updatedNote);
 		} else {
