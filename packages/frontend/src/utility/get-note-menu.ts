@@ -455,7 +455,7 @@ export function getNoteMenu(props: {
 		if (appearNote.userId === $i.id || $i.isModerator || $i.isAdmin) {
 			menuItems.push({ type: 'divider' });
 
-			if ($i.policies.canEditNote) {
+			if ($i.policies.canEditNote && appearNote.userId === $i.id) {
 				menuItems.push({
 					icon: 'ti ti-edit',
 					text: i18n.ts.edit,
