@@ -975,9 +975,6 @@ async function post(ev?: MouseEvent) {
 		nextTick(() => {
 			deleteDraft();
 			emit('posted');
-			if (postAccount.value != null ? postAccount.value.id : null) {
-				postAccount.value = null;
-			}
 			if (postData.text && postData.text !== '') {
 				const hashtags_ = mfm.parse(postData.text).map(x => x.type === 'hashtag' && x.props.hashtag).filter(x => x) as string[];
 				const history = JSON.parse(miLocalStorage.getItem('hashtags') ?? '[]') as string[];
