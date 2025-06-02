@@ -22,12 +22,12 @@ SPDX-License-Identifier: AGPL-3.0-only
 </template>
 
 <script lang="ts" setup>
-import { computed, shallowRef } from 'vue';
+import { computed, useTemplateRef } from 'vue';
 import MkPagination from '@/components/MkPagination.vue';
 import MkApprovalUser from '@/components/MkApprovalUser.vue';
 import { i18n } from '@/i18n.js';
 import { definePage } from '@/page.js';
-let paginationComponent = shallowRef<InstanceType<typeof MkPagination>>();
+let paginationComponent = useTemplateRef<InstanceType<typeof MkPagination>>('paginationComponent');
 const pagination = {
 	endpoint: 'admin/show-users' as const,
 	limit: 10,

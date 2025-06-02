@@ -39,6 +39,10 @@ export const meta = {
 				type: 'string',
 				optional: false, nullable: true,
 			},
+			signupReason: {
+				type: 'string',
+				optional: false, nullable: true,
+			},
 			autoAcceptFollowed: {
 				type: 'boolean',
 				optional: false, nullable: false,
