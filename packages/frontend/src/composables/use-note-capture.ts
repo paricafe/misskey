@@ -18,7 +18,7 @@ export const noteEvents = new EventEmitter<{
 	[ev: `reacted:${string}`]: (ctx: { userId: Misskey.entities.User['id']; reaction: string; emoji?: { name: string; url: string; }; }) => void;
 	[ev: `unreacted:${string}`]: (ctx: { userId: Misskey.entities.User['id']; reaction: string; emoji?: { name: string; url: string; }; }) => void;
 	[ev: `pollVoted:${string}`]: (ctx: { userId: Misskey.entities.User['id']; choice: string; }) => void;
-	[ev: `updated:${string}`]: (ctx: { 
+	[ev: `updated:${string}`]: (ctx: {
 		cw: string | null;
 		text: string;
 		updatedAt: string;
@@ -26,7 +26,7 @@ export const noteEvents = new EventEmitter<{
 		emojis?: Record<string, string>;
 		fileIds?: string[];
 		files?: Misskey.entities.DriveFile[];
-	 }) => void;
+	}) => void;
 }>();
 
 const fetchEvent = new EventEmitter<{
@@ -216,8 +216,8 @@ export function useNoteCapture(props: {
 	parentNote: Misskey.entities.Note | null;
 	mock?: boolean;
 }): {
-	$note: Reactive<ReactiveNoteData>;
-	subscribe: () => void;
+		$note: Reactive<ReactiveNoteData>;
+		subscribe: () => void;
 } {
 	const { note, parentNote, mock } = props;
 
@@ -302,7 +302,7 @@ export function useNoteCapture(props: {
 		$note.pollChoices = choices;
 	}
 
-	function onUpdated(ctx: { 
+	function onUpdated(ctx: {
 		cw: string | null;
 		text: string;
 		updatedAt: string;
@@ -310,7 +310,7 @@ export function useNoteCapture(props: {
 		emojis?: Record<string, string>;
 		fileIds?: string[];
 		files?: Misskey.entities.DriveFile[];
-	 }): void {
+	}): void {
 		note.history = [
 			...(note.history || []),
 			{

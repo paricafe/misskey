@@ -652,8 +652,8 @@ const fullHistoryWithLatest = computed(() =>
 	] : [],
 );
 
-function historyMenu(viaKeyboard = false): void {
-	const currentNoteUpdatedAtDate = new Date(showingNoteHistoryRef.value?.createdAt ?? appearNote.updatedAt ?? new Date()).getTime();
+function historyMenu(): void {
+	const currentNoteUpdatedAtDate = new Date(showingNoteHistoryRef.value?.createdAt || appearNote.updatedAt!).getTime();
 	const menu = fullHistoryWithLatest.value
 		.sort((h1, h2) => new Date(h2.createdAt).getTime() - new Date(h1.createdAt).getTime())
 		.map(h => ({
@@ -661,9 +661,7 @@ function historyMenu(viaKeyboard = false): void {
 			text: h.displayText || new Date(h.createdAt).toISOString(),
 			action: () => setCurrentNoteInfo(h.clearState ? null : h),
 		}));
-	os.popupMenu(menu, historyMenuButton.value, {
-		viaKeyboard,
-	}).then(focus);
+	os.popupMenu(menu, historyMenuButton.value).then(focus);
 }
 
 async function clip(): Promise<void> {
