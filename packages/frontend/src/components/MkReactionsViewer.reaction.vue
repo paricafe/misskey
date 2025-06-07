@@ -77,13 +77,14 @@ async function toggleReaction() {
 
 	const oldReaction = props.myReaction;
 	if (oldReaction) {
+		const isSameReaction = oldReaction.replace(/@\./g, '') === props.reaction.replace(/@\./g, '');
 		const confirm = await os.confirm({
 			type: 'warning',
-			text: oldReaction !== props.reaction ? i18n.ts.changeReactionConfirm : i18n.ts.cancelReactionConfirm,
+			text: isSameReaction ? i18n.ts.cancelReactionConfirm : i18n.ts.changeReactionConfirm,
 		});
 		if (confirm.canceled) return;
 
-		if (oldReaction !== props.reaction) {
+		if (!isSameReaction) {
 			sound.playMisskeySfx('reaction');
 		}
 
@@ -99,7 +100,7 @@ async function toggleReaction() {
 				userId: $i!.id,
 				reaction: oldReaction,
 			});
-			if (oldReaction !== props.reaction) {
+			if (!isSameReaction) {
 				misskeyApi('notes/reactions/create', {
 					noteId: props.noteId,
 					reaction: props.reaction,
