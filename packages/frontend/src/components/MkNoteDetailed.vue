@@ -183,7 +183,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 			<button v-else class="_button" :class="$style.noteFooterButton" disabled>
 				<i class="ti ti-ban"></i>
 			</button>
-			<button v-if="appearNote.myReaction == null && $appearNote.reactionAcceptance !== 'likeOnly' && !disableReactionsViewer" ref="likeButton" :class="$style.noteFooterButton" class="_button" @mousedown="like()">
+			<button v-if="prefer.s.enableFallbackReactButton && $appearNote.myReaction == null && appearNote.reactionAcceptance !== 'likeOnly' && !disableReactionsViewer" ref="likeButton" :class="$style.noteFooterButton" class="_button" @mousedown="like()">
 				<i class="ti ti-heart"></i>
 			</button>
 			<button ref="reactButton" :class="$style.noteFooterButton" class="_button" @click.stop="toggleReact()">
@@ -191,7 +191,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 				<i v-else-if="$appearNote.myReaction != null" class="ti ti-minus" style="color: var(--MI_THEME-accent);"></i>
 				<i v-else-if="appearNote.reactionAcceptance === 'likeOnly' || disableReactionsViewer" class="ti ti-heart"></i>
 				<i v-else class="ti ti-plus"></i>
-				<p v-if="(appearNote.reactionAcceptance === 'likeOnly' || prefer.s.showReactionsCount || disableReactionsViewer) && $appearNote.reactionCount > 0" :class="$style.noteFooterButtonCount">{{ number($appearNote.reactionCount) }}</p>
+				<p v-if="($appearNote.reactionAcceptance === 'likeOnly' || prefer.s.showReactionsCount || disableReactionsViewer) && $appearNote.reactionCount > 0" :class="$style.noteFooterButtonCount">{{ number($appearNote.reactionCount) }}</p>
 			</button>
 			<button
 				v-if="appearNote.updatedAt" ref="historyMenuButton" class="_button" :class="[
@@ -605,7 +605,7 @@ function undoReact(targetNote: Misskey.entities.Note): void {
 }
 
 function toggleReact() {
-	if (appearNote.myReaction == null) {
+	if ($appearNote.myReaction == null) {
 		react();
 	} else {
 		undoReact(appearNote);
