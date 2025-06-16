@@ -36,7 +36,6 @@ import { isSupportedEmoji } from '@@/js/emojilist.js';
 import XReaction from '@/components/MkReactionsViewer.reaction.vue';
 import { $i } from '@/i.js';
 import { prefer } from '@/preferences.js';
-import { customEmojisMap } from '@/custom-emojis.js';
 import { DI } from '@/di.js';
 
 const props = withDefaults(defineProps<{
@@ -76,7 +75,9 @@ function onMockToggleReaction(emoji: string, count: number) {
 function canReact(reaction: string) {
 	if (!$i) return false;
 	// TODO: CheckPermissions
-	return !reaction.match(/@\w/) && (customEmojisMap.has(reaction) || isSupportedEmoji(reaction));
+	//return !reaction.match(/@\w/) && (customEmojisMap.has(reaction) || isSupportedEmoji(reaction));
+	// We have checked in the backend whether the emoji exists
+	return !reaction.match(/@\w/) && isSupportedEmoji(reaction);
 }
 
 watch([() => props.reactions, () => props.maxNumber], ([newSource, maxNumber]) => {
