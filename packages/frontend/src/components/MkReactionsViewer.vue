@@ -83,34 +83,23 @@ watch([() => props.reactions, () => props.maxNumber], ([newSource, maxNumber]) =
 	let newReactions: [string, number][] = [];
 	hasMoreReactions.value = Object.keys(newSource).length > maxNumber;
 
-	for (let i = 0; i < _reactions.value.length; i++) {
-		const reaction = _reactions.value[i][0];
-		if (reaction in newSource && newSource[reaction] !== 0) {
-			_reactions.value[i][1] = newSource[reaction];
-			newReactions.push(_reactions.value[i]);
+	newReactions = Object.entries(newSource)
+		.filter(([, count]) => count !== 0)
+		.sort(([emojiA, countA], [emojiB, countB]) => {
+			if (prefer.s.showAvailableReactionsFirstInNote) {
+				if (!canReact(emojiA) && canReact(emojiB)) return 1;
+				if (canReact(emojiA) && !canReact(emojiB)) return -1;
+				return countB - countA;
+			} else {
+				return countB - countA;
+			}
+		})
+		.slice(0, props.maxNumber);
+
+	if (props.myReaction && !newReactions.some(([x]) => x === props.myReaction) && props.myReaction in newSource) {
+		if (newSource[props.myReaction] > 0) {
+			newReactions.push([props.myReaction, newSource[props.myReaction]]);
 		}
-	}
-
-	const newReactionsNames = newReactions.map(([x]) => x);
-	newReactions = [
-		...newReactions,
-		...Object.entries(newSource)
-			.sort(([emojiA, countA], [emojiB, countB]) => {
-				if (prefer.s.showAvailableReactionsFirstInNote) {
-					if (!canReact(emojiA) && canReact(emojiB)) return 1;
-					if (canReact(emojiA) && !canReact(emojiB)) return -1;
-					return countB - countA;
-				} else {
-					return countB - countA;
-				}
-			})
-			.filter(([y], i) => i < maxNumber && !newReactionsNames.includes(y)),
-	];
-
-	newReactions = newReactions.slice(0, props.maxNumber);
-
-	if (props.myReaction && !newReactions.map(([x]) => x).includes(props.myReaction)) {
-		newReactions.push([props.myReaction, newSource[props.myReaction]]);
 	}
 
 	_reactions.value = newReactions;

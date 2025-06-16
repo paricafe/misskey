@@ -8,7 +8,12 @@ SPDX-License-Identifier: AGPL-3.0-only
 	ref="buttonEl"
 	v-ripple="canToggle"
 	class="_button"
-	:class="[$style.root, { [$style.reacted]: myReaction == reaction, [$style.canToggle]: canToggle, [$style.small]: prefer.s.reactionsDisplaySize === 'small', [$style.large]: prefer.s.reactionsDisplaySize === 'large' }]"
+	:class="[$style.root, {
+		[$style.reacted]: myReaction ? myReaction.replace(/@\./g, '') === reaction.replace(/@\./g, '') : false,
+		[$style.canToggle]: canToggle,
+		[$style.small]: prefer.s.reactionsDisplaySize === 'small',
+		[$style.large]: prefer.s.reactionsDisplaySize === 'large'
+	}]"
 	@click="toggleReaction()"
 	@contextmenu.prevent.stop="menu"
 >
@@ -72,13 +77,14 @@ async function toggleReaction() {
 
 	const oldReaction = props.myReaction;
 	if (oldReaction) {
+		const isSameReaction = oldReaction.replace(/@\./g, '') === props.reaction.replace(/@\./g, '');
 		const confirm = await os.confirm({
 			type: 'warning',
-			text: oldReaction !== props.reaction ? i18n.ts.changeReactionConfirm : i18n.ts.cancelReactionConfirm,
+			text: isSameReaction ? i18n.ts.cancelReactionConfirm : i18n.ts.changeReactionConfirm,
 		});
 		if (confirm.canceled) return;
 
-		if (oldReaction !== props.reaction) {
+		if (!isSameReaction) {
 			sound.playMisskeySfx('reaction');
 		}
 
@@ -94,7 +100,7 @@ async function toggleReaction() {
 				userId: $i!.id,
 				reaction: oldReaction,
 			});
-			if (oldReaction !== props.reaction) {
+			if (!isSameReaction) {
 				misskeyApi('notes/reactions/create', {
 					noteId: props.noteId,
 					reaction: props.reaction,
