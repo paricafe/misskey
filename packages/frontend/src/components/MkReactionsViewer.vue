@@ -32,7 +32,9 @@ SPDX-License-Identifier: AGPL-3.0-only
 import * as Misskey from 'misskey-js';
 import { inject, watch, ref } from 'vue';
 import { TransitionGroup } from 'vue';
+import { isSupportedEmoji } from '@@/js/emojilist.js';
 import XReaction from '@/components/MkReactionsViewer.reaction.vue';
+import { $i } from '@/i.js';
 import { prefer } from '@/preferences.js';
 import { DI } from '@/di.js';
 
@@ -57,13 +59,42 @@ const initialReactions = new Set(Object.keys(props.reactions));
 const _reactions = ref<[string, number][]>([]);
 const hasMoreReactions = ref(false);
 
+if (props.myReaction && !Object.keys(_reactions.value).includes(props.myReaction)) {
+	_reactions.value[props.myReaction] = props.reactions[props.myReaction];
+}
+
+function onMockToggleReaction(emoji: string, count: number) {
+	if (!mock) return;
+
+	const i = _reactions.value.findIndex((item) => item[0] === emoji);
+	if (i < 0) return;
+
+	emit('mockUpdateMyReaction', emoji, (count - _reactions.value[i][1]));
+}
+
+function canReact(reaction: string) {
+	if (!$i) return false;
+	// TODO: CheckPermissions
+	//return !reaction.match(/@\w/) && (customEmojisMap.has(reaction) || isSupportedEmoji(reaction));
+	// We have checked in the backend whether the emoji exists
+	return !reaction.match(/@\w/) && isSupportedEmoji(reaction);
+}
+
 watch([() => props.reactions, () => props.maxNumber], ([newSource, maxNumber]) => {
 	let newReactions: [string, number][] = [];
 	hasMoreReactions.value = Object.keys(newSource).length > maxNumber;
 
 	newReactions = Object.entries(newSource)
 		.filter(([, count]) => count !== 0)
-		.sort(([, a], [, b]) => b - a)
+		.sort(([emojiA, countA], [emojiB, countB]) => {
+			if (prefer.s.showAvailableReactionsFirstInNote) {
+				if (!canReact(emojiA) && canReact(emojiB)) return 1;
+				if (canReact(emojiA) && !canReact(emojiB)) return -1;
+				return countB - countA;
+			} else {
+				return countB - countA;
+			}
+		})
 		.slice(0, props.maxNumber);
 
 	if (props.myReaction && !newReactions.some(([x]) => x === props.myReaction) && props.myReaction in newSource) {
