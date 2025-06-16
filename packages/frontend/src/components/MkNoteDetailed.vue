@@ -605,7 +605,7 @@ function undoReact(targetNote: Misskey.entities.Note): void {
 }
 
 function toggleReact() {
-	if (appearNote.myReaction == null) {
+	if ($appearNote.myReaction == null) {
 		react();
 	} else {
 		undoReact(appearNote);
