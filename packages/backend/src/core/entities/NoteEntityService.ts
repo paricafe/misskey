@@ -127,10 +127,6 @@ export class NoteEntityService implements OnModuleInit {
 		// TODO: isVisibleForMe を使うようにしても良さそう(型違うけど)
 		let hide = false;
 
-		if (!packedNote.user.requireSigninToViewContents && meId == null) {
-			hide = true;
-		}
-
 		if (packedNote.user.requireSigninToViewContents && meId == null) {
 			hide = true;
 		}
