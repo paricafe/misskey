@@ -14,7 +14,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 		[$style.small]: prefer.s.reactionsDisplaySize === 'small',
 		[$style.large]: prefer.s.reactionsDisplaySize === 'large'
 	}]"
-	@click="toggleReaction()"
+	@click.stop="toggleReaction()"
 	@contextmenu.prevent.stop="menu"
 >
 	<MkReactionIcon style="pointer-events: none;" :class="prefer.s.limitWidthOfReaction ? $style.limitWidth : ''" :reaction="reaction" :emojiUrl="reactionEmojis[reaction.substring(1, reaction.length - 1)]"/>
