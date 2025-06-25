@@ -129,7 +129,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 					:noteId="appearNote.id"
 					:maxNumber="16"
 					@mockUpdateMyReaction="emitUpdReaction"
-					@click.stop
 				>
 					<template #more>
 						<MkA :to="`/notes/${appearNote.id}/reactions`" :class="[$style.reactionOmitted]">{{ i18n.ts.more }}</MkA>
