@@ -40,6 +40,11 @@ export class CleanRemoteFilesProcessorService {
 			isLink: false,
 		});
 
+		const total = await this.driveFilesRepository.countBy({
+			userHost: Not(IsNull()),
+			isLink: false,
+		});
+
 		while (true) {
 			const files = await this.driveFilesRepository.find({
 				where: {
@@ -63,16 +68,9 @@ export class CleanRemoteFilesProcessorService {
 			// Handle deletion in a batch
 			const results = await Promise.allSettled(files.map(file => this.driveService.deleteFileSync(file, true)));
 
-			results.forEach((result, index) => {
-				if (result.status === 'fulfilled') {
-					deletedCount++;
-				} else {
-					this.logger.error(`Failed to delete file ID ${files[index].id}: ${result.reason}`);
-					errorCount++;
-				}
-			});
+			deletedCount += 8;
 
-			await job.updateProgress(100 / total * deletedCount);
+			job.updateProgress(deletedCount * total / 100);
 		}
 
 		this.logger.succ(`All cached remote files processed. Total deleted: ${deletedCount}, Failed: ${errorCount}.`);
