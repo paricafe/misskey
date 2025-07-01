@@ -39,9 +39,11 @@ import MkButton from '@/components/MkButton.vue';
 import { i18n } from '@/i18n.js';
 import * as os from '@/os.js';
 import { misskeyApi } from '@/utility/misskey-api.js';
+
 const props = defineProps<{
 	user: Misskey.entities.User;
 }>();
+
 const reason = ref('');
 const email = ref('');
 
@@ -49,8 +51,8 @@ function getReason() {
 	return misskeyApi('admin/show-user', {
 		userId: props.user.id,
 	}).then(info => {
-		reason.value = info.signupReason;
-		email.value = info.email;
+		reason.value = info?.signupReason;
+		email.value = info?.email;
 	});
 }
 

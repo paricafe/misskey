@@ -6,7 +6,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 <template>
 <div>
 	<PageWithHeader :actions="headerActions" :tabs="headerTabs">
-		<MkSpacer :contentMax="900">
+		<div class="_spacer" style="--MI_SPACER-w: 900px;">
 			<div class="_gaps_m">
 				<MkPagination ref="paginationComponent" :pagination="pagination" :displayLimit="50">
 					<template #default="{ items }">
@@ -16,7 +16,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 					</template>
 				</MkPagination>
 			</div>
-		</MkSpacer>
+		</div>
 	</PageWithHeader>
 </div>
 </template>
@@ -27,7 +27,9 @@ import MkPagination from '@/components/MkPagination.vue';
 import MkApprovalUser from '@/components/MkApprovalUser.vue';
 import { i18n } from '@/i18n.js';
 import { definePage } from '@/page.js';
+
 let paginationComponent = useTemplateRef<InstanceType<typeof MkPagination>>('paginationComponent');
+
 const pagination = {
 	endpoint: 'admin/show-users' as const,
 	limit: 10,
@@ -46,7 +48,9 @@ function deleted(id: string) {
 }
 
 const headerActions = computed(() => []);
+
 const headerTabs = computed(() => []);
+
 definePage(computed(() => ({
 	title: i18n.ts.signupPendingApprovals.toString(),
 	icon: 'ti ti-user-check',
