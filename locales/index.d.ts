@@ -159,6 +159,10 @@ export interface Locale extends ILocale {
      */
     "signup": string;
     /**
+     * Signup Reason
+     */
+    "signupReason": string;
+    /**
      * アップロード中
      */
     "uploading": string;
