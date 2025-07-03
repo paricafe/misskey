@@ -268,7 +268,7 @@ export const store = markRaw(new Pizzax('base', {
 	},
 	useBlurEffect: {
 		where: 'device',
-		default: DEFAULT_DEVICE_KIND === 'desktop',
+		default: false,
 	},
 	showFixedPostForm: {
 		where: 'device',

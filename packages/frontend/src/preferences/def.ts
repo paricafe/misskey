@@ -232,7 +232,7 @@ export const PREF_DEF = definePreferences({
 		default: true,
 	},
 	useBlurEffect: {
-		default: true,
+		default: false,
 	},
 	useStickyIcons: {
 		default: true,
