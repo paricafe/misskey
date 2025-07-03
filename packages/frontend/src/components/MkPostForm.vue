@@ -764,9 +764,7 @@ async function onPaste(ev: ClipboardEvent) {
 	}
 	if (pastedFiles.length > 0) {
 		ev.preventDefault();
-		os.launchUploader(pastedFiles, {}).then(driveFiles => {
-			files.value.push(...driveFiles);
-		});
+		uploader.addFiles(pastedFiles);
 		return;
 	}
 
@@ -801,9 +799,7 @@ async function onPaste(ev: ClipboardEvent) {
 
 			const fileName = formatTimeString(new Date(), pastedFileName).replace(/{{number}}/g, '0');
 			const file = new File([paste], `${fileName}.txt`, { type: 'text/plain' });
-			os.launchUploader([file], {}).then(driveFiles => {
-				files.value.push(...driveFiles);
-			});
+			uploader.addFiles([file]);
 		});
 	}
 
@@ -849,9 +845,7 @@ function onDrop(ev: DragEvent): void {
 	// ファイルだったら
 	if (ev.dataTransfer && ev.dataTransfer.files.length > 0) {
 		ev.preventDefault();
-		os.launchUploader(Array.from(ev.dataTransfer.files), {}).then(driveFiles => {
-			files.value.push(...driveFiles);
-		});
+		uploader.addFiles(Array.from(ev.dataTransfer.files));
 		return;
 	}
 
@@ -1296,7 +1290,7 @@ function showDraftMenu(ev: MouseEvent) {
 			if (!canSaveAsServerDraft.value) {
 				return os.alert({
 					type: 'error',
-					text: i18n.ts._drafts.cannotCreateDraftOfRenote,
+					text: i18n.ts._drafts.cannotCreateDraft,
 				});
 			}
 			saveServerDraft();
