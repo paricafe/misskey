@@ -67,7 +67,7 @@ const props = defineProps<{
 const react = inject(DI.mfmEmojiReactCallback);
 
 const customEmojiName = computed(() => (props.name[0] === ':' ? props.name.substring(1, props.name.length - 1) : props.name).replace('@.', ''));
-const isLocal = computed(() => !props.host && (customEmojiName.value.endsWith('@.') || !customEmojiName.value.includes('@')));
+const isLocal = computed(() => customEmojisMap.has(customEmojiName.value));
 const emojiCodeToMute = makeEmojiMuteKey(props);
 const isMuted = checkEmojiMuted(emojiCodeToMute);
 const shouldMute = computed(() => !props.ignoreMuted && isMuted.value);
