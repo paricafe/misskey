@@ -64,7 +64,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 			</div>
 			<div :class="$style.noteHeaderMetaInfo">
 				<div :class="$style.noteHeaderInfo">
-					<span v-if="note.updatedAt" ref="historyMenu" style="margin-right: 0.5em;" :title="i18n.ts.edited" @click.stop="historyMenu()"><i class="ti ti-pencil"></i></span>
+					<span v-if="note.updatedAt" ref="historyMenu" style="margin-right: 0.5em;" :title="i18n.ts.edited" @click.stop="showHistoryMenu()"><i class="ti ti-pencil"></i></span>
 					<span v-if="appearNote.visibility !== 'public'" style="margin-right: 0.5em;" :title="i18n.ts._visibility[appearNote.visibility]">
 						<i v-if="appearNote.visibility === 'home'" class="ti ti-home"></i>
 						<i v-else-if="appearNote.visibility === 'followers'" class="ti ti-lock"></i>
@@ -193,15 +193,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 				<i v-else-if="appearNote.reactionAcceptance === 'likeOnly' || disableReactionsViewer" class="ti ti-heart"></i>
 				<i v-else class="ti ti-plus"></i>
 				<p v-if="($appearNote.reactionAcceptance === 'likeOnly' || prefer.s.showReactionsCount || disableReactionsViewer) && $appearNote.reactionCount > 0" :class="$style.noteFooterButtonCount">{{ number($appearNote.reactionCount) }}</p>
-			</button>
-			<button
-				v-if="appearNote.updatedAt" ref="historyMenuButton" class="_button" :class="[
-					$style.noteFooterButton,
-					$style.noteFooterButtonHistoryMenu,
-					showingNoteHistoryRef ? $style.active : undefined,
-				]" @mousedown="historyMenu()"
-			>
-				<i class="ti ti-history"></i>
 			</button>
 			<button v-if="prefer.s.showClipButtonInNoteFooter" ref="clipButton" class="_button" :class="$style.noteFooterButton" @mousedown.prevent="clip()">
 				<i class="ti ti-paperclip"></i>
@@ -651,7 +642,7 @@ const fullHistoryWithLatest = computed(() =>
 	] : [],
 );
 
-function historyMenu(): void {
+function showHistoryMenu(): void {
 	const currentNoteUpdatedAtDate = new Date(showingNoteHistoryRef.value?.createdAt || appearNote.updatedAt!).getTime();
 	const menu = fullHistoryWithLatest.value
 		.sort((h1, h2) => new Date(h2.createdAt).getTime() - new Date(h1.createdAt).getTime())
