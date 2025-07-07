@@ -521,6 +521,9 @@ export const PREF_DEF = definePreferences({
 	alwaysCollapseRenotes: {
 		default: false,
 	},
+	collapseEverything: {
+		default: false,
+	},
 	disableReactionsViewer: {
 		default: false,
 	},
