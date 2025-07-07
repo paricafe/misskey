@@ -518,6 +518,9 @@ export const PREF_DEF = definePreferences({
 	collapseNotesRepliedTo: {
 		default: false,
 	},
+	alwaysCollapseRenotes: {
+		default: false,
+	},
 	disableReactionsViewer: {
 		default: false,
 	},
