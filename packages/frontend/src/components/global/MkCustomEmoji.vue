@@ -122,7 +122,7 @@ function onClick(ev: MouseEvent) {
 			});
 		}
 
-		if (props.menuReaction && react) {
+		if ((props.menuReaction || customEmojisMap.has(customEmojiName.value)) && react) { //if local has custom emoji, allow reaction
 			menuItems.push({
 				text: i18n.ts.doReaction,
 				icon: 'ti ti-plus',
