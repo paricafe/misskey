@@ -1103,22 +1103,6 @@ onMounted(() => {
 	}
 }
 
-@container (max-width: 400px) {
-	.footerButton {
-		&:not(:last-child) {
-			margin-right: 0.2em;
-		}
-	}
-}
-
-@container (max-width: 350px) {
-	.footerButton {
-		&:not(:last-child) {
-			margin-right: 0.1em;
-		}
-	}
-}
-
 @container (max-width: 300px) {
 	.root {
 		font-size: 0.825em;
@@ -1127,12 +1111,6 @@ onMounted(() => {
 	.noteHeaderAvatar {
 		width: 50px;
 		height: 50px;
-	}
-
-	.footerButton {
-		&:not(:last-child) {
-			margin-right: 0.1em;
-		}
 	}
 }
 
