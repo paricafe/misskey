@@ -524,9 +524,6 @@ export const PREF_DEF = definePreferences({
 	disableReactionsViewer: {
 		default: false,
 	},
-	collapsedUnexpectedLangs: {
-		default: false,
-	},
 	emojiAutoSpacing: {
 		default: true,
 	},
