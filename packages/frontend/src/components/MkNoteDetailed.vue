@@ -64,6 +64,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 			</div>
 			<div :class="$style.noteHeaderMetaInfo">
 				<div :class="$style.noteHeaderInfo">
+					<span v-if="note.updatedAt" ref="historyMenu" style="margin-right: 0.5em;" :title="i18n.ts.edited" @click.stop="historyMenu()"><i class="ti ti-pencil"></i></span>
 					<span v-if="appearNote.visibility !== 'public'" style="margin-right: 0.5em;" :title="i18n.ts._visibility[appearNote.visibility]">
 						<i v-if="appearNote.visibility === 'home'" class="ti ti-home"></i>
 						<i v-else-if="appearNote.visibility === 'followers'" class="ti ti-lock"></i>
@@ -166,50 +167,48 @@ SPDX-License-Identifier: AGPL-3.0-only
 				:maxNumber="16"
 				@mockUpdateMyReaction="emitUpdReaction"
 			/>
-			<div class="footerButton">
-				<button class="_button" :class="$style.noteFooterButton" @click.stop="reply()">
-					<i class="ti ti-arrow-back-up"></i>
-					<p v-if="appearNote.repliesCount > 0" :class="$style.noteFooterButtonCount">{{ number(appearNote.repliesCount) }}</p>
-				</button>
-				<button
-					v-if="canRenote"
-					ref="renoteButton"
-					class="_button"
-					:class="$style.noteFooterButton"
-					@mousedown.prevent="renote()"
-				>
-					<i class="ti ti-repeat"></i>
-					<p v-if="appearNote.renoteCount > 0" :class="$style.noteFooterButtonCount">{{ number(appearNote.renoteCount) }}</p>
-				</button>
-				<button v-else class="_button" :class="$style.noteFooterButton" disabled>
-					<i class="ti ti-ban"></i>
-				</button>
-				<button v-if="prefer.s.enableFallbackReactButton && $appearNote.myReaction == null && appearNote.reactionAcceptance !== 'likeOnly' && !disableReactionsViewer" ref="likeButton" :class="$style.noteFooterButton" class="_button" @mousedown="like()">
-					<i class="ti ti-heart"></i>
-				</button>
-				<button ref="reactButton" :class="$style.noteFooterButton" class="_button" @click.stop="toggleReact()">
-					<i v-if="(appearNote.reactionAcceptance === 'likeOnly' || disableReactionsViewer) && $appearNote.myReaction != null" class="ti ti-heart-filled" style="color: var(--MI_THEME-love);"></i>
-					<i v-else-if="$appearNote.myReaction != null" class="ti ti-minus" style="color: var(--MI_THEME-accent);"></i>
-					<i v-else-if="appearNote.reactionAcceptance === 'likeOnly' || disableReactionsViewer" class="ti ti-heart"></i>
-					<i v-else class="ti ti-plus"></i>
-					<p v-if="($appearNote.reactionAcceptance === 'likeOnly' || prefer.s.showReactionsCount || disableReactionsViewer) && $appearNote.reactionCount > 0" :class="$style.noteFooterButtonCount">{{ number($appearNote.reactionCount) }}</p>
-				</button>
-				<button
-					v-if="appearNote.updatedAt" ref="historyMenuButton" class="_button" :class="[
-						$style.noteFooterButton,
-						$style.noteFooterButtonHistoryMenu,
-						showingNoteHistoryRef ? $style.active : undefined,
-					]" @mousedown="historyMenu()"
-				>
-					<i class="ti ti-history"></i>
-				</button>
-				<button v-if="prefer.s.showClipButtonInNoteFooter" ref="clipButton" class="_button" :class="$style.noteFooterButton" @mousedown.prevent="clip()">
-					<i class="ti ti-paperclip"></i>
-				</button>
-				<button ref="menuButton" class="_button" :class="$style.noteFooterButton" @mousedown.prevent="showMenu()">
-					<i class="ti ti-dots"></i>
-				</button>
-			</div>
+			<button class="_button" :class="$style.noteFooterButton" @click.stop="reply()">
+				<i class="ti ti-arrow-back-up"></i>
+				<p v-if="appearNote.repliesCount > 0" :class="$style.noteFooterButtonCount">{{ number(appearNote.repliesCount) }}</p>
+			</button>
+			<button
+				v-if="canRenote"
+				ref="renoteButton"
+				class="_button"
+				:class="$style.noteFooterButton"
+				@mousedown.prevent="renote()"
+			>
+				<i class="ti ti-repeat"></i>
+				<p v-if="appearNote.renoteCount > 0" :class="$style.noteFooterButtonCount">{{ number(appearNote.renoteCount) }}</p>
+			</button>
+			<button v-else class="_button" :class="$style.noteFooterButton" disabled>
+				<i class="ti ti-ban"></i>
+			</button>
+			<button v-if="prefer.s.enableFallbackReactButton && $appearNote.myReaction == null && appearNote.reactionAcceptance !== 'likeOnly' && !disableReactionsViewer" ref="likeButton" :class="$style.noteFooterButton" class="_button" @mousedown="like()">
+				<i class="ti ti-heart"></i>
+			</button>
+			<button ref="reactButton" :class="$style.noteFooterButton" class="_button" @click.stop="toggleReact()">
+				<i v-if="(appearNote.reactionAcceptance === 'likeOnly' || disableReactionsViewer) && $appearNote.myReaction != null" class="ti ti-heart-filled" style="color: var(--MI_THEME-love);"></i>
+				<i v-else-if="$appearNote.myReaction != null" class="ti ti-minus" style="color: var(--MI_THEME-accent);"></i>
+				<i v-else-if="appearNote.reactionAcceptance === 'likeOnly' || disableReactionsViewer" class="ti ti-heart"></i>
+				<i v-else class="ti ti-plus"></i>
+				<p v-if="($appearNote.reactionAcceptance === 'likeOnly' || prefer.s.showReactionsCount || disableReactionsViewer) && $appearNote.reactionCount > 0" :class="$style.noteFooterButtonCount">{{ number($appearNote.reactionCount) }}</p>
+			</button>
+			<button
+				v-if="appearNote.updatedAt" ref="historyMenuButton" class="_button" :class="[
+					$style.noteFooterButton,
+					$style.noteFooterButtonHistoryMenu,
+					showingNoteHistoryRef ? $style.active : undefined,
+				]" @mousedown="historyMenu()"
+			>
+				<i class="ti ti-history"></i>
+			</button>
+			<button v-if="prefer.s.showClipButtonInNoteFooter" ref="clipButton" class="_button" :class="$style.noteFooterButton" @mousedown.prevent="clip()">
+				<i class="ti ti-paperclip"></i>
+			</button>
+			<button ref="menuButton" class="_button" :class="$style.noteFooterButton" @mousedown.prevent="showMenu()">
+				<i class="ti ti-dots"></i>
+			</button>
 		</footer>
 	</article>
 	<div :class="$style.tabs">
@@ -356,7 +355,7 @@ const renoteTime = useTemplateRef('renoteTime');
 const reactButton = useTemplateRef('reactButton');
 const clipButton = useTemplateRef('clipButton');
 const likeButton = useTemplateRef('likeButton');
-const historyMenuButton = useTemplateRef('historyMenuButton');
+const historyMenu = useTemplateRef('historyMenu');
 const galleryEl = useTemplateRef('galleryEl');
 const isMyRenote = $i && ($i.id === note.userId);
 const showContent = ref(false);
@@ -661,7 +660,7 @@ function historyMenu(): void {
 			text: h.displayText || new Date(h.createdAt).toISOString(),
 			action: () => setCurrentNoteInfo(h.clearState ? null : h),
 		}));
-	os.popupMenu(menu, historyMenuButton.value).then(focus);
+	os.popupMenu(menu, historyMenu.value).then(focus);
 }
 
 async function clip(): Promise<void> {
@@ -1118,12 +1117,5 @@ onMounted(() => {
 	padding: 8px;
 	text-align: center;
 	opacity: 0.7;
-}
-
-.footerButton {
-	display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: nowrap;
 }
 </style>
