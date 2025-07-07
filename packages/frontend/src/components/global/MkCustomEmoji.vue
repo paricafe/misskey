@@ -122,7 +122,7 @@ function onClick(ev: MouseEvent) {
 			});
 		}
 
-		if (props.menuReaction && react) {
+		if (isLocal.value && react) { // use isLocal instead of props.menuReaction to make remote reactions clickable
 			menuItems.push({
 				text: i18n.ts.doReaction,
 				icon: 'ti ti-plus',
