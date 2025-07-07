@@ -100,15 +100,9 @@ function showInstanceTickerWindow() {
 	paint-order: stroke fill;
 }
 
-@container (max-width: 500px) {
+@container (max-width: 450px) {
 	.name {
-		max-width: 55px;
-	}
-}
-
-@container (max-width: 400px) {
-	.name {
-		max-width: 35px;
+		max-width: 50px;
 	}
 }
 </style>
