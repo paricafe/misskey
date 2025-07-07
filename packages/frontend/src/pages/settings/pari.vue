@@ -88,7 +88,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 					<MkSwitch v-model="alwaysCollapseRenotes">{{ i18n.ts.alwaysCollapseRenotes }}</MkSwitch>
 				</MkPreferenceContainer>
 				<MkPreferenceContainer k="collapseEverything">
-					<MkSwitch v-model="prefer.s.collapseEverything">{{ i18n.ts.collapseEverything }}</MkSwitch>
+					<MkSwitch v-model="collapseEverything">{{ i18n.ts.collapseEverything }}</MkSwitch>
 					<template #caption><i class="ti ti-alert-triangle" style="color: var(--MI_THEME-warn);"></i>{{ i18n.ts.collapseEverythingDescription }}</template>
 				</MkPreferenceContainer>
 				<MkPreferenceContainer k="disableReactionsViewer">
@@ -155,6 +155,7 @@ const enableUndoClearPostForm = prefer.model('enableUndoClearPostForm');
 const autoSpacingBehaviour = prefer.model('autoSpacingBehaviour');
 const collapseNotesRepliedTo = prefer.model('collapseNotesRepliedTo');
 const alwaysCollapseRenotes = prefer.model('alwaysCollapseRenotes');
+const collapseEverything = prefer.model('collapseEverything');
 const disableReactionsViewer = prefer.model('disableReactionsViewer');
 const emojiAutoSpacing = prefer.model('emojiAutoSpacing');
 const clickToShowInstanceTickerWindow = prefer.model('clickToShowInstanceTickerWindow');
