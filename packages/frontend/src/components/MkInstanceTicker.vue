@@ -99,4 +99,10 @@ function showInstanceTickerWindow() {
 	-webkit-text-stroke: var(--MI_THEME-panel) .225em;
 	paint-order: stroke fill;
 }
+
+@container (max-width: 450px) {
+	.name {
+		max-width: 50px;
+	}
+}
 </style>
