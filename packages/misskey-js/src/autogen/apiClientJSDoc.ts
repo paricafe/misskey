@@ -716,6 +716,17 @@ declare module '../api.js' {
     /**
      * No description provided.
      *
+     * **Credential required**: *Yes* / **Permission**: *read:admin:queue*
+     */
+    request<E extends 'admin/queue/show-job-logs', P extends Endpoints[E]['req']>(
+      endpoint: E,
+      params: P,
+      credential?: string | null,
+    ): Promise<SwitchCaseResponseType<E, P>>;
+
+    /**
+     * No description provided.
+     *
      * **Credential required**: *Yes* / **Permission**: *read:admin:emoji*
      */
     request<E extends 'admin/queue/stats', P extends Endpoints[E]['req']>(
@@ -2042,7 +2053,7 @@ declare module '../api.js' {
 
     /**
      * No description provided.
-     * 
+     *
      * **Credential required**: *Yes* / **Permission**: *read:drive*
      */
     request<E extends 'drive/files/attached-chat-messages', P extends Endpoints[E]['req']>(
@@ -2484,7 +2495,7 @@ declare module '../api.js' {
 
     /**
      * No description provided.
-     * 
+     *
      * **Credential required**: *No*
      */
     request<E extends 'flash/show', P extends Endpoints[E]['req']>(
