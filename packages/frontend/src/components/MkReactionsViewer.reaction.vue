@@ -237,7 +237,7 @@ if (!mock) {
 			reaction: props.reaction,
 			users,
 			count: props.count,
-			targetElement: buttonEl.value,
+			anchorElement: buttonEl.value,
 		}, {
 			closed: () => dispose(),
 		});

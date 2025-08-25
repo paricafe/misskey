@@ -5009,7 +5009,7 @@ export interface Locale extends ILocale {
     /**
      * メールアドレスの確認中に問題が発生しました。リンクの有効期限が切れている可能性があります。
      */
-    "signupPendingError": string;
+    "emailVerificationFailedError": string;
     /**
      * 「内容を隠す」がオンの場合は注釈の記述が必要です。
      */
@@ -6630,6 +6630,18 @@ export interface Locale extends ILocale {
          * 現在の一部の設定はリセットされます。
          */
         "restartServerSetupWizardConfirm_text": string;
+        /**
+         * エントランスページのスタイル
+         */
+        "entrancePageStyle": string;
+        /**
+         * タイムラインを表示する
+         */
+        "showTimelineForVisitor": string;
+        /**
+         * アクティビティを表示する
+         */
+        "showActivitiesForVisitor": string;
         "_userGeneratedContentsVisibilityForVisitor": {
             /**
              * 全て公開

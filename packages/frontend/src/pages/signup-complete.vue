@@ -58,7 +58,7 @@ function submit() {
 		os.alert({
 			type: 'error',
 			title: i18n.ts.somethingHappened,
-			text: i18n.ts.signupPendingError,
+			text: i18n.ts.emailVerificationFailedError,
 		});
 	});
 }
