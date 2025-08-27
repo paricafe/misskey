@@ -193,6 +193,8 @@ const menuDef = computed<SuperMenuDef[]>(() => [{
 }]);
 
 onMounted(() => {
+	if (el.value == null) return; // TSを黙らすため
+
 	ro.observe(el.value);
 
 	narrow.value = el.value.offsetWidth < NARROW_THRESHOLD;
@@ -203,6 +205,8 @@ onMounted(() => {
 });
 
 onActivated(() => {
+	if (el.value == null) return; // TSを黙らすため
+
 	narrow.value = el.value.offsetWidth < NARROW_THRESHOLD;
 
 	if (!narrow.value && currentPage.value?.route.name == null) {
@@ -220,7 +224,7 @@ watch(router.currentRef, (to) => {
 	}
 });
 
-const emailNotConfigured = computed(() => instance.enableEmail && ($i.email == null || !$i.emailVerified));
+const emailNotConfigured = computed(() => $i && instance.enableEmail && ($i.email == null || !$i.emailVerified));
 
 provideMetadataReceiver((metadataGetter) => {
 	const info = metadataGetter();

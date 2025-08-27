@@ -3,6 +3,8 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+// TODO: (可能な部分を)sharedに抽出して frontend と共通化
+
 import tinycolor from 'tinycolor2';
 import lightTheme from '@@/themes/p-light2.json5';
 import darkTheme from '@@/themes/p-dark2.json5';

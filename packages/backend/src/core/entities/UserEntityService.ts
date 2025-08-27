@@ -502,11 +502,12 @@ export class UserEntityService implements OnModuleInit {
 			? getLocalUserDecorations()
 			: this.cacheService.pariRemoteUserDecorationsCache.fetch(user.id).then(res => res.map(ad => ({
 				...ad,
-				url: ad.url && (this.config.proxyRemoteFiles || this.config.mediaProxy)
+				url: ad.url && this.config.mediaProxy
 					? `${this.config.mediaProxy}/static.webp?url=${(encodeURIComponent(ad.url))}`
 					: ad.url,
 			})));
 
+		// TODO: 例えば avatarUrl: true など間違った型を設定しても型エラーにならないのをどうにかする(ジェネリクス使わない方法で実装するしかなさそう？)
 		const packed = {
 			id: user.id,
 			name: user.name,
