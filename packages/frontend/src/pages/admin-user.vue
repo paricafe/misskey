@@ -255,7 +255,7 @@ const ips = ref(result.ips);
 const ap = ref<any>(null);
 const moderator = ref(info.value.isModerator);
 const silenced = ref(info.value.isSilenced);
-const approved = ref(info.value.isApproved);
+const approved = ref(info.value.approved);
 const suspended = ref(info.value.isSuspended);
 const isSystem = ref(user.value.host == null && user.value.username.includes('.'));
 const moderationNote = ref(info.value.moderationNote);
