@@ -15,7 +15,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 		<MkAvatar :class="$style.collapsedInReplyToAvatar" :user="appearNote.reply.user" link preview/>
 		<Mfm :text="getNoteSummary(appearNote.reply)" :plain="true" :nowrap="true" :author="appearNote.reply.user" :nyaize="'respect'" :class="$style.collapsedInReplyToText" @click.stop="inReplyToCollapsed = false"/>
 	</div>
-	<MkNoteSub v-if="appearNote.replyId && !renoteCollapsed && !inReplyToCollapsed" :note="appearNote.reply" :class="$style.replyTo"/>
+	<MkNoteSub v-if="appearNote.replyId && !renoteCollapsed && !inReplyToCollapsed" :note="appearNote?.reply ?? null" :class="$style.replyTo"/>
 	<div v-if="pinned" :class="$style.tip"><i class="ti ti-pin"></i> {{ i18n.ts.pinnedNote }}</div>
 	<div v-if="isRenote" :class="$style.renote">
 		<div v-if="note.channel" :class="$style.colorBar" :style="{ background: note.channel.color }"></div>
@@ -110,7 +110,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 						<div v-if="isEnabledUrlPreview">
 							<MkUrlPreview v-for="url in urls" :key="url" :url="url" :compact="true" :detail="false" :class="$style.urlPreview" @click.stop/>
 						</div>
-						<div v-if="appearNote.renoteId" :class="$style.quote"><MkNoteSimple :note="appearNote.renote" :class="$style.quoteNote"/></div>
+						<div v-if="appearNote.renoteId" :class="$style.quote"><MkNoteSimple :note="appearNote?.renote ?? null" :class="$style.quoteNote"/></div>
 						<button v-if="isLong && collapsed" :class="$style.collapsed" class="_button" @click.stop="collapsed = false">
 							<span :class="$style.collapsedLabel">{{ i18n.ts.showMore }}</span>
 						</button>

@@ -55,11 +55,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 				<MkPushNotificationAllowButton ref="allowButton"/>
 				<MkSwitch :disabled="!pushRegistrationInServer" :modelValue="sendReadMessage" @update:modelValue="onChangeSendReadMessage">
 					<template #label>{{ i18n.ts.sendPushNotificationReadMessage }}</template>
-					<template #caption>
-						<I18n :src="i18n.ts.sendPushNotificationReadMessageCaption">
-							<template #emptyPushNotificationMessage>{{ i18n.ts._notification.emptyPushNotificationMessage }}</template>
-						</I18n>
-					</template>
+					<template #caption>{{ i18n.ts.sendPushNotificationReadMessageCaption }}</template>
 				</MkSwitch>
 			</div>
 		</FormSection>
@@ -69,7 +65,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 
 <script lang="ts" setup>
 import { useTemplateRef, computed } from 'vue';
-import { notificationTypes } from '@@/js/const.js';
+import { notificationTypes } from 'misskey-js';
 import XNotificationConfig from './notifications.notification-config.vue';
 import type { NotificationConfig } from './notifications.notification-config.vue';
 import FormLink from '@/components/form/link.vue';
