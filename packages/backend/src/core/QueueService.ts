@@ -815,8 +815,8 @@ export class QueueService {
 	@bindThis
 	public async queueRetryJob(queueType: typeof QUEUE_TYPES[number], jobId: string) {
 		const queue = this.getQueue(queueType);
-		const job: Bull.Job | null = await queue.getJob(jobId);
-		if (job) {
+		const job = await queue.getJob(jobId);
+		if (job != null) {
 			if (job.finishedOn != null) {
 				await job.retry();
 			} else {
@@ -828,8 +828,8 @@ export class QueueService {
 	@bindThis
 	public async queueRemoveJob(queueType: typeof QUEUE_TYPES[number], jobId: string) {
 		const queue = this.getQueue(queueType);
-		const job: Bull.Job | null = await queue.getJob(jobId);
-		if (job) {
+		const job = await queue.getJob(jobId);
+		if (job != null) {
 			await job.remove();
 		}
 	}
@@ -862,8 +862,8 @@ export class QueueService {
 	@bindThis
 	public async queueGetJob(queueType: typeof QUEUE_TYPES[number], jobId: string) {
 		const queue = this.getQueue(queueType);
-		const job: Bull.Job | null = await queue.getJob(jobId);
-		if (job) {
+		const job = await queue.getJob(jobId);
+		if (job != null) {
 			return this.packJobData(job);
 		} else {
 			throw new Error(`Job not found: ${jobId}`);
