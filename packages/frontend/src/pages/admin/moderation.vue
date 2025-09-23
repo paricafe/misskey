@@ -182,7 +182,6 @@ const meta = await misskeyApi('admin/meta');
 const enableRegistration = ref(!meta.disableRegistration);
 const emailRequiredForSignup = ref(meta.emailRequiredForSignup);
 const approvalRequiredForSignup = ref(meta.approvalRequiredForSignup);
-const ugcVisibilityForVisitor = ref(meta.ugcVisibilityForVisitor);
 const {
 	model: ugcVisibilityForVisitor,
 	def: ugcVisibilityForVisitorDef,
