@@ -71,6 +71,8 @@ function toBase62(n: number): string {
 }
 
 export function getConfig(): UserConfig {
+	const localesHash = toBase62(hash(JSON.stringify(locales)));
+
 	return {
 		base: '/embed_vite/',
 
@@ -155,9 +157,9 @@ export function getConfig(): UserConfig {
 						// dependencies of i18n.ts
 						'config': ['@@/js/config.js'],
 					},
-					entryFileNames: 'scripts/[hash:8].js',
-					chunkFileNames: 'scripts/[hash:8].js',
-					assetFileNames: 'assets/[hash:8][extname]',
+					entryFileNames: `scripts/${localesHash}-[hash:8].js`,
+					chunkFileNames: `scripts/${localesHash}-[hash:8].js`,
+					assetFileNames: `assets/${localesHash}-[hash:8][extname]`,
 					paths(id) {
 						for (const p of externalPackages) {
 							if (p.match.test(id)) {

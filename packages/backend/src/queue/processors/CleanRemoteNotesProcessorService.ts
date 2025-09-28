@@ -79,6 +79,7 @@ export class CleanRemoteNotesProcessorService {
 		// - not have clipped
 		// - not have pinned on the user profile
 		// - not has been favorite by any user
+		// - only delete notes from bots
 		const removalCriteria = [
 			'note."id" < :newestLimit',
 			'note."clippedCount" = 0',
@@ -87,6 +88,7 @@ export class CleanRemoteNotesProcessorService {
 			'NOT EXISTS (SELECT 1 FROM user_note_pining WHERE "noteId" = note."id")',
 			'NOT EXISTS (SELECT 1 FROM note_favorite WHERE "noteId" = note."id")',
 			'NOT EXISTS (SELECT 1 FROM note_reaction INNER JOIN "user" ON note_reaction."userId" = "user".id WHERE note_reaction."noteId" = note."id" AND "user"."host" IS NULL)',
+			'note."userId" IN (SELECT id FROM "user" WHERE "isBot" = TRUE)',
 		].join(' AND ');
 
 		const minId = (await this.notesRepository.createQueryBuilder('note')
