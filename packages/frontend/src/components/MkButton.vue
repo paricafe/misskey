@@ -124,7 +124,7 @@ function onMousedown(evt: MouseEvent): void {
 	position: relative;
 	z-index: 1; // 他コンポーネントのbox-shadowに隠されないようにするため
 	display: block;
-	min-width: 80px;
+	min-width: 100px;
 	width: max-content;
 	padding: 7px 14px;
 	text-align: center;
