@@ -47,7 +47,7 @@ export class ApImageService {
 			throw new UnrecoverableError(`actor has been suspended: ${actor.uri}`);
 		}
 
-		const image = await this.apResolverService.createResolver().resolve(value);
+		const image = await (await this.apResolverService.createResolver()).resolve(value);
 
 		if (!isDocument(image)) return null;
 
