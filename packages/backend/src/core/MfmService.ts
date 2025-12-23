@@ -236,21 +236,6 @@ export class MfmService {
 					break;
 				}
 
-				case 'ruby': {
-					const rtText = node.childNodes
-						.filter((n) => n.nodeName === 'rt')
-						.map((n) => getText(n)).join(' ');
-					const rubyText = node.childNodes
-						.filter((n) => treeAdapter.isTextNode(n))
-						.map((n) => getText(n)).join(' ');
-					if (rubyText && rtText) {
-						text += `$[ruby ${rubyText}|${rtText} ]`;
-					} else {
-						appendChildren(node.childNodes);
-					}
-					break;
-				}
-
 				case 'P':
 				case 'H2':
 				case 'H3':
