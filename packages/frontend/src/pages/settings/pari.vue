@@ -32,18 +32,11 @@ SPDX-License-Identifier: AGPL-3.0-only
 						</div>
 					</template>
 				</MkRange>
-				<MkSelect v-model="defaultFont.fontFace">
+				<MkSelect v-model="defaultFont.fontFace" :items="defaultFont.fontList">
 					<template #label>{{ i18n.ts.pariPlusFontPicker }}</template>
 					<template #caption>
 						Testing feature, may cause slow loading.
 					</template>
-					<option
-						v-for="item in defaultFont.fontList"
-						:key="item.id"
-						:value="item.id"
-					>
-						{{ item.name }}
-					</option>
 				</MkSelect>
 				<MkRadios v-if="defaultFont.availableTypes.length > 0" v-model="defaultFont.fontFaceType">
 					<template #label>{{ i18n.ts.appearance }}</template>
@@ -101,11 +94,15 @@ SPDX-License-Identifier: AGPL-3.0-only
 					<MkSwitch v-model="clickToShowInstanceTickerWindow">{{ i18n.ts.clickToShowInstanceTickerWindow }}</MkSwitch>
 				</MkPreferenceContainer>
 				<MkPreferenceContainer k="autoSpacingBehaviour">
-					<MkSelect v-model="autoSpacingBehaviour">
+					<MkSelect
+						v-model="autoSpacingBehaviour"
+						:items="[
+							{ label: i18n.ts.disabled , value: null },
+							{ label: i18n.ts.auto, value: 'special' },
+							{ label: i18n.ts.all, value: 'all' },
+						]"
+					>
 						<template #label>{{ i18n.ts.autoSpacing }}</template>
-						<option :value="null">{{ i18n.ts.disabled }}</option>
-						<option value="special">Auto</option>
-						<option value="all">{{ i18n.ts.all }}</option>
 						<template #caption>{{ i18n.ts.autoSpacingDescription }}</template>
 					</MkSelect>
 				</MkPreferenceContainer>
