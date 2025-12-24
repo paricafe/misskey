@@ -64,7 +64,7 @@ export function ErrorPage(props: {
 					<p data-i18n="solution3">Clear your browser cache</p>
 					<p data-i18n="solution4">(Tor Browser) Set dom.webaudio.enabled to true</p>
 
-					<details style="color: #86b300;">
+					<details style="color: #ff82ab;">
 						<summary data-i18n="otherOption">Other options</summary>
 						<a href="/flush">
 							<button class="button-small">
