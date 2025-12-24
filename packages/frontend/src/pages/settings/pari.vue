@@ -32,7 +32,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 						</div>
 					</template>
 				</MkRange>
-				<MkSelect v-model="defaultFont.fontFace" :items="defaultFont.fontList">
+				<MkSelect v-model="defaultFont.fontFace" :items="defaultFont.fontList.map(x => ({ label: x[1], value: x[0] }))">
 					<template #label>{{ i18n.ts.pariPlusFontPicker }}</template>
 					<template #caption>
 						Testing feature, may cause slow loading.
