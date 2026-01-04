@@ -726,6 +726,11 @@ function loadConversation() {
 		conversation.value = res.reverse();
 	});
 }
+
+onMounted(() => {
+	loadReplies();
+	loadConversation();
+});
 </script>
 
 <style lang="scss" module>
