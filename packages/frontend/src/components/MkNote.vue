@@ -501,7 +501,7 @@ if (!props.mock) {
 function noteClickToOpen(id: string) {
 	const selection = window.document.getSelection();
 	if (selection?.toString().length === 0) {
-		router.push('/notes/${id}' as any);
+		router.push(`/notes/${id}` as any);
 	}
 }
 
