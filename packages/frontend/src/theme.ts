@@ -7,8 +7,8 @@
 
 import { ref, nextTick } from 'vue';
 import tinycolor from 'tinycolor2';
-import lightTheme from '@@/themes/_light.json5';
-import darkTheme from '@@/themes/_dark.json5';
+import lightTheme from '@@/themes/p-light2.json5';
+import darkTheme from '@@/themes/p-dark2.json5';
 import JSON5 from 'json5';
 import { version } from '@@/js/config.js';
 import type { Ref } from 'vue';
@@ -211,7 +211,7 @@ export function compile(theme: Theme): Record<string, string> {
 		return tinycolor(val);
 	}
 
-	const props = {};
+	const props = {} as Record<string, string>;
 
 	for (const [k, v] of Object.entries(theme.props)) {
 		if (k.startsWith('$')) continue; // ignore const
@@ -239,7 +239,7 @@ export function parseThemeCode(code: string): Theme {
 
 	try {
 		theme = JSON5.parse(code);
-	} catch (err) {
+	} catch (_) {
 		throw new Error('Failed to parse theme json');
 	}
 	if (!validateTheme(theme)) {
@@ -254,11 +254,19 @@ export function parseThemeCode(code: string): Theme {
 
 export function previewTheme(code: string): void {
 	const theme = parseThemeCode(code);
+<<<<<<< HEAD
 	applyTheme(theme, false);
+=======
+	if (theme != null) applyTheme(theme, false);
+>>>>>>> develop
 }
 
 export async function installTheme(code: string): Promise<void> {
 	const theme = parseThemeCode(code);
+<<<<<<< HEAD
+=======
+	if (theme == null) return;
+>>>>>>> develop
 	await addTheme(theme);
 }
 

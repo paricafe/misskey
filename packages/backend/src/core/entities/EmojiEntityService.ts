@@ -22,9 +22,11 @@ export class EmojiEntityService {
 	}
 
 	@bindThis
-	public packSimpleNoQuery(
-		emoji: MiEmoji,
-	): Packed<'EmojiSimple'> {
+	public async packSimple(
+		src: MiEmoji['id'] | MiEmoji,
+	): Promise<Packed<'EmojiSimple'>> {
+		const emoji = typeof src === 'object' ? src : await this.emojisRepository.findOneByOrFail({ id: src });
+
 		return {
 			aliases: emoji.aliases,
 			name: emoji.name,
@@ -38,34 +40,18 @@ export class EmojiEntityService {
 	}
 
 	@bindThis
-	public async packSimple(
+	public packSimpleMany(
+		emojis: (MiEmoji['id'] | MiEmoji)[],
+	) {
+		return Promise.all(emojis.map(x => this.packSimple(x)));
+	}
+
+	@bindThis
+	public async packDetailed(
 		src: MiEmoji['id'] | MiEmoji,
-	): Promise<Packed<'EmojiSimple'>> {
+	): Promise<Packed<'EmojiDetailed'>> {
 		const emoji = typeof src === 'object' ? src : await this.emojisRepository.findOneByOrFail({ id: src });
 
-		return this.packSimpleNoQuery(emoji);
-	}
-
-	@bindThis
-	public async packSimpleMany(
-		emojis: MiEmoji['id'][] | MiEmoji[],
-	): Promise<Packed<'EmojiSimple'>[]> {
-		if (emojis.length === 0) {
-			return [];
-		}
-		
-		if (typeof emojis[0] === 'string') {
-			const res = await this.emojisRepository.findBy({ id: In(emojis as MiEmoji['id'][]) });
-			return res.map(this.packSimpleNoQuery);
-		}
-
-		return (emojis as MiEmoji[]).map(this.packSimpleNoQuery);
-	}
-
-	@bindThis
-	public packDetailedNoQuery(
-		emoji: MiEmoji,
-	): Packed<'EmojiDetailed'> {
 		return {
 			id: emoji.id,
 			aliases: emoji.aliases,
@@ -82,17 +68,8 @@ export class EmojiEntityService {
 	}
 
 	@bindThis
-	public async packDetailed(
-		src: MiEmoji['id'] | MiEmoji,
-	): Promise<Packed<'EmojiDetailed'>> {
-		const emoji = typeof src === 'object' ? src : await this.emojisRepository.findOneByOrFail({ id: src });
-
-		return this.packDetailedNoQuery(emoji);
-	}
-
-	@bindThis
-	public async packDetailedMany(
-		emojis: any[],
+	public packDetailedMany(
+		emojis: (MiEmoji['id'] | MiEmoji)[],
 	): Promise<Packed<'EmojiDetailed'>[]> {
 		return Promise.all(emojis.map(x => this.packDetailed(x)));
 	}
@@ -179,4 +156,3 @@ export class EmojiEntityService {
 		return Promise.all(emojis.map(x => this.packDetailedAdmin(x, { roles: hintRoles })));
 	}
 }
-
