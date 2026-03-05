@@ -254,19 +254,12 @@ export function parseThemeCode(code: string): Theme {
 
 export function previewTheme(code: string): void {
 	const theme = parseThemeCode(code);
-<<<<<<< HEAD
-	applyTheme(theme, false);
-=======
 	if (theme != null) applyTheme(theme, false);
->>>>>>> develop
 }
 
 export async function installTheme(code: string): Promise<void> {
 	const theme = parseThemeCode(code);
-<<<<<<< HEAD
-=======
 	if (theme == null) return;
->>>>>>> develop
 	await addTheme(theme);
 }
 
