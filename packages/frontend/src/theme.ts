@@ -43,8 +43,6 @@ export const getBuiltinThemes = () => Promise.all(
 	[
 		'p-light2',
 		'p-light',
-		'shw-light',
-		'stpv-light',
 		'l-light',
 		'l-coffee',
 		'l-apricot',
@@ -57,7 +55,6 @@ export const getBuiltinThemes = () => Promise.all(
 
 		'p-dark2',
 		'p-dark',
-		'stpv-dark',
 		'd-dark',
 		'd-persimmon',
 		'd-astro',
