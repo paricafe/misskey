@@ -7,8 +7,8 @@
 
 import { ref, nextTick } from 'vue';
 import tinycolor from 'tinycolor2';
-import lightTheme from '@@/themes/p-light2.json5';
-import darkTheme from '@@/themes/p-dark2.json5';
+import lightTheme from '@@/themes/_light.json5';
+import darkTheme from '@@/themes/_dark.json5';
 import JSON5 from 'json5';
 import { version } from '@@/js/config.js';
 import type { Ref } from 'vue';
