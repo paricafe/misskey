@@ -35,7 +35,11 @@ const isBeta = version.includes('-beta') || version.includes('-alpha') || versio
 
 function whatIsNew() {
 	modal.value?.close();
-	useRouter().push(`/tags/${version.replaceAll('.', '-')}`);
+	useRouter().push('/tags/:tag', {
+		params: {
+			tag: version.replaceAll('.', '-'),
+		},
+	});
 }
 
 onMounted(() => {
