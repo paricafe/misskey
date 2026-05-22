@@ -652,6 +652,17 @@ declare module '../api.js' {
      *
      * **Credential required**: *Yes* / **Permission**: *write:admin:queue*
      */
+    request<E extends 'admin/queue/pause', P extends Endpoints[E]['req']>(
+      endpoint: E,
+      params: P,
+      credential?: string | null,
+    ): Promise<SwitchCaseResponseType<E, P>>;
+
+    /**
+     * No description provided.
+     * 
+     * **Credential required**: *Yes* / **Permission**: *write:admin:queue*
+     */
     request<E extends 'admin/queue/promote-jobs', P extends Endpoints[E]['req']>(
       endpoint: E,
       params: P,
@@ -694,6 +705,17 @@ declare module '../api.js' {
     /**
      * No description provided.
      *
+     * **Credential required**: *Yes* / **Permission**: *write:admin:queue*
+     */
+    request<E extends 'admin/queue/resume', P extends Endpoints[E]['req']>(
+      endpoint: E,
+      params: P,
+      credential?: string | null,
+    ): Promise<SwitchCaseResponseType<E, P>>;
+
+    /**
+     * No description provided.
+     * 
      * **Credential required**: *Yes* / **Permission**: *write:admin:queue*
      */
     request<E extends 'admin/queue/retry-job', P extends Endpoints[E]['req']>(
