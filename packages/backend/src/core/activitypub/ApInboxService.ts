@@ -29,9 +29,8 @@ import { bindThis } from '@/decorators.js';
 import type { MiRemoteUser } from '@/models/User.js';
 import { GlobalEventService } from '@/core/GlobalEventService.js';
 import { AbuseReportService } from '@/core/AbuseReportService.js';
-import { fromTuple } from '@/misc/from-tuple.js';
 import { IdentifiableError } from '@/misc/identifiable-error.js';
-import { getApHrefNullable, getApId, getApIds, getApType, getNullableApId, isAccept, isActor, isAdd, isAnnounce, isApObject, isBlock, isCollection, isCollectionOrOrderedCollection, isCreate, isDelete, isFlag, isFollow, isLike, isMove, isPost, isReject, isRemove, isTombstone, isUndo, isUpdate, validActor, validPost } from './type.js';
+import { getApHrefNullable, getApId, getApIds, getApType, isAccept, isActor, isAdd, isAnnounce, isBlock, isCollection, isCollectionOrOrderedCollection, isCreate, isDelete, isFlag, isFollow, isLike, isMove, isPost, isReject, isRemove, isTombstone, isUndo, isUpdate, validActor, validPost } from './type.js';
 import { ApNoteService } from './models/ApNoteService.js';
 import { ApLoggerService } from './ApLoggerService.js';
 import { ApDbResolverService } from './ApDbResolverService.js';
@@ -269,12 +268,7 @@ export class ApInboxService {
 		}
 
 		if (activity.target === actor.featured) {
-			const activityObject = fromTuple(activity.object);
-			if (isApObject(activityObject) && !isPost(activityObject)) {
-				return `unsupported featured object type: ${getApType(activityObject)}`;
-			}
-
-			const note = await this.apNoteService.resolveNote(activityObject, { resolver });
+			const note = await this.apNoteService.resolveNote(activity.object, { resolver });
 			if (note == null) return 'note not found';
 			await this.notePiningService.addPinned(actor, note.id);
 			return;
@@ -292,12 +286,11 @@ export class ApInboxService {
 		// eslint-disable-next-line no-param-reassign
 		resolver ??= await this.apResolverService.createResolver();
 
-		const activityObject = fromTuple(activity.object);
-		if (!activityObject) return 'skip: activity has no object property';
-		const targetUri = getApId(activityObject);
+		if (!activity.object) return 'skip: activity has no object property';
+		const targetUri = getApId(activity.object);
 		if (targetUri.startsWith('bear:')) return 'skip: bearcaps url not supported.';
 
-		const target = await resolver.resolve(activityObject).catch(e => {
+		const target = await resolver.resolve(activity.object).catch(e => {
 			this.logger.error(`Resolution failed: ${e}`);
 			throw e;
 		});
@@ -339,7 +332,7 @@ export class ApInboxService {
 				// 対象が4xxならスキップ
 				if (err instanceof StatusError) {
 					if (!err.isRetryable) {
-						return `skip: ignored announce target ${target.id} - ${err.statusCode}`;
+						return `Ignored announce target ${target.id} - ${err.statusCode}`;
 					}
 					return `Error in announce target ${target.id} - ${err.statusCode}`;
 				}
@@ -403,31 +396,30 @@ export class ApInboxService {
 
 		this.logger.info(`Create: ${uri}`);
 
-		const activityObject = fromTuple(activity.object);
-		if (!activityObject) return 'skip: activity has no object property';
-		const targetUri = getApId(activityObject);
+		if (!activity.object) return 'skip: activity has no object property';
+		const targetUri = getApId(activity.object);
 		if (targetUri.startsWith('bear:')) return 'skip: bearcaps url not supported.';
 
 		// copy audiences between activity <=> object.
-		if (typeof activityObject === 'object') {
-			const to = unique(concat([toArray(activity.to), toArray(activityObject.to)]));
-			const cc = unique(concat([toArray(activity.cc), toArray(activityObject.cc)]));
+		if (typeof activity.object === 'object') {
+			const to = unique(concat([toArray(activity.to), toArray(activity.object.to)]));
+			const cc = unique(concat([toArray(activity.cc), toArray(activity.object.cc)]));
 
 			activity.to = to;
 			activity.cc = cc;
-			activityObject.to = to;
-			activityObject.cc = cc;
+			activity.object.to = to;
+			activity.object.cc = cc;
 		}
 
 		// If there is no attributedTo, use Activity actor.
-		if (typeof activityObject === 'object' && !activityObject.attributedTo) {
-			activityObject.attributedTo = activity.actor;
+		if (typeof activity.object === 'object' && !activity.object.attributedTo) {
+			activity.object.attributedTo = activity.actor;
 		}
 
 		// eslint-disable-next-line no-param-reassign
 		resolver ??= await this.apResolverService.createResolver();
 
-		const object = await resolver.resolve(activityObject).catch(e => {
+		const object = await resolver.resolve(activity.object).catch(e => {
 			this.logger.error(`Resolution failed: ${e}`);
 			throw e;
 		});
@@ -435,7 +427,7 @@ export class ApInboxService {
 		if (isPost(object)) {
 			await this.createNote(resolver, actor, object, false, activity);
 		} else {
-			return `skip: Unsupported type for Create: ${getApType(object)} ${getNullableApId(object)}`;
+			return `Unknown type: ${getApType(object)}`;
 		}
 	}
 
@@ -467,7 +459,7 @@ export class ApInboxService {
 			return 'ok';
 		} catch (err) {
 			if (err instanceof StatusError && !err.isRetryable) {
-				return `skip: ${err.statusCode}`;
+				return `skip ${err.statusCode}`;
 			} else {
 				throw err;
 			}
@@ -485,15 +477,15 @@ export class ApInboxService {
 		// 削除対象objectのtype
 		let formerType: string | undefined;
 
-		const activityObject = fromTuple(activity.object);
-		if (typeof activityObject === 'string') {
+		if (typeof activity.object === 'string') {
 			// typeが不明だけど、どうせ消えてるのでremote resolveしない
 			formerType = undefined;
 		} else {
-			if (isTombstone(activityObject)) {
-				formerType = toSingle(activityObject.formerType);
+			const object = activity.object;
+			if (isTombstone(object)) {
+				formerType = toSingle(object.formerType);
 			} else {
-				formerType = toSingle(activityObject.type);
+				formerType = toSingle(object.type);
 			}
 		}
 
@@ -547,7 +539,7 @@ export class ApInboxService {
 			const note = await this.apDbResolverService.getNoteFromApId(uri);
 
 			if (note == null) {
-				return 'skip: ignoring deleted note on both ends';
+				return 'message not found';
 			}
 
 			if (note.userId !== actor.id) {
@@ -641,12 +633,7 @@ export class ApInboxService {
 		}
 
 		if (activity.target === actor.featured) {
-			const activityObject = fromTuple(activity.object);
-			if (isApObject(activityObject) && !isPost(activityObject)) {
-				return `unsupported featured object type: ${getApType(activityObject)}`;
-			}
-
-			const note = await this.apNoteService.resolveNote(activityObject, { resolver });
+			const note = await this.apNoteService.resolveNote(activity.object, { resolver });
 			if (note == null) return 'note not found';
 			await this.notePiningService.removePinned(actor, note.id);
 			return;
@@ -680,7 +667,7 @@ export class ApInboxService {
 		if (isAnnounce(object)) return await this.undoAnnounce(actor, object);
 		if (isAccept(object)) return await this.undoAccept(actor, object);
 
-		return `skip: unknown activity type ${getApType(object)}`;
+		return `skip: unknown object type ${getApType(object)}`;
 	}
 
 	@bindThis
@@ -811,11 +798,8 @@ export class ApInboxService {
 		} else if (getApType(object) === 'Question') {
 			await this.apQuestionService.updateQuestion(object, actor, resolver).catch(err => console.error(err));
 			return 'ok: Question updated';
-		} else if (getApType(object) === 'Note') {
-			await this.apNoteService.updateNote(object, resolver).catch(err => console.error(err));
-			return 'ok: Note updated';
 		} else {
-			return `skip: Unsupported type for Update: ${getApType(object)} ${getNullableApId(object)}`;
+			return `skip: Unknown type: ${getApType(object)}`;
 		}
 	}
 

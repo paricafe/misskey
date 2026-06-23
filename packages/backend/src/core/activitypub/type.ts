@@ -99,7 +99,7 @@ export interface IActivity extends IObject {
 	actor: IObject | string;
 	// ActivityPub spec allows for arrays: https://www.w3.org/TR/activitystreams-vocabulary/#properties
 	// Misskey can only handle one value, so we use a tuple for that case.
-	object: IObject | string | [IObject | string];
+	object: IObject | string | [IObject | string] ;
 	target?: IObject | string;
 	/** LD-Signature */
 	signature?: {
