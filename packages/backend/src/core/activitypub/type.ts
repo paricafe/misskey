@@ -65,32 +65,10 @@ export function getOneApId(value: ApObject): string {
 /**
  * Get ActivityStreams Object id
  */
-<<<<<<< HEAD
-export function getApId(value: string | IObject | [string | IObject]): string {
-	// eslint-disable-next-line no-param-reassign
-	value = fromTuple(value);
-
-	if (typeof value === 'string') return value;
-	if (typeof value.id === 'string') return value.id;
-	throw new UnrecoverableError('cannot determine id');
-}
-
-/**
- * Get ActivityStreams Object id, or null if not present
- */
-export function getNullableApId(value: string | IObject | [string | IObject]): string | null {
-	// eslint-disable-next-line no-param-reassign
-	value = fromTuple(value);
-
-	if (typeof value === 'string') return value;
-	if (typeof value.id === 'string') return value.id;
-	return null;
-=======
 export function getApId(value: string | IObject | undefined): string {
 	if (typeof value === 'string') return value;
 	if (value != null && typeof value.id === 'string') return value.id;
 	throw new Error('cannot determine id');
->>>>>>> develop
 }
 
 /**
@@ -121,7 +99,7 @@ export interface IActivity extends IObject {
 	actor: IObject | string;
 	// ActivityPub spec allows for arrays: https://www.w3.org/TR/activitystreams-vocabulary/#properties
 	// Misskey can only handle one value, so we use a tuple for that case.
-	object: IObject | string | [IObject | string] ;
+	object: IObject | string | [IObject | string];
 	target?: IObject | string;
 	/** LD-Signature */
 	signature?: {
