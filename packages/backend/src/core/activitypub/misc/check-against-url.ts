@@ -2,7 +2,6 @@
  * SPDX-FileCopyrightText: dakkar and sharkey-project
  * SPDX-License-Identifier: AGPL-3.0-only
  */
-
 import type { IObject } from '../type.js';
 
 export enum FetchAllowSoftFailMask {

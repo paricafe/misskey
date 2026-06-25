@@ -476,7 +476,6 @@ export class NoteCreateService implements OnApplicationShutdown {
 			if (this.utilityService.isKeyWordIncluded(data.cw ?? data.text ?? '', sensitiveWords)) {
 				data.visibility = 'home';
 			} else if ((await this.roleService.getUserPolicies(user.id)).canPublicNote === false) {
-				// User are banned from creating public notes
 				data.visibility = 'followers';
 			}
 		}
@@ -511,7 +510,7 @@ export class NoteCreateService implements OnApplicationShutdown {
 				case 'followers':
 					// 他人のfollowers noteはreject
 					if (data.renote.userId !== user.id) {
-						throw new Bull.UnrecoverableError('Renote target is not public or home');
+						throw new Error('Renote target is not public or home');
 					}
 
 					// followers noteはfollowers以下にrenote可能
@@ -521,7 +520,7 @@ export class NoteCreateService implements OnApplicationShutdown {
 					break;
 				case 'specified':
 					// specified / direct noteはreject
-					throw new Bull.UnrecoverableError('Renote target is not public or home');
+					throw new Error('Renote target is not public or home');
 			}
 		}
 
@@ -643,7 +642,9 @@ export class NoteCreateService implements OnApplicationShutdown {
 			renoteId: data.renote ? data.renote.id : null,
 			channelId: data.channel ? data.channel.id : null,
 			threadId: data.reply
-				? data.reply.threadId ?? data.reply.id
+				? data.reply.threadId
+					? data.reply.threadId
+					: data.reply.id
 				: null,
 			name: data.name,
 			text: data.text,
@@ -671,14 +672,6 @@ export class NoteCreateService implements OnApplicationShutdown {
 			renoteChannelId: data.renote ? data.renote.channelId : null,
 			userHost: user.host,
 		});
-
-		// should really not happen, but better safe than sorry
-		if (data.reply?.id === insert.id) {
-			throw new Error("A note can't reply to itself");
-		}
-		if (data.renote?.id === insert.id) {
-			throw new Error("A note can't renote itself");
-		}
 
 		if (data.uri != null) insert.uri = data.uri;
 		if (data.url != null) insert.url = data.url;

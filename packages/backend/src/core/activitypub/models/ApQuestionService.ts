@@ -4,7 +4,6 @@
  */
 
 import { Inject, Injectable } from '@nestjs/common';
-import { UnrecoverableError } from 'bullmq';
 import { DI } from '@/di-symbols.js';
 import type { UsersRepository, NotesRepository, PollsRepository } from '@/models/_.js';
 import type { Config } from '@/config.js';
@@ -12,8 +11,8 @@ import type { IPoll } from '@/models/Poll.js';
 import type { MiRemoteUser } from '@/models/User.js';
 import type Logger from '@/logger.js';
 import { bindThis } from '@/decorators.js';
+import { getOneApId, isQuestion } from '../type.js';
 import { UtilityService } from '@/core/UtilityService.js';
-import { getApId, getApType, getNullableApId, getOneApId, isQuestion } from '../type.js';
 import { ApLoggerService } from '../ApLoggerService.js';
 import { ApResolverService } from '../ApResolverService.js';
 import type { Resolver } from '../ApResolverService.js';
@@ -49,10 +48,10 @@ export class ApQuestionService {
 		if (resolver == null) resolver = await this.apResolverService.createResolver();
 
 		const question = await resolver.resolve(source);
-		if (!isQuestion(question)) throw new UnrecoverableError(`invalid type ${getApType(question)}: ${getNullableApId(question)}`);
+		if (!isQuestion(question)) throw new Error('invalid type');
 
 		const multiple = question.oneOf === undefined;
-		if (multiple && question.anyOf === undefined) throw new UnrecoverableError(`invalid question - neither oneOf nor anyOf is defined: ${getNullableApId(question)}`);
+		if (multiple && question.anyOf === undefined) throw new Error('invalid question');
 
 		const expiresAt = question.endTime ? new Date(question.endTime) : question.closed ? new Date(question.closed) : null;
 
@@ -73,20 +72,21 @@ export class ApQuestionService {
 	 */
 	@bindThis
 	public async updateQuestion(value: string | IObject, actor?: MiRemoteUser, resolver?: Resolver): Promise<boolean> {
-		const uri = getApId(value);
+		const uri = typeof value === 'string' ? value : value.id;
+		if (uri == null) throw new Error('uri is null');
 
 		// URIがこのサーバーを指しているならスキップ
-		if (this.utilityService.isUriLocal(uri)) throw new Error(`uri points local: ${uri}`);
+		if (this.utilityService.isUriLocal(uri)) throw new Error('uri points local');
 
 		//#region このサーバーに既に登録されているか
 		const note = await this.notesRepository.findOneBy({ uri });
-		if (note == null) throw new Error(`Question is not registered (no note): ${uri}`);
+		if (note == null) throw new Error('Question is not registered');
 
 		const poll = await this.pollsRepository.findOneBy({ noteId: note.id });
-		if (poll == null) throw new Error(`Question is not registered (no poll): ${uri}`);
+		if (poll == null) throw new Error('Question is not registered');
 
 		const user = await this.usersRepository.findOneBy({ id: poll.userId });
-		if (user == null) throw new Error(`Question is not registered (no user): ${uri}`);
+		if (user == null) throw new Error('Question is not registered');
 		//#endregion
 
 		// resolve new Question object
@@ -95,25 +95,25 @@ export class ApQuestionService {
 		const question = await resolver.resolve(value);
 		this.logger.debug(`fetched question: ${JSON.stringify(question, null, 2)}`);
 
-		if (!isQuestion(question)) throw new UnrecoverableError(`object ${getApType(question)} is not a Question: ${uri}`);
+		if (!isQuestion(question)) throw new Error('object is not a Question');
 
 		const attribution = (question.attributedTo) ? getOneApId(question.attributedTo) : user.uri;
 		const attributionMatchesExisting = attribution === user.uri;
 		const actorMatchesAttribution = (actor) ? attribution === actor.uri : true;
 
 		if (!attributionMatchesExisting || !actorMatchesAttribution) {
-			throw new UnrecoverableError(`Refusing to ingest update for poll by different user: ${uri}`);
+			throw new Error('Refusing to ingest update for poll by different user');
 		}
 
 		const apChoices = question.oneOf ?? question.anyOf;
-		if (apChoices == null) throw new UnrecoverableError(`poll has no choices: ${uri}`);
+		if (apChoices == null) throw new Error('invalid apChoices: ' + apChoices);
 
 		let changed = false;
 
 		for (const choice of poll.choices) {
 			const oldCount = poll.votes[poll.choices.indexOf(choice)];
 			const newCount = apChoices.filter(ap => ap.name === choice).at(0)?.replies?.totalItems;
-			if (newCount == null || !(Number.isInteger(newCount) && newCount >= 0)) throw new UnrecoverableError(`invalid newCount: ${newCount} in ${uri}`);
+			if (newCount == null || !(Number.isInteger(newCount) && newCount >= 0)) throw new Error('invalid newCount: ' + newCount);
 
 			if (oldCount !== newCount) {
 				changed = true;
