@@ -156,3 +156,4 @@ export class EmojiEntityService {
 		return Promise.all(emojis.map(x => this.packDetailedAdmin(x, { roles: hintRoles })));
 	}
 }
+

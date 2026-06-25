@@ -184,6 +184,7 @@ type Option = {
 	visibleUsers?: MinimumUser[] | null;
 	channel?: MiChannel | null;
 	apMentions?: MinimumUser[] | null;
+	apMentionRawCount?: number | null;
 	apHashtags?: string[] | null;
 	apEmojis?: string[] | null;
 	uri?: string | null;
@@ -475,7 +476,6 @@ export class NoteCreateService implements OnApplicationShutdown {
 			if (this.utilityService.isKeyWordIncluded(data.cw ?? data.text ?? '', sensitiveWords)) {
 				data.visibility = 'home';
 			} else if ((await this.roleService.getUserPolicies(user.id)).canPublicNote === false) {
-				// User are banned from creating public notes
 				data.visibility = 'followers';
 			}
 		}
@@ -510,15 +510,17 @@ export class NoteCreateService implements OnApplicationShutdown {
 				case 'followers':
 					// 他人のfollowers noteはreject
 					if (data.renote.userId !== user.id) {
-						throw new Bull.UnrecoverableError('Renote target is not public or home');
+						throw new Error('Renote target is not public or home');
 					}
 
-					// Renote対象がfollowersならfollowersにする
-					data.visibility = 'followers';
+					// followers noteはfollowers以下にrenote可能
+					if (data.visibility === 'public' || data.visibility === 'home') {
+						data.visibility = 'followers';
+					}
 					break;
 				case 'specified':
 					// specified / direct noteはreject
-					throw new Bull.UnrecoverableError('Renote target is not public or home');
+					throw new Error('Renote target is not public or home');
 			}
 		}
 
@@ -605,7 +607,8 @@ export class NoteCreateService implements OnApplicationShutdown {
 			}
 		}
 
-		if (mentionedUsers.length > 0 && mentionedUsers.length > (await this.roleService.getUserPolicies(user.id)).mentionLimit) {
+		const effectiveMentionCount = Math.max(mentionedUsers.length, data.apMentionRawCount ?? 0);
+		if (effectiveMentionCount > 0 && effectiveMentionCount > (await this.roleService.getUserPolicies(user.id)).mentionLimit) {
 			throw new IdentifiableError('9f466dab-c856-48cd-9e65-ff90ff750580', 'Note contains too many mentions');
 		}
 
@@ -639,7 +642,9 @@ export class NoteCreateService implements OnApplicationShutdown {
 			renoteId: data.renote ? data.renote.id : null,
 			channelId: data.channel ? data.channel.id : null,
 			threadId: data.reply
-				? data.reply.threadId ?? data.reply.id
+				? data.reply.threadId
+					? data.reply.threadId
+					: data.reply.id
 				: null,
 			name: data.name,
 			text: data.text,
@@ -667,14 +672,6 @@ export class NoteCreateService implements OnApplicationShutdown {
 			renoteChannelId: data.renote ? data.renote.channelId : null,
 			userHost: user.host,
 		});
-
-		// should really not happen, but better safe than sorry
-		if (data.reply?.id === insert.id) {
-			throw new Error("A note can't reply to itself");
-		}
-		if (data.renote?.id === insert.id) {
-			throw new Error("A note can't renote itself");
-		}
 
 		if (data.uri != null) insert.uri = data.uri;
 		if (data.url != null) insert.url = data.url;

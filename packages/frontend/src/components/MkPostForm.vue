@@ -782,6 +782,7 @@ function clear() {
 	scheduledAt.value = null;
 
 	nextTick(() => textareaEl.value && autosize.update(textareaEl.value));
+	uploader.reset();
 }
 
 function onKeydown(ev: KeyboardEvent) {

@@ -165,9 +165,9 @@ export class DriveService {
 
 			// 拡張子からContent-Typeを設定してそうな挙動を示すオブジェクトストレージ (upcloud?) も存在するので、
 			// 許可されているファイル形式でしかURLに拡張子をつけない
-			// if (!FILE_TYPE_BROWSERSAFE.includes(type)) {
-			// 	ext = '';
-			// }
+			if (!FILE_TYPE_BROWSERSAFE.includes(type)) {
+				ext = '';
+			}
 
 			const baseUrl = this.meta.objectStorageBaseUrl
 				?? `${ this.meta.objectStorageUseSSL ? 'https' : 'http' }://${ this.meta.objectStorageEndpoint }${ this.meta.objectStoragePort ? `:${this.meta.objectStoragePort}` : '' }/${ this.meta.objectStorageBucket }`;
@@ -228,33 +228,25 @@ export class DriveService {
 			const thumbnailAccessKey = 'thumbnail-' + randomUUID();
 			const webpublicAccessKey = 'webpublic-' + randomUUID();
 
-			// Ugly type is just to help TS figure out that 2nd / 3rd promises are optional.
-			const promises: [Promise<string>, ...(Promise<string> | undefined)[]] = [
-				this.internalStorageService.saveFromPath(accessKey, path),
-			];
+			const url = this.internalStorageService.saveFromPath(accessKey, path);
+
+			let thumbnailUrl: string | null = null;
+			let webpublicUrl: string | null = null;
 
 			if (alts.thumbnail) {
-				promises.push(this.internalStorageService.saveFromBuffer(thumbnailAccessKey, alts.thumbnail.data));
-			}
-
-			if (alts.webpublic) {
-				promises.push(this.internalStorageService.saveFromBuffer(webpublicAccessKey, alts.webpublic.data));
-			}
-
-			const [url, thumbnailUrl, webpublicUrl] = await Promise.all(promises);
-
-			if (thumbnailUrl) {
+				thumbnailUrl = this.internalStorageService.saveFromBuffer(thumbnailAccessKey, alts.thumbnail.data);
 				this.registerLogger.info(`thumbnail stored: ${thumbnailAccessKey}`);
 			}
 
-			if (webpublicUrl) {
+			if (alts.webpublic) {
+				webpublicUrl = this.internalStorageService.saveFromBuffer(webpublicAccessKey, alts.webpublic.data);
 				this.registerLogger.info(`web stored: ${webpublicAccessKey}`);
 			}
 
 			file.storedInternal = true;
 			file.url = url;
-			file.thumbnailUrl = thumbnailUrl ?? null;
-			file.webpublicUrl = webpublicUrl ?? null;
+			file.thumbnailUrl = thumbnailUrl;
+			file.webpublicUrl = webpublicUrl;
 			file.accessKey = accessKey;
 			file.thumbnailAccessKey = thumbnailAccessKey;
 			file.webpublicAccessKey = webpublicAccessKey;
@@ -381,8 +373,8 @@ export class DriveService {
 	 */
 	@bindThis
 	private async upload(key: string, stream: fs.ReadStream | Buffer, type: string, ext?: string | null, filename?: string) {
-		// if (type === 'image/apng') type = 'image/png';
-		// if (!FILE_TYPE_BROWSERSAFE.includes(type)) type = 'application/octet-stream';
+		if (type === 'image/apng') type = 'image/png';
+		if (!FILE_TYPE_BROWSERSAFE.includes(type)) type = 'application/octet-stream';
 
 		const params = {
 			Bucket: this.meta.objectStorageBucket,
@@ -788,19 +780,19 @@ export class DriveService {
 
 	@bindThis
 	public async deleteFileSync(file: MiDriveFile, isExpired = false, deleter?: MiUser) {
-		const promises = [];
-
 		if (file.storedInternal) {
-			promises.push(this.internalStorageService.del(file.accessKey!));
+			this.internalStorageService.del(file.accessKey!);
 
 			if (file.thumbnailUrl) {
-				promises.push(this.internalStorageService.del(file.thumbnailAccessKey!));
+				this.internalStorageService.del(file.thumbnailAccessKey!);
 			}
 
 			if (file.webpublicUrl) {
-				promises.push(this.internalStorageService.del(file.webpublicAccessKey!));
+				this.internalStorageService.del(file.webpublicAccessKey!);
 			}
 		} else if (!file.isLink) {
+			const promises = [];
+
 			promises.push(this.deleteObjectStorageFile(file.accessKey!));
 
 			if (file.thumbnailUrl) {
@@ -810,6 +802,8 @@ export class DriveService {
 			if (file.webpublicUrl) {
 				promises.push(this.deleteObjectStorageFile(file.webpublicAccessKey!));
 			}
+
+			await Promise.all(promises);
 		}
 
 		await this.deletePostProcess(file, isExpired, deleter);

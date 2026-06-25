@@ -59,7 +59,6 @@ export class EmailService {
 			} : undefined,
 		} as any);
 
-
 		const htmlContent = `<!doctype html>
 <html>
 	<head>

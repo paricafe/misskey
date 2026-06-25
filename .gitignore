@@ -83,3 +83,6 @@ vite.config.local-dev.ts.timestamp-*
 .favorites.json
 
 /dump.rdb
+
+# Affinity
+*.af~lock~

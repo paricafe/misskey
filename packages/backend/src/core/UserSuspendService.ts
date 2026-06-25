@@ -38,7 +38,6 @@ export class UserSuspendService {
 
 	@bindThis
 	public async suspend(user: MiUser, moderator: MiUser): Promise<void> {
-
 		await this.usersRepository.update(user.id, {
 			isSuspended: true,
 		});

@@ -6,7 +6,6 @@
 import * as crypto from 'node:crypto';
 import { promisify } from 'node:util';
 import { Injectable } from '@nestjs/common';
-import { UnrecoverableError } from 'bullmq';
 import { RsaKeyPair } from 'slacc';
 import { HttpRequestService } from '@/core/HttpRequestService.js';
 import { bindThis } from '@/decorators.js';
@@ -172,7 +171,7 @@ export class JsonLd {
 	@bindThis
 	private getLoader() {
 		return async (url: string): Promise<RemoteDocument> => {
-			if (!/^https?:\/\//.test(url)) throw new UnrecoverableError(`Invalid URL: ${url}`);
+			if (!/^https?:\/\//.test(url)) throw new Error(`Invalid URL ${url}`);
 
 			if (this.preLoad) {
 				if (url in PRELOADED_CONTEXTS) {
@@ -225,7 +224,7 @@ export class JsonLd {
 			},
 		).then(res => {
 			if (!res.ok) {
-				throw new Error(`JSON-LD fetch failed with ${res.status} ${res.statusText}: ${url}`);
+				throw new Error(`${res.status} ${res.statusText}`);
 			} else {
 				return res.json();
 			}
