@@ -134,7 +134,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 				</div>
 				<MkA v-if="appearNote.channel && !inChannel" :class="$style.channel" :to="`/channels/${appearNote.channel.id}`"><i class="ti ti-device-tv"></i> {{ appearNote.channel.name }}</MkA>
 			</div>
-			<footer>
+			<footer :class="$style.noteFooter">
 				<div :class="$style.noteFooterInfo">
 					<MkA :to="notePage(appearNote)">
 						<MkTime :time="appearNote.createdAt" mode="detail" colored/>
@@ -636,6 +636,12 @@ const keymap = {
 	font-size: 80%;
 }
 
+.noteFooter {
+	display: flex;
+	align-items: center;
+	justify-content: space-around;
+}
+
 .noteFooterInfo {
 	margin: 16px 0;
 	opacity: 0.7;
@@ -646,10 +652,8 @@ const keymap = {
 	margin: 0;
 	padding: 8px;
 	opacity: 0.7;
-
-	&:not(:last-child) {
-		margin-right: 28px;
-	}
+	white-space: nowrap;
+	flex-shrink: 0;
 
 	&:hover {
 		color: var(--MI_THEME-fgHighlighted);
@@ -660,6 +664,7 @@ const keymap = {
 	display: inline;
 	margin: 0 0 0 8px;
 	opacity: 0.7;
+	white-space: nowrap;
 
 	&.reacted {
 		color: var(--MI_THEME-accent);
@@ -735,9 +740,8 @@ const keymap = {
 
 @container (max-width: 350px) {
 	.noteFooterButton {
-		&:not(:last-child) {
-			margin-right: 18px;
-		}
+		padding: 6px;
+		font-size: 0.95em;
 	}
 }
 
@@ -752,9 +756,8 @@ const keymap = {
 	}
 
 	.noteFooterButton {
-		&:not(:last-child) {
-			margin-right: 12px;
-		}
+		padding: 5px;
+		font-size: 0.9em;
 	}
 }
 
