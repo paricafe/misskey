@@ -146,7 +146,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 						<i v-else-if="appearNote.visibility === 'specified'" ref="specified" class="ti ti-mail"></i>
 						<span style="margin-left: 0.3em;">{{ i18n.ts._visibility[appearNote.visibility] }}</span>
 					</span>
-					<MkInstanceTicker v-if="showTicker" :host="appearNote.user.host" :instance="appearNote.user.instance"/>
+					<MkInstanceTicker v-if="showTicker" :host="appearNote.user.host" :instance="appearNote.user.instance" style="width: fit-content; max-width: 100%;"/>
 				</div>
 				<MkReactionsViewer
 					v-if="appearNote.reactionAcceptance !== 'likeOnly' && !disableReactionsViewer"
