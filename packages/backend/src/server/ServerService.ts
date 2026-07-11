@@ -21,6 +21,7 @@ import { genIdenticon } from '@/misc/gen-identicon.js';
 import { UserEntityService } from '@/core/entities/UserEntityService.js';
 import { LoggerService } from '@/core/LoggerService.js';
 import { bindThis } from '@/decorators.js';
+import { envOption } from '@/env.js';
 import { ActivityPubServerService } from './ActivityPubServerService.js';
 import { NodeinfoServerService } from './NodeinfoServerService.js';
 import { ApiServerService } from './api/ApiServerService.js';
@@ -86,6 +87,15 @@ export class ServerService implements OnApplicationShutdown {
 			const preload = this.config.hstsPreload;
 			const host = new URL(this.config.url).host;
 			fastify.addHook('onRequest', makeHstsHook(host, preload));
+		}
+
+		// for test
+		if (envOption.enableCrossOriginIsolation) {
+			fastify.addHook('onRequest', (request, reply, done) => {
+				reply.header('Cross-Origin-Opener-Policy', 'same-origin');
+				reply.header('Cross-Origin-Embedder-Policy', 'credentialless');
+				done();
+			});
 		}
 
 		// Register raw-body parser for ActivityPub HTTP signature validation.
