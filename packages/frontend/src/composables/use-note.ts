@@ -157,7 +157,12 @@ export function useNote(
 	const collapsed = ref(appearNote.cw == null && isLong.value);
 	const showTicker = computed(() => (prefer.s.instanceTicker === 'always') || (prefer.s.instanceTicker === 'remote' && appearNote.user.instance));
 	const canRenote = computed(() => ['public', 'home'].includes(appearNote.visibility) || (appearNote.visibility === 'followers' && appearNote.userId === $i?.id));
-	const renoteCollapsed = ref(prefer.s.collapseRenotes && isRenote && (($i && ($i.id === rawNote.userId || $i.id === appearNote.userId)) || ($appearNote.myReaction != null)));
+	const renoteCollapsed = ref(
+		prefer.s.collapseEverything || (prefer.s.alwaysCollapseRenotes && isRenote) || (prefer.s.collapseRenotes && isRenote && (
+			($i && ($i.id === rawNote.userId || $i.id === appearNote.userId)) || // `||` must be `||`! See https://github.com/misskey-dev/misskey/issues/13131
+			($appearNote.myReaction != null)
+		)),
+	);
 
 	const pleaseLoginContext = computed<OpenOnRemoteOptions>(() => ({
 		type: 'lookup',

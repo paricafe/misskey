@@ -83,6 +83,10 @@ SPDX-License-Identifier: AGPL-3.0-only
 							:enableEmojiMenuReaction="true"
 							class="_selectable"
 						/>
+						<div v-if="enableTranslateButton && appearNote.text" style="padding-top: 5px; color: var(--MI_THEME-accent);">
+							<button v-if="!(translating || translation)" ref="translateButton" class="_button" @click.stop="translate()"><i class="ti ti-language-hiragana"></i>{{ i18n.ts.translate }}</button>
+							<button v-else class="_button" @click.stop="translation = null">{{ i18n.ts.close }}</button>
+						</div>
 						<div v-if="translating || translation" :class="$style.translation">
 							<MkLoading v-if="translating" mini/>
 							<div v-else-if="translation">
@@ -219,6 +223,8 @@ import number from '@/filters/number.js';
 import { DI } from '@/di.js';
 import type { Keymap } from '@/utility/hotkey.js';
 import { useRouter } from '@/router';
+import { misskeyApi } from '@/utility/misskey-api.js';
+import { miLocalStorage } from '@/local-storage.js';
 
 // コンポーネント外部の依存関係
 import MkNoteSub from '@/components/MkNoteSub.vue';
@@ -319,6 +325,7 @@ provide(DI.mfmEmojiReactCallback, reactViaMfmEmoji);
 const showSoftWordMutedWord = computed(() => prefer.s.showSoftWordMutedWord);
 const disableReactionsViewer = ref(prefer.s.disableReactionsViewer);
 const inReplyToCollapsed = ref(prefer.s.collapseNotesRepliedTo);
+const enableTranslateButton = ref(prefer.s.enableTranslateButton);
 
 function handleToggleReact() {
 	toggleReact((reaction) => {
@@ -350,6 +357,19 @@ function noteClickToOpen(id: string) {
 
 function like() {
 	react(prefer.s.defaultLike);
+}
+
+async function translate(): Promise<void> {
+	if (translation.value != null) return;
+	collapsed.value = false;
+	translating.value = true;
+	if (props.mock) return;
+	const res = await misskeyApi('notes/translate', {
+		noteId: appearNote.id,
+		targetLang: miLocalStorage.getItem('lang') ?? navigator.language,
+	});
+	translating.value = false;
+	translation.value = res;
 }
 
 // キーボードショートカットマップ
