@@ -103,6 +103,10 @@ SPDX-License-Identifier: AGPL-3.0-only
 						class="_selectable"
 					/>
 					<a v-if="appearNote.renote != null" :class="$style.rn">RN:</a>
+					<div v-if="enableTranslateButton && appearNote.text" style="padding-top: 5px; color: var(--MI_THEME-accent);">
+						<button v-if="!(translating || translation)" ref="translateButton" class="_button" @click.stop="translate()"><i class="ti ti-language-hiragana"></i>{{ i18n.ts.translate }}</button>
+						<button v-else class="_button" @click.stop="translation = null">{{ i18n.ts.close }}</button>
+					</div>
 					<div v-if="translating || translation" :class="$style.translation">
 						<MkLoading v-if="translating" mini/>
 						<div v-else-if="translation">
@@ -252,6 +256,7 @@ import { notePage } from '@/filters/note.js';
 import { isEnabledUrlPreview } from '@/utility/url-preview.js';
 import { Paginator } from '@/utility/paginator.js';
 import { misskeyApi } from '@/utility/misskey-api.js';
+import { miLocalStorage } from '@/local-storage.js';
 import number from '@/filters/number.js';
 import { DI } from '@/di.js';
 import type { Keymap } from '@/utility/hotkey.js';
@@ -336,9 +341,21 @@ provide(DI.mfmEmojiReactCallback, reactViaMfmEmoji);
 
 // pari-specific
 const disableReactionsViewer = ref(prefer.s.disableReactionsViewer);
+const enableTranslateButton = ref(prefer.s.enableTranslateButton);
 
 function like() {
 	react(prefer.s.defaultLike);
+}
+
+async function translate(): Promise<void> {
+	if (translation.value != null) return;
+	translating.value = true;
+	const res = await misskeyApi('notes/translate', {
+		noteId: appearNote.id,
+		targetLang: miLocalStorage.getItem('lang') ?? navigator.language,
+	});
+	translating.value = false;
+	translation.value = res;
 }
 
 // MkNoteDetailed固有
