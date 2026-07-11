@@ -242,10 +242,34 @@ export function useNote(
 		});
 	}
 
-	async function react(customCallback?: (reaction: string) => void) {
+	async function react(arg?: ((reaction: string) => void) | string): Promise<void> {
 		const isLoggedIn = await pleaseLogin({ openOnRemote: pleaseLoginContext.value });
 		if (!isLoggedIn) return;
 		showMovedDialog();
+
+		// direct emoji reaction (e.g. fallback like button with defaultLike)
+		if (typeof arg === 'string') {
+			const emoji = arg;
+			sound.playMisskeySfx('reaction');
+			if (props.mock) return;
+			misskeyApi('notes/reactions/create', {
+				noteId: appearNote.id,
+				reaction: emoji,
+			}).then(() => {
+				noteEvents.emit(`reacted:${appearNote.id}`, { userId: $i!.id, reaction: emoji });
+			});
+			const rippleTarget = els.likeButton ?? els.reactButton;
+			if (rippleTarget != null && rippleTarget.value != null && prefer.s.animation) {
+				const rect = rippleTarget.value.getBoundingClientRect();
+				const { dispose } = os.popup(MkRippleEffect, {
+					x: rect.left + (rippleTarget.value.offsetWidth / 2),
+					y: rect.top + (rippleTarget.value.offsetHeight / 2),
+				}, {
+					end: () => dispose(),
+				});
+			}
+			return;
+		}
 
 		if (appearNote.reactionAcceptance === 'likeOnly' || prefer.s.disableReactionsViewer) {
 			sound.playMisskeySfx('reaction');
@@ -277,7 +301,7 @@ export function useNote(
 				}
 				sound.playMisskeySfx('reaction');
 				if (props.mock) {
-					if (customCallback) customCallback(reaction);
+					if (typeof arg === 'function') arg(reaction);
 					return;
 				}
 				misskeyApi('notes/reactions/create', {

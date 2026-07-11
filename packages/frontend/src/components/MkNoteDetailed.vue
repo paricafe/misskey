@@ -338,7 +338,7 @@ provide(DI.mfmEmojiReactCallback, reactViaMfmEmoji);
 const disableReactionsViewer = ref(prefer.s.disableReactionsViewer);
 
 function like() {
-	react();
+	react(prefer.s.defaultLike);
 }
 
 // MkNoteDetailed固有

@@ -349,7 +349,7 @@ function noteClickToOpen(id: string) {
 }
 
 function like() {
-	react();
+	react(prefer.s.defaultLike);
 }
 
 // キーボードショートカットマップ
