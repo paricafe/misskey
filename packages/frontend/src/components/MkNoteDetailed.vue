@@ -85,6 +85,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 						:nyaize="'respect'"
 						:enableEmojiMenu="true"
 						:enableEmojiMenuReaction="true"
+						class="_textAutoSpacing"
 					/>
 					<MkCwButton v-model="showContent" :text="appearNote.text" :renote="appearNote.renote" :files="appearNote.files" :poll="appearNote.poll"/>
 				</p>
@@ -100,7 +101,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 						:emojiUrls="appearNote.emojis"
 						:enableEmojiMenu="true"
 						:enableEmojiMenuReaction="true"
-						class="_selectable"
+						class="_selectable _textAutoSpacing"
 					/>
 					<a v-if="appearNote.renote != null" :class="$style.rn">RN:</a>
 					<div v-if="enableTranslateButton && appearNote.text" style="padding-top: 5px; color: var(--MI_THEME-accent);">
@@ -111,7 +112,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 						<MkLoading v-if="translating" mini/>
 						<div v-else-if="translation">
 							<b>{{ i18n.tsx.translatedFrom({ x: translation.sourceLang }) }}: </b>
-							<Mfm :text="translation.text" :author="appearNote.user" :nyaize="'respect'" :emojiUrls="appearNote.emojis" class="_selectable"/>
+							<Mfm :text="translation.text" :author="appearNote.user" :nyaize="'respect'" :emojiUrls="appearNote.emojis" class="_selectable _textAutoSpacing"/>
 						</div>
 					</div>
 					<div v-if="appearNote.files && appearNote.files.length > 0">

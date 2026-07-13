@@ -1,3 +1,14 @@
+## Unreleased
+
+### General
+-
+
+### Client
+- Enhance: ノートの自動スペーシングで、テキストを変更せずブラウザ標準の `text-autospace` を使用するように
+
+### Server
+-
+
 ## 2026.7.0
 
 ### Note

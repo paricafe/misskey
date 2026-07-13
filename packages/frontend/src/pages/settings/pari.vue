@@ -93,18 +93,11 @@ SPDX-License-Identifier: AGPL-3.0-only
 				<MkPreferenceContainer k="clickToShowInstanceTickerWindow">
 					<MkSwitch v-model="clickToShowInstanceTickerWindow">{{ i18n.ts.clickToShowInstanceTickerWindow }}</MkSwitch>
 				</MkPreferenceContainer>
-				<MkPreferenceContainer k="autoSpacingBehaviour">
-					<MkSelect
-						v-model="autoSpacingBehaviour"
-						:items="[
-							{ label: i18n.ts.disabled , value: null },
-							{ label: i18n.ts.auto, value: 'special' },
-							{ label: i18n.ts.all, value: 'all' },
-						]"
-					>
+				<MkPreferenceContainer k="autoSpacing">
+					<MkSwitch v-model="autoSpacing">
 						<template #label>{{ i18n.ts.autoSpacing }}</template>
 						<template #caption>{{ i18n.ts.autoSpacingDescription }}</template>
-					</MkSelect>
+					</MkSwitch>
 				</MkPreferenceContainer>
 			</div>
 		</div>
@@ -149,7 +142,7 @@ const noteClickToOpen = prefer.model('noteClickToOpen');
 const enableFallbackReactButton = prefer.model('enableFallbackReactButton');
 const enableMFMCheatsheet = prefer.model('enableMFMCheatsheet');
 const enableUndoClearPostForm = prefer.model('enableUndoClearPostForm');
-const autoSpacingBehaviour = prefer.model('autoSpacingBehaviour');
+const autoSpacing = prefer.model('autoSpacing');
 const collapseNotesRepliedTo = prefer.model('collapseNotesRepliedTo');
 const alwaysCollapseRenotes = prefer.model('alwaysCollapseRenotes');
 const collapseEverything = prefer.model('collapseEverything');

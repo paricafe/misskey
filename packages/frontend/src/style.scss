@@ -20,6 +20,7 @@
 	--MI-marginHalf: 10px;
 
 	--MI-margin: var(--MI-marginFull);
+	--MI-textAutospace: no-autospace;
 
 	// switch dynamically
 	--MI-minBottomSpacingMobile: calc(72px + max(12px, env(safe-area-inset-bottom, 0px)));
@@ -31,6 +32,7 @@
 }
 
 html {
+	text-autospace: no-autospace;
 	overflow: auto;
 	overflow-wrap: break-word;
 	font-family: 'Lexend', 'Hiragino Maru Gothic Pro', "BIZ UDGothic", Roboto, HelveticaNeue, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
@@ -287,6 +289,10 @@ rt {
 ._selectable {
 	user-select: text;
 	-webkit-user-select: text;
+}
+
+._textAutoSpacing {
+	text-autospace: var(--MI-textAutospace);
 }
 
 ._selectableAtomic {

@@ -147,7 +147,25 @@ function createEmptyProfile(): PossiblyNonNormalizedPreferencesProfile {
 	};
 }
 
+export function migrateLegacyAutoSpacingPreference(
+	preferences: PossiblyNonNormalizedPreferencesProfile['preferences'],
+): PossiblyNonNormalizedPreferencesProfile['preferences'] {
+	const currentRecords = preferences.autoSpacing;
+	const legacyRecords = preferences.autoSpacingBehaviour;
+	if ((currentRecords != null && currentRecords.length > 0) || legacyRecords == null || legacyRecords.length === 0) return preferences;
+
+	return {
+		...preferences,
+		autoSpacing: legacyRecords.map(([scope, value, meta]) => [
+			scope,
+			value === 'all' || value === 'special',
+			meta,
+		]),
+	};
+}
+
 function normalizePreferences(preferences: PossiblyNonNormalizedPreferencesProfile['preferences'], account: { id: string } | null): PreferencesProfile['preferences'] {
+	preferences = migrateLegacyAutoSpacingPreference(preferences);
 	const data = {} as Record<string, [scope: Scope, value: any, meta: ValueMeta][]>;
 	for (const key in PREF_DEF) {
 		const records = preferences[key];

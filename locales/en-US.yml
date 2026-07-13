@@ -3329,7 +3329,7 @@ collapseEverythingDescription: "Collapse all notes when enabled, click to expand
 disableReactionsViewer: "Disable emoji reactions viewer"
 emojiAutoSpacing: "Automatically add spaces when inserting emoji"
 autoSpacing: "Auto Spacing"
-autoSpacingDescription: "Adding spaces between CJK and English characters"
+autoSpacingDescription: "Use the browser's text layout to visually adjust spacing between CJK characters and letters or numbers"
 clickToShowInstanceTickerWindow: "Click InstanceTicker to show instance info"
 defaultLike: "Default like reaction"
 _dataRequest:

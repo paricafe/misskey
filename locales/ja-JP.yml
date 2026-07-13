@@ -3368,7 +3368,7 @@ disableReactionsViewer: "Disable emoji reactions viewer"
 collapsedUnexpectedLangs: "Collapse notes using unexpected languages"
 emojiAutoSpacing: "Automatically add spaces when inserting emoji"
 autoSpacing: "Auto Spacing"
-autoSpacingDescription: "Adding spaces between CJK and English characters"
+autoSpacingDescription: "ブラウザの機能を使用して、CJK文字と英数字の間隔を視覚的に調整します"
 clickToShowInstanceTickerWindow: "Click InstanceTicker to show instance info"
 defaultLike: "Default like reaction"
 _dataRequest:

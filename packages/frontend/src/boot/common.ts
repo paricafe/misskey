@@ -28,6 +28,7 @@ import { analytics, initAnalytics } from '@/analytics.js';
 import { miLocalStorage } from '@/local-storage.js';
 import { fetchCustomEmojis } from '@/custom-emojis.js';
 import { loadFontStyle } from '@/utility/load-font.js';
+import { applyTextAutospacePreference } from '@/utility/text-autospace.js';
 import { prefer } from '@/preferences.js';
 import { $i } from '@/i.js';
 import { launchPlugins } from '@/plugin.js';
@@ -207,6 +208,10 @@ export async function common(createVue: () => Promise<App<Element>>) {
 		} else {
 			window.document.documentElement.style.setProperty('--MI-blur', 'none');
 		}
+	}, { immediate: true });
+
+	watch(prefer.r.autoSpacing, v => {
+		applyTextAutospacePreference(v);
 	}, { immediate: true });
 
 	// Keep screen on
