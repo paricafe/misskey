@@ -286,6 +286,21 @@ export class ApiCallService implements OnApplicationShutdown {
 	}
 
 	@bindThis
+	public invoke(
+		ep: IEndpoint & { exec: any },
+		user: MiLocalUser | null | undefined,
+		token: MiAccessToken | null | undefined,
+		data: any,
+		file: {
+			name: string;
+			path: string;
+		} | null,
+		request: FastifyRequest<{ Body: Record<string, unknown> | undefined, Querystring: Record<string, unknown> }>,
+	): Promise<unknown> {
+		return this.call(ep, user, token, data, file, request);
+	}
+
+	@bindThis
 	private async call(
 		ep: IEndpoint & { exec: any },
 		user: MiLocalUser | null | undefined,

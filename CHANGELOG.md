@@ -7,7 +7,7 @@
 - Enhance: ノートの自動スペーシングで、テキストを変更せずブラウザ標準の `text-autospace` を使用するように
 
 ### Server
--
+- Feat: Mastodon API compatible OAuth, REST, and streaming endpoints are now available for Mastodon clients
 
 ## 2026.7.0
 
