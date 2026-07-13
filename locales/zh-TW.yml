@@ -3327,7 +3327,7 @@ collapseEverythingDescription: "啓用后，會折疊所有貼文，點擊展開
 disableReactionsViewer: "禁用貼文表情回應顯示"
 emojiAutoSpacing: "在插入 Emoji 時自動添加前後間距"
 autoSpacing: "自動間距"
-autoSpacingDescription: "在CJK字符和英文字符中添加間距"
+autoSpacingDescription: "使用瀏覽器的文字排版功能，在視覺上調整 CJK 字元與英文字母或數字之間的間距"
 clickToShowInstanceTickerWindow: "點擊 InstanceTicker 顯示實例資訊視窗"
 defaultLike: "默認回應表情"
 _dataRequest:

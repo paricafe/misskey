@@ -54,6 +54,8 @@ export const DI = {
 	registrationTicketsRepository: Symbol('registrationTicketsRepository'),
 	authSessionsRepository: Symbol('authSessionsRepository'),
 	accessTokensRepository: Symbol('accessTokensRepository'),
+	mastodonOAuthClientsRepository: Symbol('mastodonOAuthClientsRepository'),
+	mastodonOAuthTokensRepository: Symbol('mastodonOAuthTokensRepository'),
 	signinsRepository: Symbol('signinsRepository'),
 	pagesRepository: Symbol('pagesRepository'),
 	pageLikesRepository: Symbol('pageLikesRepository'),

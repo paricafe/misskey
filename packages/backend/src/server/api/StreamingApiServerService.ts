@@ -17,6 +17,14 @@ import MainStreamConnection, { ConnectionRequest } from './stream/Connection.js'
 import type * as http from 'node:http';
 import { ContextIdFactory, ModuleRef } from '@nestjs/core';
 
+export function isNativeStreamingPath(url: string): boolean {
+	try {
+		return new URL(url, 'http://localhost').pathname === '/streaming';
+	} catch {
+		return false;
+	}
+}
+
 @Injectable()
 export class StreamingApiServerService {
 	#wss: WebSocket.WebSocketServer;
@@ -45,6 +53,7 @@ export class StreamingApiServerService {
 				socket.destroy();
 				return;
 			}
+			if (!isNativeStreamingPath(request.url)) return;
 
 			const q = new URL(request.url, `http://${request.headers.host}`).searchParams;
 

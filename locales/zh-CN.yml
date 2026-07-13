@@ -3328,7 +3328,7 @@ collapseEverythingDescription: "启用后，会折叠所有帖子内容，点击
 disableReactionsViewer: "禁用帖文表情回应显示"
 emojiAutoSpacing: "在插入 Emoji 时自动添加空格"
 autoSpacing: "自动空格"
-autoSpacingDescription: "在CJK字符和英文字符中添加空格"
+autoSpacingDescription: "使用浏览器的文本排版功能，在视觉上调整 CJK 字符与字母或数字之间的间距"
 clickToShowInstanceTickerWindow: "点击 InstanceTicker 显示实例信息窗口"
 defaultLike: "默认回应表情"
 _dataRequest:

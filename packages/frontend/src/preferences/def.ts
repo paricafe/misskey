@@ -556,8 +556,8 @@ export const PREF_DEF = definePreferences({
 	enableUndoClearPostForm: {
 		default: true,
 	},
-	autoSpacingBehaviour: {
-		default: null as 'all' | 'special' | null,
+	autoSpacing: {
+		default: false,
 	},
 	collapseNotesRepliedTo: {
 		default: false,
