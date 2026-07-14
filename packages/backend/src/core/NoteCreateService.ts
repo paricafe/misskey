@@ -59,6 +59,7 @@ import { IdentifiableError } from '@/misc/identifiable-error.js';
 import { CollapsedQueue } from '@/misc/collapsed-queue.js';
 import { CacheService } from '@/core/CacheService.js';
 import { isQuote, isRenote } from '@/misc/is-renote.js';
+import { shouldCountRenote } from '@/misc/should-count-renote.js';
 
 type NotificationType = 'reply' | 'renote' | 'quote' | 'mention';
 
@@ -804,8 +805,8 @@ export class NoteCreateService implements OnApplicationShutdown {
 			});
 		}
 
-		if (data.renote && data.renote.userId !== user.id && !user.isBot) {
-			this.incRenoteCount(data.renote);
+		if (data.renote && shouldCountRenote(data.renote, user)) {
+			await this.incRenoteCount(data.renote);
 		}
 
 		if (data.poll && data.poll.expiresAt) {
@@ -985,8 +986,8 @@ export class NoteCreateService implements OnApplicationShutdown {
 	}
 
 	@bindThis
-	private incRenoteCount(renote: MiNote) {
-		this.notesRepository.createQueryBuilder().update()
+	private async incRenoteCount(renote: MiNote): Promise<void> {
+		await this.notesRepository.createQueryBuilder().update()
 			.set({
 				renoteCount: () => '"renoteCount" + 1',
 			})
@@ -999,11 +1000,9 @@ export class NoteCreateService implements OnApplicationShutdown {
 				if (renote.replyId == null) {
 					this.featuredService.updateInChannelNotesRanking(renote.channelId, renote.id, 5);
 				}
-			} else {
-				if (renote.visibility === 'public' && renote.userHost == null && renote.replyId == null) {
-					this.featuredService.updateGlobalNotesRanking(renote.id, 5);
-					this.featuredService.updatePerUserNotesRanking(renote.userId, renote.id, 5);
-				}
+			} else if (renote.visibility === 'public' && renote.userHost == null && renote.replyId == null) {
+				this.featuredService.updateGlobalNotesRanking(renote.id, 5);
+				this.featuredService.updatePerUserNotesRanking(renote.userId, renote.id, 5);
 			}
 		}
 	}
