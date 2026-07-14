@@ -61,6 +61,8 @@ export interface UseNoteOptions {
 	inChannel?: ExtractInjectedType<typeof DIType['inChannel']>;
 	currentClip?: Ref<Misskey.entities.Clip | null> | null;
 	currentAntenna?: Ref<Misskey.entities.Antenna | null> | null;
+	onChildrenChanged?: (event: { action: 'added' | 'removed'; childId: Misskey.entities.Note['id'] }) => void;
+	forceNoteCapture?: boolean;
 }
 
 export function calculateMuteStatus<
@@ -137,6 +139,8 @@ export function useNote(
 		note: appearNote,
 		parentNote: rawNote,
 		mock: props.mock,
+		onChildrenChanged: options.onChildrenChanged,
+		forceCapture: options.forceNoteCapture,
 	});
 
 	// 各種フラグ状態
@@ -189,7 +193,7 @@ export function useNote(
 				const { dispose } = os.popup(MkUsersTooltip, {
 					showing,
 					users,
-					count: appearNote.renoteCount,
+					count: $appearNote.renoteCount,
 					anchorElement: els.renoteButton!.value,
 				}, {
 					closed: () => dispose(),

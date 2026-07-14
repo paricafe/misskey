@@ -160,7 +160,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 				<div :class="$style.noteFooterButtons">
 					<button class="_button" :class="$style.noteFooterButton" @click="reply()">
 						<i class="ti ti-arrow-back-up"></i>
-						<p v-if="appearNote.repliesCount > 0" :class="$style.noteFooterButtonCount">{{ number(appearNote.repliesCount) }}</p>
+						<p v-if="$appearNote.repliesCount > 0" :class="$style.noteFooterButtonCount">{{ number($appearNote.repliesCount) }}</p>
 					</button>
 					<button
 						v-if="canRenote"
@@ -170,7 +170,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 						@mousedown.prevent="renote()"
 					>
 						<i class="ti ti-repeat"></i>
-						<p v-if="appearNote.renoteCount > 0" :class="$style.noteFooterButtonCount">{{ number(appearNote.renoteCount) }}</p>
+						<p v-if="$appearNote.renoteCount > 0" :class="$style.noteFooterButtonCount">{{ number($appearNote.renoteCount) }}</p>
 					</button>
 					<button v-else class="_button" :class="$style.noteFooterButton" disabled>
 						<i class="ti ti-ban"></i>
@@ -249,9 +249,11 @@ SPDX-License-Identifier: AGPL-3.0-only
 </template>
 
 <script lang="ts" setup>
-import { inject, provide, ref, useTemplateRef, markRaw, computed, onMounted } from 'vue';
+import { inject, provide, ref, useTemplateRef, markRaw, computed, onMounted, onUnmounted, watch } from 'vue';
 import * as Misskey from 'misskey-js';
 import { useNote } from '@/composables/use-note.js';
+import { createRepliesRefreshScheduler } from '@/composables/use-replies-refresh.js';
+import type { NoteChildrenChange } from '@/composables/use-replies-refresh.js';
 import { prefer } from '@/preferences.js';
 import { i18n } from '@/i18n.js';
 import { userPage } from '@/filters/user.js';
@@ -337,6 +339,8 @@ const {
 	likeButton,
 }, {
 	inChannel,
+	onChildrenChanged,
+	forceNoteCapture: true,
 });
 
 // provide
@@ -383,15 +387,43 @@ const reactionsPaginator = markRaw(new Paginator('notes/reactions', {
 const replies = ref<Misskey.entities.Note[]>([]);
 const repliesLoaded = ref(false);
 
-function loadReplies() {
-	repliesLoaded.value = true;
-	misskeyApi('notes/children', {
+async function refreshReplies(): Promise<void> {
+	replies.value = await misskeyApi('notes/children', {
 		noteId: appearNote.id,
 		limit: 30,
-	}).then(res => {
-		replies.value = res;
 	});
 }
+
+async function loadReplies(): Promise<void> {
+	try {
+		await refreshReplies();
+	} catch {
+		repliesRefreshScheduler.invalidate();
+	} finally {
+		repliesLoaded.value = true;
+		repliesRefreshScheduler.activate();
+	}
+}
+
+const repliesRefreshScheduler = createRepliesRefreshScheduler({
+	isActive: () => tab.value === 'replies',
+	isLoaded: () => repliesLoaded.value,
+	refresh: refreshReplies,
+	remove: (childId) => {
+		replies.value = replies.value.filter(reply => reply.id !== childId);
+	},
+	throttleMs: 1000,
+});
+
+function onChildrenChanged(event: NoteChildrenChange): void {
+	repliesRefreshScheduler.notify(event);
+}
+
+watch(tab, (value) => {
+	if (value === 'replies') repliesRefreshScheduler.activate();
+});
+
+onUnmounted(() => repliesRefreshScheduler.dispose());
 
 const conversation = ref<Misskey.entities.Note[]>([]);
 const conversationLoaded = ref(false);
