@@ -18,6 +18,7 @@ export function createRepliesRefreshScheduler(options: {
 	const throttleMs = options.throttleMs ?? 1000;
 	let dirty = false;
 	let running = false;
+	let invalidatedWhileRunning = false;
 	let disposed = false;
 	let timer: number | null = null;
 	let lastStartedAt = -throttleMs;
@@ -37,6 +38,7 @@ export function createRepliesRefreshScheduler(options: {
 		if (!canRefresh() || running) return;
 		dirty = false;
 		running = true;
+		invalidatedWhileRunning = false;
 		lastStartedAt = Date.now();
 		let failed = false;
 		try {
@@ -46,12 +48,13 @@ export function createRepliesRefreshScheduler(options: {
 			failed = true;
 		} finally {
 			running = false;
-			if (!failed) schedule();
+			if (!failed || invalidatedWhileRunning) schedule();
 		}
 	}
 
 	function invalidate(): void {
 		dirty = true;
+		if (running) invalidatedWhileRunning = true;
 		schedule();
 	}
 

@@ -779,15 +779,13 @@ export class NoteCreateService implements OnApplicationShutdown {
 		const childTargets = new Map<MiNote['id'], MiNote>();
 
 		if (data.reply) {
-			await this.saveReply(data.reply);
-			this.globalEventService.publishNoteStream(data.reply, 'repliesCountChanged', { delta: 1 });
+			await this.incrementReplyCountAndPublish(data.reply);
 			childTargets.set(data.reply.id, data.reply);
 		}
 
 		if (this.isRenote(data)) {
 			if (shouldCountRenote(data.renote, user)) {
-				await this.incRenoteCount(data.renote);
-				this.globalEventService.publishNoteStream(data.renote, 'renoteCountChanged', { delta: 1 });
+				await this.incrementRenoteCountAndPublish(data.renote);
 			}
 			if (this.isQuote(data)) childTargets.set(data.renote.id, data.renote);
 		}
@@ -997,13 +995,14 @@ export class NoteCreateService implements OnApplicationShutdown {
 	}
 
 	@bindThis
-	private async incRenoteCount(renote: MiNote): Promise<void> {
-		await this.notesRepository.createQueryBuilder().update()
+	private async incRenoteCount(renote: MiNote): Promise<boolean> {
+		const result = await this.notesRepository.createQueryBuilder().update()
 			.set({
 				renoteCount: () => '"renoteCount" + 1',
 			})
 			.where('id = :id', { id: renote.id })
 			.execute();
+		if (result.affected !== 1) return false;
 
 		// 30%の確率、3日以内に投稿されたノートの場合ハイライト用ランキング更新
 		if (Math.random() < 0.3 && (Date.now() - this.idService.parse(renote.id).date.getTime()) < 1000 * 60 * 60 * 24 * 3) {
@@ -1016,6 +1015,14 @@ export class NoteCreateService implements OnApplicationShutdown {
 				this.featuredService.updatePerUserNotesRanking(renote.userId, renote.id, 5);
 			}
 		}
+
+		return true;
+	}
+
+	@bindThis
+	private async incrementRenoteCountAndPublish(renote: MiNote): Promise<void> {
+		if (!(await this.incRenoteCount(renote))) return;
+		this.globalEventService.publishNoteStream(renote, 'renoteCountChanged', { delta: 1 });
 	}
 
 	@bindThis
@@ -1053,8 +1060,15 @@ export class NoteCreateService implements OnApplicationShutdown {
 	}
 
 	@bindThis
-	private async saveReply(reply: MiNote): Promise<void> {
-		await this.notesRepository.increment({ id: reply.id }, 'repliesCount', 1);
+	private async saveReply(reply: MiNote): Promise<boolean> {
+		const result = await this.notesRepository.increment({ id: reply.id }, 'repliesCount', 1);
+		return result.affected === 1;
+	}
+
+	@bindThis
+	private async incrementReplyCountAndPublish(reply: MiNote): Promise<void> {
+		if (!(await this.saveReply(reply))) return;
+		this.globalEventService.publishNoteStream(reply, 'repliesCountChanged', { delta: 1 });
 	}
 
 	@bindThis

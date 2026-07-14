@@ -94,4 +94,29 @@ describe('createRepliesRefreshScheduler', () => {
 		await vi.advanceTimersByTimeAsync(0);
 		expect(refresh).toHaveBeenCalledTimes(2);
 	});
+
+	test('schedules a follow-up when invalidated during a request that fails', async () => {
+		let failFirst!: (error: Error) => void;
+		const first = new Promise<void>((_resolve, reject) => { failFirst = reject; });
+		const refresh = vi.fn()
+			.mockImplementationOnce(() => first)
+			.mockResolvedValue(undefined);
+		const scheduler = createRepliesRefreshScheduler({
+			isActive: () => true,
+			isLoaded: () => true,
+			refresh,
+			remove: vi.fn(),
+			throttleMs: 1000,
+		});
+
+		scheduler.notify({ action: 'added', childId: 'one' });
+		await vi.advanceTimersByTimeAsync(0);
+		scheduler.notify({ action: 'added', childId: 'two' });
+		failFirst(new Error('network'));
+		await Promise.resolve();
+		await vi.advanceTimersByTimeAsync(999);
+		expect(refresh).toHaveBeenCalledTimes(1);
+		await vi.advanceTimersByTimeAsync(1);
+		expect(refresh).toHaveBeenCalledTimes(2);
+	});
 });

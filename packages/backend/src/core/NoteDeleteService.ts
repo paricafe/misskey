@@ -3,10 +3,10 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { Brackets, In, IsNull, Not } from 'typeorm';
+import { Brackets, DataSource, In, IsNull, Not } from 'typeorm';
 import { Injectable, Inject } from '@nestjs/common';
 import type { MiUser, MiLocalUser, MiRemoteUser } from '@/models/User.js';
-import type { MiNote, IMentionedRemoteUsers } from '@/models/Note.js';
+import { MiNote, type IMentionedRemoteUsers } from '@/models/Note.js';
 import type { InstancesRepository, MiMeta, NotesRepository, UsersRepository } from '@/models/_.js';
 import { RelayService } from '@/core/RelayService.js';
 import { FederatedInstanceService } from '@/core/FederatedInstanceService.js';
@@ -30,6 +30,9 @@ export class NoteDeleteService {
 	constructor(
 		@Inject(DI.config)
 		private config: Config,
+
+		@Inject(DI.db)
+		private db: DataSource,
 
 		@Inject(DI.meta)
 		private meta: MiMeta,
@@ -72,20 +75,24 @@ export class NoteDeleteService {
 			: await this.notesRepository.findBy({ id: In(relatedNoteIds) });
 		const replyTarget = note.replyId == null ? null : relatedNotes.find(target => target.id === note.replyId) ?? null;
 		const renoteTarget = note.renoteId == null ? null : relatedNotes.find(target => target.id === note.renoteId) ?? null;
-		const childTargets = new Map<MiNote['id'], MiNote>();
+		const mutation = await this.deleteNoteAndUpdateCounters(user, note, replyTarget, renoteTarget);
+		if (!mutation.deleted) return;
 
-		if (replyTarget != null) {
-			await this.notesRepository.decrement({ id: replyTarget.id }, 'repliesCount', 1);
+		if (replyTarget != null && mutation.replyCountChanged) {
 			this.globalEventService.publishNoteStream(replyTarget, 'repliesCountChanged', { delta: -1 });
-			childTargets.set(replyTarget.id, replyTarget);
 		}
 
-		if (renoteTarget != null) {
-			if (shouldCountRenote(renoteTarget, user)) {
-				await this.notesRepository.decrement({ id: renoteTarget.id }, 'renoteCount', 1);
-				this.globalEventService.publishNoteStream(renoteTarget, 'renoteCountChanged', { delta: -1 });
-			}
-			if (isRenote(note) && isQuote(note)) childTargets.set(renoteTarget.id, renoteTarget);
+		if (renoteTarget != null && mutation.renoteCountChanged) {
+			this.globalEventService.publishNoteStream(renoteTarget, 'renoteCountChanged', { delta: -1 });
+		}
+
+		for (const targetId of mutation.childTargetIds) {
+			const target = relatedNotes.find(relatedNote => relatedNote.id === targetId);
+			if (target == null) continue;
+			this.globalEventService.publishNoteStream(target, 'childrenChanged', {
+				action: 'removed',
+				childId: note.id,
+			});
 		}
 
 		if (!quiet) {
@@ -131,18 +138,6 @@ export class NoteDeleteService {
 
 		this.searchService.unindexNote(note);
 
-		await this.notesRepository.delete({
-			id: note.id,
-			userId: user.id,
-		});
-
-		for (const target of childTargets.values()) {
-			this.globalEventService.publishNoteStream(target, 'childrenChanged', {
-				action: 'removed',
-				childId: note.id,
-			});
-		}
-
 		if (deleter && (note.userId !== deleter.id)) {
 			const user = await this.usersRepository.findOneByOrFail({ id: note.userId });
 			this.moderationLogService.log(deleter, 'deleteNote', {
@@ -153,6 +148,63 @@ export class NoteDeleteService {
 				note: note,
 			});
 		}
+	}
+
+	@bindThis
+	private async deleteNoteAndUpdateCounters(
+		user: Pick<MiUser, 'id' | 'isBot'>,
+		note: MiNote,
+		replyTarget: MiNote | null,
+		renoteTarget: MiNote | null,
+	): Promise<{
+		deleted: boolean;
+		replyCountChanged: boolean;
+		renoteCountChanged: boolean;
+		childTargetIds: MiNote['id'][];
+	}> {
+		return this.db.transaction(async transactionalEntityManager => {
+			const deletion = await transactionalEntityManager.delete(MiNote, {
+				id: note.id,
+				userId: user.id,
+			});
+			if (deletion.affected !== 1) {
+				return {
+					deleted: false,
+					replyCountChanged: false,
+					renoteCountChanged: false,
+					childTargetIds: [],
+				};
+			}
+
+			let replyCountChanged = false;
+			let renoteCountChanged = false;
+			const childTargetIds = new Set<MiNote['id']>();
+
+			if (replyTarget != null) {
+				const result = await transactionalEntityManager.decrement(MiNote, { id: replyTarget.id }, 'repliesCount', 1);
+				replyCountChanged = result.affected === 1;
+				if (replyCountChanged) childTargetIds.add(replyTarget.id);
+			}
+
+			if (renoteTarget != null) {
+				let renoteTargetExists = false;
+				if (shouldCountRenote(renoteTarget, user)) {
+					const result = await transactionalEntityManager.decrement(MiNote, { id: renoteTarget.id }, 'renoteCount', 1);
+					renoteCountChanged = result.affected === 1;
+					renoteTargetExists = renoteCountChanged;
+				} else if (isRenote(note) && isQuote(note)) {
+					renoteTargetExists = await transactionalEntityManager.existsBy(MiNote, { id: renoteTarget.id });
+				}
+				if (renoteTargetExists && isRenote(note) && isQuote(note)) childTargetIds.add(renoteTarget.id);
+			}
+
+			return {
+				deleted: true,
+				replyCountChanged,
+				renoteCountChanged,
+				childTargetIds: [...childTargetIds],
+			};
+		});
 	}
 
 	@bindThis

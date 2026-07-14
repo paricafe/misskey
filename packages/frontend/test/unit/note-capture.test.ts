@@ -3,21 +3,58 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { afterEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { createApp, defineComponent, h } from 'vue';
 import type * as Misskey from 'misskey-js';
 import { applyNoteCaptureDiff, noteEvents, useNoteCapture } from '@/composables/use-note-capture.js';
 
+const mocks = vi.hoisted(() => {
+	const listeners = new Map<string, Set<(data?: unknown) => void>>();
+	const connection = {
+		send: vi.fn(),
+		on: vi.fn((event: string, listener: (data?: unknown) => void) => {
+			const eventListeners = listeners.get(event) ?? new Set();
+			eventListeners.add(listener);
+			listeners.set(event, eventListeners);
+		}),
+		off: vi.fn((event: string, listener: (data?: unknown) => void) => {
+			listeners.get(event)?.delete(listener);
+		}),
+		emit: (event: string, data?: unknown) => {
+			for (const listener of listeners.get(event) ?? []) listener(data);
+		},
+		reset: () => {
+			listeners.clear();
+			connection.send.mockClear();
+			connection.on.mockClear();
+			connection.off.mockClear();
+		},
+	};
+
+	return {
+		connection,
+		realtimeMode: false,
+	};
+});
+
 vi.mock('@/store.js', () => ({
-	store: { s: { realtimeMode: false } },
+	store: { s: { get realtimeMode() { return mocks.realtimeMode; } } },
+}));
+
+vi.mock('@/i.js', () => ({
+	$i: { id: 'viewer' },
+}));
+
+vi.mock('@/stream.js', () => ({
+	useStream: () => mocks.connection,
 }));
 
 const mountedApps: ReturnType<typeof createApp>[] = [];
 
-function makeNote(): Misskey.entities.Note {
+function makeNote(createdAt = new Date().toISOString()): Misskey.entities.Note {
 	return {
 		id: 'note-id',
-		createdAt: new Date().toISOString(),
+		createdAt,
 		reactions: {},
 		reactionCount: 0,
 		reactionEmojis: {},
@@ -28,19 +65,29 @@ function makeNote(): Misskey.entities.Note {
 	} as Misskey.entities.Note;
 }
 
-function mountCapture(onChildrenChanged = vi.fn()) {
-	const note = makeNote();
-	let state!: ReturnType<typeof useNoteCapture>['$note'];
+function mountCapture(options: {
+	note?: Misskey.entities.Note;
+	mock?: boolean;
+	onChildrenChanged?: ReturnType<typeof vi.fn>;
+} = {}) {
+	const note = options.note ?? makeNote();
+	const onChildrenChanged = options.onChildrenChanged ?? vi.fn();
+	let capture!: ReturnType<typeof useNoteCapture>;
 	const app = createApp(defineComponent({
 		setup() {
-			state = useNoteCapture({ note, parentNote: null, mock: true, onChildrenChanged }).$note;
+			capture = useNoteCapture({ note, parentNote: null, mock: options.mock ?? true, onChildrenChanged });
 			return () => h('div');
 		},
 	}));
 	app.mount(document.createElement('div'));
 	mountedApps.push(app);
-	return { note, state, onChildrenChanged };
+	return { note, capture, state: capture.$note, onChildrenChanged, app };
 }
+
+beforeEach(() => {
+	mocks.realtimeMode = false;
+	mocks.connection.reset();
+});
 
 afterEach(() => {
 	for (const app of mountedApps.splice(0)) app.unmount();
@@ -80,5 +127,49 @@ describe('useNoteCapture counts', () => {
 		const emit = noteEvents.emit.bind(noteEvents) as (event: string, body: unknown) => boolean;
 		emit(`childrenChanged:${note.id}`, { action: 'removed', childId: 'child-id' });
 		expect(onChildrenChanged).toHaveBeenCalledWith({ action: 'removed', childId: 'child-id' });
+	});
+
+	test('shares one stream bridge across two captures of the same note', () => {
+		mocks.realtimeMode = true;
+		const first = mountCapture({ mock: false });
+		const second = mountCapture({ mock: false });
+
+		expect(mocks.connection.send).toHaveBeenCalledTimes(1);
+		expect(mocks.connection.send).toHaveBeenCalledWith('sr', { id: first.note.id });
+
+		mocks.connection.emit('noteUpdated', {
+			id: first.note.id,
+			type: 'repliesCountChanged',
+			body: { delta: 1 },
+		});
+
+		expect(first.state.repliesCount).toBe(3);
+		expect(second.state.repliesCount).toBe(3);
+
+		first.app.unmount();
+		mountedApps.splice(mountedApps.indexOf(first.app), 1);
+		expect(mocks.connection.send).toHaveBeenCalledTimes(1);
+		second.app.unmount();
+		mountedApps.splice(mountedApps.indexOf(second.app), 1);
+		expect(mocks.connection.send).toHaveBeenCalledWith('un', { id: first.note.id });
+		expect(mocks.connection.send).toHaveBeenCalledTimes(2);
+	});
+
+	test('manual subscription is idempotent when called repeatedly', () => {
+		mocks.realtimeMode = true;
+		const oldNote = makeNote(new Date(Date.now() - 1000 * 60 * 10).toISOString());
+		const { capture, state } = mountCapture({ note: oldNote, mock: false });
+
+		capture.subscribe();
+		capture.subscribe();
+		expect(mocks.connection.send).toHaveBeenCalledTimes(1);
+
+		mocks.connection.emit('noteUpdated', {
+			id: oldNote.id,
+			type: 'renoteCountChanged',
+			body: { delta: 1 },
+		});
+
+		expect(state.renoteCount).toBe(4);
 	});
 });

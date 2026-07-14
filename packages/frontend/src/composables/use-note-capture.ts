@@ -108,7 +108,7 @@ window.setInterval(() => {
 function pollingSubscribe(props: {
 	note: Pick<Misskey.entities.Note, 'id' | 'createdAt'>;
 	$note: ReactiveNoteData;
-}) {
+}): () => void {
 	const { note, $note } = props;
 
 	function onFetched(data: NoteCaptureDiff): void {
@@ -118,17 +118,41 @@ function pollingSubscribe(props: {
 	pollingEnqueue(note);
 	fetchEvent.on(note.id, onFetched);
 
-	onUnmounted(() => {
+	return () => {
 		pollingDequeue(note);
 		fetchEvent.off(note.id, onFetched);
-	});
+	};
 }
+
+const realtimeSubscriptions = new WeakMap<Misskey.IStream, Map<Misskey.entities.Note['id'], {
+	referenceCount: number;
+	onStreamNoteUpdated: (noteData: NoteUpdatedEvent) => void;
+	onStreamConnected: () => void;
+}>>();
 
 function realtimeSubscribe(props: {
 	note: Pick<Misskey.entities.Note, 'id' | 'createdAt'>;
-}): void {
+}): () => void {
 	const note = props.note;
 	const connection = useStream();
+	let subscriptions = realtimeSubscriptions.get(connection);
+	if (subscriptions == null) {
+		subscriptions = new Map();
+		realtimeSubscriptions.set(connection, subscriptions);
+	}
+
+	const existingSubscription = subscriptions.get(note.id);
+	if (existingSubscription != null) {
+		existingSubscription.referenceCount++;
+		return () => {
+			existingSubscription.referenceCount--;
+			if (existingSubscription.referenceCount !== 0) return;
+			connection.send('un', { id: note.id });
+			connection.off('noteUpdated', existingSubscription.onStreamNoteUpdated);
+			connection.off('_connected_', existingSubscription.onStreamConnected);
+			subscriptions.delete(note.id);
+		};
+	}
 
 	function onStreamNoteUpdated(noteData: NoteUpdatedEvent): void {
 		const { type, id, body } = noteData;
@@ -196,27 +220,28 @@ function realtimeSubscribe(props: {
 		}
 	}
 
-	function capture(withHandler = false): void {
-		connection.send('sr', { id: note.id });
-		if (withHandler) connection.on('noteUpdated', onStreamNoteUpdated);
-	}
-
-	function decapture(withHandler = false): void {
-		connection.send('un', { id: note.id });
-		if (withHandler) connection.off('noteUpdated', onStreamNoteUpdated);
-	}
-
 	function onStreamConnected() {
-		capture(false);
+		connection.send('sr', { id: note.id });
 	}
 
-	capture(true);
+	const subscription = {
+		referenceCount: 1,
+		onStreamNoteUpdated,
+		onStreamConnected,
+	};
+	subscriptions.set(note.id, subscription);
+	connection.send('sr', { id: note.id });
+	connection.on('noteUpdated', onStreamNoteUpdated);
 	connection.on('_connected_', onStreamConnected);
 
-	onUnmounted(() => {
-		decapture(true);
+	return () => {
+		subscription.referenceCount--;
+		if (subscription.referenceCount !== 0) return;
+		connection.send('un', { id: note.id });
+		connection.off('noteUpdated', onStreamNoteUpdated);
 		connection.off('_connected_', onStreamConnected);
-	});
+		subscriptions.delete(note.id);
+	};
 }
 
 export type ReactiveNoteData = {
@@ -255,6 +280,7 @@ export function useNoteCapture(props: {
 	subscribe: () => void;
 } {
 	const { note, parentNote, mock } = props;
+	let unsubscribeCapture: (() => void) | null = null;
 
 	const $note = reactive<ReactiveNoteData>({
 		reactions: Object.entries(note.reactions).reduce((acc, [name, count]) => {
@@ -382,17 +408,17 @@ export function useNoteCapture(props: {
 	}
 
 	function subscribe() {
-		if (mock) {
+		if (mock || unsubscribeCapture != null) {
 			// モックモードでは購読しない
 			return;
 		}
 
 		if ($i && store.s.realtimeMode) {
-			realtimeSubscribe({
+			unsubscribeCapture = realtimeSubscribe({
 				note,
 			});
 		} else {
-			pollingSubscribe({
+			unsubscribeCapture = pollingSubscribe({
 				note,
 				$note,
 			});
@@ -400,6 +426,8 @@ export function useNoteCapture(props: {
 	}
 
 	onUnmounted(() => {
+		unsubscribeCapture?.();
+		unsubscribeCapture = null;
 		noteEvents.off(`reacted:${note.id}`, onReacted);
 		noteEvents.off(`unreacted:${note.id}`, onUnreacted);
 		noteEvents.off(`pollVoted:${note.id}`, onPollVoted);
@@ -418,9 +446,7 @@ export function useNoteCapture(props: {
 				// リノートで表示されているノートでもないし、投稿からある程度経過しているので自動で購読しない
 				return {
 					$note,
-					subscribe: () => {
-						subscribe();
-					},
+					subscribe,
 				};
 			}
 		} else {
@@ -428,9 +454,7 @@ export function useNoteCapture(props: {
 				// リノートで表示されているノートだが、リノートされてからある程度経過しているので自動で購読しない
 				return {
 					$note,
-					subscribe: () => {
-						subscribe();
-					},
+					subscribe,
 				};
 			}
 		}
@@ -440,8 +464,6 @@ export function useNoteCapture(props: {
 
 	return {
 		$note,
-		subscribe: () => {
-			// すでに購読しているので何もしない
-		},
+		subscribe,
 	};
 }
