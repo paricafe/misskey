@@ -4,9 +4,10 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { createApp, defineComponent, h } from 'vue';
+import { createApp, defineComponent, h, nextTick } from 'vue';
 import type * as Misskey from 'misskey-js';
 import { applyNoteCaptureDiff, noteEvents, useNoteCapture } from '@/composables/use-note-capture.js';
+import { useNote } from '@/composables/use-note.js';
 
 const mocks = vi.hoisted(() => {
 	const listeners = new Map<string, Set<(data?: unknown) => void>>();
@@ -42,11 +43,26 @@ vi.mock('@/store.js', () => ({
 }));
 
 vi.mock('@/i.js', () => ({
-	$i: { id: 'viewer' },
+	$i: {
+		id: 'viewer',
+		policies: {
+			chatAvailability: 'available',
+		},
+	},
+	iAmModerator: false,
 }));
 
 vi.mock('@/stream.js', () => ({
 	useStream: () => mocks.connection,
+}));
+
+vi.mock('@/utility/misskey-api.js', () => ({
+	misskeyApi: vi.fn().mockResolvedValue([]),
+	misskeyApiGet: vi.fn().mockResolvedValue([]),
+}));
+
+vi.mock('@/plugin.js', () => ({
+	getPluginHandlers: () => [],
 }));
 
 const mountedApps: ReturnType<typeof createApp>[] = [];
@@ -173,5 +189,51 @@ describe('useNoteCapture counts', () => {
 		});
 
 		expect(state.renoteCount).toBe(4);
+	});
+});
+
+describe('useNote edit updates', () => {
+	test('rerenders note content after an updated event', async () => {
+		const note = {
+			...makeNote(),
+			text: 'before',
+			cw: null,
+			userId: 'author-id',
+			user: {
+				id: 'author-id',
+				instance: null,
+			},
+			visibility: 'public',
+			localOnly: false,
+			reactionAcceptance: null,
+			tags: [],
+			emojis: {},
+			fileIds: [],
+			files: [],
+			history: null,
+		} as unknown as Misskey.entities.Note;
+		const container = document.createElement('div');
+		const app = createApp(defineComponent({
+			setup() {
+				const { appearNote } = useNote({ note, mock: true });
+				return () => h('div', appearNote.text ?? '');
+			},
+		}));
+		app.mount(container);
+		mountedApps.push(app);
+
+		expect(container.textContent).toBe('before');
+		noteEvents.emit(`updated:${note.id}`, {
+			cw: null,
+			text: 'after',
+			updatedAt: new Date().toISOString(),
+			tags: [],
+			emojis: {},
+			fileIds: [],
+			files: [],
+		});
+		await nextTick();
+
+		expect(container.textContent).toBe('after');
 	});
 });

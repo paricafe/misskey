@@ -132,7 +132,7 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				};
 			}
 
-			await this.noteUpdateService.update(await this.usersRepository.findOneByOrFail({ id: note.userId }), note, {
+			const updatedNote = await this.noteUpdateService.update(await this.usersRepository.findOneByOrFail({ id: note.userId }), note, {
 				text: ps.text,
 				cw: ps.cw,
 				updatedAt: new Date(),
@@ -140,7 +140,7 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 			}, false, me);
 
 			return {
-				updatedNote: await this.noteEntityService.pack(note, me),
+				updatedNote: await this.noteEntityService.pack(updatedNote, me),
 			};
 		});
 	}

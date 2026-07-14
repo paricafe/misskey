@@ -7,6 +7,7 @@
 - Enhance: ノートの自動スペーシングで、テキストを変更せずブラウザ標準の `text-autospace` を使用するように
 - Fix: ノートの返信・Renote数と詳細画面の返信一覧がリアルタイムに更新されない問題を修正
 - Fix: 「ノートをクリックして詳細を表示」が有効なとき、メディアのクリックやCWの展開でもノート詳細が開く問題を修正
+- Fix: ノートを編集した直後に、表示中の内容が更新されない問題を修正
 
 ### Server
 - Feat: Mastodon API compatible OAuth, REST, and streaming endpoints are now available for Mastodon clients

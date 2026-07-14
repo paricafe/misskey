@@ -42,7 +42,7 @@ type Option = {
 	cw: string | null;
 	apHashtags?: string[] | null;
 	apEmojis?: string[] | null;
-}
+};
 
 @Injectable()
 export class NoteUpdateService {
@@ -85,14 +85,14 @@ export class NoteUpdateService {
 	 * @param note Note to update
 	 * @param data New note info
 	 */
-	async update(user: { id: MiUser['id']; uri: MiUser['uri']; host: MiUser['host']; isBot: MiUser['isBot']; }, note: MiNote, data: Option, quiet = false, updater?: MiUser) {
+	async update(user: { id: MiUser['id']; uri: MiUser['uri']; host: MiUser['host']; isBot: MiUser['isBot']; }, note: MiNote, data: Option, quiet = false, updater?: MiUser): Promise<MiNote> {
 		if (!data.updatedAt) {
 			throw new Error('update time is required');
 		}
 
 		if (note.history && note.history.findIndex(h => h.createdAt === data.updatedAt?.toISOString()) !== -1) {
 			// Same history already exists, skip this
-			return;
+			return note;
 		}
 
 		// Parse tags & emojis
@@ -159,6 +159,7 @@ export class NoteUpdateService {
 			cw: note.cw,
 			text: note.text,
 		}];
+		let updatedNote: MiNote;
 		if (note.updatedAt && note.updatedAt >= data.updatedAt) {
 			// Previous version, just update history
 			history.sort((h1, h2) => new Date(h1.createdAt).getTime() - new Date(h2.createdAt).getTime()); // earliest -> latest
@@ -166,6 +167,7 @@ export class NoteUpdateService {
 			await this.notesRepository.update({ id: note.id }, {
 				history,
 			});
+			updatedNote = { ...note, history };
 		} else {
 			// Latest version
 
@@ -182,6 +184,7 @@ export class NoteUpdateService {
 				tags,
 				emojis,
 			});
+			updatedNote = { ...newNote, history };
 		}
 
 		// Currently not implemented
@@ -195,6 +198,8 @@ export class NoteUpdateService {
 		// 		note: note,
 		// 	});
 		// }
+
+		return updatedNote;
 	}
 
 	@bindThis

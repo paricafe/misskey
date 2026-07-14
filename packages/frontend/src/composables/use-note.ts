@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { ref, computed } from 'vue';
+import { ref, computed, reactive } from 'vue';
 import type { Ref } from 'vue';
 import * as mfm from 'mfm-js';
 import * as Misskey from 'misskey-js';
@@ -129,6 +129,7 @@ export function useNote(
 			rawNote = result as Misskey.entities.Note;
 		}
 	}
+	rawNote = reactive(rawNote);
 
 	// 基本状態
 	const isRenote = Misskey.note.isPureRenote(rawNote);
