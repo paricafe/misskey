@@ -620,6 +620,8 @@ export class NoteEntityService implements OnModuleInit {
 				userHost: true,
 				reactions: true,
 				reactionAndUserPairCache: true,
+				repliesCount: true,
+				renoteCount: true,
 			},
 		});
 
@@ -639,6 +641,8 @@ export class NoteEntityService implements OnModuleInit {
 				id: note.id,
 				reactions,
 				reactionEmojis,
+				repliesCount: note.repliesCount,
+				renoteCount: note.renoteCount,
 			}));
 		});
 

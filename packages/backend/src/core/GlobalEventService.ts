@@ -130,9 +130,15 @@ export interface NoteEventTypes {
 		reaction: string;
 		userId: MiUser['id'];
 	};
-	replied: {
-		id: MiNote['id'];
-		userId: MiUser['id'];
+	repliesCountChanged: {
+		delta: 1 | -1;
+	};
+	renoteCountChanged: {
+		delta: 1 | -1;
+	};
+	childrenChanged: {
+		action: 'added' | 'removed';
+		childId: MiNote['id'];
 	};
 }
 type NoteStreamEventTypes = {

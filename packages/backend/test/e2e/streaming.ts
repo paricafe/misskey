@@ -8,7 +8,7 @@ process.env.NODE_ENV = 'test';
 import * as assert from 'assert';
 import { describe, beforeAll, test } from 'vitest';
 import { WebSocket } from 'ws';
-import { api, connectStream, createAppToken, initTestDb, port, post, signup, waitFire } from '../utils.js';
+import { api, captureNoteUpdatedEvents, connectStream, createAppToken, initTestDb, port, post, signup, waitFire } from '../utils.js';
 import type * as misskey from 'misskey-js';
 import { MiFollowing } from '@/models/Following.js';
 
@@ -105,6 +105,79 @@ describe('Streaming', () => {
 		}, 1000 * 60 * 2);
 
 		describe('Events', () => {
+			test('note count and child events are published in both directions', async () => {
+				const target = await post(kyoko, { text: 'stream target' });
+
+				const replyAdded = await captureNoteUpdatedEvents(kyoko, target.id, () => post(ayano, {
+					text: 'stream reply',
+					replyId: target.id,
+				}));
+				assert.ok(replyAdded.events.some(event => event.type === 'repliesCountChanged' && event.body.delta === 1));
+				assert.ok(replyAdded.events.some(event => event.type === 'childrenChanged' && event.body.action === 'added' && event.body.childId === replyAdded.result.id));
+
+				const replyRemoved = await captureNoteUpdatedEvents(kyoko, target.id, () => api('notes/delete', {
+					noteId: replyAdded.result.id,
+				}, ayano));
+				assert.ok(replyRemoved.events.some(event => event.type === 'repliesCountChanged' && event.body.delta === -1));
+				assert.ok(replyRemoved.events.some(event => event.type === 'childrenChanged' && event.body.action === 'removed' && event.body.childId === replyAdded.result.id));
+
+				const renoteAdded = await captureNoteUpdatedEvents(kyoko, target.id, () => post(ayano, { renoteId: target.id }));
+				assert.ok(renoteAdded.events.some(event => event.type === 'renoteCountChanged' && event.body.delta === 1));
+				assert.strictEqual(renoteAdded.events.some(event => event.type === 'childrenChanged'), false);
+
+				const renoteRemoved = await captureNoteUpdatedEvents(kyoko, target.id, () => api('notes/delete', {
+					noteId: renoteAdded.result.id,
+				}, ayano));
+				assert.ok(renoteRemoved.events.some(event => event.type === 'renoteCountChanged' && event.body.delta === -1));
+				assert.strictEqual(renoteRemoved.events.some(event => event.type === 'childrenChanged'), false);
+
+				const quoteAdded = await captureNoteUpdatedEvents(kyoko, target.id, () => post(ayano, {
+					text: 'stream quote',
+					renoteId: target.id,
+				}));
+				assert.ok(quoteAdded.events.some(event => event.type === 'renoteCountChanged' && event.body.delta === 1));
+				assert.ok(quoteAdded.events.some(event => event.type === 'childrenChanged' && event.body.action === 'added' && event.body.childId === quoteAdded.result.id));
+
+				const quoteRemoved = await captureNoteUpdatedEvents(kyoko, target.id, () => api('notes/delete', {
+					noteId: quoteAdded.result.id,
+				}, ayano));
+				assert.ok(quoteRemoved.events.some(event => event.type === 'renoteCountChanged' && event.body.delta === -1));
+				assert.ok(quoteRemoved.events.some(event => event.type === 'childrenChanged' && event.body.action === 'removed' && event.body.childId === quoteAdded.result.id));
+
+				const combinedAdded = await captureNoteUpdatedEvents(kyoko, target.id, () => post(ayano, {
+					text: 'stream reply quote',
+					replyId: target.id,
+					renoteId: target.id,
+				}));
+				assert.ok(combinedAdded.events.some(event => event.type === 'repliesCountChanged' && event.body.delta === 1));
+				assert.ok(combinedAdded.events.some(event => event.type === 'renoteCountChanged' && event.body.delta === 1));
+				assert.strictEqual(combinedAdded.events.filter(event => event.type === 'childrenChanged' && event.body.action === 'added').length, 1);
+
+				const combinedRemoved = await captureNoteUpdatedEvents(kyoko, target.id, () => api('notes/delete', {
+					noteId: combinedAdded.result.id,
+				}, ayano));
+				assert.ok(combinedRemoved.events.some(event => event.type === 'repliesCountChanged' && event.body.delta === -1));
+				assert.ok(combinedRemoved.events.some(event => event.type === 'renoteCountChanged' && event.body.delta === -1));
+				assert.strictEqual(combinedRemoved.events.filter(event => event.type === 'childrenChanged' && event.body.action === 'removed').length, 1);
+
+				const selfRenoteAdded = await captureNoteUpdatedEvents(kyoko, target.id, () => post(kyoko, { renoteId: target.id }));
+				assert.strictEqual(selfRenoteAdded.events.some(event => event.type === 'renoteCountChanged'), false);
+				const selfRenoteRemoved = await captureNoteUpdatedEvents(kyoko, target.id, () => api('notes/delete', {
+					noteId: selfRenoteAdded.result.id,
+				}, kyoko));
+				assert.strictEqual(selfRenoteRemoved.events.some(event => event.type === 'renoteCountChanged'), false);
+
+				const bot = await signup({ username: 'streambot' });
+				const botUpdate = await api('i/update', { isBot: true }, bot);
+				assert.strictEqual(botUpdate.status, 204);
+				const botRenoteAdded = await captureNoteUpdatedEvents(kyoko, target.id, () => post(bot, { renoteId: target.id }));
+				assert.strictEqual(botRenoteAdded.events.some(event => event.type === 'renoteCountChanged'), false);
+				const botRenoteRemoved = await captureNoteUpdatedEvents(kyoko, target.id, () => api('notes/delete', {
+					noteId: botRenoteAdded.result.id,
+				}, bot));
+				assert.strictEqual(botRenoteRemoved.events.some(event => event.type === 'renoteCountChanged'), false);
+			});
+
 			test('mention event', async () => {
 				const fired = await waitFire(
 					kyoko, 'main',	// kyoko:main

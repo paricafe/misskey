@@ -59,6 +59,7 @@ import { IdentifiableError } from '@/misc/identifiable-error.js';
 import { CollapsedQueue } from '@/misc/collapsed-queue.js';
 import { CacheService } from '@/core/CacheService.js';
 import { isQuote, isRenote } from '@/misc/is-renote.js';
+import { shouldCountRenote } from '@/misc/should-count-renote.js';
 
 type NotificationType = 'reply' | 'renote' | 'quote' | 'mention';
 
@@ -775,8 +776,25 @@ export class NoteCreateService implements OnApplicationShutdown {
 			channel: data.channel ?? null,
 		}, user);
 
+		const childTargets = new Map<MiNote['id'], MiNote>();
+
 		if (data.reply) {
-			this.saveReply(data.reply, note);
+			await this.incrementReplyCountAndPublish(data.reply);
+			childTargets.set(data.reply.id, data.reply);
+		}
+
+		if (this.isRenote(data)) {
+			if (shouldCountRenote(data.renote, user)) {
+				await this.incrementRenoteCountAndPublish(data.renote);
+			}
+			if (this.isQuote(data)) childTargets.set(data.renote.id, data.renote);
+		}
+
+		for (const target of childTargets.values()) {
+			this.globalEventService.publishNoteStream(target, 'childrenChanged', {
+				action: 'added',
+				childId: note.id,
+			});
 		}
 
 		if (data.reply == null) {
@@ -802,10 +820,6 @@ export class NoteCreateService implements OnApplicationShutdown {
 					}
 				}
 			});
-		}
-
-		if (data.renote && data.renote.userId !== user.id && !user.isBot) {
-			this.incRenoteCount(data.renote);
 		}
 
 		if (data.poll && data.poll.expiresAt) {
@@ -843,10 +857,6 @@ export class NoteCreateService implements OnApplicationShutdown {
 
 			// If has in reply to note
 			if (data.reply) {
-				this.globalEventService.publishNoteStream(data.reply.id, 'replied', {
-					id: note.id,
-					userId: user.id,
-				});
 				// 通知
 				if (data.reply.userHost === null) {
 					const isThreadMuted = await this.noteThreadMutingsRepository.exists({
@@ -985,13 +995,14 @@ export class NoteCreateService implements OnApplicationShutdown {
 	}
 
 	@bindThis
-	private incRenoteCount(renote: MiNote) {
-		this.notesRepository.createQueryBuilder().update()
+	private async incRenoteCount(renote: MiNote): Promise<boolean> {
+		const result = await this.notesRepository.createQueryBuilder().update()
 			.set({
 				renoteCount: () => '"renoteCount" + 1',
 			})
 			.where('id = :id', { id: renote.id })
 			.execute();
+		if (result.affected !== 1) return false;
 
 		// 30%の確率、3日以内に投稿されたノートの場合ハイライト用ランキング更新
 		if (Math.random() < 0.3 && (Date.now() - this.idService.parse(renote.id).date.getTime()) < 1000 * 60 * 60 * 24 * 3) {
@@ -999,13 +1010,19 @@ export class NoteCreateService implements OnApplicationShutdown {
 				if (renote.replyId == null) {
 					this.featuredService.updateInChannelNotesRanking(renote.channelId, renote.id, 5);
 				}
-			} else {
-				if (renote.visibility === 'public' && renote.userHost == null && renote.replyId == null) {
-					this.featuredService.updateGlobalNotesRanking(renote.id, 5);
-					this.featuredService.updatePerUserNotesRanking(renote.userId, renote.id, 5);
-				}
+			} else if (renote.visibility === 'public' && renote.userHost == null && renote.replyId == null) {
+				this.featuredService.updateGlobalNotesRanking(renote.id, 5);
+				this.featuredService.updatePerUserNotesRanking(renote.userId, renote.id, 5);
 			}
 		}
+
+		return true;
+	}
+
+	@bindThis
+	private async incrementRenoteCountAndPublish(renote: MiNote): Promise<void> {
+		if (!(await this.incRenoteCount(renote))) return;
+		this.globalEventService.publishNoteStream(renote, 'renoteCountChanged', { delta: 1 });
 	}
 
 	@bindThis
@@ -1043,8 +1060,15 @@ export class NoteCreateService implements OnApplicationShutdown {
 	}
 
 	@bindThis
-	private saveReply(reply: MiNote, note: MiNote) {
-		this.notesRepository.increment({ id: reply.id }, 'repliesCount', 1);
+	private async saveReply(reply: MiNote): Promise<boolean> {
+		const result = await this.notesRepository.increment({ id: reply.id }, 'repliesCount', 1);
+		return result.affected === 1;
+	}
+
+	@bindThis
+	private async incrementReplyCountAndPublish(reply: MiNote): Promise<void> {
+		if (!(await this.saveReply(reply))) return;
+		this.globalEventService.publishNoteStream(reply, 'repliesCountChanged', { delta: 1 });
 	}
 
 	@bindThis

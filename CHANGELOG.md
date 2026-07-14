@@ -5,9 +5,13 @@
 
 ### Client
 - Enhance: ノートの自動スペーシングで、テキストを変更せずブラウザ標準の `text-autospace` を使用するように
+- Fix: ノートの返信・Renote数と詳細画面の返信一覧がリアルタイムに更新されない問題を修正
+- Fix: 「ノートをクリックして詳細を表示」が有効なとき、メディアのクリックやCWの展開でもノート詳細が開く問題を修正
+- Fix: ノートを編集した直後に、表示中の内容が更新されない問題を修正
 
 ### Server
 - Feat: Mastodon API compatible OAuth, REST, and streaming endpoints are now available for Mastodon clients
+- Fix: Renoteを削除した際に対象ノートのRenote数が減少しない問題を修正
 
 ## 2026.7.0
 
@@ -48,8 +52,17 @@
 - Fix: 非ログイン時トップページをスクロール操作できないことがある問題を修正
 
 ### Server
-- Enhance: センシティブメディアの判定を外部サービス ([sensitive-detector](https://github.com/misskey-dev/sensitive-detector)) に分離し、`nsfwjs` / `@tensorflow/tfjs(-node)` の同梱と NSFW 判定モデルを廃止 (#16804)
+- Feat: OpenTelemetryサポート
+  - 詳細な設定はconfigファイルを参照してください。
+  - Sentryとの併用も可能です。Sentry併用時は、PostgreSQL Query と Redis command は Sentry で計装されます。
+  - 以下の自動計装をサポートしています。（計装対象にする項目は設定可能）
+    - PostgreSQL query
+    - Redis command
+    - 全ての受信HTTPリクエスト
+    - 全ての送信HTTPリクエスト
+    - ジョブキュー（エンキュー元のトレースを含む）
 - Enhance: Sentry バックエンドの自動計装を `sentryForBackend.disabledIntegrations` で個別に無効化できるように
+- Enhance: センシティブメディアの判定を外部サービス ([sensitive-detector](https://github.com/misskey-dev/sensitive-detector)) に分離し、`nsfwjs` / `@tensorflow/tfjs(-node)` の同梱と NSFW 判定モデルを廃止 (#16804)
 - Enhance: Node.js 22.23.0以降、24.17.0以降、26.4.0以降をサポートするように
 - Enhance: Docker Image の Node.js を 26.4.0 に、Debian を trixie (v13) に更新
 - Enhance: URLプレビューの結果を内部でキャッシュするように

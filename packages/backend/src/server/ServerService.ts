@@ -35,6 +35,7 @@ import { OAuth2ProviderService } from './oauth/OAuth2ProviderService.js';
 import { makeHstsHook } from './hsts.js';
 import { MastodonApiServerService } from './api/mastodon/MastodonApiServerService.js';
 import { MastodonStreamingApiServerService } from './api/mastodon/MastodonStreamingApiServerService.js';
+import { registerHttpServerInstrumentation } from './http-server-instrumentation.js';
 
 const _dirname = fileURLToPath(new URL('.', import.meta.url));
 
@@ -85,6 +86,7 @@ export class ServerService implements OnApplicationShutdown {
 			logger: false,
 		});
 		this.#fastify = fastify;
+		await registerHttpServerInstrumentation(fastify, this.config);
 
 		// HSTS
 		if (this.config.url.startsWith('https') && !this.config.disableHsts) {
