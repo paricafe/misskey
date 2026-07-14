@@ -19,6 +19,9 @@ export const noteEvents = new EventEmitter<{
 	[ev: `reacted:${string}`]: (ctx: { userId: Misskey.entities.User['id']; reaction: string; emoji?: { name: string; url: string; } | null; }) => void;
 	[ev: `unreacted:${string}`]: (ctx: { userId: Misskey.entities.User['id']; reaction: string; emoji?: { name: string; url: string; } | null; }) => void;
 	[ev: `pollVoted:${string}`]: (ctx: { userId: Misskey.entities.User['id']; choice: number; }) => void;
+	[ev: `repliesCountChanged:${string}`]: (ctx: { delta: 1 | -1 }) => void;
+	[ev: `renoteCountChanged:${string}`]: (ctx: { delta: 1 | -1 }) => void;
+	[ev: `childrenChanged:${string}`]: (ctx: { action: 'added' | 'removed'; childId: Misskey.entities.Note['id'] }) => void;
 	[ev: `updated:${string}`]: (ctx: {
 		cw: string | null;
 		text: string;
@@ -31,7 +34,7 @@ export const noteEvents = new EventEmitter<{
 }>();
 
 const fetchEvent = new EventEmitter<{
-	[id: string]: Pick<Misskey.entities.Note, 'reactions' | 'reactionEmojis'>;
+	[id: string]: NoteCaptureDiff;
 }>();
 
 const pollingQueue = new Map<string, {
@@ -95,6 +98,8 @@ window.setInterval(() => {
 			fetchEvent.emit(item.id, {
 				reactions: item.reactions,
 				reactionEmojis: item.reactionEmojis,
+				repliesCount: item.repliesCount,
+				renoteCount: item.renoteCount,
 			});
 		}
 	});
@@ -106,10 +111,8 @@ function pollingSubscribe(props: {
 }) {
 	const { note, $note } = props;
 
-	function onFetched(data: Pick<Misskey.entities.Note, 'reactions' | 'reactionEmojis'>): void {
-		$note.reactions = data.reactions;
-		$note.reactionCount = Object.values(data.reactions).reduce((a, b) => a + b, 0);
-		$note.reactionEmojis = data.reactionEmojis;
+	function onFetched(data: NoteCaptureDiff): void {
+		applyNoteCaptureDiff($note, data);
 	}
 
 	pollingEnqueue(note);
@@ -155,6 +158,21 @@ function realtimeSubscribe(props: {
 					userId: body.userId,
 					choice: body.choice,
 				});
+				break;
+			}
+
+			case 'repliesCountChanged': {
+				noteEvents.emit(`repliesCountChanged:${id}`, body);
+				break;
+			}
+
+			case 'renoteCountChanged': {
+				noteEvents.emit(`renoteCountChanged:${id}`, body);
+				break;
+			}
+
+			case 'childrenChanged': {
+				noteEvents.emit(`childrenChanged:${id}`, body);
 				break;
 			}
 
@@ -205,9 +223,24 @@ export type ReactiveNoteData = {
 	reactions: Misskey.entities.Note['reactions'];
 	reactionCount: Misskey.entities.Note['reactionCount'];
 	reactionEmojis: Misskey.entities.Note['reactionEmojis'];
+	repliesCount: Misskey.entities.Note['repliesCount'];
+	renoteCount: Misskey.entities.Note['renoteCount'];
 	myReaction: Misskey.entities.Note['myReaction'];
 	pollChoices: NonNullable<Misskey.entities.Note['poll']>['choices'];
 };
+
+type NoteCaptureDiff = Pick<
+	Misskey.entities.Note,
+	'reactions' | 'reactionEmojis' | 'repliesCount' | 'renoteCount'
+>;
+
+export function applyNoteCaptureDiff($note: ReactiveNoteData, data: NoteCaptureDiff): void {
+	$note.reactions = data.reactions;
+	$note.reactionCount = Object.values(data.reactions).reduce((a, b) => a + b, 0);
+	$note.reactionEmojis = data.reactionEmojis;
+	$note.repliesCount = data.repliesCount;
+	$note.renoteCount = data.renoteCount;
+}
 
 const noReaction = Symbol();
 
@@ -215,6 +248,8 @@ export function useNoteCapture(props: {
 	note: Misskey.entities.Note;
 	parentNote: Misskey.entities.Note | null;
 	mock?: boolean;
+	onChildrenChanged?: (event: { action: 'added' | 'removed'; childId: Misskey.entities.Note['id'] }) => void;
+	forceCapture?: boolean;
 }): {
 	$note: Reactive<ReactiveNoteData>;
 	subscribe: () => void;
@@ -234,6 +269,8 @@ export function useNoteCapture(props: {
 		}, {} as Misskey.entities.Note['reactions']),
 		reactionCount: note.reactionCount,
 		reactionEmojis: note.reactionEmojis,
+		repliesCount: note.repliesCount,
+		renoteCount: note.renoteCount,
 		myReaction: note.myReaction,
 		pollChoices: note.poll?.choices ?? [],
 	});
@@ -241,6 +278,9 @@ export function useNoteCapture(props: {
 	noteEvents.on(`reacted:${note.id}`, onReacted);
 	noteEvents.on(`unreacted:${note.id}`, onUnreacted);
 	noteEvents.on(`pollVoted:${note.id}`, onPollVoted);
+	noteEvents.on(`repliesCountChanged:${note.id}`, onRepliesCountChanged);
+	noteEvents.on(`renoteCountChanged:${note.id}`, onRenoteCountChanged);
+	noteEvents.on(`childrenChanged:${note.id}`, onChildrenChanged);
 	noteEvents.on(`updated:${note.id}`, onUpdated);
 
 	// 操作がダブっていないかどうかを簡易的に記録するためのMap
@@ -303,6 +343,18 @@ export function useNoteCapture(props: {
 		$note.pollChoices = choices;
 	}
 
+	function onRepliesCountChanged(ctx: { delta: 1 | -1 }): void {
+		$note.repliesCount = Math.max(0, $note.repliesCount + ctx.delta);
+	}
+
+	function onRenoteCountChanged(ctx: { delta: 1 | -1 }): void {
+		$note.renoteCount = Math.max(0, $note.renoteCount + ctx.delta);
+	}
+
+	function onChildrenChanged(ctx: { action: 'added' | 'removed'; childId: Misskey.entities.Note['id'] }): void {
+		props.onChildrenChanged?.(ctx);
+	}
+
 	function onUpdated(ctx: {
 		cw: string | null;
 		text: string;
@@ -351,31 +403,36 @@ export function useNoteCapture(props: {
 		noteEvents.off(`reacted:${note.id}`, onReacted);
 		noteEvents.off(`unreacted:${note.id}`, onUnreacted);
 		noteEvents.off(`pollVoted:${note.id}`, onPollVoted);
+		noteEvents.off(`repliesCountChanged:${note.id}`, onRepliesCountChanged);
+		noteEvents.off(`renoteCountChanged:${note.id}`, onRenoteCountChanged);
+		noteEvents.off(`childrenChanged:${note.id}`, onChildrenChanged);
 		noteEvents.off(`updated:${note.id}`, onUpdated);
 	});
 
 	// 投稿からある程度経過している(=タイムラインを遡って表示した)ノートは、イベントが発生する可能性が低いためそもそも購読しない
 	// ただし「リノートされたばかりの過去のノート」(= parentNoteが存在し、かつparentNoteの投稿日時が最近)はイベント発生が考えられるため購読する
 	// TODO: デバイスとサーバーの時計がズレていると不具合の元になるため、ズレを検知して警告を表示するなどのケアが必要かもしれない
-	if (parentNote == null) {
-		if ((Date.now() - new Date(note.createdAt).getTime()) > 1000 * 60 * 5) { // 5min
-			// リノートで表示されているノートでもないし、投稿からある程度経過しているので自動で購読しない
-			return {
-				$note,
-				subscribe: () => {
-					subscribe();
-				},
-			};
-		}
-	} else {
-		if ((Date.now() - new Date(parentNote.createdAt).getTime()) > 1000 * 60 * 5) { // 5min
-			// リノートで表示されているノートだが、リノートされてからある程度経過しているので自動で購読しない
-			return {
-				$note,
-				subscribe: () => {
-					subscribe();
-				},
-			};
+	if (!props.forceCapture) {
+		if (parentNote == null) {
+			if ((Date.now() - new Date(note.createdAt).getTime()) > 1000 * 60 * 5) { // 5min
+				// リノートで表示されているノートでもないし、投稿からある程度経過しているので自動で購読しない
+				return {
+					$note,
+					subscribe: () => {
+						subscribe();
+					},
+				};
+			}
+		} else {
+			if ((Date.now() - new Date(parentNote.createdAt).getTime()) > 1000 * 60 * 5) { // 5min
+				// リノートで表示されているノートだが、リノートされてからある程度経過しているので自動で購読しない
+				return {
+					$note,
+					subscribe: () => {
+						subscribe();
+					},
+				};
+			}
 		}
 	}
 
