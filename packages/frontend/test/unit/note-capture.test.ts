@@ -51,6 +51,8 @@ vi.mock('@/stream.js', () => ({
 
 const mountedApps: ReturnType<typeof createApp>[] = [];
 
+type ChildrenChangedHandler = NonNullable<Parameters<typeof useNoteCapture>[0]['onChildrenChanged']>;
+
 function makeNote(createdAt = new Date().toISOString()): Misskey.entities.Note {
 	return {
 		id: 'note-id',
@@ -68,10 +70,10 @@ function makeNote(createdAt = new Date().toISOString()): Misskey.entities.Note {
 function mountCapture(options: {
 	note?: Misskey.entities.Note;
 	mock?: boolean;
-	onChildrenChanged?: ReturnType<typeof vi.fn>;
+	onChildrenChanged?: ChildrenChangedHandler;
 } = {}) {
 	const note = options.note ?? makeNote();
-	const onChildrenChanged = options.onChildrenChanged ?? vi.fn();
+	const onChildrenChanged = options.onChildrenChanged ?? vi.fn<ChildrenChangedHandler>();
 	let capture!: ReturnType<typeof useNoteCapture>;
 	const app = createApp(defineComponent({
 		setup() {
