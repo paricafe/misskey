@@ -947,6 +947,18 @@ describe('Note', () => {
 		});
 	});
 
+	test('notes/show-partial-bulk returns reply and renote counts', async () => {
+		const target = await post(alice, { text: 'partial target' });
+		await post(bob, { text: 'partial reply', replyId: target.id });
+		await post(bob, { text: 'partial quote', renoteId: target.id });
+
+		const response = await api('notes/show-partial-bulk', { noteIds: [target.id] }, alice);
+		assert.strictEqual(response.status, 200);
+		assert.strictEqual(response.body.length, 1);
+		assert.strictEqual(response.body[0].repliesCount, 1);
+		assert.strictEqual(response.body[0].renoteCount, 1);
+	});
+
 	describe('notes/delete', () => {
 		test('delete a reply', async () => {
 			const mainNoteRes = await api('notes/create', {
