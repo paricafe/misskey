@@ -23,6 +23,7 @@ import { bindThis } from '@/decorators.js';
 import { SearchService } from '@/core/SearchService.js';
 import { ModerationLogService } from '@/core/ModerationLogService.js';
 import { isQuote, isRenote } from '@/misc/is-renote.js';
+import { shouldCountRenote } from '@/misc/should-count-renote.js';
 
 @Injectable()
 export class NoteDeleteService {
@@ -63,8 +64,21 @@ export class NoteDeleteService {
 	async delete(user: { id: MiUser['id']; uri: MiUser['uri']; host: MiUser['host']; isBot: MiUser['isBot']; }, note: MiNote, quiet = false, deleter?: MiUser) {
 		const deletedAt = new Date();
 
-		if (note.replyId) {
-			await this.notesRepository.decrement({ id: note.replyId }, 'repliesCount', 1);
+		const relatedNoteIds = [...new Set(
+			[note.replyId, note.renoteId].filter((id): id is MiNote['id'] => id != null),
+		)];
+		const relatedNotes = relatedNoteIds.length === 0
+			? []
+			: await this.notesRepository.findBy({ id: In(relatedNoteIds) });
+		const replyTarget = note.replyId == null ? null : relatedNotes.find(target => target.id === note.replyId) ?? null;
+		const renoteTarget = note.renoteId == null ? null : relatedNotes.find(target => target.id === note.renoteId) ?? null;
+
+		if (replyTarget != null) {
+			await this.notesRepository.decrement({ id: replyTarget.id }, 'repliesCount', 1);
+		}
+
+		if (renoteTarget != null && shouldCountRenote(renoteTarget, user)) {
+			await this.notesRepository.decrement({ id: renoteTarget.id }, 'renoteCount', 1);
 		}
 
 		if (!quiet) {

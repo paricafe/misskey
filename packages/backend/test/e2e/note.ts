@@ -979,6 +979,50 @@ describe('Note', () => {
 			assert.ok(mainNote);
 			assert.strictEqual(mainNote.repliesCount, 0);
 		});
+
+		test('delete a counted renote and quote', async () => {
+			const target = await post(alice, { text: 'renote target' });
+			const renote = await post(bob, { renoteId: target.id });
+
+			let storedTarget = await Notes.findOneByOrFail({ id: target.id });
+			assert.strictEqual(storedTarget.renoteCount, 1);
+
+			const deleteRenote = await api('notes/delete', { noteId: renote.id }, bob);
+			assert.strictEqual(deleteRenote.status, 204);
+			storedTarget = await Notes.findOneByOrFail({ id: target.id });
+			assert.strictEqual(storedTarget.renoteCount, 0);
+
+			const quote = await post(bob, { text: 'quote body', renoteId: target.id });
+			storedTarget = await Notes.findOneByOrFail({ id: target.id });
+			assert.strictEqual(storedTarget.renoteCount, 1);
+
+			const deleteQuote = await api('notes/delete', { noteId: quote.id }, bob);
+			assert.strictEqual(deleteQuote.status, 204);
+			storedTarget = await Notes.findOneByOrFail({ id: target.id });
+			assert.strictEqual(storedTarget.renoteCount, 0);
+		});
+
+		test('delete a note that is both a reply and a quote', async () => {
+			const replyTarget = await post(alice, { text: 'reply target' });
+			const renoteTarget = await post(alice, { text: 'quote target' });
+			const child = await post(bob, {
+				text: 'reply and quote',
+				replyId: replyTarget.id,
+				renoteId: renoteTarget.id,
+			});
+
+			let storedReplyTarget = await Notes.findOneByOrFail({ id: replyTarget.id });
+			let storedRenoteTarget = await Notes.findOneByOrFail({ id: renoteTarget.id });
+			assert.strictEqual(storedReplyTarget.repliesCount, 1);
+			assert.strictEqual(storedRenoteTarget.renoteCount, 1);
+
+			const deleted = await api('notes/delete', { noteId: child.id }, bob);
+			assert.strictEqual(deleted.status, 204);
+			storedReplyTarget = await Notes.findOneByOrFail({ id: replyTarget.id });
+			storedRenoteTarget = await Notes.findOneByOrFail({ id: renoteTarget.id });
+			assert.strictEqual(storedReplyTarget.repliesCount, 0);
+			assert.strictEqual(storedRenoteTarget.renoteCount, 0);
+		});
 	});
 
 	describe('notes/translate', () => {
