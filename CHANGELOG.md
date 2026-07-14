@@ -5,9 +5,11 @@
 
 ### Client
 - Enhance: ノートの自動スペーシングで、テキストを変更せずブラウザ標準の `text-autospace` を使用するように
+- Fix: ノートの返信・Renote数と詳細画面の返信一覧がリアルタイムに更新されない問題を修正
 
 ### Server
 - Feat: Mastodon API compatible OAuth, REST, and streaming endpoints are now available for Mastodon clients
+- Fix: Renoteを削除した際に対象ノートのRenote数が減少しない問題を修正
 
 ## 2026.7.0
 
