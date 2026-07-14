@@ -72,13 +72,20 @@ export class NoteDeleteService {
 			: await this.notesRepository.findBy({ id: In(relatedNoteIds) });
 		const replyTarget = note.replyId == null ? null : relatedNotes.find(target => target.id === note.replyId) ?? null;
 		const renoteTarget = note.renoteId == null ? null : relatedNotes.find(target => target.id === note.renoteId) ?? null;
+		const childTargets = new Map<MiNote['id'], MiNote>();
 
 		if (replyTarget != null) {
 			await this.notesRepository.decrement({ id: replyTarget.id }, 'repliesCount', 1);
+			this.globalEventService.publishNoteStream(replyTarget, 'repliesCountChanged', { delta: -1 });
+			childTargets.set(replyTarget.id, replyTarget);
 		}
 
-		if (renoteTarget != null && shouldCountRenote(renoteTarget, user)) {
-			await this.notesRepository.decrement({ id: renoteTarget.id }, 'renoteCount', 1);
+		if (renoteTarget != null) {
+			if (shouldCountRenote(renoteTarget, user)) {
+				await this.notesRepository.decrement({ id: renoteTarget.id }, 'renoteCount', 1);
+				this.globalEventService.publishNoteStream(renoteTarget, 'renoteCountChanged', { delta: -1 });
+			}
+			if (isRenote(note) && isQuote(note)) childTargets.set(renoteTarget.id, renoteTarget);
 		}
 
 		if (!quiet) {
@@ -128,6 +135,13 @@ export class NoteDeleteService {
 			id: note.id,
 			userId: user.id,
 		});
+
+		for (const target of childTargets.values()) {
+			this.globalEventService.publishNoteStream(target, 'childrenChanged', {
+				action: 'removed',
+				childId: note.id,
+			});
+		}
 
 		if (deleter && (note.userId !== deleter.id)) {
 			const user = await this.usersRepository.findOneByOrFail({ id: note.userId });

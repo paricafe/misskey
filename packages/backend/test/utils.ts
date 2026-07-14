@@ -403,6 +403,44 @@ export function connectStream<C extends keyof misskey.Channels>(user: UserToken,
 	});
 }
 
+export async function captureNoteUpdatedEvents<T>(
+	user: UserToken,
+	noteId: string,
+	trigger: () => Promise<T>,
+): Promise<{ events: Record<string, any>[]; result: T }> {
+	const url = new URL(`ws://127.0.0.1:${port}/streaming`);
+	const options: ClientOptions = {};
+	if (user.bearer) {
+		options.headers = { Authorization: `Bearer ${user.token}` };
+	} else {
+		url.searchParams.set('i', user.token);
+	}
+
+	const socket = new WebSocket(url, options);
+	const events: Record<string, any>[] = [];
+	try {
+		await new Promise<void>((resolve, reject) => {
+			socket.once('error', reject);
+			socket.once('unexpected-response', (_request, response) => reject(response));
+			socket.once('open', () => {
+				socket.send(JSON.stringify({ type: 'sr', body: { id: noteId } }));
+				resolve();
+			});
+		});
+		socket.on('message', data => {
+			const message = JSON.parse(data.toString());
+			if (message.type === 'noteUpdated') events.push(message.body);
+		});
+
+		await new Promise(resolve => setTimeout(resolve, 50));
+		const result = await trigger();
+		await new Promise(resolve => setTimeout(resolve, 250));
+		return { events, result };
+	} finally {
+		socket.close();
+	}
+}
+
 export const waitFire = async <C extends keyof misskey.Channels>(user: UserToken, channel: C, trgr: () => any, cond: (msg: Record<string, any>) => boolean, params?: misskey.Channels[C]['params']) => {
 	let ws: WebSocket | undefined;
 

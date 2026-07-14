@@ -321,6 +321,22 @@ export type NoteUpdatedEvent = { id: Note['id'] } & ({
 		updatedAt: string;
 	};
 } | {
+	type: 'repliesCountChanged';
+	body: {
+		delta: 1 | -1;
+	};
+} | {
+	type: 'renoteCountChanged';
+	body: {
+		delta: 1 | -1;
+	};
+} | {
+	type: 'childrenChanged';
+	body: {
+		action: 'added' | 'removed';
+		childId: Note['id'];
+	};
+} | {
 	type: 'pollVoted';
 	body: {
 		choice: number;

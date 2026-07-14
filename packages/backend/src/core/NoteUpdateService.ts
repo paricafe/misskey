@@ -132,7 +132,7 @@ export class NoteUpdateService {
 		};
 
 		if (!quiet) {
-			this.globalEventService.publishNoteStream(note.id, 'updated', await awaitAll({
+			this.globalEventService.publishNoteStream(note, 'updated', await awaitAll({
 				fileIds: newNote.fileIds,
 				files: this.driveFileEntityService.packManyByIds(newNote.fileIds),
 				cw: data.cw,
