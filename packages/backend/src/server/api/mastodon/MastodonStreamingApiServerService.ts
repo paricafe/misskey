@@ -15,7 +15,7 @@ import type { Packed } from '@/misc/json-schema.js';
 import type { JsonObject } from '@/misc/json-value.js';
 import MainStreamConnection, { type ConnectionRequest } from '@/server/api/stream/Connection.js';
 import type * as http from 'node:http';
-import type { MastodonAuth } from './types.js';
+import type { MastodonUserAuth } from './types.js';
 import { MastodonAuthenticateService } from './MastodonAuthenticateService.js';
 import { MastodonEntityService } from './MastodonEntityService.js';
 import { MastodonScopeService } from './MastodonScopeService.js';
@@ -24,7 +24,7 @@ const MAX_BUFFERED_BYTES = 1024 * 1024;
 const ALLOWED_STREAMS = new Set(['user', 'user:notification', 'public', 'public:local', 'public:media', 'public:local:media', 'hashtag', 'hashtag:local', 'list', 'direct']);
 
 type ConnectionContext = {
-	auth: MastodonAuth;
+	auth: MastodonUserAuth;
 	streams: Set<string>;
 	tags: Set<string>;
 	listId: string | null;
@@ -109,6 +109,10 @@ export class MastodonStreamingApiServerService {
 				return;
 			}
 			const auth = await this.mastodonAuthenticateService.authenticate(token);
+			if (auth.kind === 'application') {
+				this.reject(socket, 401, 'Unauthorized');
+				return;
+			}
 			const streams = this.getStreams(url);
 			this.assertScopes(auth, streams);
 			const contextId = ContextIdFactory.create();
@@ -155,7 +159,7 @@ export class MastodonStreamingApiServerService {
 		return streams;
 	}
 
-	private assertScopes(auth: MastodonAuth, streams: ReadonlySet<string>): void {
+	private assertScopes(auth: MastodonUserAuth, streams: ReadonlySet<string>): void {
 		const statusStream = [...streams].some(stream => stream !== 'user:notification');
 		const notificationStream = streams.has('user') || streams.has('user:notification');
 		if (statusStream) this.mastodonScopeService.assert(auth.token.scopes, 'read:statuses');

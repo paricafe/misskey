@@ -5,6 +5,7 @@
 
 import Fastify from 'fastify';
 import { afterEach, describe, expect, test, vi } from 'vitest';
+import { MastodonApiError } from './errors.js';
 import { MastodonApiServerService } from './MastodonApiServerService.js';
 
 describe(MastodonApiServerService, () => {
@@ -15,16 +16,18 @@ describe(MastodonApiServerService, () => {
 	});
 
 	function createServer() {
-		const auth = { user: { id: 'user-id' }, token: { id: 'token-id', scopes: ['read'] } };
+		const auth = { kind: 'user', user: { id: 'user-id' }, token: { id: 'token-id', scopes: ['read'] } };
 		const authenticate = vi.fn().mockResolvedValue(auth);
 		const assert = vi.fn();
 		const nativeInvoke = vi.fn(async name => {
 			if (name === 'i') return { id: 'user-id', username: 'alice' };
 			if (name === 'notes/timeline') return [{ id: 'note-id' }];
+			if (name === 'notes/show') return { id: 'note-id' };
 			if (name === 'notes/create') return { createdNote: { id: 'created-note-id' } };
 			return [];
 		});
 		const registerApplication = vi.fn().mockResolvedValue({ client_id: 'client-id', client_secret: 'client-secret' });
+		const getApplication = vi.fn().mockResolvedValue({ id: 'client-id', name: 'Elk' });
 		const redis = {
 			get: vi.fn().mockResolvedValue(null),
 			set: vi.fn().mockResolvedValue('OK'),
@@ -33,16 +36,18 @@ describe(MastodonApiServerService, () => {
 			expire: vi.fn().mockResolvedValue(1),
 		};
 		const notesRepository = { findBy: vi.fn().mockResolvedValue([]) };
+		const noteFavoritesRepository = { findBy: vi.fn().mockResolvedValue([]) };
+		const userNotePiningsRepository = { findBy: vi.fn().mockResolvedValue([]) };
 		const service = new MastodonApiServerService(
 			{ url: 'https://misskey.example/', host: 'misskey.example', version: '2026.7.0', maxFileSize: 10_000_000 } as never,
 			{ name: 'Misskey Test', description: 'Test instance', langs: ['en'], bannerUrl: null } as never,
 			notesRepository as never,
-			{ findBy: vi.fn().mockResolvedValue([]) } as never,
-			{ findBy: vi.fn().mockResolvedValue([]) } as never,
-			{ registerApplication } as never,
+			noteFavoritesRepository as never,
+			userNotePiningsRepository as never,
+			{ registerApplication, getApplication } as never,
 			{ authenticate } as never,
 			{ assert } as never,
-			{ invoke: nativeInvoke } as never,
+			{ invoke: nativeInvoke, invokePublic: nativeInvoke } as never,
 			{
 				account: vi.fn(value => ({ id: value.id, username: value.username })),
 				credentialAccount: vi.fn(value => ({ id: value.id, username: value.username })),
@@ -58,7 +63,18 @@ describe(MastodonApiServerService, () => {
 		fastify.register(service.createServer);
 		servers.push(fastify);
 
-		return { fastify, authenticate, assert, nativeInvoke, registerApplication, redis, notesRepository };
+		return {
+			fastify,
+			authenticate,
+			assert,
+			nativeInvoke,
+			registerApplication,
+			getApplication,
+			redis,
+			notesRepository,
+			noteFavoritesRepository,
+			userNotePiningsRepository,
+		};
 	}
 
 	test('registers Mastodon applications from JSON', async () => {
@@ -80,6 +96,109 @@ describe(MastodonApiServerService, () => {
 
 		expect(response.statusCode).toBe(401);
 		expect(authenticate).not.toHaveBeenCalled();
+	});
+
+	test('accepts an application token for app verification', async () => {
+		const { fastify, authenticate, getApplication, assert } = createServer();
+		authenticate.mockResolvedValue({
+			kind: 'application',
+			user: null,
+			token: { id: 'app-token', clientId: 'client-id', scopes: ['read'] },
+		});
+		const response = await fastify.inject({
+			method: 'GET',
+			url: '/api/v1/apps/verify_credentials',
+			headers: { authorization: 'Bearer app-token' },
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(getApplication).toHaveBeenCalledWith('client-id');
+		expect(assert).not.toHaveBeenCalled();
+	});
+
+	test('rejects an application token on user-only routes', async () => {
+		const { fastify, authenticate } = createServer();
+		authenticate.mockResolvedValue({
+			kind: 'application',
+			user: null,
+			token: { id: 'app-token', clientId: 'client-id', scopes: ['read'] },
+		});
+		const response = await fastify.inject({
+			method: 'GET',
+			url: '/api/v1/accounts/verify_credentials',
+			headers: { authorization: 'Bearer app-token' },
+		});
+
+		expect(response.statusCode).toBe(422);
+	});
+
+	test('serves public routes anonymously when Authorization is absent', async () => {
+		const { fastify, authenticate, nativeInvoke, notesRepository, noteFavoritesRepository, userNotePiningsRepository } = createServer();
+		const response = await fastify.inject({ method: 'GET', url: '/api/v1/statuses/note-id' });
+
+		expect(response.statusCode).toBe(200);
+		expect(authenticate).not.toHaveBeenCalled();
+		expect(nativeInvoke).toHaveBeenCalledWith('notes/show', { noteId: 'note-id' }, null, expect.any(Object));
+		expect(notesRepository.findBy).not.toHaveBeenCalled();
+		expect(noteFavoritesRepository.findBy).not.toHaveBeenCalled();
+		expect(userNotePiningsRepository.findBy).not.toHaveBeenCalled();
+	});
+
+	test('uses a user token and viewer state on public routes', async () => {
+		const { fastify, authenticate, assert, nativeInvoke, notesRepository, noteFavoritesRepository, userNotePiningsRepository } = createServer();
+		const response = await fastify.inject({
+			method: 'GET',
+			url: '/api/v1/statuses/note-id',
+			headers: { authorization: 'bEaReR mastodon-token' },
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(authenticate).toHaveBeenCalledWith('mastodon-token');
+		expect(assert).toHaveBeenCalledWith(['read'], 'read:statuses');
+		expect(nativeInvoke).toHaveBeenCalledWith('notes/show', { noteId: 'note-id' }, expect.objectContaining({ kind: 'user' }), expect.any(Object));
+		expect(notesRepository.findBy).toHaveBeenCalledWith(expect.objectContaining({ userId: 'user-id' }));
+		expect(noteFavoritesRepository.findBy).toHaveBeenCalledWith(expect.objectContaining({ userId: 'user-id' }));
+		expect(userNotePiningsRepository.findBy).toHaveBeenCalledWith(expect.objectContaining({ userId: 'user-id' }));
+	});
+
+	test('treats an application token as anonymous on public routes', async () => {
+		const { fastify, authenticate, assert, nativeInvoke, notesRepository } = createServer();
+		authenticate.mockResolvedValue({
+			kind: 'application',
+			user: null,
+			token: { id: 'app-token', clientId: 'client-id', scopes: ['read'] },
+		});
+		const response = await fastify.inject({
+			method: 'GET',
+			url: '/api/v1/statuses/note-id',
+			headers: { authorization: 'Bearer app-token' },
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(nativeInvoke).toHaveBeenCalledWith('notes/show', { noteId: 'note-id' }, null, expect.any(Object));
+		expect(assert).not.toHaveBeenCalled();
+		expect(notesRepository.findBy).not.toHaveBeenCalled();
+	});
+
+	test('rejects malformed and invalid Authorization on public routes', async () => {
+		const { fastify, authenticate, nativeInvoke } = createServer();
+		const malformed = await fastify.inject({
+			method: 'GET',
+			url: '/api/v1/statuses/note-id',
+			headers: { authorization: 'Basic mastodon-token' },
+		});
+		expect(malformed.statusCode).toBe(401);
+		expect(authenticate).not.toHaveBeenCalled();
+
+		authenticate.mockRejectedValueOnce(new MastodonApiError(401, 'invalid_token', 'The access token is invalid'));
+		const invalid = await fastify.inject({
+			method: 'GET',
+			url: '/api/v1/statuses/note-id',
+			headers: { authorization: 'Bearer invalid-token' },
+		});
+
+		expect(invalid.statusCode).toBe(401);
+		expect(nativeInvoke).not.toHaveBeenCalled();
 	});
 
 	test('rejects unknown and recipient-less direct visibility instead of publishing publicly', async () => {

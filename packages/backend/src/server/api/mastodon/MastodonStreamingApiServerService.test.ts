@@ -43,7 +43,7 @@ describe('Mastodon streaming compatibility', () => {
 		const service = new MastodonStreamingApiServerService(
 			redis as never,
 			{ registerRequestByContextId: vi.fn(), create: vi.fn().mockResolvedValue(nativeStream) } as never,
-			{ authenticate: vi.fn().mockResolvedValue({ user: { id: 'user-id' }, token: { id: 'token-id', scopes: ['read'] } }) } as never,
+			{ authenticate: vi.fn().mockResolvedValue({ kind: 'user', user: { id: 'user-id' }, token: { id: 'token-id', scopes: ['read'] } }) } as never,
 			{ assert: vi.fn(), allows: vi.fn().mockReturnValue(true), toMisskeyPermissions: vi.fn().mockReturnValue(['read:account']) } as never,
 			{ status: vi.fn(note => ({ id: note.id })), notification: vi.fn(value => value) } as never,
 		);
@@ -84,6 +84,48 @@ describe('Mastodon streaming compatibility', () => {
 			redis.emit('message', 'misskey', JSON.stringify({ channel: 'mastodonTokenRevoked:token-id', message: null }));
 			await closed;
 			await vi.waitFor(() => expect(nativeStream.dispose).toHaveBeenCalled());
+		} finally {
+			client.terminate();
+			await service.detach();
+			await new Promise<void>(resolve => server.close(() => resolve()));
+		}
+	});
+
+	test('rejects application tokens before creating native streaming state', async () => {
+		const redis = new EventEmitter();
+		const registerRequestByContextId = vi.fn();
+		const create = vi.fn();
+		const assert = vi.fn();
+		const authenticate = vi.fn().mockResolvedValue({
+			kind: 'application',
+			user: null,
+			token: { id: 'app-token', clientId: 'client-id', scopes: ['read'] },
+		});
+		const service = new MastodonStreamingApiServerService(
+			redis as never,
+			{ registerRequestByContextId, create } as never,
+			{ authenticate } as never,
+			{ assert, allows: vi.fn(), toMisskeyPermissions: vi.fn() } as never,
+			{ status: vi.fn(), notification: vi.fn() } as never,
+		);
+		const server = http.createServer();
+		service.attach(server);
+		await new Promise<void>((resolve, reject) => server.listen(0, '127.0.0.1', resolve).once('error', reject));
+		const address = server.address();
+		if (address == null || typeof address === 'string') throw new Error('Missing test server address');
+		const client = new WebSocket.WebSocket(`ws://127.0.0.1:${address.port}/api/v1/streaming?stream=public`, {
+			headers: { authorization: 'Bearer app-token' },
+		});
+		client.on('error', () => {});
+
+		try {
+			const [, response] = await once(client, 'unexpected-response') as [http.ClientRequest, http.IncomingMessage];
+			expect(response.statusCode).toBe(401);
+			response.resume();
+			expect(authenticate).toHaveBeenCalledWith('app-token');
+			expect(assert).not.toHaveBeenCalled();
+			expect(registerRequestByContextId).not.toHaveBeenCalled();
+			expect(create).not.toHaveBeenCalled();
 		} finally {
 			client.terminate();
 			await service.detach();
