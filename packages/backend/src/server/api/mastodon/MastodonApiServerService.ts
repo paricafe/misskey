@@ -511,21 +511,72 @@ export class MastodonApiServerService {
 	}
 
 	private registerSearch(fastify: FastifyInstance): void {
-		fastify.get('/api/v2/search', request => this.withAuth(request as MastodonRequest, 'read:search', async auth => {
+		fastify.get('/api/v2/search', async request => {
 			const query = request.query as Dictionary;
 			const q = this.string(query.q)?.trim();
 			if (q == null || q === '') throw new MastodonApiError(400, 'invalid_request', 'q is required');
-			const limit = Math.min(40, Math.max(1, Number(this.string(query.limit) ?? 20)));
-			const [accounts, statuses] = await Promise.all([
-				this.invoke('users/search-by-username-and-host', { username: q.replace(/^@/u, '').split('@')[0], limit, detail: true }, auth, request as MastodonRequest),
-				this.invoke('notes/search', { query: q, limit }, auth, request as MastodonRequest).catch(() => []),
-			]);
-			return {
-				accounts: (accounts as Packed<'UserDetailed'>[]).map(user => this.mastodonEntityService.account(user)),
-				statuses: await this.statusesWithState(statuses as Packed<'Note'>[], auth),
-				hashtags: [],
+			const rawType = query.type;
+			const type = this.string(rawType);
+			if (rawType != null && type !== 'accounts' && type !== 'hashtags' && type !== 'statuses') {
+				throw new MastodonApiError(400, 'invalid_request', 'type must be accounts, hashtags, or statuses');
+			}
+			const resolve = this.boolean(query.resolve);
+			const requiresUser = resolve || Object.hasOwn(query, 'offset');
+			const search = async (auth: MastodonUserAuth | null) => {
+				if (resolve && auth != null && this.isHttpUrl(q)) {
+					let result: { type: 'Note'; object: Packed<'Note'> } | { type: 'User'; object: Packed<'UserDetailed'> } | null;
+					try {
+						result = await this.invoke('ap/show', { uri: q }, auth, request as MastodonRequest) as typeof result;
+					} catch (error) {
+						if (error instanceof ApiError && (error.code === 'NO_SUCH_OBJECT' || error.code === 'REQUEST_FAILED')) {
+							result = null;
+						} else {
+							throw error;
+						}
+					}
+					return {
+						accounts: result?.type === 'User' && (type == null || type === 'accounts')
+							? [this.mastodonEntityService.account(result.object)]
+							: [],
+						statuses: result?.type === 'Note' && (type == null || type === 'statuses')
+							? await this.statusesWithState([result.object], auth)
+							: [],
+						hashtags: [],
+					};
+				}
+
+				const limit = this.integer(query.limit, 20, 1, 40);
+				const offset = this.integer(query.offset, 0, 0);
+				const accountId = this.string(query.account_id);
+				const untilId = this.string(query.max_id);
+				const sinceId = this.string(query.min_id);
+				const [accounts, statuses, hashtags] = await Promise.all([
+					type == null || type === 'accounts'
+						? this.invokePublic('users/search', { query: q, limit, offset }, auth, request as MastodonRequest) as Promise<Packed<'UserDetailed'>[]>
+						: Promise.resolve([]),
+					type == null || type === 'statuses'
+						? this.invokePublic('notes/search', {
+							query: q,
+							limit,
+							...(accountId != null && accountId !== '' ? { userId: accountId } : {}),
+							...(untilId != null && untilId !== '' ? { untilId } : {}),
+							...(sinceId != null && sinceId !== '' ? { sinceId } : {}),
+						}, auth, request as MastodonRequest) as Promise<Packed<'Note'>[]>
+						: Promise.resolve([]),
+					type == null || type === 'hashtags'
+						? this.invokePublic('hashtags/search', { query: q, limit, offset }, auth, request as MastodonRequest) as Promise<string[]>
+						: Promise.resolve([]),
+				]);
+				return {
+					accounts: accounts.map(user => this.mastodonEntityService.account(user)),
+					statuses: await this.statusesWithState(statuses, auth),
+					hashtags: hashtags.map(hashtag => this.mastodonEntityService.tag(hashtag)),
+				};
 			};
-		}));
+			return requiresUser
+				? await this.withAuth(request as MastodonRequest, 'read:search', search)
+				: await this.withOptionalUser(request as MastodonRequest, 'read:search', search);
+		});
 	}
 
 	private registerLists(fastify: FastifyInstance): void {
@@ -953,6 +1004,15 @@ export class MastodonApiServerService {
 		if (Array.isArray(value)) return value.flatMap(item => this.strings(item));
 		const item = this.string(value);
 		return item == null || item === '' ? [] : item.split(',').map(part => part.trim()).filter(Boolean);
+	}
+
+	private isHttpUrl(value: string): boolean {
+		try {
+			const url = new URL(value);
+			return url.protocol === 'http:' || url.protocol === 'https:';
+		} catch {
+			return false;
+		}
 	}
 
 	private integer(value: unknown, fallback: number, minimum: number, maximum = Number.MAX_SAFE_INTEGER): number {

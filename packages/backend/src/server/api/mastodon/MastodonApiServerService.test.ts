@@ -522,6 +522,245 @@ describe(MastodonApiServerService, () => {
 		}, expect.any(Object), expect.any(Object));
 	});
 
+	test.each([
+		['accounts', 'users/search'],
+		['statuses', 'notes/search'],
+		['hashtags', 'hashtags/search'],
+	] as const)('dispatches Mastodon search type=%s only to %s and keeps a stable result envelope', async (type, endpoint) => {
+		const { fastify, authenticate, nativeInvoke, publicInvoke } = createServer();
+		nativeInvoke.mockImplementation(async name => {
+			if (name === 'users/search') return [{ id: 'user-a', username: 'alice' }];
+			if (name === 'notes/search') return [{ id: 'note-a' }];
+			if (name === 'hashtags/search') return ['Fediverse'];
+			return [];
+		});
+
+		const response = await fastify.inject({ method: 'GET', url: `/api/v2/search?q=fediverse&type=${type}` });
+
+		expect(response.statusCode).toBe(200);
+		expect(response.json()).toEqual({
+			accounts: type === 'accounts' ? [{ id: 'user-a', username: 'alice' }] : [],
+			statuses: type === 'statuses' ? [expect.objectContaining({ id: 'note-a' })] : [],
+			hashtags: type === 'hashtags' ? [{ name: 'Fediverse', url: 'https://misskey.example/tags/Fediverse', history: [] }] : [],
+		});
+		expect(authenticate).not.toHaveBeenCalled();
+		expect(publicInvoke).toHaveBeenCalledTimes(1);
+		expect(publicInvoke).toHaveBeenCalledWith(endpoint, expect.any(Object), null, expect.any(Object));
+	});
+
+	test('dispatches an untyped public search to all compatible native searches', async () => {
+		const { fastify, authenticate, publicInvoke } = createServer();
+
+		const response = await fastify.inject({ method: 'GET', url: '/api/v2/search?q=fediverse' });
+
+		expect(response.statusCode).toBe(200);
+		expect(response.json()).toEqual({ accounts: [], statuses: [], hashtags: [] });
+		expect(authenticate).not.toHaveBeenCalled();
+		expect(publicInvoke).toHaveBeenCalledTimes(3);
+		expect(publicInvoke).toHaveBeenCalledWith('users/search', expect.any(Object), null, expect.any(Object));
+		expect(publicInvoke).toHaveBeenCalledWith('notes/search', expect.any(Object), null, expect.any(Object));
+		expect(publicInvoke).toHaveBeenCalledWith('hashtags/search', expect.any(Object), null, expect.any(Object));
+	});
+
+	test('rejects an invalid Mastodon search type before dispatch', async () => {
+		const { fastify, nativeInvoke, publicInvoke } = createServer();
+
+		const response = await fastify.inject({ method: 'GET', url: '/api/v2/search?q=fediverse&type=invalid' });
+
+		expect(response.statusCode).toBe(400);
+		expect(nativeInvoke).not.toHaveBeenCalled();
+		expect(publicInvoke).not.toHaveBeenCalled();
+	});
+
+	test('translates Mastodon search filters to the native searches that support them', async () => {
+		const { fastify, publicInvoke } = createServer();
+
+		const response = await fastify.inject({
+			method: 'GET',
+			url: '/api/v2/search?q=fediverse&account_id=user-a&max_id=older&min_id=newer&limit=39&offset=7',
+			headers: { authorization: 'Bearer user-token' },
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(publicInvoke).toHaveBeenCalledWith('users/search', {
+			query: 'fediverse',
+			limit: 39,
+			offset: 7,
+		}, expect.any(Object), expect.any(Object));
+		expect(publicInvoke).toHaveBeenCalledWith('notes/search', {
+			query: 'fediverse',
+			limit: 39,
+			userId: 'user-a',
+			untilId: 'older',
+			sinceId: 'newer',
+		}, expect.any(Object), expect.any(Object));
+		expect(publicInvoke).toHaveBeenCalledWith('hashtags/search', {
+			query: 'fediverse',
+			limit: 39,
+			offset: 7,
+		}, expect.any(Object), expect.any(Object));
+	});
+
+	test.each([
+		'/api/v2/search?q=fediverse',
+		'/api/v2/search?q=fediverse&resolve=false',
+	])('allows public Mastodon search without user-only parameters: %s', async url => {
+		const { fastify, authenticate } = createServer();
+
+		const response = await fastify.inject({ method: 'GET', url });
+
+		expect(response.statusCode).toBe(200);
+		expect(authenticate).not.toHaveBeenCalled();
+	});
+
+	test.each([
+		'/api/v2/search?q=https%3A%2F%2Fremote.example%2Fnotes%2F1&resolve=true',
+		'/api/v2/search?q=fediverse&offset=0',
+		'/api/v2/search?q=fediverse&offset=7',
+	])('requires a user token for user-only Mastodon search parameters: %s', async url => {
+		const { fastify, nativeInvoke, publicInvoke } = createServer();
+
+		const response = await fastify.inject({ method: 'GET', url });
+
+		expect(response.statusCode).toBe(401);
+		expect(nativeInvoke).not.toHaveBeenCalled();
+		expect(publicInvoke).not.toHaveBeenCalled();
+	});
+
+	test('checks the mapped read:search scope for user-authenticated search', async () => {
+		const { fastify, assert, nativeInvoke, publicInvoke } = createServer();
+		assert.mockImplementation(() => {
+			throw new MastodonApiError(403, 'insufficient_scope', 'Scope read:search is required');
+		});
+
+		const response = await fastify.inject({
+			method: 'GET',
+			url: '/api/v2/search?q=fediverse&offset=0',
+			headers: { authorization: 'Bearer user-token' },
+		});
+
+		expect(response.statusCode).toBe(403);
+		expect(assert).toHaveBeenCalledWith(['read'], 'read:search');
+		expect(nativeInvoke).not.toHaveBeenCalled();
+		expect(publicInvoke).not.toHaveBeenCalled();
+	});
+
+	test('does not accept an application token for a resolve search', async () => {
+		const { fastify, authenticate, nativeInvoke } = createServer();
+		authenticate.mockResolvedValue({ kind: 'application', token: { id: 'app-token', scopes: ['read'] } });
+
+		const response = await fastify.inject({
+			method: 'GET',
+			url: '/api/v2/search?q=https%3A%2F%2Fremote.example%2Fnotes%2F1&resolve=true',
+			headers: { authorization: 'Bearer app-token' },
+		});
+
+		expect(response.statusCode).toBe(422);
+		expect(nativeInvoke).not.toHaveBeenCalled();
+	});
+
+	test('rejects an explicitly invalid bearer token for an otherwise-public search', async () => {
+		const { fastify, authenticate, nativeInvoke, publicInvoke } = createServer();
+		authenticate.mockRejectedValue(new MastodonApiError(401, 'invalid_token', 'The access token is invalid'));
+
+		const response = await fastify.inject({
+			method: 'GET',
+			url: '/api/v2/search?q=fediverse',
+			headers: { authorization: 'Bearer invalid-token' },
+		});
+
+		expect(response.statusCode).toBe(401);
+		expect(authenticate).toHaveBeenCalledWith('invalid-token');
+		expect(nativeInvoke).not.toHaveBeenCalled();
+		expect(publicInvoke).not.toHaveBeenCalled();
+	});
+
+	test.each([
+		['statuses', { type: 'Note', object: { id: 'resolved-note' } }, { accounts: [], statuses: [expect.objectContaining({ id: 'resolved-note' })], hashtags: [] }],
+		['accounts', { type: 'User', object: { id: 'resolved-user', username: 'alice' } }, { accounts: [{ id: 'resolved-user', username: 'alice' }], statuses: [], hashtags: [] }],
+	] as const)('resolves an HTTP URL to the matching Mastodon search type %s', async (type, resolved, expected) => {
+		const { fastify, nativeInvoke } = createServer();
+		nativeInvoke.mockResolvedValue(resolved);
+
+		const response = await fastify.inject({
+			method: 'GET',
+			url: `/api/v2/search?q=https%3A%2F%2Fremote.example%2Fobjects%2F1&resolve=true&type=${type}`,
+			headers: { authorization: 'Bearer user-token' },
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(response.json()).toEqual(expected);
+		expect(nativeInvoke).toHaveBeenCalledWith('ap/show', { uri: 'https://remote.example/objects/1' }, expect.any(Object), expect.any(Object));
+		expect(nativeInvoke).toHaveBeenCalledTimes(1);
+	});
+
+	test.each([
+		['accounts', { type: 'Note', object: { id: 'resolved-note' } }],
+		['statuses', { type: 'User', object: { id: 'resolved-user', username: 'alice' } }],
+	] as const)('does not leak a resolved object through the incompatible Mastodon search type %s', async (type, resolved) => {
+		const { fastify, nativeInvoke } = createServer();
+		nativeInvoke.mockResolvedValue(resolved);
+
+		const response = await fastify.inject({
+			method: 'GET',
+			url: `/api/v2/search?q=https%3A%2F%2Fremote.example%2Fobjects%2F1&resolve=true&type=${type}`,
+			headers: { authorization: 'Bearer user-token' },
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(response.json()).toEqual({ accounts: [], statuses: [], hashtags: [] });
+	});
+
+	test.each(['NO_SUCH_OBJECT', 'REQUEST_FAILED'])('treats the safe ap/show resolver miss %s as an empty search result', async code => {
+		const { fastify, nativeInvoke } = createServer();
+		nativeInvoke.mockRejectedValue(new ApiError({ message: 'Resolver miss.', code, id: `resolver-${code}` }));
+
+		const response = await fastify.inject({
+			method: 'GET',
+			url: '/api/v2/search?q=https%3A%2F%2Fremote.example%2Fobjects%2Fmissing&resolve=true',
+			headers: { authorization: 'Bearer user-token' },
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(response.json()).toEqual({ accounts: [], statuses: [], hashtags: [] });
+	});
+
+	test('propagates unexpected ap/show resolver errors', async () => {
+		const { fastify, nativeInvoke } = createServer();
+		nativeInvoke.mockRejectedValue(new ApiError({ message: 'Resolver broke.', code: 'INTERNAL_ERROR', id: 'resolver-broke', kind: 'server' }));
+
+		const response = await fastify.inject({
+			method: 'GET',
+			url: '/api/v2/search?q=https%3A%2F%2Fremote.example%2Fobjects%2F1&resolve=true',
+			headers: { authorization: 'Bearer user-token' },
+		});
+
+		expect(response.statusCode).toBe(500);
+	});
+
+	test('never invokes ap/show for a non-HTTP query even when resolution is requested', async () => {
+		const { fastify, nativeInvoke } = createServer();
+
+		const response = await fastify.inject({
+			method: 'GET',
+			url: '/api/v2/search?q=fediverse&resolve=true&type=statuses',
+			headers: { authorization: 'Bearer user-token' },
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(nativeInvoke).toHaveBeenCalledWith('notes/search', expect.any(Object), expect.any(Object), expect.any(Object));
+		expect(nativeInvoke).not.toHaveBeenCalledWith('ap/show', expect.anything(), expect.anything(), expect.anything());
+	});
+
+	test('propagates native search failures instead of replacing them with an empty array', async () => {
+		const { fastify, nativeInvoke } = createServer();
+		nativeInvoke.mockRejectedValue(new ApiError({ message: 'Search unavailable.', code: 'UNAVAILABLE', id: 'search-unavailable', kind: 'server' }));
+
+		const response = await fastify.inject({ method: 'GET', url: '/api/v2/search?q=fediverse&type=statuses' });
+
+		expect(response.statusCode).toBe(500);
+	});
+
 	test('retrieves a poll publicly through its note', async () => {
 		const { fastify, authenticate, publicInvoke } = createServer();
 		const response = await fastify.inject({ method: 'GET', url: '/api/v1/polls/note-with-poll' });
