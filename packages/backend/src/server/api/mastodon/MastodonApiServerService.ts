@@ -158,8 +158,8 @@ export class MastodonApiServerService {
 			}));
 		}));
 		fastify.get<{ Params: { name: string } }>('/api/v1/tags/:name', request => this.withOptionalToken(request as MastodonRequest, async () => {
-			const hashtag = await this.invokePublic('hashtags/show', { tag: request.params.name }, null, request as MastodonRequest) as { name?: string };
-			return this.mastodonEntityService.tag(hashtag.name ?? request.params.name);
+			const hashtag = await this.invokePublic('hashtags/show', { tag: request.params.name }, null, request as MastodonRequest) as Packed<'Hashtag'>;
+			return this.mastodonEntityService.tag(hashtag.tag);
 		}));
 
 		fastify.get('/api/v1/accounts/verify_credentials', request => this.withAuth(request as MastodonRequest, 'read:accounts', async auth => {

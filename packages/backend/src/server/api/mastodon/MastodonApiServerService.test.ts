@@ -1130,9 +1130,9 @@ describe(MastodonApiServerService, () => {
 
 	test('maps public tag metadata through hashtags/show and the central tag serializer', async () => {
 		const { fastify, authenticate, nativeInvoke, publicInvoke } = createServer();
-		nativeInvoke.mockImplementation(async name => name === 'hashtags/show' ? { name: 'Fediverse News', chart: [1, 2, 3] } : []);
+		nativeInvoke.mockImplementation(async name => name === 'hashtags/show' ? { tag: 'Fediverse News' } : []);
 
-		const response = await fastify.inject({ method: 'GET', url: '/api/v1/tags/Fediverse%20News' });
+		const response = await fastify.inject({ method: 'GET', url: '/api/v1/tags/fediverse%20news' });
 
 		expect(response.statusCode).toBe(200);
 		expect(response.json()).toEqual({
@@ -1141,7 +1141,7 @@ describe(MastodonApiServerService, () => {
 			history: [],
 		});
 		expect(authenticate).not.toHaveBeenCalled();
-		expect(publicInvoke).toHaveBeenCalledWith('hashtags/show', { tag: 'Fediverse News' }, null, expect.any(Object));
+		expect(publicInvoke).toHaveBeenCalledWith('hashtags/show', { tag: 'fediverse news' }, null, expect.any(Object));
 	});
 
 	test('validates an explicitly supplied token before reading tag metadata', async () => {
