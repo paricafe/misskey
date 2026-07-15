@@ -7,7 +7,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
 import * as Redis from 'ioredis';
-import { parse as mfmParse } from 'mfm-js';
+import { extract, parse as mfmParse } from 'mfm-js';
 import { In } from 'typeorm';
 import { pipeline } from 'node:stream/promises';
 import * as fs from 'node:fs';
@@ -109,10 +109,58 @@ export class MastodonApiServerService {
 				category: emoji.category ?? null,
 			}));
 		}));
-		fastify.get('/api/v1/trends', request => this.withOptionalToken(request as MastodonRequest, async () => []));
-		fastify.get('/api/v1/trends/tags', request => this.withOptionalToken(request as MastodonRequest, async () => []));
-		fastify.get('/api/v1/trends/statuses', request => this.withOptionalToken(request as MastodonRequest, async () => []));
-		fastify.get('/api/v1/trends/links', request => this.withOptionalToken(request as MastodonRequest, async () => []));
+		for (const path of ['/api/v1/trends', '/api/v1/trends/tags']) {
+			fastify.get(path, (request, reply) => this.withOptionalToken(request as MastodonRequest, async () => {
+				const pagination = this.offsetPagination(request.query as Dictionary, 10, 20);
+				const trends = await this.invokePublic('hashtags/trend', {}, null, request as MastodonRequest) as Array<{ tag: string }>;
+				return this.offsetPage(request, reply, trends.map(trend => this.mastodonEntityService.tag(trend.tag)), pagination);
+			}));
+		}
+		fastify.get('/api/v1/trends/statuses', (request, reply) => this.withOptionalUser(request as MastodonRequest, 'read:statuses', async auth => {
+			const pagination = this.offsetPagination(request.query as Dictionary, 20, 40);
+			const notes = await this.invokePublic('notes/featured', { limit: pagination.readLimit }, auth, request as MastodonRequest) as Packed<'Note'>[];
+			const page = this.offsetPage(request, reply, notes, pagination);
+			return await this.statusesWithState(page, auth);
+		}));
+		fastify.get('/api/v1/trends/links', (request, reply) => this.withOptionalToken(request as MastodonRequest, async () => {
+			const pagination = this.offsetPagination(request.query as Dictionary, 10, 20);
+			const notes = await this.invokePublic('notes/featured', { limit: 100 }, null, request as MastodonRequest) as Packed<'Note'>[];
+			const urls: string[] = [];
+			const seen = new Set<string>();
+			for (const note of notes) {
+				if (note.text == null) continue;
+				for (const node of extract(mfmParse(note.text), node => node.type === 'url' || node.type === 'link')) {
+					if (node.type !== 'url' && node.type !== 'link') continue;
+					const url = node.props.url;
+					try {
+						const parsed = new URL(url);
+						if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') continue;
+					} catch {
+						continue;
+					}
+					if (seen.has(url)) continue;
+					seen.add(url);
+					urls.push(url);
+				}
+			}
+			return this.offsetPage(request, reply, urls.map(url => this.mastodonEntityService.trendLink(url)), pagination);
+		}));
+		fastify.get('/api/v2/suggestions', request => this.withAuth(request as MastodonRequest, 'read:accounts', async auth => {
+			const query = request.query as Dictionary;
+			const users = await this.invoke('users/recommendation', {
+				limit: this.integer(query.limit, 40, 1, 80),
+				offset: this.integer(query.offset, 0, 0),
+			}, auth, request as MastodonRequest) as Packed<'UserDetailed'>[];
+			return users.map(user => ({
+				source: 'global',
+				sources: ['most_followed'],
+				account: this.mastodonEntityService.account(user),
+			}));
+		}));
+		fastify.get<{ Params: { name: string } }>('/api/v1/tags/:name', request => this.withOptionalToken(request as MastodonRequest, async () => {
+			const hashtag = await this.invokePublic('hashtags/show', { tag: request.params.name }, null, request as MastodonRequest) as { name?: string };
+			return this.mastodonEntityService.tag(hashtag.name ?? request.params.name);
+		}));
 
 		fastify.get('/api/v1/accounts/verify_credentials', request => this.withAuth(request as MastodonRequest, 'read:accounts', async auth => {
 			const user = await this.invoke('i', {}, auth, request as MastodonRequest);
@@ -794,6 +842,33 @@ export class MastodonApiServerService {
 		const link = this.mastodonPaginationService.linkHeader(new URL(request.url, this.config.url).toString(), source);
 		if (link != null) reply.header('Link', link);
 		return converted;
+	}
+
+	private offsetPagination(query: Dictionary, defaultLimit: number, maximumLimit: number): { limit: number; offset: number; readLimit: number } {
+		const limit = this.integer(query.limit, defaultLimit, 1, maximumLimit);
+		const offset = this.integer(query.offset, 0, 0);
+		return {
+			limit,
+			offset,
+			readLimit: Math.min(100, offset + limit + 1),
+		};
+	}
+
+	private offsetPage<T>(
+		request: FastifyRequest,
+		reply: FastifyReply,
+		source: readonly T[],
+		pagination: { limit: number; offset: number },
+	): T[] {
+		const { limit, offset } = pagination;
+		const link = this.mastodonPaginationService.offsetLinkHeader(
+			new URL(request.url, this.config.url).toString(),
+			offset,
+			limit,
+			source.length > offset + limit,
+		);
+		if (link != null) reply.header('Link', link);
+		return source.slice(offset, offset + limit);
 	}
 
 	private instanceV1(): Dictionary {

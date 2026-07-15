@@ -68,6 +68,13 @@ describe(MastodonApiServerService, () => {
 		const noteFavoritesRepository = { findBy: vi.fn().mockResolvedValue([]) };
 		const userNotePiningsRepository = { findBy: vi.fn().mockResolvedValue([]) };
 		const linkHeader = vi.fn().mockReturnValue('<next>; rel="next"');
+		const offsetLinkHeader = vi.fn((_requestUrl: string, offset: number, limit: number, hasMore: boolean) => {
+			const links = [
+				...(hasMore ? [`<next:${offset + limit}>; rel="next"`] : []),
+				...(offset > 0 ? [`<prev:${Math.max(0, offset - limit)}>; rel="prev"`] : []),
+			];
+			return links.length === 0 ? null : links.join(', ');
+		});
 		const mastodonNotificationService = new MastodonNotificationService(redis as never);
 		const service = new MastodonApiServerService(
 			{ url: 'https://misskey.example/', host: 'misskey.example', version: '2026.7.0', maxFileSize: 10_000_000 } as never,
@@ -91,6 +98,32 @@ describe(MastodonApiServerService, () => {
 			{
 				account: vi.fn(value => ({ id: value.id, username: value.username })),
 				credentialAccount: vi.fn(value => ({ id: value.id, username: value.username })),
+				tag: vi.fn(name => ({
+					name,
+					url: `https://misskey.example/tags/${encodeURIComponent(name)}`,
+					history: [],
+				})),
+				trendLink: vi.fn(url => ({
+					url,
+					title: url,
+					description: '',
+					language: '',
+					type: 'link',
+					authors: [],
+					author_name: '',
+					author_url: '',
+					provider_name: '',
+					provider_url: '',
+					html: '',
+					width: 0,
+					height: 0,
+					image: null,
+					image_description: '',
+					embed_url: '',
+					blurhash: null,
+					published_at: null,
+					history: [],
+				})),
 				status: vi.fn(value => ({
 					id: value.id,
 					media_attachments: value.files ?? [],
@@ -112,6 +145,7 @@ describe(MastodonApiServerService, () => {
 			{
 				toMisskey: vi.fn().mockReturnValue({ limit: 20 }),
 				linkHeader,
+				offsetLinkHeader,
 			} as never,
 			mastodonNotificationService,
 			redis as never,
@@ -133,6 +167,7 @@ describe(MastodonApiServerService, () => {
 			noteFavoritesRepository,
 			userNotePiningsRepository,
 			linkHeader,
+			offsetLinkHeader,
 		};
 	}
 
@@ -905,14 +940,223 @@ describe(MastodonApiServerService, () => {
 		expect(publicInvoke).not.toHaveBeenCalled();
 	});
 
+	test('maps status trends with user state and status-specific pagination bounds', async () => {
+		const { fastify, assert, nativeInvoke, publicInvoke, offsetLinkHeader } = createServer();
+		nativeInvoke.mockImplementation(async (name, data) => name === 'notes/featured'
+			? Array.from({ length: data.limit as number }, (_, index) => ({ id: `featured-${index}` }))
+			: []);
+
+		const defaultPage = await fastify.inject({
+			method: 'GET',
+			url: '/api/v1/trends/statuses',
+			headers: { authorization: 'Bearer user-token' },
+		});
+
+		expect(defaultPage.statusCode).toBe(200);
+		expect(defaultPage.json()).toHaveLength(20);
+		expect(defaultPage.json()[0]).toMatchObject({
+			id: 'featured-0',
+			reblogged: false,
+			bookmarked: false,
+			pinned: false,
+		});
+		expect(publicInvoke).toHaveBeenCalledWith('notes/featured', { limit: 21 }, expect.objectContaining({ kind: 'user' }), expect.any(Object));
+		expect(assert).toHaveBeenCalledWith(['read'], 'read:statuses');
+		expect(offsetLinkHeader).toHaveBeenCalledWith('https://misskey.example/api/v1/trends/statuses', 0, 20, true);
+		expect(defaultPage.headers.link).toBe('<next:20>; rel="next"');
+
+		publicInvoke.mockClear();
+		offsetLinkHeader.mockClear();
+		const boundedPage = await fastify.inject({ method: 'GET', url: '/api/v1/trends/statuses?limit=999&offset=-5' });
+
+		expect(boundedPage.statusCode).toBe(200);
+		expect(boundedPage.json()).toHaveLength(40);
+		expect(publicInvoke).toHaveBeenCalledWith('notes/featured', { limit: 41 }, null, expect.any(Object));
+		expect(offsetLinkHeader).toHaveBeenCalledWith('https://misskey.example/api/v1/trends/statuses?limit=999&offset=-5', 0, 40, true);
+	});
+
+	test('maps tag trends for the current and legacy routes with tag-specific pagination', async () => {
+		const { fastify, nativeInvoke, publicInvoke, offsetLinkHeader } = createServer();
+		nativeInvoke.mockImplementation(async name => name === 'hashtags/trend'
+			? Array.from({ length: 25 }, (_, index) => ({ tag: `tag ${index}`, chart: [index], usersCount: index }))
+			: []);
+
+		const legacy = await fastify.inject({ method: 'GET', url: '/api/v1/trends' });
+		expect(legacy.statusCode).toBe(200);
+		expect(legacy.json()).toHaveLength(10);
+		expect(legacy.json()[0]).toEqual({
+			name: 'tag 0',
+			url: 'https://misskey.example/tags/tag%200',
+			history: [],
+		});
+		expect(publicInvoke).toHaveBeenCalledWith('hashtags/trend', {}, null, expect.any(Object));
+
+		const page = await fastify.inject({ method: 'GET', url: '/api/v1/trends/tags?limit=2&offset=1' });
+		expect(page.statusCode).toBe(200);
+		expect(page.json().map((tag: { name: string }) => tag.name)).toEqual(['tag 1', 'tag 2']);
+		expect(page.headers.link).toBe('<next:3>; rel="next", <prev:0>; rel="prev"');
+		expect(offsetLinkHeader).toHaveBeenCalledWith('https://misskey.example/api/v1/trends/tags?limit=2&offset=1', 1, 2, true);
+
+		const boundedPage = await fastify.inject({ method: 'GET', url: '/api/v1/trends/tags?limit=999&offset=-5' });
+		expect(boundedPage.statusCode).toBe(200);
+		expect(boundedPage.json()).toHaveLength(20);
+		expect(boundedPage.json().every((tag: { history: unknown[] }) => tag.history.length === 0)).toBe(true);
+	});
+
+	test('derives bounded unique HTTP trend links in first-seen order without fetching them', async () => {
+		const { fastify, nativeInvoke, publicInvoke, offsetLinkHeader } = createServer();
+		const externalFetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('unexpected external fetch'));
+		nativeInvoke.mockImplementation(async name => name === 'notes/featured' ? [
+			{
+				id: 'featured-a',
+				text: 'https://first.example/path [Second](https://second.example/article) https://first.example/path [FTP](ftp://files.example/archive) http://%',
+			},
+			{ id: 'featured-b', text: 'https://third.example/story' },
+			{ id: 'featured-c', text: '[Fourth](http://fourth.example/page)' },
+		] : []);
+
+		try {
+			const response = await fastify.inject({ method: 'GET', url: '/api/v1/trends/links?limit=2&offset=1' });
+
+			expect(response.statusCode).toBe(200);
+			expect(response.json()).toEqual([
+				{
+					url: 'https://second.example/article',
+					title: 'https://second.example/article',
+					description: '',
+					language: '',
+					type: 'link',
+					authors: [],
+					author_name: '',
+					author_url: '',
+					provider_name: '',
+					provider_url: '',
+					html: '',
+					width: 0,
+					height: 0,
+					image: null,
+					image_description: '',
+					embed_url: '',
+					blurhash: null,
+					published_at: null,
+					history: [],
+				},
+				expect.objectContaining({ url: 'https://third.example/story', history: [] }),
+			]);
+			expect(publicInvoke).toHaveBeenCalledWith('notes/featured', { limit: 100 }, null, expect.any(Object));
+			expect(offsetLinkHeader).toHaveBeenCalledWith('https://misskey.example/api/v1/trends/links?limit=2&offset=1', 1, 2, true);
+			expect(response.headers.link).toBe('<next:3>; rel="next", <prev:0>; rel="prev"');
+			expect(externalFetch).not.toHaveBeenCalled();
+		} finally {
+			externalFetch.mockRestore();
+		}
+	});
+
+	test('applies link-specific default and maximum limits', async () => {
+		const { fastify, nativeInvoke } = createServer();
+		nativeInvoke.mockImplementation(async name => name === 'notes/featured'
+			? Array.from({ length: 25 }, (_, index) => ({ id: `featured-${index}`, text: `https://link-${index}.example/` }))
+			: []);
+
+		const defaultPage = await fastify.inject({ method: 'GET', url: '/api/v1/trends/links' });
+		const boundedPage = await fastify.inject({ method: 'GET', url: '/api/v1/trends/links?limit=999&offset=-5' });
+
+		expect(defaultPage.statusCode).toBe(200);
+		expect(defaultPage.json()).toHaveLength(10);
+		expect(boundedPage.statusCode).toBe(200);
+		expect(boundedPage.json()).toHaveLength(20);
+	});
+
 	test('serves all trend routes anonymously', async () => {
 		const { fastify, authenticate } = createServer();
 		for (const url of ['/api/v1/trends', '/api/v1/trends/tags', '/api/v1/trends/statuses', '/api/v1/trends/links']) {
 			const response = await fastify.inject({ method: 'GET', url });
 			expect(response.statusCode).toBe(200);
-			expect(response.json()).toEqual([]);
 		}
 		expect(authenticate).not.toHaveBeenCalled();
+	});
+
+	test('requires account read access for bounded Mastodon suggestions and wraps every account', async () => {
+		const { fastify, assert, nativeInvoke } = createServer();
+		nativeInvoke.mockImplementation(async (name, data) => name === 'users/recommendation'
+			? Array.from({ length: data.limit as number }, (_, index) => ({ id: `account-${index}`, username: `user-${index}` }))
+			: []);
+
+		const missingToken = await fastify.inject({ method: 'GET', url: '/api/v2/suggestions' });
+		expect(missingToken.statusCode).toBe(401);
+
+		const defaultPage = await fastify.inject({
+			method: 'GET',
+			url: '/api/v2/suggestions',
+			headers: { authorization: 'Bearer user-token' },
+		});
+		expect(defaultPage.statusCode).toBe(200);
+		expect(defaultPage.json()).toHaveLength(40);
+		expect(defaultPage.json()[0]).toEqual({
+			source: 'global',
+			sources: ['most_followed'],
+			account: { id: 'account-0', username: 'user-0' },
+		});
+		expect(nativeInvoke).toHaveBeenCalledWith('users/recommendation', { limit: 40, offset: 0 }, expect.objectContaining({ kind: 'user' }), expect.any(Object));
+		expect(assert).toHaveBeenCalledWith(['read'], 'read:accounts');
+
+		nativeInvoke.mockClear();
+		const boundedPage = await fastify.inject({
+			method: 'GET',
+			url: '/api/v2/suggestions?limit=999&offset=-5',
+			headers: { authorization: 'Bearer user-token' },
+		});
+		expect(boundedPage.statusCode).toBe(200);
+		expect(boundedPage.json()).toHaveLength(80);
+		expect(nativeInvoke).toHaveBeenCalledWith('users/recommendation', { limit: 80, offset: 0 }, expect.any(Object), expect.any(Object));
+	});
+
+	test('rejects application tokens for suggestions', async () => {
+		const { fastify, authenticate, nativeInvoke } = createServer();
+		authenticate.mockResolvedValue({
+			kind: 'application',
+			token: { id: 'application-token', scopes: ['read'] },
+		});
+
+		const response = await fastify.inject({
+			method: 'GET',
+			url: '/api/v2/suggestions',
+			headers: { authorization: 'Bearer application-token' },
+		});
+
+		expect(response.statusCode).toBe(422);
+		expect(nativeInvoke).not.toHaveBeenCalledWith('users/recommendation', expect.anything(), expect.anything(), expect.anything());
+	});
+
+	test('maps public tag metadata through hashtags/show and the central tag serializer', async () => {
+		const { fastify, authenticate, nativeInvoke, publicInvoke } = createServer();
+		nativeInvoke.mockImplementation(async name => name === 'hashtags/show' ? { name: 'Fediverse News', chart: [1, 2, 3] } : []);
+
+		const response = await fastify.inject({ method: 'GET', url: '/api/v1/tags/Fediverse%20News' });
+
+		expect(response.statusCode).toBe(200);
+		expect(response.json()).toEqual({
+			name: 'Fediverse News',
+			url: 'https://misskey.example/tags/Fediverse%20News',
+			history: [],
+		});
+		expect(authenticate).not.toHaveBeenCalled();
+		expect(publicInvoke).toHaveBeenCalledWith('hashtags/show', { tag: 'Fediverse News' }, null, expect.any(Object));
+	});
+
+	test('validates an explicitly supplied token before reading tag metadata', async () => {
+		const { fastify, authenticate, publicInvoke } = createServer();
+		authenticate.mockRejectedValue(new MastodonApiError(401, 'invalid_token', 'The access token is invalid'));
+
+		const response = await fastify.inject({
+			method: 'GET',
+			url: '/api/v1/tags/fediverse',
+			headers: { authorization: 'Bearer invalid-token' },
+		});
+
+		expect(response.statusCode).toBe(401);
+		expect(authenticate).toHaveBeenCalledWith('invalid-token');
+		expect(publicInvoke).not.toHaveBeenCalledWith('hashtags/show', expect.anything(), expect.anything(), expect.anything());
 	});
 
 	test.each([
