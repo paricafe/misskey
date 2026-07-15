@@ -696,16 +696,21 @@ export class MastodonApiServerService {
 		auth: MastodonUserAuth | null,
 		request: MastodonRequest,
 	): Promise<unknown[]> {
-		const ids = [...new Set(this.strings(rawIds))].slice(0, 40);
-		const values = await Promise.all(ids.map(async id => {
+		const requestedIds = this.strings(rawIds).slice(0, 40);
+		const uniqueIds = [...new Set(requestedIds)];
+		const entries = await Promise.all(uniqueIds.map(async id => {
 			try {
-				return await this.invokePublic(name, { [idKey]: id }, auth, request);
+				return [id, await this.invokePublic(name, { [idKey]: id }, auth, request)] as const;
 			} catch (error) {
-				if (this.isBatchOmittableError(error)) return null;
+				if (this.isBatchOmittableError(error)) return [id, null] as const;
 				throw error;
 			}
 		}));
-		return values.filter(value => value != null);
+		const valuesById = new Map(entries);
+		return requestedIds.flatMap(id => {
+			const value = valuesById.get(id);
+			return value == null ? [] : [value];
+		});
 	}
 
 	private isBatchOmittableError(error: unknown): boolean {

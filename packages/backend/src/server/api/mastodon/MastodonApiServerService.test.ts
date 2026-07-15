@@ -239,7 +239,7 @@ describe(MastodonApiServerService, () => {
 		expect(publicInvoke).toHaveBeenCalledWith('notes/show', { noteId: 'note-a' }, null, expect.any(Object));
 	});
 
-	test('de-duplicates batch IDs and omits only missing or inaccessible records', async () => {
+	test('fetches batch IDs once while preserving duplicates and omitting inaccessible records', async () => {
 		const { fastify, nativeInvoke, publicInvoke } = createServer();
 		nativeInvoke.mockImplementation(async (name, data) => {
 			if (name !== 'users/show') return [];
@@ -265,21 +265,24 @@ describe(MastodonApiServerService, () => {
 		expect(response.statusCode).toBe(200);
 		expect(response.json()).toEqual([
 			expect.objectContaining({ id: 'user-a' }),
+			expect.objectContaining({ id: 'user-a' }),
 			expect.objectContaining({ id: 'user-b' }),
 		]);
 		expect(publicInvoke).toHaveBeenCalledTimes(4);
 	});
 
-	test('caps batch requests at 40 unique IDs', async () => {
+	test('caps the original batch sequence at 40 positions before de-duplicating fetches', async () => {
 		const { fastify, publicInvoke } = createServer();
-		const ids = Array.from({ length: 42 }, (_, index) => `user-${index}`);
+		const cappedIds = ['user-a', 'user-a', ...Array.from({ length: 38 }, (_, index) => `user-${index}`)];
+		const ids = [...cappedIds, 'outside-cap'];
 		const query = ids.map(id => `id[]=${id}`).join('&');
 
 		const response = await fastify.inject({ method: 'GET', url: `/api/v1/accounts?${query}` });
 
 		expect(response.statusCode).toBe(200);
-		expect(response.json()).toHaveLength(40);
-		expect(publicInvoke).toHaveBeenCalledTimes(40);
+		expect(response.json().map((account: { id: string }) => account.id)).toEqual(cappedIds);
+		expect(publicInvoke).toHaveBeenCalledTimes(39);
+		expect(publicInvoke).not.toHaveBeenCalledWith('users/show', { userId: 'outside-cap' }, expect.anything(), expect.anything());
 	});
 
 	test.each([500, 429])('rethrows %i failures from batch requests', async statusCode => {
