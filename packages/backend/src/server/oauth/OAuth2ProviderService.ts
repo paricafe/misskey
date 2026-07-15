@@ -528,7 +528,7 @@ export class OAuth2ProviderService implements OnApplicationShutdown {
 			token_endpoint: new URL('/oauth/token', this.config.url),
 			scopes_supported: [...new Set([...kinds, ...this.mastodonOAuthService.getSupportedScopes()])],
 			response_types_supported: ['code'],
-			grant_types_supported: ['authorization_code'],
+			grant_types_supported: ['authorization_code', 'client_credentials'],
 			token_endpoint_auth_methods_supported: ['client_secret_basic', 'client_secret_post', 'none'],
 			revocation_endpoint: this.mastodonOAuthService.getRevocationEndpoint(),
 			app_registration_endpoint: new URL('/api/v1/apps', this.config.url),

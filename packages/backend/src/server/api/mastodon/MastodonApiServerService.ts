@@ -109,10 +109,10 @@ export class MastodonApiServerService {
 				category: emoji.category ?? null,
 			}));
 		}));
-		fastify.get('/api/v1/trends', async () => []);
-		fastify.get('/api/v1/trends/tags', async () => []);
-		fastify.get('/api/v1/trends/statuses', async () => []);
-		fastify.get('/api/v1/trends/links', async () => []);
+		fastify.get('/api/v1/trends', request => this.withOptionalToken(request as MastodonRequest, async () => []));
+		fastify.get('/api/v1/trends/tags', request => this.withOptionalToken(request as MastodonRequest, async () => []));
+		fastify.get('/api/v1/trends/statuses', request => this.withOptionalToken(request as MastodonRequest, async () => []));
+		fastify.get('/api/v1/trends/links', request => this.withOptionalToken(request as MastodonRequest, async () => []));
 
 		fastify.get('/api/v1/accounts/verify_credentials', request => this.withAuth(request as MastodonRequest, 'read:accounts', async auth => {
 			const user = await this.invoke('i', {}, auth, request as MastodonRequest);
@@ -166,17 +166,17 @@ export class MastodonApiServerService {
 			const query = request.query as Dictionary;
 			if (this.boolean(query.pinned)) {
 				const user = await this.invokePublic('users/show', { userId: request.params.id }, auth, request as MastodonRequest) as Packed<'UserDetailed'>;
-				const notes = user.pinnedNotes;
+				const notes = this.filterAccountStatuses(user.pinnedNotes, query);
 				return this.page(request, reply, notes, await this.statusesWithState(notes, auth));
 			}
-			const notes = await this.invokePublic('users/notes', {
+			const nativeNotes = await this.invokePublic('users/notes', {
 				userId: request.params.id,
 				...this.mastodonPaginationService.toMisskey(query),
 				withReplies: !this.boolean(query.exclude_replies),
 				withRenotes: !this.boolean(query.exclude_reblogs),
-				withFiles: this.boolean(query.only_media),
 			}, auth, request as MastodonRequest) as Packed<'Note'>[];
-			return this.page(request, reply, notes, await this.statusesWithState(notes, auth));
+			const notes = this.filterAccountStatuses(nativeNotes, query);
+			return this.page(request, reply, nativeNotes, await this.statusesWithState(notes, auth));
 		}));
 		fastify.get<{ Params: { id: string } }>('/api/v1/accounts/:id/followers', (request, reply) => this.userPage(request as MastodonRequest, reply, 'users/followers', request.params.id));
 		fastify.get<{ Params: { id: string } }>('/api/v1/accounts/:id/following', (request, reply) => this.userPage(request as MastodonRequest, reply, 'users/following', request.params.id));
@@ -423,11 +423,13 @@ export class MastodonApiServerService {
 			const excludeTypes = this.strings(query['exclude_types[]'] ?? query.exclude_types);
 			const includeMisskeyTypes = this.mastodonNotificationService.toMisskeyTypes(includeTypes).filter(type => type !== 'reaction:grouped' && type !== 'renote:grouped');
 			const excludeMisskeyTypes = this.mastodonNotificationService.toMisskeyTypes(excludeTypes).filter(type => type !== 'reaction:grouped' && type !== 'renote:grouped');
+			const excluded = new Set(excludeMisskeyTypes);
+			const effectiveIncludeTypes = [...new Set(includeMisskeyTypes.filter(type => !excluded.has(type)))];
 			const notifications = await this.invoke('i/notifications', {
 				...this.mastodonPaginationService.toMisskey(query, 100),
 				markAsRead: false,
-				...(includeTypes.length > 0 ? { includeTypes: includeMisskeyTypes } : {}),
-				...(excludeTypes.length > 0 ? { excludeTypes: excludeMisskeyTypes } : {}),
+				...(includeTypes.length > 0 ? { includeTypes: effectiveIncludeTypes } : {}),
+				...(includeTypes.length === 0 && excludeTypes.length > 0 ? { excludeTypes: [...new Set(excludeMisskeyTypes)] } : {}),
 			}, auth, request as MastodonRequest) as Packed<'Notification'>[];
 			let converted = notifications.map(notification => this.mastodonEntityService.notification(notification)).filter(value => value != null);
 			const accountId = this.string(query.account_id);
@@ -567,8 +569,8 @@ export class MastodonApiServerService {
 	}
 
 	private async createStatus(request: MastodonRequest, auth: MastodonUserAuth): Promise<Record<string, unknown>> {
-		const scheduledAt = this.string(request.body?.scheduled_at);
-		if (scheduledAt != null && scheduledAt !== '') {
+		const body = request.body ?? {};
+		if (Object.hasOwn(body, 'scheduled_at') && body.scheduled_at !== '') {
 			throw new MastodonApiError(422, 'unprocessable_entity', 'Scheduled statuses are not supported');
 		}
 		const idempotencyKey = this.string(request.headers['idempotency-key']);
@@ -583,7 +585,6 @@ export class MastodonApiServerService {
 		}
 
 		try {
-			const body = request.body ?? {};
 			const text = this.string(body.status) ?? null;
 			const visibility = this.string(body.visibility) ?? 'public';
 			const misskeyVisibility = this.toMisskeyVisibility(visibility);
@@ -722,7 +723,24 @@ export class MastodonApiServerService {
 	}
 
 	private async invokePublic(name: string, data: Dictionary, auth: MastodonUserAuth | null, request: MastodonRequest): Promise<unknown> {
-		return await this.mastodonApiCallService.invokePublic(name, data, auth, request);
+		try {
+			return await this.mastodonApiCallService.invokePublic(name, data, auth, request);
+		} catch (error) {
+			if (this.isPublicRecordUnavailableError(error)) {
+				throw new MastodonApiError(404, 'not_found', 'Record not found');
+			}
+			throw error;
+		}
+	}
+
+	private isPublicRecordUnavailableError(error: unknown): boolean {
+		if (error instanceof MastodonApiError) return error.statusCode === 403 || error.statusCode === 404;
+		if (!(error instanceof ApiError)) return false;
+		return error.httpStatusCode === 404 ||
+			error.kind === 'permission' ||
+			error.code.startsWith('NO_SUCH_') ||
+			error.code.endsWith('_NOT_FOUND') ||
+			error.code.startsWith('CONTENT_RESTRICTED_');
 	}
 
 	private async invokePublicBatch(
@@ -750,13 +768,19 @@ export class MastodonApiServerService {
 	}
 
 	private isBatchOmittableError(error: unknown): boolean {
-		if (error instanceof MastodonApiError) return error.statusCode === 403 || error.statusCode === 404;
-		if (!(error instanceof ApiError)) return false;
-		return error.httpStatusCode === 404 ||
-			error.kind === 'permission' ||
-			error.code.startsWith('NO_SUCH_') ||
-			error.code.endsWith('_NOT_FOUND') ||
-			error.code.startsWith('CONTENT_RESTRICTED_');
+		return this.isPublicRecordUnavailableError(error);
+	}
+
+	private filterAccountStatuses(notes: Packed<'Note'>[], query: Dictionary): Packed<'Note'>[] {
+		const onlyMedia = this.boolean(query.only_media);
+		const excludeReplies = this.boolean(query.exclude_replies);
+		const excludeReblogs = this.boolean(query.exclude_reblogs);
+		return notes.filter(note => {
+			if (onlyMedia && (note.files?.length ?? 0) === 0) return false;
+			if (excludeReplies && note.replyId != null) return false;
+			if (excludeReblogs && note.renote != null && note.text == null && (note.files?.length ?? 0) === 0 && note.poll == null && note.replyId == null) return false;
+			return true;
+		});
 	}
 
 	private page<T>(request: FastifyRequest, reply: FastifyReply, source: readonly { id: string }[], converted: T[]): T[] {

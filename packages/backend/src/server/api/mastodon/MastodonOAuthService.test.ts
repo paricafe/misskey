@@ -103,6 +103,24 @@ describe(MastodonOAuthService, () => {
 		await expect(service.registerApplication({ client_name: 'Client', redirect_uris: 'https://client.example/cb', scopes: 'unknown' })).rejects.toMatchObject({ statusCode: 422 });
 	});
 
+	test('returns array-valued scopes from a registered application', async () => {
+		const { service } = createService({
+			clients: { findOneBy: vi.fn().mockResolvedValue({
+				id: 'client-id',
+				name: 'Client',
+				website: null,
+				redirectUris: ['https://client.example/callback'],
+				scopes: ['read:accounts', 'write:statuses'],
+			}) },
+		});
+
+		await expect(service.getApplication('client-id')).resolves.toMatchObject({
+			id: 'client-id',
+			redirect_uris: ['https://client.example/callback'],
+			scopes: ['read:accounts', 'write:statuses'],
+		});
+	});
+
 	test('issues a read-scoped application token with no user', async () => {
 		const clientSecret = 'client-secret';
 		const client = {

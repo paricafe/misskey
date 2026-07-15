@@ -6,6 +6,7 @@
 import Fastify from 'fastify';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { ApiError } from '@/server/api/error.js';
+import UsersNotesEndpoint from '@/server/api/endpoints/users/notes.js';
 import { MastodonApiError } from './errors.js';
 import { MastodonApiServerService } from './MastodonApiServerService.js';
 import { MastodonNotificationService } from './MastodonNotificationService.js';
@@ -66,6 +67,7 @@ describe(MastodonApiServerService, () => {
 		const notesRepository = { findBy: vi.fn().mockResolvedValue([]) };
 		const noteFavoritesRepository = { findBy: vi.fn().mockResolvedValue([]) };
 		const userNotePiningsRepository = { findBy: vi.fn().mockResolvedValue([]) };
+		const linkHeader = vi.fn().mockReturnValue('<next>; rel="next"');
 		const mastodonNotificationService = new MastodonNotificationService(redis as never);
 		const service = new MastodonApiServerService(
 			{ url: 'https://misskey.example/', host: 'misskey.example', version: '2026.7.0', maxFileSize: 10_000_000 } as never,
@@ -97,13 +99,17 @@ describe(MastodonApiServerService, () => {
 				poll: vi.fn((noteId, poll) => ({ id: noteId, votes_count: poll.choices.reduce((total: number, choice: { votes: number }) => total + choice.votes, 0) })),
 				notification: vi.fn(value => value.user == null ? null : {
 					id: value.id,
-					type: value.type ?? 'mention',
+					type: value.type === 'reaction' || value.type === 'reaction:grouped'
+						? 'favourite'
+						: value.type === 'renote' || value.type === 'renote:grouped'
+							? 'reblog'
+							: value.type ?? 'mention',
 					account: { id: value.user.id },
 				}),
 			} as never,
 			{
 				toMisskey: vi.fn().mockReturnValue({ limit: 20 }),
-				linkHeader: vi.fn().mockReturnValue('<next>; rel="next"'),
+				linkHeader,
 			} as never,
 			mastodonNotificationService,
 			redis as never,
@@ -124,6 +130,7 @@ describe(MastodonApiServerService, () => {
 			notesRepository,
 			noteFavoritesRepository,
 			userNotePiningsRepository,
+			linkHeader,
 		};
 	}
 
@@ -148,7 +155,38 @@ describe(MastodonApiServerService, () => {
 			limit: 20,
 			markAsRead: false,
 			includeTypes: ['mention', 'reply', 'note', 'quote', 'reaction'],
-			excludeTypes: ['follow', 'followRequestAccepted', 'renote'],
+		}, expect.any(Object), expect.any(Object));
+	});
+
+	test('subtracts excluded notification types from includes before native grouped filtering', async () => {
+		const { fastify, nativeInvoke } = createServer();
+		nativeInvoke.mockImplementation(async (name, data) => {
+			if (name !== 'i/notifications') return [];
+			const notifications = [
+				{ id: 'favourite', type: 'reaction', user: { id: 'account-a' } },
+				{ id: 'reblog', type: 'renote', user: { id: 'account-b' } },
+			];
+			if (Array.isArray(data.includeTypes)) {
+				const includeTypes = data.includeTypes as string[];
+				return notifications.filter(notification => includeTypes.includes(notification.type));
+			}
+			return notifications;
+		});
+
+		const response = await fastify.inject({
+			method: 'GET',
+			url: '/api/v1/notifications?types[]=favourite&types[]=reblog&exclude_types[]=favourite',
+			headers: { authorization: 'Bearer user-token' },
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(response.json()).toEqual([
+			expect.objectContaining({ id: 'reblog', type: 'reblog' }),
+		]);
+		expect(nativeInvoke).toHaveBeenCalledWith('i/notifications', {
+			limit: 20,
+			markAsRead: false,
+			includeTypes: ['renote'],
 		}, expect.any(Object), expect.any(Object));
 	});
 
@@ -427,8 +465,10 @@ describe(MastodonApiServerService, () => {
 		expect(media.statusCode).toBe(200);
 		expect(publicInvoke).toHaveBeenCalledWith('users/notes', expect.objectContaining({
 			userId: 'user-id',
-			withFiles: true,
+			withReplies: true,
+			withRenotes: true,
 		}), null, expect.any(Object));
+		expect(publicInvoke).not.toHaveBeenCalledWith('users/notes', expect.objectContaining({ withReplies: true, withFiles: true }), null, expect.any(Object));
 
 		publicInvoke.mockClear();
 		nativeInvoke.mockResolvedValueOnce({
@@ -445,6 +485,96 @@ describe(MastodonApiServerService, () => {
 		]);
 		expect(publicInvoke).toHaveBeenCalledWith('users/show', { userId: 'user-id' }, null, expect.any(Object));
 		expect(publicInvoke).not.toHaveBeenCalledWith('users/notes', expect.anything(), expect.anything(), expect.anything());
+	});
+
+	test('composes media, reply, and reblog filters without the rejected native combination', async () => {
+		const { fastify, publicInvoke } = createServer();
+		publicInvoke.mockImplementation(async (name, data) => {
+			if (name !== 'users/notes') return [];
+			if (data.withReplies === true && data.withFiles === true) {
+				throw new ApiError({
+					message: 'Specifying both withReplies and withFiles is not supported',
+					code: 'BOTH_WITH_REPLIES_AND_WITH_FILES',
+					id: '91c8cb9f-36ed-46e7-9ca2-7df96ed6e222',
+				});
+			}
+			return [
+				{ id: 'media-reply', replyId: 'parent', renoteId: null, files: [{ id: 'file-a' }] },
+				{ id: 'media-status', replyId: null, renoteId: null, files: [{ id: 'file-b' }] },
+				{ id: 'text-status', replyId: null, renoteId: null, files: [] },
+			];
+		});
+
+		const response = await fastify.inject({
+			method: 'GET',
+			url: '/api/v1/accounts/user-id/statuses?only_media=true',
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(response.json().map((status: { id: string }) => status.id)).toEqual(['media-reply', 'media-status']);
+		expect(publicInvoke).toHaveBeenCalledWith('users/notes', expect.objectContaining({
+			userId: 'user-id',
+			withReplies: true,
+			withRenotes: true,
+		}), null, expect.any(Object));
+		expect(publicInvoke).not.toHaveBeenCalledWith('users/notes', expect.objectContaining({ withReplies: true, withFiles: true }), null, expect.any(Object));
+	});
+
+	test('keeps the native account-status cursor when a media filter empties the converted page', async () => {
+		const { fastify, publicInvoke, linkHeader } = createServer();
+		const nativePage = [{ id: 'text-status', replyId: null, renoteId: null, files: [] }];
+		publicInvoke.mockResolvedValueOnce(nativePage);
+
+		const response = await fastify.inject({
+			method: 'GET',
+			url: '/api/v1/accounts/user-id/statuses?only_media=true',
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(response.json()).toEqual([]);
+		expect(response.headers.link).toBe('<next>; rel="next"');
+		expect(linkHeader).toHaveBeenCalledWith('https://misskey.example/api/v1/accounts/user-id/statuses?only_media=true', nativePage);
+	});
+
+	test('applies media, reply, and reblog filters to pinned statuses', async () => {
+		const { fastify, nativeInvoke } = createServer();
+		const pinnedNotes = [
+			{ id: 'media-reply', replyId: 'parent', renoteId: null, renote: null, files: [{ id: 'file-a' }] },
+			{ id: 'media-renote', replyId: null, renoteId: 'original', renote: { id: 'original' }, text: null, cw: null, files: [], poll: null },
+			{ id: 'text-status', replyId: null, renoteId: null, renote: null, files: [] },
+			{ id: 'media-status', replyId: null, renoteId: null, renote: null, files: [{ id: 'file-c' }] },
+		];
+		nativeInvoke.mockImplementation(async name => name === 'users/show'
+			? { id: 'user-id', username: 'alice', pinnedNotes }
+			: []);
+
+		const media = await fastify.inject({ method: 'GET', url: '/api/v1/accounts/user-id/statuses?pinned=true&only_media=true' });
+		const noReplies = await fastify.inject({ method: 'GET', url: '/api/v1/accounts/user-id/statuses?pinned=true&exclude_replies=true' });
+		const noReblogs = await fastify.inject({ method: 'GET', url: '/api/v1/accounts/user-id/statuses?pinned=true&exclude_reblogs=true' });
+
+		expect(media.statusCode).toBe(200);
+		expect(media.json().map((status: { id: string }) => status.id)).toEqual(['media-reply', 'media-status']);
+		expect(noReplies.json().map((status: { id: string }) => status.id)).toEqual(['media-renote', 'text-status', 'media-status']);
+		expect(noReblogs.json().map((status: { id: string }) => status.id)).toEqual(['media-reply', 'text-status', 'media-status']);
+	});
+
+	test('characterizes the native users/notes rejection for reply plus file filtering', async () => {
+		const endpoint = new UsersNotesEndpoint(
+			{ enableFanoutTimeline: false } as never,
+			{} as never,
+			{} as never,
+			{} as never,
+			{} as never,
+			{} as never,
+			{} as never,
+			{} as never,
+		);
+
+		await expect(endpoint.exec({
+			userId: 'userid',
+			withReplies: true,
+			withFiles: true,
+		}, null, null)).rejects.toMatchObject({ code: 'BOTH_WITH_REPLIES_AND_WITH_FILES' });
 	});
 
 	test('maps supported public and hashtag timeline filters', async () => {
@@ -483,6 +613,50 @@ describe(MastodonApiServerService, () => {
 
 		expect(response.statusCode).toBe(422);
 		expect(nativeInvoke).not.toHaveBeenCalledWith('notes/create', expect.anything(), expect.anything(), expect.anything());
+	});
+
+	test.each([
+		{
+			name: 'an array from repeated JSON fields',
+			headers: { 'content-type': 'application/json' },
+			payload: { status: 'later', scheduled_at: ['', '2099-01-01T00:00:00.000Z'] },
+		},
+		{
+			name: 'an invalid null value',
+			headers: { 'content-type': 'application/json' },
+			payload: { status: 'later', scheduled_at: null },
+		},
+		{
+			name: 'repeated form fields',
+			headers: { 'content-type': 'application/x-www-form-urlencoded' },
+			payload: 'status=later&scheduled_at=&scheduled_at=2099-01-01T00%3A00%3A00.000Z',
+		},
+	])('rejects scheduled_at represented as $name before idempotency or note creation', async ({ headers, payload }) => {
+		const { fastify, nativeInvoke, redis } = createServer();
+		const response = await fastify.inject({
+			method: 'POST',
+			url: '/api/v1/statuses',
+			headers: { authorization: 'Bearer user-token', 'idempotency-key': 'schedule-test', ...headers },
+			payload,
+		});
+
+		expect(response.statusCode).toBe(422);
+		expect(redis.get).not.toHaveBeenCalled();
+		expect(redis.set).not.toHaveBeenCalled();
+		expect(nativeInvoke).not.toHaveBeenCalledWith('notes/create', expect.anything(), expect.anything(), expect.anything());
+	});
+
+	test('treats an explicitly empty scalar scheduled_at as unscheduled', async () => {
+		const { fastify, nativeInvoke } = createServer();
+		const response = await fastify.inject({
+			method: 'POST',
+			url: '/api/v1/statuses',
+			headers: { authorization: 'Bearer user-token', 'content-type': 'application/json' },
+			payload: { status: 'now', scheduled_at: '' },
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(nativeInvoke).toHaveBeenCalledWith('notes/create', expect.anything(), expect.anything(), expect.anything());
 	});
 
 	test('returns deleted status text while preserving media attachments and poll', async () => {
@@ -676,6 +850,70 @@ describe(MastodonApiServerService, () => {
 		expect(response.statusCode).toBe(401);
 		expect(authenticate).toHaveBeenCalledWith('invalid-token');
 		expect(publicInvoke).not.toHaveBeenCalled();
+	});
+
+	test('serves all trend routes anonymously', async () => {
+		const { fastify, authenticate } = createServer();
+		for (const url of ['/api/v1/trends', '/api/v1/trends/tags', '/api/v1/trends/statuses', '/api/v1/trends/links']) {
+			const response = await fastify.inject({ method: 'GET', url });
+			expect(response.statusCode).toBe(200);
+			expect(response.json()).toEqual([]);
+		}
+		expect(authenticate).not.toHaveBeenCalled();
+	});
+
+	test.each([
+		['/api/v1/trends', 'Basic malformed'],
+		['/api/v1/trends/tags', 'Bearer unknown-token'],
+		['/api/v1/trends/statuses', 'Bearer native-token'],
+		['/api/v1/trends/links', 'Bearer unknown-token'],
+	])('rejects invalid Authorization on trend route %s', async (url, authorization) => {
+		const { fastify, authenticate } = createServer();
+		authenticate.mockRejectedValue(new MastodonApiError(401, 'invalid_token', 'The access token is invalid'));
+
+		const response = await fastify.inject({ method: 'GET', url, headers: { authorization } });
+
+		expect(response.statusCode).toBe(401);
+		if (authorization.startsWith('Bearer ')) {
+			expect(authenticate).toHaveBeenCalledWith(authorization.slice('Bearer '.length));
+		} else {
+			expect(authenticate).not.toHaveBeenCalled();
+		}
+	});
+
+	test('maps inaccessible public records to a non-leaking 404 while preserving validation errors', async () => {
+		const { fastify, nativeInvoke } = createServer();
+		nativeInvoke.mockImplementation(async (name, data) => {
+			if (name !== 'notes/show') return [];
+			if (data.noteId === 'hidden') throw new ApiError({
+				message: 'Content restricted by user.',
+				code: 'CONTENT_RESTRICTED_BY_USER',
+				id: 'restricted-note',
+			});
+			if (data.noteId === 'forbidden') throw new ApiError({
+				message: 'Permission denied.',
+				code: 'PERMISSION_DENIED',
+				id: 'forbidden-note',
+				kind: 'permission',
+			});
+			throw new ApiError({
+				message: 'Invalid param.',
+				code: 'INVALID_PARAM',
+				id: 'invalid-param',
+				kind: 'client',
+			});
+		});
+
+		const hidden = await fastify.inject({ method: 'GET', url: '/api/v1/statuses/hidden' });
+		const forbidden = await fastify.inject({ method: 'GET', url: '/api/v1/statuses/forbidden' });
+		const invalid = await fastify.inject({ method: 'GET', url: '/api/v1/statuses/invalid' });
+
+		expect(hidden.statusCode).toBe(404);
+		expect(hidden.json()).toEqual({ error: 'Record not found' });
+		expect(forbidden.statusCode).toBe(404);
+		expect(forbidden.json()).toEqual({ error: 'Record not found' });
+		expect(invalid.statusCode).toBe(400);
+		expect(invalid.json()).toEqual({ error: 'Invalid param.' });
 	});
 
 	test('authenticates, checks scope, and reuses native endpoints', async () => {

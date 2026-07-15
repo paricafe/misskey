@@ -34,4 +34,23 @@ describe('Mastodon error translation', () => {
 		expect(reply.header).not.toHaveBeenCalledWith('WWW-Authenticate', expect.anything());
 		expect(reply.send).toHaveBeenCalledWith({ error: 'invalid_client', error_description: 'Bad client' });
 	});
+
+	test('preserves native rate-limit reset information as Retry-After', () => {
+		vi.useFakeTimers();
+		vi.setSystemTime(new Date('2026-07-15T00:00:00.000Z'));
+		try {
+			const reply = replyMock();
+			sendMastodonError(reply as never, new ApiError({
+				message: 'Rate limit exceeded.',
+				code: 'RATE_LIMIT_EXCEEDED',
+				id: 'rate-limit',
+				httpStatusCode: 429,
+			}, { resetMs: Date.now() + 2500 }));
+
+			expect(reply.code).toHaveBeenCalledWith(429);
+			expect(reply.header).toHaveBeenCalledWith('Retry-After', '3');
+		} finally {
+			vi.useRealTimers();
+		}
+	});
 });
