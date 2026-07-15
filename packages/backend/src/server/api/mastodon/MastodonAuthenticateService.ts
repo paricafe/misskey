@@ -27,6 +27,11 @@ export class MastodonAuthenticateService {
 	) {}
 
 	@bindThis
+	public async isActiveUserToken(tokenId: string, userId: string): Promise<boolean> {
+		return this.mastodonOAuthTokensRepository.exists({ where: { id: tokenId, userId } });
+	}
+
+	@bindThis
 	public async authenticate(rawToken: string | null | undefined): Promise<MastodonAuth> {
 		if (rawToken == null || rawToken === '') {
 			throw this.authenticationError();

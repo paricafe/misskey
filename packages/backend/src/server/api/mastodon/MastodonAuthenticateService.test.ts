@@ -8,6 +8,22 @@ import { digestCredential } from './utils.js';
 import { MastodonAuthenticateService } from './MastodonAuthenticateService.js';
 
 describe(MastodonAuthenticateService, () => {
+	test('checks active user-token ownership by token id and user id', async () => {
+		const exists = vi.fn()
+			.mockResolvedValueOnce(true)
+			.mockResolvedValueOnce(false);
+		const service = new MastodonAuthenticateService(
+			{ exists } as never,
+			{ findOneBy: vi.fn() } as never,
+			{ localUserByIdCache: { fetch: vi.fn() } } as never,
+		);
+
+		await expect(service.isActiveUserToken('token-id', 'user-id')).resolves.toBe(true);
+		await expect(service.isActiveUserToken('token-id', 'other-user-id')).resolves.toBe(false);
+		expect(exists).toHaveBeenNthCalledWith(1, { where: { id: 'token-id', userId: 'user-id' } });
+		expect(exists).toHaveBeenNthCalledWith(2, { where: { id: 'token-id', userId: 'other-user-id' } });
+	});
+
 	test('looks up only the compatibility token digest', async () => {
 		const token = {
 			id: 'token-id',

@@ -77,13 +77,13 @@ export class MastodonStreamingApiServerService {
 		this.redisForSub.on('message', this.onRedisMessage);
 		this.#wss.on('connection', (connection: WebSocket.WebSocket, _request: http.IncomingMessage, context: ConnectionContext) => {
 			this.#connections.set(connection, context);
-			connection.on('pong', () => { context.lastPongAt = Date.now(); });
-			void this.startNativeStream(connection, context).catch(() => connection.terminate());
 			connection.once('close', () => {
 				context.subscriber.removeAllListeners();
 				context.nativeStream.dispose();
 				this.#connections.delete(connection);
 			});
+			connection.on('pong', () => { context.lastPongAt = Date.now(); });
+			void this.startNativeStreamIfTokenActive(connection, context).catch(() => connection.terminate());
 		});
 		this.#heartbeatInterval = setInterval(() => {
 			const now = Date.now();
@@ -164,6 +164,15 @@ export class MastodonStreamingApiServerService {
 		const notificationStream = streams.has('user') || streams.has('user:notification');
 		if (statusStream) this.mastodonScopeService.assert(auth.token.scopes, 'read:statuses');
 		if (notificationStream && !statusStream) this.mastodonScopeService.assert(auth.token.scopes, 'read:notifications');
+	}
+
+	private async startNativeStreamIfTokenActive(connection: WebSocket.WebSocket, context: ConnectionContext): Promise<void> {
+		const isActive = await this.mastodonAuthenticateService.isActiveUserToken(context.auth.token.id, context.auth.user.id);
+		if (!isActive || connection.readyState !== WebSocket.WebSocket.OPEN) {
+			connection.terminate();
+			return;
+		}
+		await this.startNativeStream(connection, context);
 	}
 
 	private async startNativeStream(connection: WebSocket.WebSocket, context: ConnectionContext): Promise<void> {
