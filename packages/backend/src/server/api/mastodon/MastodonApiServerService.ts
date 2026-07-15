@@ -19,6 +19,7 @@ import { createTemp } from '@/misc/create-temp.js';
 import type { Packed } from '@/misc/json-schema.js';
 import { extractMentions } from '@/misc/extract-mentions.js';
 import { bindThis } from '@/decorators.js';
+import { ApiError } from '@/server/api/error.js';
 import type { FastifyInstance, FastifyPluginOptions, FastifyReply, FastifyRequest } from 'fastify';
 import { MastodonApiCallService } from './MastodonApiCallService.js';
 import { MastodonAuthenticateService } from './MastodonAuthenticateService.js';
@@ -113,7 +114,25 @@ export class MastodonApiServerService {
 			'reading:expand:media': 'default',
 			'reading:expand:spoilers': false,
 		} as Dictionary)));
-		fastify.get<{ Params: { id: string } }>('/api/v1/accounts/:id', request => this.account(request as MastodonRequest, request.params.id));
+		fastify.get('/api/v1/accounts', request => this.withOptionalUser(request as MastodonRequest, 'read:accounts', async auth => {
+			const users = await this.invokePublicBatch(
+				'users/show',
+				'userId',
+				(request.query as Dictionary)['id[]'] ?? (request.query as Dictionary).id,
+				auth,
+				request as MastodonRequest,
+			) as Packed<'UserDetailed'>[];
+			return users.map(user => this.mastodonEntityService.account(user));
+		}));
+		fastify.get('/api/v1/accounts/search', request => this.withAuth(request as MastodonRequest, 'read:accounts', async auth => {
+			const query = request.query as Dictionary;
+			const q = this.string(query.q)?.trim();
+			if (q == null || q === '') throw new MastodonApiError(400, 'invalid_request', 'q is required');
+			const limit = this.integer(query.limit, 40, 1, 40);
+			const offset = this.integer(query.offset, 0, 0);
+			const users = await this.invoke('users/search', { query: q, limit, offset }, auth, request as MastodonRequest) as Packed<'UserDetailed'>[];
+			return users.map(user => this.mastodonEntityService.account(user));
+		}));
 		fastify.get('/api/v1/accounts/lookup', request => this.withAuth(request as MastodonRequest, 'read:accounts', async auth => {
 			const acct = this.string((request.query as Dictionary).acct);
 			if (acct == null) throw new MastodonApiError(400, 'invalid_request', 'acct is required');
@@ -128,8 +147,14 @@ export class MastodonApiServerService {
 				return this.mastodonEntityService.relationship(user as Packed<'UserDetailed'>);
 			}));
 		}));
+		fastify.get<{ Params: { id: string } }>('/api/v1/accounts/:id', request => this.account(request as MastodonRequest, request.params.id));
 		fastify.get<{ Params: { id: string } }>('/api/v1/accounts/:id/statuses', (request, reply) => this.withOptionalUser(request as MastodonRequest, 'read:statuses', async auth => {
 			const query = request.query as Dictionary;
+			if (this.boolean(query.pinned)) {
+				const user = await this.invokePublic('users/show', { userId: request.params.id }, auth, request as MastodonRequest) as Packed<'UserDetailed'>;
+				const notes = user.pinnedNotes;
+				return this.page(request, reply, notes, await this.statusesWithState(notes, auth));
+			}
 			const notes = await this.invokePublic('users/notes', {
 				userId: request.params.id,
 				...this.mastodonPaginationService.toMisskey(query),
@@ -194,8 +219,16 @@ export class MastodonApiServerService {
 	private registerTimelines(fastify: FastifyInstance): void {
 		const timelines: Array<[string, string, string, (query: Dictionary, params: Dictionary) => Dictionary]> = [
 			['/api/v1/timelines/home', 'notes/timeline', 'read:statuses', query => this.mastodonPaginationService.toMisskey(query)],
-			['/api/v1/timelines/public', 'notes/global-timeline', 'read:statuses', query => this.mastodonPaginationService.toMisskey(query)],
-			['/api/v1/timelines/tag/:tag', 'notes/search-by-tag', 'read:statuses', (query, params) => ({ ...this.mastodonPaginationService.toMisskey(query), tag: params.tag })],
+			['/api/v1/timelines/public', 'notes/global-timeline', 'read:statuses', query => ({
+				...this.mastodonPaginationService.toMisskey(query),
+				withFiles: this.boolean(query.only_media),
+			})],
+			['/api/v1/timelines/tag/:tag', 'notes/search-by-tag', 'read:statuses', (query, params) => ({
+				...this.mastodonPaginationService.toMisskey(query),
+				tag: params.tag,
+				withFiles: this.boolean(query.only_media),
+				localHostOnly: this.boolean(query.local),
+			})],
 			['/api/v1/timelines/list/:id', 'notes/user-list-timeline', 'read:statuses', (query, params) => ({ ...this.mastodonPaginationService.toMisskey(query), listId: params.id })],
 		];
 		for (const [path, endpoint, scope, data] of timelines) {
@@ -203,6 +236,9 @@ export class MastodonApiServerService {
 			if (isPublic) {
 				fastify.get(path, (request, reply) => this.withOptionalUser(request as MastodonRequest, scope, async auth => {
 					const query = request.query as Dictionary;
+					if (this.boolean(query.remote)) {
+						throw new MastodonApiError(422, 'unprocessable_entity', 'Remote-only timelines are not supported');
+					}
 					const selectedEndpoint = path === '/api/v1/timelines/public' && this.boolean(query.local)
 						? 'notes/local-timeline'
 						: endpoint;
@@ -238,6 +274,16 @@ export class MastodonApiServerService {
 	}
 
 	private registerStatuses(fastify: FastifyInstance): void {
+		fastify.get('/api/v1/statuses', request => this.withOptionalUser(request as MastodonRequest, 'read:statuses', async auth => {
+			const notes = await this.invokePublicBatch(
+				'notes/show',
+				'noteId',
+				(request.query as Dictionary)['id[]'] ?? (request.query as Dictionary).id,
+				auth,
+				request as MastodonRequest,
+			) as Packed<'Note'>[];
+			return await this.statusesWithState(notes, auth);
+		}));
 		fastify.get<{ Params: { id: string } }>('/api/v1/statuses/:id', request => this.withOptionalUser(request as MastodonRequest, 'read:statuses', async auth => {
 			const note = await this.invokePublic('notes/show', { noteId: request.params.id }, auth, request as MastodonRequest) as Packed<'Note'>;
 			return await this.statusWithState(note, auth, request as MastodonRequest);
@@ -286,7 +332,7 @@ export class MastodonApiServerService {
 		fastify.delete<{ Params: { id: string } }>('/api/v1/statuses/:id', request => this.withAuth(request as MastodonRequest, 'write:statuses', async auth => {
 			const note = await this.invoke('notes/show', { noteId: request.params.id }, auth, request as MastodonRequest) as Packed<'Note'>;
 			await this.invoke('notes/delete', { noteId: request.params.id }, auth, request as MastodonRequest);
-			return this.mastodonEntityService.status(note);
+			return { ...this.mastodonEntityService.status(note), text: note.text ?? '' };
 		}));
 
 		const actions: Array<[string, string, string, Dictionary]> = [
@@ -324,6 +370,11 @@ export class MastodonApiServerService {
 				return { ...this.mastodonEntityService.status(note), pinned: action === 'pin' };
 			}));
 		}
+		fastify.get<{ Params: { id: string } }>('/api/v1/polls/:id', request => this.withOptionalUser(request as MastodonRequest, 'read:statuses', async auth => {
+			const note = await this.invokePublic('notes/show', { noteId: request.params.id }, auth, request as MastodonRequest) as Packed<'Note'>;
+			if (note.poll == null) throw new MastodonApiError(404, 'not_found', 'Poll not found');
+			return this.mastodonEntityService.poll(note.id, note.poll);
+		}));
 		fastify.post<{ Params: { id: string }; Body: Dictionary }>('/api/v1/polls/:id/votes', request => this.withAuth(request as MastodonRequest, 'write:statuses', async auth => {
 			const choices = this.strings(request.body?.['choices[]'] ?? request.body?.choices)
 				.map(choice => Number(choice))
@@ -344,6 +395,10 @@ export class MastodonApiServerService {
 		fastify.put<{ Params: { id: string }; Body: Dictionary }>('/api/v1/media/:id', request => this.withAuth(request as MastodonRequest, 'write:media', async auth => {
 			const file = await this.invoke('drive/files/update', { fileId: request.params.id, comment: this.string(request.body?.description) ?? null }, auth, request as MastodonRequest);
 			return this.mastodonEntityService.attachment(file as Packed<'DriveFile'>);
+		}));
+		fastify.delete<{ Params: { id: string } }>('/api/v1/media/:id', request => this.withAuth(request as MastodonRequest, 'write:media', async auth => {
+			await this.invoke('drive/files/delete', { fileId: request.params.id }, auth, request as MastodonRequest);
+			return {};
 		}));
 	}
 
@@ -482,6 +537,10 @@ export class MastodonApiServerService {
 	}
 
 	private async createStatus(request: MastodonRequest, auth: MastodonUserAuth): Promise<Record<string, unknown>> {
+		const scheduledAt = this.string(request.body?.scheduled_at);
+		if (scheduledAt != null && scheduledAt !== '') {
+			throw new MastodonApiError(422, 'unprocessable_entity', 'Scheduled statuses are not supported');
+		}
 		const idempotencyKey = this.string(request.headers['idempotency-key']);
 		const cacheKey = idempotencyKey == null || idempotencyKey === ''
 			? null
@@ -630,6 +689,35 @@ export class MastodonApiServerService {
 		return await this.mastodonApiCallService.invokePublic(name, data, auth, request);
 	}
 
+	private async invokePublicBatch(
+		name: string,
+		idKey: string,
+		rawIds: unknown,
+		auth: MastodonUserAuth | null,
+		request: MastodonRequest,
+	): Promise<unknown[]> {
+		const ids = [...new Set(this.strings(rawIds))].slice(0, 40);
+		const values = await Promise.all(ids.map(async id => {
+			try {
+				return await this.invokePublic(name, { [idKey]: id }, auth, request);
+			} catch (error) {
+				if (this.isBatchOmittableError(error)) return null;
+				throw error;
+			}
+		}));
+		return values.filter(value => value != null);
+	}
+
+	private isBatchOmittableError(error: unknown): boolean {
+		if (error instanceof MastodonApiError) return error.statusCode === 403 || error.statusCode === 404;
+		if (!(error instanceof ApiError)) return false;
+		return error.httpStatusCode === 404 ||
+			error.kind === 'permission' ||
+			error.code.startsWith('NO_SUCH_') ||
+			error.code.endsWith('_NOT_FOUND') ||
+			error.code.startsWith('CONTENT_RESTRICTED_');
+	}
+
 	private page<T>(request: FastifyRequest, reply: FastifyReply, source: readonly { id: string }[], converted: T[]): T[] {
 		const link = this.mastodonPaginationService.linkHeader(new URL(request.url, this.config.url).toString(), source);
 		if (link != null) reply.header('Link', link);
@@ -705,6 +793,11 @@ export class MastodonApiServerService {
 		if (Array.isArray(value)) return value.flatMap(item => this.strings(item));
 		const item = this.string(value);
 		return item == null || item === '' ? [] : item.split(',').map(part => part.trim()).filter(Boolean);
+	}
+
+	private integer(value: unknown, fallback: number, minimum: number, maximum = Number.MAX_SAFE_INTEGER): number {
+		const parsed = Number(this.string(value));
+		return Number.isFinite(parsed) ? Math.min(maximum, Math.max(minimum, Math.trunc(parsed))) : fallback;
 	}
 
 	private boolean(value: unknown): boolean {

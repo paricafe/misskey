@@ -5,6 +5,7 @@
 
 import Fastify from 'fastify';
 import { afterEach, describe, expect, test, vi } from 'vitest';
+import { ApiError } from '@/server/api/error.js';
 import { MastodonApiError } from './errors.js';
 import { MastodonApiServerService } from './MastodonApiServerService.js';
 
@@ -19,13 +20,24 @@ describe(MastodonApiServerService, () => {
 		const auth = { kind: 'user', user: { id: 'user-id' }, token: { id: 'token-id', scopes: ['read'] } };
 		const authenticate = vi.fn().mockResolvedValue(auth);
 		const assert = vi.fn();
-		const nativeInvoke = vi.fn(async name => {
+		const nativeInvoke = vi.fn(async (name: string, data: Record<string, unknown> = {}, _viewer?: unknown, _request?: unknown) => {
 			if (name === 'i') return { id: 'user-id', username: 'alice' };
 			if (name === 'notes/timeline') return [{ id: 'note-id' }];
-			if (name === 'notes/show') return { id: 'note-id' };
+			if (name === 'users/show') return { id: data.userId, username: data.userId };
+			if (name === 'notes/show') return data.noteId === 'note-with-poll'
+				? {
+					id: data.noteId,
+					poll: {
+						expiresAt: null,
+						multiple: false,
+						choices: [{ text: 'A', votes: 2, isVoted: false }],
+					},
+				}
+				: { id: data.noteId ?? 'note-id' };
 			if (name === 'notes/create') return { createdNote: { id: 'created-note-id' } };
 			return [];
 		});
+		const publicInvoke = vi.fn((name: string, data: Record<string, unknown>, viewer: unknown, request: unknown) => nativeInvoke(name, data, viewer, request));
 		const registerApplication = vi.fn().mockResolvedValue({ client_id: 'client-id', client_secret: 'client-secret' });
 		const getApplication = vi.fn().mockResolvedValue({ id: 'client-id', name: 'Elk' });
 		const redis = {
@@ -47,11 +59,16 @@ describe(MastodonApiServerService, () => {
 			{ registerApplication, getApplication } as never,
 			{ authenticate } as never,
 			{ assert } as never,
-			{ invoke: nativeInvoke, invokePublic: nativeInvoke } as never,
+			{ invoke: nativeInvoke, invokePublic: publicInvoke } as never,
 			{
 				account: vi.fn(value => ({ id: value.id, username: value.username })),
 				credentialAccount: vi.fn(value => ({ id: value.id, username: value.username })),
-				status: vi.fn(value => ({ id: value.id })),
+				status: vi.fn(value => ({
+					id: value.id,
+					media_attachments: value.files ?? [],
+					poll: value.poll ?? null,
+				})),
+				poll: vi.fn((noteId, poll) => ({ id: noteId, votes_count: poll.choices.reduce((total: number, choice: { votes: number }) => total + choice.votes, 0) })),
 			} as never,
 			{
 				toMisskey: vi.fn().mockReturnValue({ limit: 20 }),
@@ -68,6 +85,7 @@ describe(MastodonApiServerService, () => {
 			authenticate,
 			assert,
 			nativeInvoke,
+			publicInvoke,
 			registerApplication,
 			getApplication,
 			redis,
@@ -199,6 +217,207 @@ describe(MastodonApiServerService, () => {
 
 		expect(invalid.statusCode).toBe(401);
 		expect(nativeInvoke).not.toHaveBeenCalled();
+	});
+
+	test('serves batch accounts and statuses publicly in input order', async () => {
+		const { fastify, authenticate, publicInvoke } = createServer();
+		const accounts = await fastify.inject({ method: 'GET', url: '/api/v1/accounts?id[]=user-a&id[]=user-b' });
+		const statuses = await fastify.inject({ method: 'GET', url: '/api/v1/statuses?id[]=note-a&id[]=note-b' });
+
+		expect(accounts.statusCode).toBe(200);
+		expect(accounts.json()).toEqual([
+			expect.objectContaining({ id: 'user-a' }),
+			expect.objectContaining({ id: 'user-b' }),
+		]);
+		expect(statuses.statusCode).toBe(200);
+		expect(statuses.json()).toEqual([
+			expect.objectContaining({ id: 'note-a' }),
+			expect.objectContaining({ id: 'note-b' }),
+		]);
+		expect(authenticate).not.toHaveBeenCalled();
+		expect(publicInvoke).toHaveBeenCalledWith('users/show', { userId: 'user-a' }, null, expect.any(Object));
+		expect(publicInvoke).toHaveBeenCalledWith('notes/show', { noteId: 'note-a' }, null, expect.any(Object));
+	});
+
+	test('de-duplicates batch IDs and omits only missing or inaccessible records', async () => {
+		const { fastify, nativeInvoke, publicInvoke } = createServer();
+		nativeInvoke.mockImplementation(async (name, data) => {
+			if (name !== 'users/show') return [];
+			if (data.userId === 'missing') throw new ApiError({
+				message: 'No such user.',
+				code: 'NO_SUCH_USER',
+				id: 'missing-user',
+				httpStatusCode: 404,
+			});
+			if (data.userId === 'hidden') throw new ApiError({
+				message: 'Content restricted.',
+				code: 'CONTENT_RESTRICTED_BY_USER',
+				id: 'hidden-user',
+			});
+			return { id: data.userId, username: data.userId };
+		});
+
+		const response = await fastify.inject({
+			method: 'GET',
+			url: '/api/v1/accounts?id[]=user-a&id[]=missing&id[]=hidden&id[]=user-a&id[]=user-b',
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(response.json()).toEqual([
+			expect.objectContaining({ id: 'user-a' }),
+			expect.objectContaining({ id: 'user-b' }),
+		]);
+		expect(publicInvoke).toHaveBeenCalledTimes(4);
+	});
+
+	test('caps batch requests at 40 unique IDs', async () => {
+		const { fastify, publicInvoke } = createServer();
+		const ids = Array.from({ length: 42 }, (_, index) => `user-${index}`);
+		const query = ids.map(id => `id[]=${id}`).join('&');
+
+		const response = await fastify.inject({ method: 'GET', url: `/api/v1/accounts?${query}` });
+
+		expect(response.statusCode).toBe(200);
+		expect(response.json()).toHaveLength(40);
+		expect(publicInvoke).toHaveBeenCalledTimes(40);
+	});
+
+	test.each([500, 429])('rethrows %i failures from batch requests', async statusCode => {
+		const { fastify, nativeInvoke } = createServer();
+		nativeInvoke.mockRejectedValue(new MastodonApiError(statusCode, 'server_error', 'Failure'));
+
+		const response = await fastify.inject({ method: 'GET', url: '/api/v1/statuses?id[]=note-a&id[]=note-b' });
+
+		expect(response.statusCode).toBe(statusCode);
+	});
+
+	test('searches accounts with the authenticated native endpoint mapping', async () => {
+		const { fastify, nativeInvoke } = createServer();
+		nativeInvoke.mockResolvedValueOnce([{ id: 'user-a', username: 'alice' }]);
+		const response = await fastify.inject({
+			method: 'GET',
+			url: '/api/v1/accounts/search?q=alice&limit=5',
+			headers: { authorization: 'Bearer user-token' },
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(response.json()).toEqual([expect.objectContaining({ id: 'user-a', username: 'alice' })]);
+		expect(nativeInvoke).toHaveBeenCalledWith('users/search', {
+			query: 'alice',
+			limit: 5,
+			offset: 0,
+		}, expect.any(Object), expect.any(Object));
+	});
+
+	test('retrieves a poll publicly through its note', async () => {
+		const { fastify, authenticate, publicInvoke } = createServer();
+		const response = await fastify.inject({ method: 'GET', url: '/api/v1/polls/note-with-poll' });
+
+		expect(response.statusCode).toBe(200);
+		expect(response.json()).toMatchObject({ id: 'note-with-poll', votes_count: 2 });
+		expect(authenticate).not.toHaveBeenCalled();
+		expect(publicInvoke).toHaveBeenCalledWith('notes/show', { noteId: 'note-with-poll' }, null, expect.any(Object));
+	});
+
+	test('deletes media with a user token', async () => {
+		const { fastify, assert, nativeInvoke } = createServer();
+		const response = await fastify.inject({
+			method: 'DELETE',
+			url: '/api/v1/media/file-id',
+			headers: { authorization: 'Bearer user-token' },
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(response.json()).toEqual({});
+		expect(assert).toHaveBeenCalledWith(['read'], 'write:media');
+		expect(nativeInvoke).toHaveBeenCalledWith('drive/files/delete', { fileId: 'file-id' }, expect.any(Object), expect.any(Object));
+	});
+
+	test('maps public account status media and pinned filters', async () => {
+		const { fastify, nativeInvoke, publicInvoke } = createServer();
+		const media = await fastify.inject({ method: 'GET', url: '/api/v1/accounts/user-id/statuses?only_media=true' });
+
+		expect(media.statusCode).toBe(200);
+		expect(publicInvoke).toHaveBeenCalledWith('users/notes', expect.objectContaining({
+			userId: 'user-id',
+			withFiles: true,
+		}), null, expect.any(Object));
+
+		publicInvoke.mockClear();
+		nativeInvoke.mockResolvedValueOnce({
+			id: 'user-id',
+			username: 'alice',
+			pinnedNotes: [{ id: 'pinned-a' }, { id: 'pinned-b' }],
+		});
+		const pinned = await fastify.inject({ method: 'GET', url: '/api/v1/accounts/user-id/statuses?pinned=true' });
+
+		expect(pinned.statusCode).toBe(200);
+		expect(pinned.json()).toEqual([
+			expect.objectContaining({ id: 'pinned-a' }),
+			expect.objectContaining({ id: 'pinned-b' }),
+		]);
+		expect(publicInvoke).toHaveBeenCalledWith('users/show', { userId: 'user-id' }, null, expect.any(Object));
+		expect(publicInvoke).not.toHaveBeenCalledWith('users/notes', expect.anything(), expect.anything(), expect.anything());
+	});
+
+	test('maps supported public and hashtag timeline filters', async () => {
+		const { fastify, publicInvoke } = createServer();
+		const publicTimeline = await fastify.inject({ method: 'GET', url: '/api/v1/timelines/public?only_media=true' });
+		const hashtagTimeline = await fastify.inject({ method: 'GET', url: '/api/v1/timelines/tag/fediverse?only_media=true&local=true' });
+
+		expect(publicTimeline.statusCode).toBe(200);
+		expect(hashtagTimeline.statusCode).toBe(200);
+		expect(publicInvoke).toHaveBeenCalledWith('notes/global-timeline', expect.objectContaining({ withFiles: true }), null, expect.any(Object));
+		expect(publicInvoke).toHaveBeenCalledWith('notes/search-by-tag', expect.objectContaining({
+			tag: 'fediverse',
+			withFiles: true,
+			localHostOnly: true,
+		}), null, expect.any(Object));
+	});
+
+	test('rejects unsupported remote-only public and hashtag timelines', async () => {
+		const { fastify, publicInvoke } = createServer();
+		const publicTimeline = await fastify.inject({ method: 'GET', url: '/api/v1/timelines/public?remote=true' });
+		const hashtagTimeline = await fastify.inject({ method: 'GET', url: '/api/v1/timelines/tag/fediverse?remote=true' });
+
+		expect(publicTimeline.statusCode).toBe(422);
+		expect(hashtagTimeline.statusCode).toBe(422);
+		expect(publicInvoke).not.toHaveBeenCalled();
+	});
+
+	test('rejects scheduled statuses before creating a native note', async () => {
+		const { fastify, nativeInvoke } = createServer();
+		const response = await fastify.inject({
+			method: 'POST',
+			url: '/api/v1/statuses',
+			headers: { authorization: 'Bearer user-token', 'content-type': 'application/json' },
+			payload: { status: 'later', scheduled_at: '2099-01-01T00:00:00.000Z' },
+		});
+
+		expect(response.statusCode).toBe(422);
+		expect(nativeInvoke).not.toHaveBeenCalledWith('notes/create', expect.anything(), expect.anything(), expect.anything());
+	});
+
+	test('returns deleted status text while preserving media attachments and poll', async () => {
+		const { fastify, nativeInvoke } = createServer();
+		const media = [{ id: 'file-id' }];
+		const poll = { choices: [{ text: 'A', votes: 1 }] };
+		nativeInvoke.mockImplementation(async name => name === 'notes/show'
+			? { id: 'note-id', text: 'plain text', files: media, poll }
+			: undefined);
+		const response = await fastify.inject({
+			method: 'DELETE',
+			url: '/api/v1/statuses/note-id',
+			headers: { authorization: 'Bearer user-token' },
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(response.json()).toMatchObject({
+			id: 'note-id',
+			text: 'plain text',
+			media_attachments: media,
+			poll,
+		});
 	});
 
 	test('rejects unknown and recipient-less direct visibility instead of publishing publicly', async () => {

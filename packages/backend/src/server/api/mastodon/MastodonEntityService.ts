@@ -200,7 +200,7 @@ export class MastodonEntityService {
 		};
 	}
 
-	private poll(noteId: string, poll: NonNullable<Packed<'Note'>['poll']>) {
+	public poll(noteId: string, poll: NonNullable<Packed<'Note'>['poll']>) {
 		const votesCount = poll.choices.reduce((total, choice) => total + choice.votes, 0);
 		const ownVotes = poll.choices.flatMap((choice, index) => choice.isVoted ? [index] : []);
 

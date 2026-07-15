@@ -134,6 +134,23 @@ describe(MastodonEntityService, () => {
 		expect(status.tags).toEqual([expect.objectContaining({ name: 'fediverse' })]);
 	});
 
+	test('exposes poll conversion for the poll retrieval route', () => {
+		const poll = service.poll('note-id', note.poll as never);
+
+		expect(poll).toMatchObject({
+			id: 'note-id',
+			votes_count: 3,
+			voters_count: 3,
+			multiple: true,
+			voted: true,
+			own_votes: [0],
+			options: [
+				{ title: 'A', votes_count: 2 },
+				{ title: 'B', votes_count: 1 },
+			],
+		});
+	});
+
 	test('converts relation flags and supported notifications', () => {
 		expect(service.relationship({
 			...user,
