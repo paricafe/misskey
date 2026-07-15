@@ -14,7 +14,7 @@ const DISMISSAL_TTL_MILLISECONDS = DISMISSAL_TTL_SECONDS * 1000;
 @Injectable()
 export class MastodonNotificationService {
 	private readonly misskeyTypes: Readonly<Record<string, MiGroupedNotification['type'][]>> = {
-		mention: ['mention', 'reply', 'note', 'quote'],
+		mention: ['mention', 'reply', 'quote'],
 		status: ['note'],
 		reblog: ['renote', 'renote:grouped'],
 		favourite: ['reaction', 'reaction:grouped'],

@@ -103,7 +103,9 @@ describe(MastodonApiServerService, () => {
 						? 'favourite'
 						: value.type === 'renote' || value.type === 'renote:grouped'
 							? 'reblog'
-							: value.type ?? 'mention',
+							: value.type === 'note'
+								? 'status'
+								: value.type ?? 'mention',
 					account: { id: value.user.id },
 				}),
 			} as never,
@@ -154,7 +156,7 @@ describe(MastodonApiServerService, () => {
 		expect(nativeInvoke).toHaveBeenCalledWith('i/notifications', {
 			limit: 20,
 			markAsRead: false,
-			includeTypes: ['mention', 'reply', 'note', 'quote', 'reaction'],
+			includeTypes: ['mention', 'reply', 'quote', 'reaction'],
 		}, expect.any(Object), expect.any(Object));
 	});
 
@@ -186,7 +188,58 @@ describe(MastodonApiServerService, () => {
 		expect(nativeInvoke).toHaveBeenCalledWith('i/notifications', {
 			limit: 20,
 			markAsRead: false,
-			includeTypes: ['renote'],
+			includeTypes: ['reaction', 'renote'],
+		}, expect.any(Object), expect.any(Object));
+	});
+
+	test('keeps distinct status and mention filters separate after Mastodon conversion', async () => {
+		const { fastify, nativeInvoke } = createServer();
+		nativeInvoke.mockImplementation(async (name, data) => {
+			if (name !== 'i/notifications') return [];
+			const notifications = [
+				{ id: 'status', type: 'note', user: { id: 'account-a' } },
+				{ id: 'mention', type: 'mention', user: { id: 'account-b' } },
+			];
+			const includeTypes = Array.isArray(data.includeTypes) ? data.includeTypes as string[] : null;
+			return includeTypes == null ? notifications : notifications.filter(notification => includeTypes.includes(notification.type));
+		});
+
+		const response = await fastify.inject({
+			method: 'GET',
+			url: '/api/v1/notifications?types[]=status&exclude_types[]=mention',
+			headers: { authorization: 'Bearer user-token' },
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(response.json()).toEqual([expect.objectContaining({ id: 'status', type: 'status' })]);
+		expect(nativeInvoke).toHaveBeenCalledWith('i/notifications', {
+			limit: 20,
+			markAsRead: false,
+			includeTypes: ['note'],
+		}, expect.any(Object), expect.any(Object));
+	});
+
+	test('applies exact notification exclusions after Mastodon conversion', async () => {
+		const { fastify, nativeInvoke } = createServer();
+		nativeInvoke.mockImplementation(async (name, data) => {
+			if (name !== 'i/notifications') return [];
+			const notifications = [{ id: 'status', type: 'note', user: { id: 'account-a' } }];
+			const includeTypes = Array.isArray(data.includeTypes) ? data.includeTypes as string[] : null;
+			return includeTypes == null ? notifications : notifications.filter(notification => includeTypes.includes(notification.type));
+		});
+
+		const response = await fastify.inject({
+			method: 'GET',
+			url: '/api/v1/notifications?types[]=status&exclude_types[]=status',
+			headers: { authorization: 'Bearer user-token' },
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(response.json()).toEqual([]);
+		expect(nativeInvoke).toHaveBeenCalledWith('i/notifications', {
+			limit: 20,
+			markAsRead: false,
+			includeTypes: ['note'],
 		}, expect.any(Object), expect.any(Object));
 	});
 
@@ -914,6 +967,26 @@ describe(MastodonApiServerService, () => {
 		expect(forbidden.json()).toEqual({ error: 'Record not found' });
 		expect(invalid.statusCode).toBe(400);
 		expect(invalid.json()).toEqual({ error: 'Invalid param.' });
+	});
+
+	test.each([
+		['followers', 'users/followers'],
+		['following', 'users/following'],
+	])('maps the native FORBIDDEN error from public %s to a non-leaking 404', async (route, endpoint) => {
+		const { fastify, nativeInvoke } = createServer();
+		nativeInvoke.mockImplementation(async name => {
+			if (name === endpoint) throw new ApiError({
+				message: 'Forbidden.',
+				code: 'FORBIDDEN',
+				id: 'native-forbidden',
+			});
+			return [];
+		});
+
+		const response = await fastify.inject({ method: 'GET', url: `/api/v1/accounts/user-id/${route}` });
+
+		expect(response.statusCode).toBe(404);
+		expect(response.json()).toEqual({ error: 'Record not found' });
 	});
 
 	test('authenticates, checks scope, and reuses native endpoints', async () => {

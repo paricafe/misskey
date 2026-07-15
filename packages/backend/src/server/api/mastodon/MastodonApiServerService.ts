@@ -423,15 +423,21 @@ export class MastodonApiServerService {
 			const excludeTypes = this.strings(query['exclude_types[]'] ?? query.exclude_types);
 			const includeMisskeyTypes = this.mastodonNotificationService.toMisskeyTypes(includeTypes).filter(type => type !== 'reaction:grouped' && type !== 'renote:grouped');
 			const excludeMisskeyTypes = this.mastodonNotificationService.toMisskeyTypes(excludeTypes).filter(type => type !== 'reaction:grouped' && type !== 'renote:grouped');
-			const excluded = new Set(excludeMisskeyTypes);
-			const effectiveIncludeTypes = [...new Set(includeMisskeyTypes.filter(type => !excluded.has(type)))];
 			const notifications = await this.invoke('i/notifications', {
 				...this.mastodonPaginationService.toMisskey(query, 100),
 				markAsRead: false,
-				...(includeTypes.length > 0 ? { includeTypes: effectiveIncludeTypes } : {}),
+				...(includeTypes.length > 0 ? { includeTypes: [...new Set(includeMisskeyTypes)] } : {}),
 				...(includeTypes.length === 0 && excludeTypes.length > 0 ? { excludeTypes: [...new Set(excludeMisskeyTypes)] } : {}),
 			}, auth, request as MastodonRequest) as Packed<'Notification'>[];
 			let converted = notifications.map(notification => this.mastodonEntityService.notification(notification)).filter(value => value != null);
+			if (includeTypes.length > 0) {
+				const includedTypes = new Set(includeTypes);
+				converted = converted.filter(notification => includedTypes.has(notification.type));
+			}
+			if (excludeTypes.length > 0) {
+				const excludedTypes = new Set(excludeTypes);
+				converted = converted.filter(notification => !excludedTypes.has(notification.type));
+			}
 			const accountId = this.string(query.account_id);
 			if (accountId != null) converted = converted.filter(notification => notification.account.id === accountId);
 			converted = await this.mastodonNotificationService.filterDismissed(auth.user.id, converted);
@@ -738,6 +744,7 @@ export class MastodonApiServerService {
 		if (!(error instanceof ApiError)) return false;
 		return error.httpStatusCode === 404 ||
 			error.kind === 'permission' ||
+			error.code === 'FORBIDDEN' ||
 			error.code.startsWith('NO_SUCH_') ||
 			error.code.endsWith('_NOT_FOUND') ||
 			error.code.startsWith('CONTENT_RESTRICTED_');

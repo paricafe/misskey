@@ -180,7 +180,7 @@ export class MastodonEntityService {
 		const status = 'note' in notification && notification.note != null
 			? this.status(notification.note)
 			: undefined;
-		if (['favourite', 'mention', 'reblog', 'poll'].includes(type) && status == null) return null;
+		if (['favourite', 'mention', 'reblog', 'poll', 'status'].includes(type) && status == null) return null;
 
 		return {
 			id: notification.id,
@@ -260,7 +260,8 @@ export class MastodonEntityService {
 	}
 
 	private notificationType(type: Packed<'Notification'>['type']): string | null {
-		if (['mention', 'reply', 'note', 'quote'].includes(type)) return 'mention';
+		if (['mention', 'reply', 'quote'].includes(type)) return 'mention';
+		if (type === 'note') return 'status';
 		if (type === 'renote' || type === 'renote:grouped') return 'reblog';
 		if (type === 'reaction' || type === 'reaction:grouped') return 'favourite';
 		if (type === 'follow' || type === 'followRequestAccepted') return 'follow';

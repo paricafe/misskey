@@ -168,6 +168,13 @@ describe(MastodonEntityService, () => {
 			user,
 			note,
 		} as never)).toMatchObject({ id: 'notification-id', type: 'favourite', status: { id: 'note-id' } });
+		expect(service.notification({
+			id: 'status-notification-id',
+			createdAt: '2025-02-03T06:00:00.000Z',
+			type: 'note',
+			user,
+			note,
+		} as never)).toMatchObject({ id: 'status-notification-id', type: 'status', status: { id: 'note-id' } });
 		expect(service.notification({ id: 'ignored', type: 'achievementEarned' } as never)).toBeNull();
 	});
 });

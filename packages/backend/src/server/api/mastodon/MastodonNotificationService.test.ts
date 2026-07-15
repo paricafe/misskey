@@ -24,7 +24,6 @@ describe(MastodonNotificationService, () => {
 		expect(service.toMisskeyTypes(['mention', 'favourite', 'reblog', 'follow_request'])).toEqual([
 			'mention',
 			'reply',
-			'note',
 			'quote',
 			'reaction',
 			'reaction:grouped',
@@ -32,6 +31,7 @@ describe(MastodonNotificationService, () => {
 			'renote:grouped',
 			'receiveFollowRequest',
 		]);
+		expect(service.toMisskeyTypes(['status'])).toEqual(['note']);
 	});
 
 	test('stores a bounded expiring user-scoped dismissal', async () => {
