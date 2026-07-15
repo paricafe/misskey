@@ -704,7 +704,7 @@ export class OAuth2ProviderService implements OnApplicationShutdown {
 				const dispatchClientId = this.mastodonOAuthService.extractClientId(body, request.headers.authorization);
 				if (this.mastodonOAuthService.isMastodonClientId(dispatchClientId)) {
 					try {
-						reply.send(await this.mastodonOAuthService.exchangeCode(body, request.headers.authorization));
+						reply.send(await this.mastodonOAuthService.exchangeToken(body, request.headers.authorization));
 					} catch (error) {
 						sendMastodonError(reply, error);
 					}

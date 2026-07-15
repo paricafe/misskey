@@ -38,9 +38,14 @@ export class MastodonAuthenticateService {
 		if (token == null) {
 			throw this.authenticationError();
 		}
+		const userId = token.userId;
+		if (userId == null) {
+			await this.mastodonOAuthTokensRepository.update(token.id, { lastUsedAt: new Date() });
+			return { kind: 'application', user: null, token };
+		}
 
-		const user = await this.cacheService.localUserByIdCache.fetch(token.userId, () => (
-			this.usersRepository.findOneByOrFail({ id: token.userId, host: IsNull() }) as Promise<MiLocalUser>
+		const user = await this.cacheService.localUserByIdCache.fetch(userId, () => (
+			this.usersRepository.findOneByOrFail({ id: userId, host: IsNull() }) as Promise<MiLocalUser>
 		)).catch(() => null);
 		if (user == null || user.isDeleted || user.isSuspended) {
 			throw this.authenticationError();
@@ -48,7 +53,7 @@ export class MastodonAuthenticateService {
 
 		await this.mastodonOAuthTokensRepository.update(token.id, { lastUsedAt: new Date() });
 
-		return { user, token };
+		return { kind: 'user', user, token };
 	}
 
 	private authenticationError(): MastodonApiError {

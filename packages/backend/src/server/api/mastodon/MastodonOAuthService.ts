@@ -117,7 +117,7 @@ export class MastodonOAuthService {
 			website,
 			redirect_uri: redirectUris[0],
 			redirect_uris: redirectUris,
-			scopes: scopes.join(' '),
+			scopes,
 			client_id: id,
 			client_secret: clientSecret,
 			client_secret_expires_at: 0,
@@ -152,7 +152,7 @@ export class MastodonOAuthService {
 			redirect_uri: client.redirectUris[0],
 			redirect_uris: client.redirectUris,
 			client_id: client.id,
-			scopes: client.scopes.join(' '),
+			scopes: client.scopes,
 			vapid_key: '',
 		};
 	}
@@ -273,11 +273,18 @@ export class MastodonOAuthService {
 		};
 	}
 
-	public async exchangeCode(parameters: OAuthParameters, authorizationHeader?: string): Promise<MastodonTokenResponse> {
-		if (this.firstValue(parameters.grant_type) !== 'authorization_code') {
-			throw this.oauthError(400, 'unsupported_grant_type', 'grant_type must be authorization_code');
+	public async exchangeToken(parameters: OAuthParameters, authorizationHeader?: string): Promise<MastodonTokenResponse> {
+		const grantType = this.firstValue(parameters.grant_type);
+		if (grantType === 'authorization_code') {
+			return await this.exchangeCode(parameters, authorizationHeader);
 		}
+		if (grantType === 'client_credentials') {
+			return await this.exchangeClientCredentials(parameters, authorizationHeader);
+		}
+		throw this.oauthError(400, 'unsupported_grant_type', 'grant_type is not supported');
+	}
 
+	private async exchangeCode(parameters: OAuthParameters, authorizationHeader?: string): Promise<MastodonTokenResponse> {
 		const client = await this.authenticateClient(parameters, authorizationHeader);
 		const code = this.firstValue(parameters.code);
 		const redirectUri = this.firstValue(parameters.redirect_uri);
@@ -336,6 +343,42 @@ export class MastodonOAuthService {
 			access_token: rawToken,
 			token_type: 'Bearer',
 			scope: grant.scopes.join(' '),
+			created_at: Math.floor(now.getTime() / 1000),
+		};
+	}
+
+	private async exchangeClientCredentials(parameters: OAuthParameters, authorizationHeader?: string): Promise<MastodonTokenResponse> {
+		const client = await this.authenticateClient(parameters, authorizationHeader);
+		const redirectUri = this.firstValue(parameters.redirect_uri);
+		if (redirectUri != null && !client.redirectUris.includes(redirectUri)) {
+			throw this.oauthError(400, 'invalid_grant', 'redirect_uri does not exactly match a registered URI');
+		}
+
+		let scopes: string[];
+		try {
+			scopes = this.mastodonScopeService.normalize(parameters.scope, ['read']);
+		} catch (error) {
+			throw this.oauthError(400, 'invalid_scope', error instanceof Error ? error.message : 'scope is invalid');
+		}
+		if (!scopes.every(scope => this.mastodonScopeService.allows(client.scopes, scope))) {
+			throw this.oauthError(400, 'invalid_scope', 'The requested scope exceeds the registered scope');
+		}
+
+		const now = new Date();
+		const rawToken = generateCredential();
+		await this.mastodonOAuthTokensRepository.insertOne({
+			id: this.idService.gen(now.getTime()),
+			tokenHash: digestCredential(rawToken),
+			userId: null,
+			clientId: client.id,
+			scopes,
+			createdAt: now,
+			lastUsedAt: null,
+		});
+		return {
+			access_token: rawToken,
+			token_type: 'Bearer',
+			scope: scopes.join(' '),
 			created_at: Math.floor(now.getTime() / 1000),
 		};
 	}

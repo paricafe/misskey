@@ -82,7 +82,7 @@ describe(MastodonOAuthService, () => {
 			client_secret_expires_at: 0,
 			redirect_uri: 'https://elk.example/callback',
 			redirect_uris: ['https://elk.example/callback', 'myapp://oauth'],
-			scopes: 'read write follow push',
+			scopes: ['read', 'write', 'follow', 'push'],
 			website: 'https://elk.example/',
 		});
 		expect(application.client_secret).toHaveLength(64);
@@ -101,6 +101,57 @@ describe(MastodonOAuthService, () => {
 		await expect(service.registerApplication({ client_name: '', redirect_uris: 'https://client.example/cb' })).rejects.toMatchObject({ statusCode: 422 });
 		await expect(service.registerApplication({ client_name: 'Client', redirect_uris: 'http://client.example/cb' })).rejects.toMatchObject({ statusCode: 422 });
 		await expect(service.registerApplication({ client_name: 'Client', redirect_uris: 'https://client.example/cb', scopes: 'unknown' })).rejects.toMatchObject({ statusCode: 422 });
+	});
+
+	test('issues a read-scoped application token with no user', async () => {
+		const clientSecret = 'client-secret';
+		const client = {
+			id: 'client-id',
+			secretHash: digestCredential(clientSecret),
+			name: 'Client',
+			redirectUris: ['https://client.example/callback'],
+			scopes: ['read', 'write'],
+		};
+		const { service, tokenInsertOne } = createService({
+			clients: { findOneBy: vi.fn().mockResolvedValue(client) },
+			id: { gen: vi.fn().mockReturnValue('application-token-id') },
+		});
+
+		const token = await service.exchangeToken({
+			grant_type: 'client_credentials',
+			client_id: client.id,
+			client_secret: clientSecret,
+			redirect_uri: client.redirectUris[0],
+		});
+
+		expect(token).toMatchObject({ token_type: 'Bearer', scope: 'read' });
+		expect(tokenInsertOne).toHaveBeenCalledWith(expect.objectContaining({
+			id: 'application-token-id',
+			userId: null,
+			clientId: client.id,
+			scopes: ['read'],
+			tokenHash: digestCredential(token.access_token),
+		}));
+	});
+
+	test('rejects application-token scopes outside the registered grant', async () => {
+		const clientSecret = 'client-secret';
+		const client = {
+			id: 'client-id',
+			secretHash: digestCredential(clientSecret),
+			redirectUris: ['https://client.example/callback'],
+			scopes: ['read'],
+		};
+		const { service } = createService({
+			clients: { findOneBy: vi.fn().mockResolvedValue(client) },
+		});
+
+		await expect(service.exchangeToken({
+			grant_type: 'client_credentials',
+			client_id: client.id,
+			client_secret: clientSecret,
+			scope: 'write',
+		})).rejects.toMatchObject({ error: 'invalid_scope' });
 	});
 
 	test('completes a confidential authorization-code flow without PKCE', async () => {
@@ -134,7 +185,7 @@ describe(MastodonOAuthService, () => {
 		const decision = await service.decide(authorization.transactionId, 'native-login-token', false);
 		expect(decision.parameters.state).toBe('state-value');
 
-		const token = await service.exchangeCode({
+		const token = await service.exchangeToken({
 			grant_type: 'authorization_code',
 			code: decision.parameters.code,
 			client_id: 'client-id',
@@ -189,13 +240,13 @@ describe(MastodonOAuthService, () => {
 		});
 		const decision = await service.decide(authorization.transactionId, 'native-login-token', false);
 
-		await expect(service.exchangeCode({
+		await expect(service.exchangeToken({
 			grant_type: 'authorization_code', code: decision.parameters.code, client_id: 'client-id', client_secret: 'wrong', redirect_uri: 'https://phanpy.example/oauth', code_verifier: verifier,
 		})).rejects.toMatchObject({ statusCode: 401, error: 'invalid_client' });
-		await expect(service.exchangeCode({
+		await expect(service.exchangeToken({
 			grant_type: 'authorization_code', code: decision.parameters.code, client_id: 'client-id', client_secret: clientSecret, redirect_uri: 'https://phanpy.example/oauth', code_verifier: 'wrong',
 		})).rejects.toMatchObject({ error: 'invalid_grant' });
-		await expect(service.exchangeCode({
+		await expect(service.exchangeToken({
 			grant_type: 'authorization_code', code: decision.parameters.code, client_id: 'client-id', client_secret: clientSecret, redirect_uri: 'https://phanpy.example/oauth', code_verifier: verifier,
 		})).resolves.toMatchObject({ token_type: 'Bearer', scope: 'read:accounts' });
 	});
@@ -221,7 +272,7 @@ describe(MastodonOAuthService, () => {
 			client_id: 'client-id', response_type: 'code', redirect_uri: 'https://elk.example/oauth', scope: 'read',
 		});
 		const decision = await service.decide(authorization.transactionId, 'native-login-token', false);
-		const exchange = () => service.exchangeCode({
+		const exchange = () => service.exchangeToken({
 			grant_type: 'authorization_code',
 			code: decision.parameters.code,
 			client_id: 'client-id',

@@ -26,10 +26,33 @@ describe(MastodonAuthenticateService, () => {
 			{ localUserByIdCache: { fetch } } as never,
 		);
 
-		await expect(service.authenticate('raw-token')).resolves.toEqual({ token, user });
+		await expect(service.authenticate('raw-token')).resolves.toEqual({ kind: 'user', token, user });
 		expect(findOneBy).toHaveBeenCalledWith({ tokenHash: digestCredential('raw-token') });
 		expect(fetch).toHaveBeenCalledWith('user-id', expect.any(Function));
 		expect(update).toHaveBeenCalledWith('token-id', { lastUsedAt: expect.any(Date) });
+	});
+
+	test('returns an application auth result without loading a user', async () => {
+		const token = {
+			id: 'app-token-id',
+			tokenHash: digestCredential('raw-token'),
+			userId: null,
+			clientId: 'client-id',
+			scopes: ['read'],
+		};
+		const fetch = vi.fn();
+		const service = new MastodonAuthenticateService(
+			{ findOneBy: vi.fn().mockResolvedValue(token), update: vi.fn() } as never,
+			{ findOneBy: vi.fn() } as never,
+			{ localUserByIdCache: { fetch } } as never,
+		);
+
+		await expect(service.authenticate('raw-token')).resolves.toEqual({
+			kind: 'application',
+			token,
+			user: null,
+		});
+		expect(fetch).not.toHaveBeenCalled();
 	});
 
 	test('rejects a missing or unknown token', async () => {
