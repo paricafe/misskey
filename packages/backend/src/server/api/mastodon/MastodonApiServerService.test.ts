@@ -17,13 +17,20 @@ describe(MastodonApiServerService, () => {
 		await Promise.all(servers.splice(0).map(server => server.close()));
 	});
 
-	function createServer() {
+	function createServer(meta: Record<string, unknown> = {}) {
 		const auth = { kind: 'user', user: { id: 'user-id' }, token: { id: 'token-id', scopes: ['read'] } };
 		const dismissedNotifications = new Set<string>();
 		const authenticate = vi.fn().mockResolvedValue(auth);
 		const assert = vi.fn();
-		const nativeInvoke = vi.fn(async (name: string, data: Record<string, unknown> = {}, _viewer?: unknown, _request?: unknown) => {
+		const nativeInvoke = vi.fn(async (name: string, data: Record<string, unknown>, _viewer?: unknown, _request?: unknown): Promise<unknown> => {
 			if (name === 'i') return { id: 'user-id', username: 'alice' };
+			if (name === 'emojis') return {
+				emojis: [{
+					name: 'blobcat',
+					url: 'https://misskey.example/files/blobcat.png',
+					category: 'Animals',
+				}],
+			};
 			if (name === 'notes/timeline') return [{ id: 'note-id' }];
 			if (name === 'users/show') return { id: data.userId, username: data.userId };
 			if (name === 'notes/show') return data.noteId === 'note-with-poll'
@@ -62,7 +69,16 @@ describe(MastodonApiServerService, () => {
 		const mastodonNotificationService = new MastodonNotificationService(redis as never);
 		const service = new MastodonApiServerService(
 			{ url: 'https://misskey.example/', host: 'misskey.example', version: '2026.7.0', maxFileSize: 10_000_000 } as never,
-			{ name: 'Misskey Test', description: 'Test instance', langs: ['en'], bannerUrl: null } as never,
+			{
+				name: 'Misskey Test',
+				description: 'Test instance',
+				langs: ['en'],
+				bannerUrl: null,
+				iconUrl: null,
+				serverRules: ['Be kind'],
+				policies: { pinLimit: 5 },
+				...meta,
+			} as never,
 			notesRepository as never,
 			noteFavoritesRepository as never,
 			userNotePiningsRepository as never,
@@ -585,18 +601,81 @@ describe(MastodonApiServerService, () => {
 		expect(registerApplication).not.toHaveBeenCalled();
 	});
 
-	test('publishes a Mastodon v2 instance document without authentication', async () => {
+	test('publishes truthful Mastodon instance discovery without authentication', async () => {
 		const { fastify, authenticate } = createServer();
-		const response = await fastify.inject({ method: 'GET', url: '/api/v2/instance' });
+		const v1 = await fastify.inject({ method: 'GET', url: '/api/v1/instance' });
+		const v2 = await fastify.inject({ method: 'GET', url: '/api/v2/instance' });
 
-		expect(response.statusCode).toBe(200);
-		expect(response.json()).toMatchObject({
+		expect(v1.statusCode).toBe(200);
+		expect(v1.json()).toMatchObject({
+			version: '4.3.0 (compatible; Misskey 2026.7.0)',
+			thumbnail: 'https://misskey.example/favicon.ico',
+			rules: [{ id: '1', text: 'Be kind', hint: '' }],
+		});
+		expect(v2.statusCode).toBe(200);
+		expect(v2.json()).toMatchObject({
 			domain: 'misskey.example',
 			title: 'Misskey Test',
-			api_versions: { mastodon: 4 },
-			configuration: { urls: { streaming: 'wss://misskey.example/api/v1/streaming' } },
+			version: '4.3.0 (compatible; Misskey 2026.7.0)',
+			api_versions: { mastodon: 1 },
+			thumbnail: { url: 'https://misskey.example/favicon.ico' },
+			configuration: {
+				accounts: { max_pinned_statuses: 5 },
+				urls: { streaming: 'wss://misskey.example/api/v1/streaming' },
+			},
+			rules: [{ id: '1', text: 'Be kind', hint: '' }],
 		});
 		expect(authenticate).not.toHaveBeenCalled();
+	});
+
+	test('uses the instance icon as the discovery image when no banner is configured', async () => {
+		const { fastify } = createServer({
+			bannerUrl: null,
+			iconUrl: 'https://misskey.example/files/icon.png',
+		});
+		const v1 = await fastify.inject({ method: 'GET', url: '/api/v1/instance' });
+		const v2 = await fastify.inject({ method: 'GET', url: '/api/v2/instance' });
+
+		expect(v1.json().thumbnail).toBe('https://misskey.example/files/icon.png');
+		expect(v2.json().thumbnail.url).toBe('https://misskey.example/files/icon.png');
+	});
+
+	test('maps public instance rules and custom emojis from Misskey', async () => {
+		const { fastify, authenticate, publicInvoke } = createServer();
+		const rules = await fastify.inject({ method: 'GET', url: '/api/v1/instance/rules' });
+		const emojis = await fastify.inject({ method: 'GET', url: '/api/v1/custom_emojis' });
+
+		expect(rules.statusCode).toBe(200);
+		expect(rules.json()).toEqual([
+			{ id: '1', text: 'Be kind', hint: '' },
+		]);
+		expect(emojis.statusCode).toBe(200);
+		expect(emojis.json()).toEqual([
+			{
+				shortcode: 'blobcat',
+				url: 'https://misskey.example/files/blobcat.png',
+				static_url: 'https://misskey.example/files/blobcat.png',
+				visible_in_picker: true,
+				category: 'Animals',
+			},
+		]);
+		expect(authenticate).not.toHaveBeenCalled();
+		expect(publicInvoke).toHaveBeenCalledWith('emojis', {}, null, expect.any(Object));
+	});
+
+	test.each(['/api/v1/instance/rules', '/api/v1/custom_emojis'])('rejects invalid Authorization on public discovery route %s', async url => {
+		const { fastify, authenticate, publicInvoke } = createServer();
+		authenticate.mockRejectedValue(new MastodonApiError(401, 'invalid_token', 'The access token is invalid'));
+
+		const response = await fastify.inject({
+			method: 'GET',
+			url,
+			headers: { authorization: 'Bearer invalid-token' },
+		});
+
+		expect(response.statusCode).toBe(401);
+		expect(authenticate).toHaveBeenCalledWith('invalid-token');
+		expect(publicInvoke).not.toHaveBeenCalled();
 	});
 
 	test('authenticates, checks scope, and reuses native endpoints', async () => {

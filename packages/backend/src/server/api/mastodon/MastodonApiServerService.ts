@@ -94,9 +94,21 @@ export class MastodonApiServerService {
 			await this.assertApplicationRegistrationRate(request.ip);
 			return await this.mastodonOAuthService.registerApplication(request.body as MastodonApplicationRegistration);
 		});
-		fastify.get('/api/v1/instance', async () => this.instanceV1());
-		fastify.get('/api/v2/instance', async () => this.instanceV2());
-		fastify.get('/api/v1/custom_emojis', async () => []);
+		fastify.get('/api/v1/instance', request => this.withOptionalToken(request as MastodonRequest, async () => this.instanceV1()));
+		fastify.get('/api/v2/instance', request => this.withOptionalToken(request as MastodonRequest, async () => this.instanceV2()));
+		fastify.get('/api/v1/instance/rules', request => this.withOptionalToken(request as MastodonRequest, async () => this.rules()));
+		fastify.get('/api/v1/custom_emojis', request => this.withOptionalToken(request as MastodonRequest, async () => {
+			const response = await this.invokePublic('emojis', {}, null, request as MastodonRequest) as {
+				emojis: Array<{ name: string; url: string; category?: string | null }>;
+			};
+			return response.emojis.map(emoji => ({
+				shortcode: emoji.name,
+				url: emoji.url,
+				static_url: emoji.url,
+				visible_in_picker: true,
+				category: emoji.category ?? null,
+			}));
+		}));
 		fastify.get('/api/v1/trends', async () => []);
 		fastify.get('/api/v1/trends/tags', async () => []);
 		fastify.get('/api/v1/trends/statuses', async () => []);
@@ -677,6 +689,12 @@ export class MastodonApiServerService {
 		return await action(await this.mastodonAuthenticateService.authenticate(token));
 	}
 
+	private async withOptionalToken<T>(request: MastodonRequest, action: () => Promise<T>): Promise<T> {
+		const token = this.bearerToken(request);
+		if (token != null) await this.mastodonAuthenticateService.authenticate(token);
+		return await action();
+	}
+
 	private async withOptionalUser<T>(
 		request: MastodonRequest,
 		scope: string,
@@ -758,14 +776,14 @@ export class MastodonApiServerService {
 			version: v2.version,
 			urls: { streaming_api: this.streamingUrl() },
 			stats: { user_count: 0, status_count: 0, domain_count: 0 },
-			thumbnail: this.meta.bannerUrl,
+			thumbnail: this.instanceImageUrl(),
 			languages: this.meta.langs,
 			registrations: !this.meta.disableRegistration,
 			approval_required: false,
 			invites_enabled: false,
 			configuration: v2.configuration,
 			contact_account: null,
-			rules: [],
+			rules: this.rules(),
 		};
 	}
 
@@ -773,15 +791,16 @@ export class MastodonApiServerService {
 		return {
 			domain: this.config.host,
 			title: this.meta.name ?? this.config.host,
-			version: `4.2.0 (compatible; Misskey ${this.config.version})`,
-			api_versions: { mastodon: 4 },
+			version: `4.3.0 (compatible; Misskey ${this.config.version})`,
+			api_versions: { mastodon: 1 },
 			source_url: 'https://github.com/misskey-dev/misskey',
 			description: this.meta.description ?? '',
 			usage: { users: { active_month: 0 } },
-			thumbnail: { url: this.meta.bannerUrl ?? null },
+			thumbnail: { url: this.instanceImageUrl() },
 			languages: this.meta.langs,
 			configuration: {
 				urls: { streaming: this.streamingUrl() },
+				accounts: { max_pinned_statuses: this.meta.policies.pinLimit ?? 5 },
 				statuses: { max_characters: MAX_NOTE_TEXT_LENGTH, max_media_attachments: 16, characters_reserved_per_url: 23 },
 				media_attachments: {
 					supported_mime_types: ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'audio/mpeg', 'audio/ogg', 'video/mp4', 'video/webm'],
@@ -792,8 +811,20 @@ export class MastodonApiServerService {
 			},
 			registrations: { enabled: !this.meta.disableRegistration, approval_required: false, message: null },
 			contact: { email: this.meta.maintainerEmail ?? '', account: null },
-			rules: [],
+			rules: this.rules(),
 		};
+	}
+
+	private instanceImageUrl(): string {
+		return this.meta.bannerUrl ?? this.meta.iconUrl ?? new URL('/favicon.ico', this.config.url).toString();
+	}
+
+	private rules(): Array<{ id: string; text: string; hint: string }> {
+		return this.meta.serverRules.map((text, index) => ({
+			id: (index + 1).toString(),
+			text,
+			hint: '',
+		}));
 	}
 
 	private streamingUrl(): string {
