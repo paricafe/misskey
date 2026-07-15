@@ -907,16 +907,40 @@ describe(MastodonApiServerService, () => {
 	test('maps supported public and hashtag timeline filters', async () => {
 		const { fastify, publicInvoke } = createServer();
 		const publicTimeline = await fastify.inject({ method: 'GET', url: '/api/v1/timelines/public?only_media=true' });
+		const plainHashtagTimeline = await fastify.inject({ method: 'GET', url: '/api/v1/timelines/tag/fediverse' });
 		const hashtagTimeline = await fastify.inject({ method: 'GET', url: '/api/v1/timelines/tag/fediverse?only_media=true&local=true' });
 
 		expect(publicTimeline.statusCode).toBe(200);
+		expect(plainHashtagTimeline.statusCode).toBe(200);
 		expect(hashtagTimeline.statusCode).toBe(200);
 		expect(publicInvoke).toHaveBeenCalledWith('notes/global-timeline', expect.objectContaining({ withFiles: true }), null, expect.any(Object));
+		expect(publicInvoke).toHaveBeenCalledWith('notes/search-by-tag', {
+			limit: 20,
+			tag: 'fediverse',
+			withFiles: false,
+			localHostOnly: false,
+		}, null, expect.any(Object));
 		expect(publicInvoke).toHaveBeenCalledWith('notes/search-by-tag', expect.objectContaining({
 			tag: 'fediverse',
 			withFiles: true,
 			localHostOnly: true,
 		}), null, expect.any(Object));
+	});
+
+	test.each([
+		'any[]',
+		'all[]',
+		'none[]',
+	])('rejects unsupported non-empty %s hashtag timeline filters before native invocation', async filter => {
+		const { fastify, publicInvoke } = createServer();
+		const response = await fastify.inject({
+			method: 'GET',
+			url: `/api/v1/timelines/tag/fediverse?${encodeURIComponent(filter)}=activitypub`,
+		});
+
+		expect(response.statusCode).toBe(422);
+		expect(response.json()).toEqual({ error: 'Compound tag filters are not supported' });
+		expect(publicInvoke).not.toHaveBeenCalled();
 	});
 
 	test('rejects unsupported remote-only public and hashtag timelines', async () => {

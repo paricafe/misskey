@@ -301,6 +301,13 @@ export class MastodonApiServerService {
 					if (this.boolean(query.remote)) {
 						throw new MastodonApiError(422, 'unprocessable_entity', 'Remote-only timelines are not supported');
 					}
+					if (path === '/api/v1/timelines/tag/:tag' && [
+						query['any[]'] ?? query.any,
+						query['all[]'] ?? query.all,
+						query['none[]'] ?? query.none,
+					].some(value => this.strings(value).length > 0)) {
+						throw new MastodonApiError(422, 'unprocessable_entity', 'Compound tag filters are not supported');
+					}
 					const selectedEndpoint = path === '/api/v1/timelines/public' && this.boolean(query.local)
 						? 'notes/local-timeline'
 						: endpoint;
