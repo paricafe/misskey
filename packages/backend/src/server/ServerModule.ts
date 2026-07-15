@@ -32,6 +32,7 @@ import { OAuth2ProviderService } from './oauth/OAuth2ProviderService.js';
 import { MastodonApiCallService } from './api/mastodon/MastodonApiCallService.js';
 import { MastodonAuthenticateService } from './api/mastodon/MastodonAuthenticateService.js';
 import { MastodonOAuthService } from './api/mastodon/MastodonOAuthService.js';
+import { MastodonNotificationService } from './api/mastodon/MastodonNotificationService.js';
 import { MastodonScopeService } from './api/mastodon/MastodonScopeService.js';
 import { MastodonApiServerService } from './api/mastodon/MastodonApiServerService.js';
 import { MastodonEntityService } from './api/mastodon/MastodonEntityService.js';
@@ -112,6 +113,7 @@ import { SigninWithPasskeyApiService } from './api/SigninWithPasskeyApiService.j
 		OAuth2ProviderService,
 		MastodonApiCallService,
 		MastodonAuthenticateService,
+		MastodonNotificationService,
 		MastodonOAuthService,
 		MastodonScopeService,
 		MastodonApiServerService,

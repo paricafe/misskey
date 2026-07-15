@@ -8,6 +8,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import { ApiError } from '@/server/api/error.js';
 import { MastodonApiError } from './errors.js';
 import { MastodonApiServerService } from './MastodonApiServerService.js';
+import { MastodonNotificationService } from './MastodonNotificationService.js';
 
 describe(MastodonApiServerService, () => {
 	const servers: ReturnType<typeof Fastify>[] = [];
@@ -18,6 +19,7 @@ describe(MastodonApiServerService, () => {
 
 	function createServer() {
 		const auth = { kind: 'user', user: { id: 'user-id' }, token: { id: 'token-id', scopes: ['read'] } };
+		const dismissedNotifications = new Set<string>();
 		const authenticate = vi.fn().mockResolvedValue(auth);
 		const assert = vi.fn();
 		const nativeInvoke = vi.fn(async (name: string, data: Record<string, unknown> = {}, _viewer?: unknown, _request?: unknown) => {
@@ -46,10 +48,18 @@ describe(MastodonApiServerService, () => {
 			del: vi.fn().mockResolvedValue(1),
 			incr: vi.fn().mockResolvedValue(1),
 			expire: vi.fn().mockResolvedValue(1),
+			zadd: vi.fn(async (_key: string, _score: number, id: string) => {
+				dismissedNotifications.add(id);
+				return 1;
+			}),
+			zremrangebyscore: vi.fn().mockResolvedValue(0),
+			zremrangebyrank: vi.fn().mockResolvedValue(0),
+			zscore: vi.fn(async (_key: string, id: string) => dismissedNotifications.has(id) ? '1' : null),
 		};
 		const notesRepository = { findBy: vi.fn().mockResolvedValue([]) };
 		const noteFavoritesRepository = { findBy: vi.fn().mockResolvedValue([]) };
 		const userNotePiningsRepository = { findBy: vi.fn().mockResolvedValue([]) };
+		const mastodonNotificationService = new MastodonNotificationService(redis as never);
 		const service = new MastodonApiServerService(
 			{ url: 'https://misskey.example/', host: 'misskey.example', version: '2026.7.0', maxFileSize: 10_000_000 } as never,
 			{ name: 'Misskey Test', description: 'Test instance', langs: ['en'], bannerUrl: null } as never,
@@ -69,11 +79,17 @@ describe(MastodonApiServerService, () => {
 					poll: value.poll ?? null,
 				})),
 				poll: vi.fn((noteId, poll) => ({ id: noteId, votes_count: poll.choices.reduce((total: number, choice: { votes: number }) => total + choice.votes, 0) })),
+				notification: vi.fn(value => value.user == null ? null : {
+					id: value.id,
+					type: value.type ?? 'mention',
+					account: { id: value.user.id },
+				}),
 			} as never,
 			{
 				toMisskey: vi.fn().mockReturnValue({ limit: 20 }),
 				linkHeader: vi.fn().mockReturnValue('<next>; rel="next"'),
 			} as never,
+			mastodonNotificationService,
 			redis as never,
 		);
 		const fastify = Fastify();
@@ -94,6 +110,58 @@ describe(MastodonApiServerService, () => {
 			userNotePiningsRepository,
 		};
 	}
+
+	test('maps and applies notification type and account filters', async () => {
+		const { fastify, nativeInvoke } = createServer();
+		nativeInvoke.mockImplementation(async name => name === 'i/notifications' ? [
+			{ id: 'notification-a', type: 'mention', user: { id: 'account-a' } },
+			{ id: 'notification-b', type: 'mention', user: { id: 'account-b' } },
+		] : []);
+
+		const response = await fastify.inject({
+			method: 'GET',
+			url: '/api/v1/notifications?types[]=mention&types[]=favourite&exclude_types[]=follow&exclude_types[]=reblog&account_id=account-a',
+			headers: { authorization: 'Bearer user-token' },
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(response.json()).toEqual([
+			expect.objectContaining({ id: 'notification-a', account: { id: 'account-a' } }),
+		]);
+		expect(nativeInvoke).toHaveBeenCalledWith('i/notifications', {
+			limit: 20,
+			markAsRead: false,
+			includeTypes: ['mention', 'reply', 'note', 'quote', 'reaction'],
+			excludeTypes: ['follow', 'followRequestAccepted', 'renote'],
+		}, expect.any(Object), expect.any(Object));
+	});
+
+	test('dismisses one notification without deleting native notifications', async () => {
+		const { fastify, assert, nativeInvoke } = createServer();
+		nativeInvoke.mockImplementation(async name => name === 'i/notifications' ? [
+			{ id: 'notification-a', type: 'mention', user: { id: 'account-a' } },
+			{ id: 'notification-b', type: 'mention', user: { id: 'account-b' } },
+		] : []);
+		const headers = { authorization: 'Bearer user-token' };
+
+		const dismissed = await fastify.inject({
+			method: 'POST',
+			url: '/api/v1/notifications/notification-a/dismiss',
+			headers,
+		});
+		const list = await fastify.inject({ method: 'GET', url: '/api/v1/notifications', headers });
+		const single = await fastify.inject({ method: 'GET', url: '/api/v1/notifications/notification-a', headers });
+
+		expect(dismissed.statusCode).toBe(200);
+		expect(dismissed.json()).toEqual({});
+		expect(list.statusCode).toBe(200);
+		expect(list.json()).toEqual([
+			expect.objectContaining({ id: 'notification-b' }),
+		]);
+		expect(single.statusCode).toBe(404);
+		expect(assert).toHaveBeenCalledWith(['read'], 'write:notifications');
+		expect(nativeInvoke).not.toHaveBeenCalledWith(expect.stringContaining('delete'), expect.anything(), expect.anything(), expect.anything());
+	});
 
 	test('registers Mastodon applications from JSON', async () => {
 		const { fastify, registerApplication } = createServer();

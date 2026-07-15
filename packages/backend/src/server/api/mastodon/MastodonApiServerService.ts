@@ -25,6 +25,7 @@ import { MastodonApiCallService } from './MastodonApiCallService.js';
 import { MastodonAuthenticateService } from './MastodonAuthenticateService.js';
 import { MastodonEntityService } from './MastodonEntityService.js';
 import { MastodonOAuthService } from './MastodonOAuthService.js';
+import { MastodonNotificationService } from './MastodonNotificationService.js';
 import { MastodonPaginationService } from './MastodonPaginationService.js';
 import { MastodonScopeService } from './MastodonScopeService.js';
 import { MastodonApiError, sendMastodonError } from './errors.js';
@@ -59,6 +60,7 @@ export class MastodonApiServerService {
 		private mastodonApiCallService: MastodonApiCallService,
 		private mastodonEntityService: MastodonEntityService,
 		private mastodonPaginationService: MastodonPaginationService,
+		private mastodonNotificationService: MastodonNotificationService,
 
 		@Inject(DI.redis)
 		private redis: Redis.Redis,
@@ -404,11 +406,21 @@ export class MastodonApiServerService {
 
 	private registerNotifications(fastify: FastifyInstance): void {
 		fastify.get('/api/v1/notifications', (request, reply) => this.withAuth(request as MastodonRequest, 'read:notifications', async auth => {
+			const query = request.query as Dictionary;
+			const includeTypes = this.strings(query['types[]'] ?? query.types);
+			const excludeTypes = this.strings(query['exclude_types[]'] ?? query.exclude_types);
+			const includeMisskeyTypes = this.mastodonNotificationService.toMisskeyTypes(includeTypes).filter(type => type !== 'reaction:grouped' && type !== 'renote:grouped');
+			const excludeMisskeyTypes = this.mastodonNotificationService.toMisskeyTypes(excludeTypes).filter(type => type !== 'reaction:grouped' && type !== 'renote:grouped');
 			const notifications = await this.invoke('i/notifications', {
-				...this.mastodonPaginationService.toMisskey(request.query as Dictionary, 100),
+				...this.mastodonPaginationService.toMisskey(query, 100),
 				markAsRead: false,
+				...(includeTypes.length > 0 ? { includeTypes: includeMisskeyTypes } : {}),
+				...(excludeTypes.length > 0 ? { excludeTypes: excludeMisskeyTypes } : {}),
 			}, auth, request as MastodonRequest) as Packed<'Notification'>[];
-			const converted = notifications.map(notification => this.mastodonEntityService.notification(notification)).filter(value => value != null);
+			let converted = notifications.map(notification => this.mastodonEntityService.notification(notification)).filter(value => value != null);
+			const accountId = this.string(query.account_id);
+			if (accountId != null) converted = converted.filter(notification => notification.account.id === accountId);
+			converted = await this.mastodonNotificationService.filterDismissed(auth.user.id, converted);
 			return this.page(request, reply, notifications, converted);
 		}));
 		fastify.get<{ Params: { id: string } }>('/api/v1/notifications/:id', request => this.withAuth(request as MastodonRequest, 'read:notifications', async auth => {
@@ -416,7 +428,13 @@ export class MastodonApiServerService {
 			const notification = notifications.find(value => value.id === request.params.id);
 			const converted = notification == null ? null : this.mastodonEntityService.notification(notification);
 			if (converted == null) throw new MastodonApiError(404, 'not_found', 'Notification not found');
-			return converted;
+			const [visible] = await this.mastodonNotificationService.filterDismissed(auth.user.id, [converted]);
+			if (visible == null) throw new MastodonApiError(404, 'not_found', 'Notification not found');
+			return visible;
+		}));
+		fastify.post<{ Params: { id: string } }>('/api/v1/notifications/:id/dismiss', request => this.withAuth(request as MastodonRequest, 'write:notifications', async auth => {
+			await this.mastodonNotificationService.dismiss(auth.user.id, request.params.id);
+			return {};
 		}));
 		fastify.post('/api/v1/notifications/clear', request => this.withAuth(request as MastodonRequest, 'write:notifications', async auth => {
 			await this.invoke('notifications/mark-all-as-read', {}, auth, request as MastodonRequest);
