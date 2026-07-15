@@ -29,6 +29,7 @@ export class MastodonEntityService {
 		const description = user.description ?? '';
 		const fields = user.fields ?? [];
 		const avatar = user.avatarUrl ?? new URL(`/avatar/@${encodeURIComponent(host == null ? user.username : `${user.username}@${host}`)}`, this.config.url).toString();
+		const header = user.bannerUrl ?? new URL('/static-assets/user-unknown.png', this.config.url).toString();
 
 		return {
 			id: user.id,
@@ -46,8 +47,8 @@ export class MastodonEntityService {
 			uri: user.uri ?? url,
 			avatar,
 			avatar_static: avatar,
-			header: user.bannerUrl ?? '',
-			header_static: user.bannerUrl ?? '',
+			header,
+			header_static: header,
 			followers_count: user.followersCount ?? 0,
 			following_count: user.followingCount ?? 0,
 			statuses_count: user.notesCount ?? 0,
@@ -197,6 +198,38 @@ export class MastodonEntityService {
 			title: list.name,
 			replies_policy: 'list',
 			exclusive: false,
+		};
+	}
+
+	public tag(name: string) {
+		return {
+			name,
+			url: new URL(`/tags/${encodeURIComponent(name)}`, this.config.url).toString(),
+			history: [],
+		};
+	}
+
+	public trendLink(url: string) {
+		return {
+			url,
+			title: url,
+			description: '',
+			language: '',
+			type: 'link',
+			authors: [],
+			author_name: '',
+			author_url: '',
+			provider_name: '',
+			provider_url: '',
+			html: '',
+			width: 0,
+			height: 0,
+			image: null,
+			image_description: '',
+			embed_url: '',
+			blurhash: null,
+			published_at: null,
+			history: [],
 		};
 	}
 

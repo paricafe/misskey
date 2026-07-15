@@ -89,6 +89,50 @@ describe(MastodonEntityService, () => {
 		expect(account.fields).toEqual([expect.objectContaining({ name: 'site', value: expect.any(String) })]);
 	});
 
+	test('uses an absolute local header fallback for an account without a banner', () => {
+		const userWithoutBanner = {
+			...user,
+			bannerUrl: null,
+		};
+		const account = service.account(userWithoutBanner as never);
+
+		expect(account.header).not.toBe('');
+		expect(account.header_static).toBe(account.header);
+		expect(new URL(account.header).origin).toBe('https://misskey.example');
+	});
+
+	test('converts a tag name to a Mastodon tag entity', () => {
+		expect(service.tag('Fediverse')).toEqual({
+			name: 'Fediverse',
+			url: 'https://misskey.example/tags/Fediverse',
+			history: [],
+		});
+	});
+
+	test('converts a URL to a complete Mastodon trend link entity', () => {
+		expect(service.trendLink('https://example.com/article')).toEqual({
+			url: 'https://example.com/article',
+			title: 'https://example.com/article',
+			description: '',
+			language: '',
+			type: 'link',
+			authors: [],
+			author_name: '',
+			author_url: '',
+			provider_name: '',
+			provider_url: '',
+			html: '',
+			width: 0,
+			height: 0,
+			image: null,
+			image_description: '',
+			embed_url: '',
+			blurhash: null,
+			published_at: null,
+			history: [],
+		});
+	});
+
 	test('returns credential source fields and status mentions required by Mastodon clients', () => {
 		const credential = service.credentialAccount(user as never);
 		expect(credential.source).toMatchObject({
