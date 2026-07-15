@@ -29,4 +29,52 @@ describe(MastodonPaginationService, () => {
 	test('omits Link relations for an empty page', () => {
 		expect(service.linkHeader('https://misskey.example/api/v1/timelines/home', [])).toBeNull();
 	});
+
+	test('builds only a next offset Link relation for the first page with more results', () => {
+		expect(service.offsetLinkHeader(
+			'https://misskey.example/api/v1/trends/tags?limit=10',
+			0,
+			10,
+			true,
+		)).toBe('<https://misskey.example/api/v1/trends/tags?limit=10&offset=10>; rel="next"');
+	});
+
+	test('builds next and previous offset Link relations for a middle page with more results', () => {
+		expect(service.offsetLinkHeader(
+			'https://misskey.example/api/v1/trends/tags?limit=10&offset=10',
+			10,
+			10,
+			true,
+		)).toBe('<https://misskey.example/api/v1/trends/tags?limit=10&offset=20>; rel="next", <https://misskey.example/api/v1/trends/tags?limit=10>; rel="prev"');
+	});
+
+	test('builds only a previous offset Link relation for a final non-first page', () => {
+		expect(service.offsetLinkHeader(
+			'https://misskey.example/api/v1/trends/tags?limit=10&offset=20',
+			20,
+			10,
+			false,
+		)).toBe('<https://misskey.example/api/v1/trends/tags?limit=10&offset=10>; rel="prev"');
+	});
+
+	test('omits offset Link relations for a first and final page', () => {
+		expect(service.offsetLinkHeader(
+			'https://misskey.example/api/v1/trends/tags?limit=10',
+			0,
+			10,
+			false,
+		)).toBeNull();
+	});
+
+	test('preserves unrelated query parameters in offset Link relations', () => {
+		const header = service.offsetLinkHeader(
+			'https://misskey.example/api/v1/trends/tags?limit=10&offset=10&language=ja&local=true',
+			10,
+			10,
+			true,
+		);
+
+		expect(header).toContain('<https://misskey.example/api/v1/trends/tags?limit=10&offset=20&language=ja&local=true>; rel="next"');
+		expect(header).toContain('<https://misskey.example/api/v1/trends/tags?limit=10&language=ja&local=true>; rel="prev"');
+	});
 });
