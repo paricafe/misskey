@@ -528,8 +528,20 @@ export class MastodonApiServerService {
 				throw new MastodonApiError(400, 'invalid_request', 'type must be accounts, hashtags, or statuses');
 			}
 			const resolve = this.boolean(query.resolve);
-			const requiresUser = resolve || Object.hasOwn(query, 'offset');
+			const following = this.boolean(query.following);
+			const excludeUnreviewed = this.boolean(query.exclude_unreviewed);
+			if (excludeUnreviewed && (type == null || type === 'hashtags')) {
+				throw new MastodonApiError(422, 'unprocessable_entity', 'exclude_unreviewed is not supported for hashtag searches');
+			}
+			const requiresUser = resolve || following || Object.hasOwn(query, 'offset');
 			const search = async (auth: MastodonUserAuth | null) => {
+				const limit = this.integer(query.limit, 20, 1, 40);
+				const offset = type == null ? 0 : this.integer(query.offset, 0, 0);
+				const accountsInScope = type == null || type === 'accounts';
+				const usesStatusOffset = type === 'statuses' && Object.hasOwn(query, 'offset');
+				if (((following && accountsInScope) || usesStatusOffset) && offset + limit > 100) {
+					throw new MastodonApiError(422, 'unprocessable_entity', 'The requested search window exceeds 100 results');
+				}
 				if (resolve && auth != null && this.isHttpUrl(q)) {
 					let result: { type: 'Note'; object: Packed<'Note'> } | { type: 'User'; object: Packed<'UserDetailed'> } | null;
 					try {
@@ -552,19 +564,19 @@ export class MastodonApiServerService {
 					};
 				}
 
-				const limit = this.integer(query.limit, 20, 1, 40);
-				const offset = this.integer(query.offset, 0, 0);
 				const accountId = this.string(query.account_id);
 				const untilId = this.string(query.max_id);
 				const sinceId = this.string(query.min_id);
 				const [accounts, statuses, hashtags] = await Promise.all([
-					type == null || type === 'accounts'
-						? this.invokePublic('users/search', { query: q, limit, offset }, auth, request as MastodonRequest) as Promise<Packed<'UserDetailed'>[]>
+					accountsInScope
+						? this.invokePublic('users/search', following
+							? { query: q, limit: 100, offset: 0, detail: true }
+							: { query: q, limit, offset }, auth, request as MastodonRequest) as Promise<Packed<'UserDetailed'>[]>
 						: Promise.resolve([]),
 					type == null || type === 'statuses'
 						? this.invokePublic('notes/search', {
 							query: q,
-							limit,
+							limit: usesStatusOffset ? offset + limit : limit,
 							...(accountId != null && accountId !== '' ? { userId: accountId } : {}),
 							...(untilId != null && untilId !== '' ? { untilId } : {}),
 							...(sinceId != null && sinceId !== '' ? { sinceId } : {}),
@@ -574,9 +586,15 @@ export class MastodonApiServerService {
 						? this.invokePublic('hashtags/search', { query: q, limit, offset }, auth, request as MastodonRequest) as Promise<string[]>
 						: Promise.resolve([]),
 				]);
+				const visibleAccounts = following
+					? accounts.filter(user => user.isFollowing === true).slice(offset, offset + limit)
+					: accounts;
+				const visibleStatuses = usesStatusOffset
+					? statuses.slice(offset, offset + limit)
+					: statuses;
 				return {
-					accounts: accounts.map(user => this.mastodonEntityService.account(user)),
-					statuses: await this.statusesWithState(statuses, auth),
+					accounts: visibleAccounts.map(user => this.mastodonEntityService.account(user)),
+					statuses: await this.statusesWithState(visibleStatuses, auth),
 					hashtags: hashtags.map(hashtag => this.mastodonEntityService.tag(hashtag)),
 				};
 			};

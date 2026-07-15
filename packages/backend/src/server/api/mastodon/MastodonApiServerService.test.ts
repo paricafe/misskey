@@ -572,7 +572,7 @@ describe(MastodonApiServerService, () => {
 		expect(publicInvoke).not.toHaveBeenCalled();
 	});
 
-	test('translates Mastodon search filters to the native searches that support them', async () => {
+	test('translates Mastodon search filters while ignoring offset for an untyped search after authentication', async () => {
 		const { fastify, publicInvoke } = createServer();
 
 		const response = await fastify.inject({
@@ -585,7 +585,7 @@ describe(MastodonApiServerService, () => {
 		expect(publicInvoke).toHaveBeenCalledWith('users/search', {
 			query: 'fediverse',
 			limit: 39,
-			offset: 7,
+			offset: 0,
 		}, expect.any(Object), expect.any(Object));
 		expect(publicInvoke).toHaveBeenCalledWith('notes/search', {
 			query: 'fediverse',
@@ -597,8 +597,195 @@ describe(MastodonApiServerService, () => {
 		expect(publicInvoke).toHaveBeenCalledWith('hashtags/search', {
 			query: 'fediverse',
 			limit: 39,
+			offset: 0,
+		}, expect.any(Object), expect.any(Object));
+	});
+
+	test.each([
+		['accounts', 'users/search'],
+		['hashtags', 'hashtags/search'],
+	] as const)('passes offset to the native %s search when following is false', async (type, endpoint) => {
+		const { fastify, publicInvoke } = createServer();
+
+		const response = await fastify.inject({
+			method: 'GET',
+			url: `/api/v2/search?q=fediverse&type=${type}&limit=3&offset=7`,
+			headers: { authorization: 'Bearer user-token' },
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(publicInvoke).toHaveBeenCalledWith(endpoint, {
+			query: 'fediverse',
+			limit: 3,
 			offset: 7,
 		}, expect.any(Object), expect.any(Object));
+	});
+
+	test('requires a user token for following-only account search', async () => {
+		const { fastify, nativeInvoke, publicInvoke } = createServer();
+
+		const response = await fastify.inject({ method: 'GET', url: '/api/v2/search?q=fediverse&type=accounts&following=true' });
+
+		expect(response.statusCode).toBe(401);
+		expect(nativeInvoke).not.toHaveBeenCalled();
+		expect(publicInvoke).not.toHaveBeenCalled();
+	});
+
+	test('rejects an application token for following-only account search', async () => {
+		const { fastify, authenticate, nativeInvoke, publicInvoke } = createServer();
+		authenticate.mockResolvedValue({ kind: 'application', token: { id: 'app-token', scopes: ['read'] } });
+
+		const response = await fastify.inject({
+			method: 'GET',
+			url: '/api/v2/search?q=fediverse&type=accounts&following=true',
+			headers: { authorization: 'Bearer app-token' },
+		});
+
+		expect(response.statusCode).toBe(422);
+		expect(nativeInvoke).not.toHaveBeenCalled();
+		expect(publicInvoke).not.toHaveBeenCalled();
+	});
+
+	test('requires the read:search scope for following-only account search', async () => {
+		const { fastify, assert, nativeInvoke, publicInvoke } = createServer();
+		assert.mockImplementation(() => {
+			throw new MastodonApiError(403, 'insufficient_scope', 'Scope read:search is required');
+		});
+
+		const response = await fastify.inject({
+			method: 'GET',
+			url: '/api/v2/search?q=fediverse&type=accounts&following=true',
+			headers: { authorization: 'Bearer user-token' },
+		});
+
+		expect(response.statusCode).toBe(403);
+		expect(assert).toHaveBeenCalledWith(['read'], 'read:search');
+		expect(nativeInvoke).not.toHaveBeenCalled();
+		expect(publicInvoke).not.toHaveBeenCalled();
+	});
+
+	test('filters a bounded detailed account search to followed users before applying offset and limit', async () => {
+		const { fastify, assert, nativeInvoke, publicInvoke } = createServer();
+		nativeInvoke.mockImplementation(async name => name === 'users/search' ? [
+			{ id: 'followed-0', username: 'followed0', isFollowing: true },
+			{ id: 'unfollowed', username: 'unfollowed', isFollowing: false },
+			{ id: 'followed-1', username: 'followed1', isFollowing: true },
+			{ id: 'followed-2', username: 'followed2', isFollowing: true },
+		] : []);
+
+		const response = await fastify.inject({
+			method: 'GET',
+			url: '/api/v2/search?q=fediverse&type=accounts&following=true&offset=1&limit=2',
+			headers: { authorization: 'Bearer user-token' },
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(response.json()).toEqual({
+			accounts: [
+				{ id: 'followed-1', username: 'followed1' },
+				{ id: 'followed-2', username: 'followed2' },
+			],
+			statuses: [],
+			hashtags: [],
+		});
+		expect(assert).toHaveBeenCalledWith(['read'], 'read:search');
+		expect(publicInvoke).toHaveBeenCalledWith('users/search', {
+			query: 'fediverse',
+			limit: 100,
+			offset: 0,
+			detail: true,
+		}, expect.any(Object), expect.any(Object));
+	});
+
+	test('keeps following authentication semantic when accounts are excluded without filtering statuses', async () => {
+		const { fastify, assert, nativeInvoke, publicInvoke } = createServer();
+		nativeInvoke.mockImplementation(async name => name === 'notes/search' ? [{ id: 'note-a' }] : []);
+
+		const response = await fastify.inject({
+			method: 'GET',
+			url: '/api/v2/search?q=fediverse&type=statuses&following=true',
+			headers: { authorization: 'Bearer user-token' },
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(response.json()).toEqual({ accounts: [], statuses: [expect.objectContaining({ id: 'note-a' })], hashtags: [] });
+		expect(assert).toHaveBeenCalledWith(['read'], 'read:search');
+		expect(publicInvoke).toHaveBeenCalledWith('notes/search', { query: 'fediverse', limit: 20 }, expect.any(Object), expect.any(Object));
+		expect(publicInvoke).not.toHaveBeenCalledWith('users/search', expect.anything(), expect.anything(), expect.anything());
+	});
+
+	test.each([
+		'',
+		'&type=hashtags',
+	])('rejects exclude_unreviewed for hashtag results before native dispatch: %s', async typeQuery => {
+		const { fastify, nativeInvoke, publicInvoke } = createServer();
+
+		const response = await fastify.inject({
+			method: 'GET',
+			url: `/api/v2/search?q=fediverse&exclude_unreviewed=true${typeQuery}`,
+		});
+
+		expect(response.statusCode).toBe(422);
+		expect(response.json()).toEqual({ error: 'exclude_unreviewed is not supported for hashtag searches' });
+		expect(nativeInvoke).not.toHaveBeenCalled();
+		expect(publicInvoke).not.toHaveBeenCalled();
+	});
+
+	test.each([
+		['accounts', 'users/search'],
+		['statuses', 'notes/search'],
+	] as const)('ignores exclude_unreviewed when type=%s excludes hashtag results', async (type, endpoint) => {
+		const { fastify, publicInvoke } = createServer();
+
+		const response = await fastify.inject({ method: 'GET', url: `/api/v2/search?q=fediverse&exclude_unreviewed=true&type=${type}` });
+
+		expect(response.statusCode).toBe(200);
+		expect(publicInvoke).toHaveBeenCalledWith(endpoint, expect.any(Object), null, expect.any(Object));
+	});
+
+	test('applies status offset locally after requesting the bounded native result window', async () => {
+		const { fastify, nativeInvoke, publicInvoke } = createServer();
+		nativeInvoke.mockImplementation(async (name, data) => name === 'notes/search'
+			? Array.from({ length: data.limit as number }, (_, index) => ({ id: `note-${index}` }))
+			: []);
+
+		const response = await fastify.inject({
+			method: 'GET',
+			url: '/api/v2/search?q=fediverse&type=statuses&account_id=user-a&max_id=older&min_id=newer&offset=2&limit=2',
+			headers: { authorization: 'Bearer user-token' },
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(response.json()).toEqual({
+			accounts: [],
+			statuses: [expect.objectContaining({ id: 'note-2' }), expect.objectContaining({ id: 'note-3' })],
+			hashtags: [],
+		});
+		expect(publicInvoke).toHaveBeenCalledWith('notes/search', {
+			query: 'fediverse',
+			limit: 4,
+			userId: 'user-a',
+			untilId: 'older',
+			sinceId: 'newer',
+		}, expect.any(Object), expect.any(Object));
+	});
+
+	test.each([
+		'/api/v2/search?q=fediverse&type=statuses&offset=61&limit=40',
+		'/api/v2/search?q=fediverse&type=accounts&following=true&offset=61&limit=40',
+	])('rejects a bounded local search window larger than 100 before native dispatch: %s', async url => {
+		const { fastify, nativeInvoke, publicInvoke } = createServer();
+
+		const response = await fastify.inject({
+			method: 'GET',
+			url,
+			headers: { authorization: 'Bearer user-token' },
+		});
+
+		expect(response.statusCode).toBe(422);
+		expect(response.json()).toEqual({ error: 'The requested search window exceeds 100 results' });
+		expect(nativeInvoke).not.toHaveBeenCalled();
+		expect(publicInvoke).not.toHaveBeenCalled();
 	});
 
 	test.each([
