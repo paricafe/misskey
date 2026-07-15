@@ -928,19 +928,32 @@ describe(MastodonApiServerService, () => {
 	});
 
 	test.each([
-		'any[]',
-		'all[]',
-		'none[]',
-	])('rejects unsupported non-empty %s hashtag timeline filters before native invocation', async filter => {
+		['mixed any aliases', 'any%5B%5D=&any=activitypub'],
+		['plain all key', 'all=activitypub'],
+		['repeated none[] values', 'none%5B%5D=activitypub&none%5B%5D=fediverse'],
+	])('rejects unsupported non-empty %s before native hashtag timeline invocation', async (_case, query) => {
 		const { fastify, publicInvoke } = createServer();
 		const response = await fastify.inject({
 			method: 'GET',
-			url: `/api/v1/timelines/tag/fediverse?${encodeURIComponent(filter)}=activitypub`,
+			url: `/api/v1/timelines/tag/fediverse?${query}`,
 		});
 
 		expect(response.statusCode).toBe(422);
 		expect(response.json()).toEqual({ error: 'Compound tag filters are not supported' });
 		expect(publicInvoke).not.toHaveBeenCalled();
+	});
+
+	test('accepts empty and whitespace-only compound hashtag filters', async () => {
+		const { fastify, publicInvoke } = createServer();
+		const response = await fastify.inject({
+			method: 'GET',
+			url: '/api/v1/timelines/tag/fediverse?any%5B%5D=&any=%20%20&all=&none%5B%5D=%20',
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(publicInvoke).toHaveBeenCalledWith('notes/search-by-tag', expect.objectContaining({
+			tag: 'fediverse',
+		}), null, expect.any(Object));
 	});
 
 	test('rejects unsupported remote-only public and hashtag timelines', async () => {
