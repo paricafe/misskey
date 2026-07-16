@@ -47,14 +47,24 @@ export class MastodonEntityService {
 			uri: user.uri ?? url,
 			avatar,
 			avatar_static: avatar,
+			avatar_description: '',
 			header,
 			header_static: header,
+			header_description: '',
 			followers_count: user.followersCount ?? 0,
 			following_count: user.followingCount ?? 0,
 			statuses_count: user.notesCount ?? 0,
 			last_status_at: null,
 			hide_collections: false,
 			noindex: true,
+			show_media: true,
+			show_media_replies: true,
+			show_featured: true,
+			feature_approval: {
+				automatic: [],
+				manual: [],
+				current_user: null,
+			},
 			emojis: this.emojis(user.emojis),
 			roles: [],
 			fields: fields.map(field => ({
@@ -62,6 +72,37 @@ export class MastodonEntityService {
 				value: this.render(field.value),
 				verified_at: user.verifiedLinks?.includes(field.value) ? user.createdAt ?? null : null,
 			})),
+		};
+	}
+
+	public profile(user: Packed<'MeDetailed'>) {
+		const note = user.description ?? '';
+		const fields = (user.fields ?? []).map(field => ({ name: field.name, value: field.value }));
+		const formattedFields = fields.map(field => ({ name: field.name, value: this.render(field.value) }));
+
+		return {
+			id: user.id,
+			display_name: user.name ?? user.username,
+			note,
+			fields,
+			formatted_note: this.render(note),
+			formatted_fields: formattedFields,
+			avatar: user.avatarUrl ?? null,
+			avatar_static: user.avatarUrl ?? null,
+			avatar_description: '',
+			header: user.bannerUrl ?? null,
+			header_static: user.bannerUrl ?? null,
+			header_description: '',
+			locked: user.isLocked ?? false,
+			bot: user.isBot ?? false,
+			hide_collections: false,
+			discoverable: user.isExplorable ?? false,
+			indexable: false,
+			show_media: true,
+			show_media_replies: true,
+			show_featured: true,
+			attribution_domains: [],
+			featured_tags: [],
 		};
 	}
 
@@ -75,6 +116,11 @@ export class MastodonEntityService {
 				note: user.description ?? '',
 				fields: (user.fields ?? []).map(field => ({ name: field.name, value: field.value })),
 				follow_requests_count: 0,
+				hide_collections: false,
+				discoverable: user.isExplorable ?? false,
+				indexable: false,
+				attribution_domains: [],
+				quote_policy: 'public',
 			},
 			role: null,
 		};

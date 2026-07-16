@@ -71,7 +71,7 @@ export class MastodonApiServerService {
 	public createServer(fastify: FastifyInstance, _options: FastifyPluginOptions, done: (error?: Error) => void): void {
 		fastify.register(cors, { origin: '*' });
 		fastify.register(multipart, {
-			limits: { fileSize: this.config.maxFileSize, files: 1 },
+			limits: { fileSize: this.config.maxFileSize, files: 2 },
 		});
 		fastify.addContentTypeParser('application/x-www-form-urlencoded', { parseAs: 'string' }, (_request, body, parserDone) => {
 			try {
@@ -177,6 +177,7 @@ export class MastodonApiServerService {
 			'reading:expand:media': 'default',
 			'reading:expand:spoilers': false,
 		} as Dictionary)));
+		this.registerProfile(fastify);
 		fastify.get('/api/v1/accounts', request => this.withOptionalUser(request as MastodonRequest, 'read:accounts', async auth => {
 			const users = await this.invokePublicBatch(
 				'users/show',
@@ -659,6 +660,183 @@ export class MastodonApiServerService {
 				},
 			});
 		}
+	}
+
+	private registerProfile(fastify: FastifyInstance): void {
+		fastify.get('/api/v1/profile', request => this.withAuth(request as MastodonRequest, ['profile', 'read:accounts'], async auth => {
+			const user = await this.invoke('i', {}, auth, request as MastodonRequest);
+			return this.mastodonEntityService.profile(user as Packed<'MeDetailed'>);
+		}));
+		fastify.patch('/api/v1/profile', request => this.updateProfile(request as MastodonRequest, 'profile'));
+		fastify.patch('/api/v1/accounts/update_credentials', request => this.updateProfile(request as MastodonRequest, 'credential-account'));
+
+		for (const [kind, update] of [
+			['avatar', { avatarId: null }],
+			['header', { bannerId: null }],
+		] as const) {
+			fastify.delete(`/api/v1/profile/${kind}`, request => this.withAuth(request as MastodonRequest, 'write:accounts', async auth => {
+				await this.invoke('i/update', update, auth, request as MastodonRequest);
+				const user = await this.invoke('i', {}, auth, request as MastodonRequest);
+				return this.mastodonEntityService.profile(user as Packed<'MeDetailed'>);
+			}));
+		}
+	}
+
+	private async updateProfile(request: MastodonRequest, response: 'profile' | 'credential-account'): Promise<Dictionary> {
+		return await this.withAuth(request, 'write:accounts', async auth => {
+			let body = request.body ?? {};
+			const uploads: Array<{ fieldname: 'avatar' | 'header'; filename: string; path: string }> = [];
+			const cleanups: Array<() => void> = [];
+			try {
+				if (request.isMultipart()) {
+					body = {};
+					const fileFields = new Set<string>();
+					for await (const part of request.parts()) {
+						if (part.type !== 'file') {
+							const current = body[part.fieldname];
+							body[part.fieldname] = current == null
+								? part.value
+								: Array.isArray(current)
+									? [...current, part.value]
+									: [current, part.value];
+							continue;
+						}
+						if (part.fieldname !== 'avatar' && part.fieldname !== 'header') {
+							part.file.resume();
+							throw new MastodonApiError(400, 'invalid_request', `Unexpected file field: ${part.fieldname}`);
+						}
+						if (fileFields.has(part.fieldname)) {
+							part.file.resume();
+							throw new MastodonApiError(400, 'invalid_request', `Duplicate file field: ${part.fieldname}`);
+						}
+						fileFields.add(part.fieldname);
+						const [path, cleanup] = await createTemp();
+						cleanups.push(cleanup);
+						await pipeline(part.file, fs.createWriteStream(path));
+						if (part.file.truncated) throw new MastodonApiError(413, 'file_too_large', 'File is too large');
+						uploads.push({ fieldname: part.fieldname, filename: part.filename, path });
+					}
+				}
+
+				const update = this.profileUpdateData(body);
+				for (const upload of uploads) {
+					const file = await this.mastodonApiCallService.invoke('drive/files/create', {
+						name: upload.filename,
+					}, auth, request, { name: upload.filename, path: upload.path }) as Packed<'DriveFile'>;
+					update[upload.fieldname === 'avatar' ? 'avatarId' : 'bannerId'] = file.id;
+				}
+				await this.invoke('i/update', update, auth, request);
+				const user = await this.invoke('i', {}, auth, request) as Packed<'MeDetailed'>;
+				return response === 'profile'
+					? this.mastodonEntityService.profile(user)
+					: this.mastodonEntityService.credentialAccount(user);
+			} finally {
+				for (const cleanup of cleanups) cleanup();
+			}
+		});
+	}
+
+	private profileUpdateData(body: Dictionary): Dictionary {
+		const update: Dictionary = {};
+		const assignString = (source: string, target: string) => {
+			if (!Object.hasOwn(body, source)) return;
+			if (body[source] == null) {
+				update[target] = null;
+				return;
+			}
+			const value = this.string(body[source]);
+			if (value == null) throw new MastodonApiError(400, 'invalid_request', `${source} must be a string`);
+			update[target] = value;
+		};
+		const assignBoolean = (source: string, target: string) => {
+			if (!Object.hasOwn(body, source)) return;
+			update[target] = this.profileBoolean(body[source], source);
+		};
+		assignString('display_name', 'name');
+		assignString('note', 'description');
+		assignBoolean('locked', 'isLocked');
+		assignBoolean('discoverable', 'isExplorable');
+		assignBoolean('bot', 'isBot');
+
+		const fields = this.profileFields(body);
+		if (fields != null) update.fields = fields;
+
+		const source = body.source != null && typeof body.source === 'object' && !Array.isArray(body.source)
+			? body.source as Dictionary
+			: {};
+		const nested = (name: string): { present: boolean; value: unknown } => {
+			const flat = `source[${name}]`;
+			if (Object.hasOwn(body, flat)) return { present: true, value: body[flat] };
+			return Object.hasOwn(source, name) ? { present: true, value: source[name] } : { present: false, value: undefined };
+		};
+		const unsupported = (name: string) => {
+			throw new MastodonApiError(422, 'unprocessable_entity', `${name} is not supported by this server`);
+		};
+
+		const privacy = nested('privacy');
+		if (privacy.present && privacy.value !== 'public') unsupported('source[privacy]');
+		const sensitive = nested('sensitive');
+		if (sensitive.present && this.profileBoolean(sensitive.value, 'source[sensitive]') !== false) unsupported('source[sensitive]');
+		const language = nested('language');
+		if (language.present && language.value != null && language.value !== '') unsupported('source[language]');
+
+		for (const name of ['avatar_description', 'header_description'] as const) {
+			if (!Object.hasOwn(body, name)) continue;
+			if (body[name] != null && body[name] !== '') unsupported(name);
+		}
+		for (const [name, defaultValue] of [
+			['hide_collections', false],
+			['indexable', false],
+			['show_media', true],
+			['show_media_replies', true],
+			['show_featured', true],
+		] as const) {
+			if (!Object.hasOwn(body, name)) continue;
+			if (this.profileBoolean(body[name], name) !== defaultValue) unsupported(name);
+		}
+		const domainsKey = Object.hasOwn(body, 'attribution_domains[]') ? 'attribution_domains[]' : 'attribution_domains';
+		if (Object.hasOwn(body, domainsKey) && this.strings(body[domainsKey]).length > 0) unsupported('attribution_domains');
+
+		return update;
+	}
+
+	private profileFields(body: Dictionary): Array<{ name: string; value: string }> | undefined {
+		const entries = new Map<number, Dictionary>();
+		let present = Object.hasOwn(body, 'fields_attributes');
+		const direct = body.fields_attributes;
+		if (Array.isArray(direct)) {
+			direct.forEach((field, index) => {
+				if (field != null && typeof field === 'object' && !Array.isArray(field)) entries.set(index, field as Dictionary);
+			});
+		} else if (direct != null && typeof direct === 'object') {
+			for (const [index, field] of Object.entries(direct)) {
+				if (/^\d+$/u.test(index) && field != null && typeof field === 'object' && !Array.isArray(field)) {
+					entries.set(Number(index), field as Dictionary);
+				}
+			}
+		}
+		for (const [key, value] of Object.entries(body)) {
+			const match = /^fields_attributes\[(\d+)\]\[(name|value)\]$/u.exec(key);
+			if (match == null) continue;
+			present = true;
+			const index = Number(match[1]);
+			const field = entries.get(index) ?? {};
+			field[match[2]] = value;
+			entries.set(index, field);
+		}
+		if (!present) return undefined;
+		return [...entries.entries()].sort(([a], [b]) => a - b).map(([, field]) => {
+			const name = this.string(field.name);
+			const value = this.string(field.value);
+			if (name == null || value == null) throw new MastodonApiError(400, 'invalid_request', 'Profile fields require name and value');
+			return { name, value };
+		});
+	}
+
+	private profileBoolean(value: unknown, name: string): boolean {
+		if (value === true || value === 1 || value === '1' || value === 'true' || value === 'on') return true;
+		if (value === false || value === 0 || value === '0' || value === 'false' || value === 'off') return false;
+		throw new MastodonApiError(400, 'invalid_request', `${name} must be a boolean`);
 	}
 
 	private validateCompatibilityRequest(route: MastodonContractRoute, request: MastodonRequest): void {

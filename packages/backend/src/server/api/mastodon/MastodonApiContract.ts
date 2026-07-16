@@ -169,7 +169,7 @@ export const MASTODON_4_6_USER_ROUTES: readonly MastodonContractRoute[] = [
 	unsupported('POST', '/api/v1/accounts', 'token', 'write:accounts', 'Token', '2.7.0', ['username', 'email', 'password', 'agreement']),
 	implemented('GET', '/api/v1/accounts/:id', 'public', 'read:accounts', 'Account'),
 	implemented('GET', '/api/v1/accounts/verify_credentials', 'user', 'read:accounts', 'CredentialAccount'),
-	unsupported('PATCH', '/api/v1/accounts/update_credentials', 'user', 'write:accounts', 'CredentialAccount'),
+	implemented('PATCH', '/api/v1/accounts/update_credentials', 'user', 'write:accounts', 'CredentialAccount'),
 	implemented('GET', '/api/v1/accounts/search', 'user', 'read:accounts', 'Account[]'),
 	implemented('GET', '/api/v1/accounts/lookup', 'user', 'read:accounts', 'Account'),
 	implemented('GET', '/api/v1/accounts/relationships', 'user', 'read:follows', 'Relationship[]'),
@@ -196,10 +196,10 @@ export const MASTODON_4_6_USER_ROUTES: readonly MastodonContractRoute[] = [
 	unsupported('POST', '/api/v1/accounts/:id/unendorse', 'user', 'write:accounts', 'Relationship'),
 	unsupported('POST', '/api/v1/accounts/:id/note', 'user', 'write:accounts', 'Relationship', '3.2.0', ['comment']),
 	unsupported('POST', '/api/v1/accounts/:id/email_subscriptions', 'user', 'write:accounts', 'Object', '4.6.0'),
-	notFound('GET', '/api/v1/profile', 'user', ['profile', 'read:accounts'], 'Profile', '4.6.0'),
-	unsupported('PATCH', '/api/v1/profile', 'user', 'write:accounts', 'Profile', '4.6.0'),
-	unsupported('DELETE', '/api/v1/profile/avatar', 'user', 'write:accounts', 'Profile', '4.6.0'),
-	unsupported('DELETE', '/api/v1/profile/header', 'user', 'write:accounts', 'Profile', '4.6.0'),
+	implemented('GET', '/api/v1/profile', 'user', ['profile', 'read:accounts'], 'Profile', '4.6.0'),
+	implemented('PATCH', '/api/v1/profile', 'user', 'write:accounts', 'Profile', '4.6.0'),
+	implemented('DELETE', '/api/v1/profile/avatar', 'user', 'write:accounts', 'Profile', '4.6.0'),
+	implemented('DELETE', '/api/v1/profile/header', 'user', 'write:accounts', 'Profile', '4.6.0'),
 
 	// Follow requests and lists
 	implemented('GET', '/api/v1/follow_requests', 'user', 'read:follows', 'Account[]'),

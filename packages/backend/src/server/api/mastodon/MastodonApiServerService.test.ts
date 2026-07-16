@@ -11,6 +11,7 @@ import { MastodonApiError } from './errors.js';
 import { MASTODON_4_6_USER_ROUTES } from './MastodonApiContract.js';
 import { MastodonApiServerService } from './MastodonApiServerService.js';
 import { MastodonNotificationService } from './MastodonNotificationService.js';
+import { MastodonScopeService } from './MastodonScopeService.js';
 
 describe(MastodonApiServerService, () => {
 	const servers: ReturnType<typeof Fastify>[] = [];
@@ -24,6 +25,7 @@ describe(MastodonApiServerService, () => {
 		const dismissedNotifications = new Set<string>();
 		const authenticate = vi.fn().mockResolvedValue(auth);
 		const assert = vi.fn();
+		const assertAny = vi.fn();
 		const nativeInvoke = vi.fn(async (name: string, data: Record<string, unknown>, _viewer?: unknown, _request?: unknown): Promise<unknown> => {
 			if (name === 'i') return { id: 'user-id', username: 'alice' };
 			if (name === 'emojis') return {
@@ -94,11 +96,12 @@ describe(MastodonApiServerService, () => {
 			userNotePiningsRepository as never,
 			{ registerApplication, getApplication } as never,
 			{ authenticate } as never,
-			{ assert } as never,
+			{ assert, assertAny } as never,
 			{ invoke: nativeInvoke, invokePublic: publicInvoke } as never,
 			{
 				account: vi.fn(value => ({ id: value.id, username: value.username })),
 				credentialAccount: vi.fn(value => ({ id: value.id, username: value.username })),
+				profile: vi.fn(value => ({ id: value.id, display_name: value.name ?? value.username })),
 				tag: vi.fn(name => ({
 					name,
 					url: `https://misskey.example/tags/${encodeURIComponent(name)}`,
@@ -159,6 +162,7 @@ describe(MastodonApiServerService, () => {
 			fastify,
 			authenticate,
 			assert,
+			assertAny,
 			nativeInvoke,
 			publicInvoke,
 			registerApplication,
@@ -472,6 +476,207 @@ describe(MastodonApiServerService, () => {
 		});
 
 		expect(response.statusCode).toBe(401);
+	});
+
+	test('reads Profile with profile, read, or read:accounts and rejects unrelated scopes', async () => {
+		const { fastify, authenticate, assertAny, nativeInvoke } = createServer();
+		const scopes = new Map([
+			['profile-token', ['profile']],
+			['read-token', ['read']],
+			['accounts-token', ['read:accounts']],
+			['statuses-token', ['read:statuses']],
+		]);
+		authenticate.mockImplementation(async token => ({
+			kind: 'user',
+			user: { id: 'user-id' },
+			token: { id: 'token-id', scopes: scopes.get(token) ?? [] },
+		}));
+		const scopeService = new MastodonScopeService();
+		assertAny.mockImplementation((tokenScopes, requiredScopes) => scopeService.assertAny(tokenScopes, requiredScopes));
+		nativeInvoke.mockImplementation(async name => name === 'i'
+			? { id: 'user-id', username: 'alice', name: 'Alice' }
+			: []);
+
+		for (const token of ['profile-token', 'read-token', 'accounts-token']) {
+			const response = await fastify.inject({
+				method: 'GET',
+				url: '/api/v1/profile',
+				headers: { authorization: `Bearer ${token}` },
+			});
+			expect(response.statusCode).toBe(200);
+			expect(response.json()).toEqual({ id: 'user-id', display_name: 'Alice' });
+		}
+		const unrelated = await fastify.inject({
+			method: 'GET',
+			url: '/api/v1/profile',
+			headers: { authorization: 'Bearer statuses-token' },
+		});
+
+		expect(unrelated.statusCode).toBe(403);
+		expect(assertAny).toHaveBeenCalledWith(expect.any(Array), ['profile', 'read:accounts']);
+	});
+
+	test('updates Profile from JSON and preserves ordered fields', async () => {
+		const { fastify, nativeInvoke } = createServer();
+		nativeInvoke.mockImplementation(async (name, data) => name === 'i'
+			? { id: 'user-id', username: 'alice', name: data.name ?? 'Updated Alice' }
+			: {});
+
+		const response = await fastify.inject({
+			method: 'PATCH',
+			url: '/api/v1/profile',
+			headers: { authorization: 'Bearer user-token' },
+			payload: {
+				display_name: 'Updated Alice',
+				note: 'Updated bio',
+				locked: true,
+				discoverable: false,
+				bot: true,
+				fields_attributes: [
+					{ name: 'First', value: 'one' },
+					{ name: 'Second', value: 'two' },
+				],
+			},
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(response.json()).toEqual({ id: 'user-id', display_name: 'Updated Alice' });
+		expect(nativeInvoke).toHaveBeenCalledWith('i/update', {
+			name: 'Updated Alice',
+			description: 'Updated bio',
+			isLocked: true,
+			isExplorable: false,
+			isBot: true,
+			fields: [
+				{ name: 'First', value: 'one' },
+				{ name: 'Second', value: 'two' },
+			],
+		}, expect.any(Object), expect.any(Object));
+		expect(nativeInvoke).toHaveBeenCalledWith('i', {}, expect.any(Object), expect.any(Object));
+	});
+
+	test('updates credential account from URL-encoded bracket fields and accepts matching defaults', async () => {
+		const { fastify, nativeInvoke } = createServer();
+		nativeInvoke.mockImplementation(async name => name === 'i'
+			? { id: 'user-id', username: 'alice' }
+			: {});
+		const body = new URLSearchParams({
+			display_name: 'Alice URL',
+			'fields_attributes[1][name]': 'Second',
+			'fields_attributes[1][value]': 'two',
+			'fields_attributes[0][name]': 'First',
+			'fields_attributes[0][value]': 'one',
+			'source[privacy]': 'public',
+			'source[sensitive]': 'false',
+			'source[language]': '',
+			avatar_description: '',
+			header_description: '',
+			hide_collections: 'false',
+			indexable: 'false',
+			show_media: 'true',
+			show_media_replies: 'true',
+			show_featured: 'true',
+			'attribution_domains[]': '',
+		}).toString();
+
+		const response = await fastify.inject({
+			method: 'PATCH',
+			url: '/api/v1/accounts/update_credentials',
+			headers: {
+				authorization: 'Bearer user-token',
+				'content-type': 'application/x-www-form-urlencoded',
+			},
+			payload: body,
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(response.json()).toEqual({ id: 'user-id', username: 'alice' });
+		expect(nativeInvoke).toHaveBeenCalledWith('i/update', {
+			name: 'Alice URL',
+			fields: [
+				{ name: 'First', value: 'one' },
+				{ name: 'Second', value: 'two' },
+			],
+		}, expect.any(Object), expect.any(Object));
+	});
+
+	test.each([
+		[{ source: { privacy: 'private' } }, 'privacy'],
+		[{ source: { sensitive: true } }, 'sensitive'],
+		[{ source: { language: 'ja' } }, 'language'],
+		[{ avatar_description: 'avatar alt' }, 'avatar_description'],
+		[{ header_description: 'header alt' }, 'header_description'],
+		[{ hide_collections: true }, 'hide_collections'],
+		[{ indexable: true }, 'indexable'],
+		[{ show_media: false }, 'show_media'],
+		[{ show_media_replies: false }, 'show_media_replies'],
+		[{ show_featured: false }, 'show_featured'],
+		[{ attribution_domains: ['example.com'] }, 'attribution_domains'],
+	] as const)('rejects unsupported non-persisted Profile option %s', async (payload, key) => {
+		const { fastify, nativeInvoke } = createServer();
+		const response = await fastify.inject({
+			method: 'PATCH',
+			url: '/api/v1/profile',
+			headers: { authorization: 'Bearer user-token' },
+			payload,
+		});
+
+		expect(response.statusCode, key).toBe(422);
+		expect(nativeInvoke).not.toHaveBeenCalledWith('i/update', expect.anything(), expect.anything(), expect.anything());
+	});
+
+	test.each([
+		['avatar', { avatarId: null }],
+		['header', { bannerId: null }],
+	] as const)('deletes Profile %s through i/update', async (kind, update) => {
+		const { fastify, nativeInvoke } = createServer();
+		nativeInvoke.mockImplementation(async name => name === 'i'
+			? { id: 'user-id', username: 'alice', name: 'Alice' }
+			: {});
+		const response = await fastify.inject({
+			method: 'DELETE',
+			url: `/api/v1/profile/${kind}`,
+			headers: { authorization: 'Bearer user-token' },
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(nativeInvoke).toHaveBeenCalledWith('i/update', update, expect.any(Object), expect.any(Object));
+		expect(nativeInvoke).toHaveBeenCalledWith('i', {}, expect.any(Object), expect.any(Object));
+	});
+
+	test('streams two multipart Profile images through Drive before updating the account', async () => {
+		const { fastify, nativeInvoke } = createServer();
+		nativeInvoke.mockImplementation(async (name, data) => {
+			if (name === 'drive/files/create') return { id: data.name === 'avatar.png' ? 'avatar-file' : 'header-file' };
+			if (name === 'i') return { id: 'user-id', username: 'alice', name: 'Alice' };
+			return {};
+		});
+		const boundary = 'mastodon-profile-boundary';
+		const payload = [
+			`--${boundary}\r\nContent-Disposition: form-data; name="display_name"\r\n\r\nMultipart Alice\r\n`,
+			`--${boundary}\r\nContent-Disposition: form-data; name="avatar"; filename="avatar.png"\r\nContent-Type: image/png\r\n\r\navatar-bytes\r\n`,
+			`--${boundary}\r\nContent-Disposition: form-data; name="header"; filename="header.png"\r\nContent-Type: image/png\r\n\r\nheader-bytes\r\n`,
+			`--${boundary}--\r\n`,
+		].join('');
+
+		const response = await fastify.inject({
+			method: 'PATCH',
+			url: '/api/v1/profile',
+			headers: {
+				authorization: 'Bearer user-token',
+				'content-type': `multipart/form-data; boundary=${boundary}`,
+			},
+			payload,
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(nativeInvoke).toHaveBeenCalledWith('drive/files/create', { name: 'avatar.png' }, expect.any(Object), expect.any(Object), expect.objectContaining({ name: 'avatar.png', path: expect.any(String) }));
+		expect(nativeInvoke).toHaveBeenCalledWith('drive/files/create', { name: 'header.png' }, expect.any(Object), expect.any(Object), expect.objectContaining({ name: 'header.png', path: expect.any(String) }));
+		expect(nativeInvoke).toHaveBeenCalledWith('i/update', {
+			name: 'Multipart Alice',
+			avatarId: 'avatar-file',
+			bannerId: 'header-file',
+		}, expect.any(Object), expect.any(Object));
 	});
 
 	test('serves public routes anonymously when Authorization is absent', async () => {

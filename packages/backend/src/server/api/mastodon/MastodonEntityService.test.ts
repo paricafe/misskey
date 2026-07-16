@@ -89,6 +89,58 @@ describe(MastodonEntityService, () => {
 		expect(account.fields).toEqual([expect.objectContaining({ name: 'site', value: expect.any(String) })]);
 	});
 
+	test('converts profile, account, and credential account with consistent Mastodon 4.6 fields', () => {
+		const profile = service.profile(user as never);
+		const account = service.account(user as never);
+		const credential = service.credentialAccount(user as never);
+
+		expect(profile).toEqual({
+			id: 'user-id',
+			display_name: 'Alice',
+			note: 'Hello **world**',
+			fields: [{ name: 'site', value: 'https://example.com' }],
+			formatted_note: expect.any(String),
+			formatted_fields: [{ name: 'site', value: expect.any(String) }],
+			avatar: 'https://cdn.example/avatar.png',
+			avatar_static: 'https://cdn.example/avatar.png',
+			avatar_description: '',
+			header: 'https://cdn.example/banner.png',
+			header_static: 'https://cdn.example/banner.png',
+			header_description: '',
+			locked: true,
+			bot: false,
+			hide_collections: false,
+			discoverable: true,
+			indexable: false,
+			show_media: true,
+			show_media_replies: true,
+			show_featured: true,
+			attribution_domains: [],
+			featured_tags: [],
+		});
+		expect(service.profile({ ...user, avatarUrl: null, bannerUrl: null } as never)).toMatchObject({
+			avatar: null,
+			avatar_static: null,
+			header: null,
+			header_static: null,
+		});
+		expect(account).toMatchObject({
+			avatar_description: '',
+			header_description: '',
+			show_media: true,
+			show_media_replies: true,
+			show_featured: true,
+			feature_approval: { automatic: [], manual: [], current_user: null },
+		});
+		expect(credential.source).toMatchObject({
+			hide_collections: false,
+			discoverable: true,
+			indexable: false,
+			attribution_domains: [],
+			quote_policy: 'public',
+		});
+	});
+
 	test('uses an absolute local header fallback for an account without a banner', () => {
 		const userWithoutBanner = {
 			...user,
