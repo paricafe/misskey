@@ -899,9 +899,7 @@ export class MastodonApiServerService {
 			this.mastodonScopeService.assert(tokenScopes, scope);
 			return;
 		}
-		if (!scope.some(required => this.mastodonScopeService.allows(tokenScopes, required))) {
-			throw new MastodonApiError(403, 'insufficient_scope', `One of these scopes is required: ${scope.join(', ')}`);
-		}
+		this.mastodonScopeService.assertAny(tokenScopes, scope);
 	}
 
 	private async invoke(name: string, data: Dictionary, auth: MastodonUserAuth, request: MastodonRequest): Promise<unknown> {

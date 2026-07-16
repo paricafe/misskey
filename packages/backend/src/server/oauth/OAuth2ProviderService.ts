@@ -35,9 +35,11 @@ import Logger from '@/logger.js';
 import { StatusError } from '@/misc/status-error.js';
 import { HtmlTemplateService } from '@/server/web/HtmlTemplateService.js';
 import { OAuthPage } from '@/server/web/views/oauth.js';
-import { sendMastodonError } from '@/server/api/mastodon/errors.js';
+import { MastodonApiError, sendMastodonError } from '@/server/api/mastodon/errors.js';
+import { MastodonAuthenticateService } from '@/server/api/mastodon/MastodonAuthenticateService.js';
 import { MastodonOAuthService } from '@/server/api/mastodon/MastodonOAuthService.js';
-import type { FastifyInstance, FastifyReply } from 'fastify';
+import { MastodonScopeService } from '@/server/api/mastodon/MastodonScopeService.js';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 
 // TODO: Consider migrating to @node-oauth/oauth2-server once
 // https://github.com/node-oauth/node-oauth2-server/issues/180 is figured out.
@@ -325,6 +327,12 @@ function applyNoStore(reply: FastifyReply): void {
 	reply.header('Pragma', 'no-cache');
 }
 
+function extractBearerToken(request: FastifyRequest): string | undefined {
+	const authorization = request.headers.authorization?.trim();
+	if (authorization == null) return undefined;
+	return /^Bearer\s+(.+)$/iu.exec(authorization)?.[1];
+}
+
 function createUnsupportedResponseTypeError(): OAuthProviderError {
 	const error = new UnsupportedResponseTypeError();
 	error.status = 501;
@@ -415,6 +423,8 @@ export class OAuth2ProviderService implements OnApplicationShutdown {
 		private cacheService: CacheService,
 		private htmlTemplateService: HtmlTemplateService,
 		private mastodonOAuthService: MastodonOAuthService,
+		private mastodonAuthenticateService: MastodonAuthenticateService,
+		private mastodonScopeService: MastodonScopeService,
 		loggerService: LoggerService,
 	) {
 		this.#authorizationTransactionCache = new MemoryKVCache<AuthorizationTransaction>(1000 * 60 * 5);
@@ -526,6 +536,7 @@ export class OAuth2ProviderService implements OnApplicationShutdown {
 			issuer: this.config.url,
 			authorization_endpoint: new URL('/oauth/authorize', this.config.url),
 			token_endpoint: new URL('/oauth/token', this.config.url),
+			userinfo_endpoint: new URL('/oauth/userinfo', this.config.url).toString(),
 			scopes_supported: [...new Set([...kinds, ...this.mastodonOAuthService.getSupportedScopes()])],
 			response_types_supported: ['code'],
 			grant_types_supported: ['authorization_code', 'client_credentials'],
@@ -677,6 +688,30 @@ export class OAuth2ProviderService implements OnApplicationShutdown {
 				sendMastodonError(reply, error);
 			}
 		});
+
+		const userinfo = async (request: FastifyRequest, reply: FastifyReply) => {
+			applyNoStore(reply);
+			try {
+				const auth = await this.mastodonAuthenticateService.authenticate(extractBearerToken(request));
+				if (auth.kind === 'application') {
+					throw new MastodonApiError(401, 'invalid_token', 'This endpoint requires a user token');
+				}
+				this.mastodonScopeService.assert(auth.token.scopes, 'profile');
+				const username = encodeURIComponent(auth.user.username);
+				reply.send({
+					iss: this.config.url,
+					sub: auth.user.uri ?? new URL(`/users/${encodeURIComponent(auth.user.id)}`, this.config.url).toString(),
+					name: auth.user.name ?? auth.user.username,
+					preferred_username: auth.user.username,
+					profile: new URL(`/@${username}`, this.config.url).toString(),
+					picture: auth.user.avatarUrl ?? new URL(`/avatar/@${username}`, this.config.url).toString(),
+				});
+			} catch (error) {
+				sendMastodonError(reply, error);
+			}
+		};
+		fastify.get('/userinfo', userinfo);
+		fastify.post('/userinfo', userinfo);
 
 		fastify.all('/*', async (_request, reply) => {
 			reply.code(404);

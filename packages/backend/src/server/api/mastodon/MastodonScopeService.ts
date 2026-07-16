@@ -7,6 +7,7 @@ import { Injectable } from '@nestjs/common';
 import { MastodonApiError } from './errors.js';
 
 const GRANULAR_SCOPES = [
+	'profile',
 	'read:accounts',
 	'read:blocks',
 	'read:bookmarks',
@@ -38,10 +39,13 @@ const SUPPORTED_SCOPES = new Set<string>([
 	'write',
 	'follow',
 	'push',
+	'read:collections',
+	'write:collections',
 	...GRANULAR_SCOPES,
 ]);
 
 const MISSKEY_PERMISSIONS_BY_SCOPE: Readonly<Record<(typeof GRANULAR_SCOPES)[number], readonly string[]>> = {
+	profile: ['read:account'],
 	'read:accounts': ['read:account'],
 	'read:blocks': ['read:blocks'],
 	'read:bookmarks': ['read:favorites'],
@@ -104,6 +108,16 @@ export class MastodonScopeService {
 	public assert(tokenScopes: readonly string[], requiredScope: string): void {
 		if (!this.allows(tokenScopes, requiredScope)) {
 			throw new MastodonApiError(403, 'insufficient_scope', `Scope ${requiredScope} is required`);
+		}
+	}
+
+	public allowsAny(tokenScopes: readonly string[], requiredScopes: readonly string[]): boolean {
+		return requiredScopes.some(requiredScope => this.allows(tokenScopes, requiredScope));
+	}
+
+	public assertAny(tokenScopes: readonly string[], requiredScopes: readonly string[]): void {
+		if (!this.allowsAny(tokenScopes, requiredScopes)) {
+			throw new MastodonApiError(403, 'insufficient_scope', `One of these scopes is required: ${requiredScopes.join(', ')}`);
 		}
 	}
 

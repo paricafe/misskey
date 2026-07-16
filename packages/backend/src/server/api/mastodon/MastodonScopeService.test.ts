@@ -31,13 +31,30 @@ describe(MastodonScopeService, () => {
 		]);
 	});
 
-	test('rejects unknown scopes', () => {
-		expect(() => service.normalize('read unknown')).toThrow();
+	test('recognizes official non-admin profile and collection scopes', () => {
+		expect(service.normalize('profile read:collections write:collections')).toEqual([
+			'profile',
+			'read:collections',
+			'write:collections',
+		]);
+	});
+
+	test.each(['admin:read', 'admin:write', 'unknown'])('rejects unsupported or admin scope %s', scope => {
+		expect(() => service.normalize(`read ${scope}`)).toThrow();
 	});
 
 	test('maps granular scopes to the minimum Misskey permissions', () => {
 		expect(service.toMisskeyPermissions(['write:statuses'])).toEqual(['write:drive', 'write:notes', 'write:votes']);
 		expect(service.toMisskeyPermissions(['read:notifications'])).toEqual(['read:notifications']);
+		expect(service.toMisskeyPermissions(['profile'])).toEqual(['read:account']);
+		expect(service.toMisskeyPermissions(['read:collections', 'write:collections'])).toEqual([]);
+	});
+
+	test('keeps profile distinct while allowing generic read to satisfy account alternatives', () => {
+		expect(service.allows(['profile'], 'profile')).toBe(true);
+		expect(service.allows(['profile'], 'read:accounts')).toBe(false);
+		expect(service.allowsAny(['read'], ['profile', 'read:accounts'])).toBe(true);
+		expect(service.allowsAny(['write'], ['write:statuses', 'write:accounts'])).toBe(true);
 	});
 
 	test('expands umbrella and compatibility scopes without duplicates', () => {
@@ -50,6 +67,16 @@ describe(MastodonScopeService, () => {
 	});
 
 	test('exposes the supported compatibility scopes for OAuth metadata', () => {
-		expect(service.getSupportedScopes()).toEqual(expect.arrayContaining(['read', 'write', 'follow', 'push', 'read:statuses', 'write:statuses']));
+		expect(service.getSupportedScopes()).toEqual(expect.arrayContaining([
+			'read',
+			'write',
+			'follow',
+			'push',
+			'profile',
+			'read:collections',
+			'write:collections',
+			'read:statuses',
+			'write:statuses',
+		]));
 	});
 });
