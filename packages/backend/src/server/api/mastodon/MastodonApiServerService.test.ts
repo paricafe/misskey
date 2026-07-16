@@ -250,6 +250,40 @@ describe(MastodonApiServerService, () => {
 			userFeatureUserEntityService as never,
 			userFeatureGlobalEventService as never,
 		);
+		const collection = (overrides: Record<string, unknown> = {}) => ({
+			id: 'collection-id',
+			account_id: 'user-id',
+			uri: 'https://misskey.example/api/v1/collections/collection-id',
+			url: null,
+			name: 'People',
+			description: null,
+			language: null,
+			local: true,
+			sensitive: false,
+			discoverable: false,
+			tag: null,
+			item_count: 0,
+			items: [],
+			created_at: '2026-07-17T00:00:00.000Z',
+			updated_at: '2026-07-17T00:00:00.000Z',
+			...overrides,
+		});
+		const mastodonCollectionService = {
+			create: vi.fn(async (_ownerId: string, input: Record<string, unknown>) => collection({ name: input.name })),
+			get: vi.fn(async () => ({ collection: collection(), accounts: [{ id: 'user-id' }] })),
+			listByAccount: vi.fn(async () => ({ items: [collection()], total: 2, hasMore: true })),
+			listInCollections: vi.fn(async () => ({ items: [collection()], total: 1, hasMore: false })),
+			update: vi.fn(async (_ownerId: string, _id: string, input: Record<string, unknown>) => collection({ name: input.name ?? 'People' })),
+			delete: vi.fn(async () => ({})),
+			addItem: vi.fn(async (_ownerId: string, _id: string, accountId: string) => ({
+				id: 'item-id',
+				account_id: accountId,
+				state: 'accepted',
+				created_at: '2026-07-17T00:00:00.000Z',
+			})),
+			removeItem: vi.fn(async () => ({})),
+			revoke: vi.fn(async () => ({})),
+		};
 		const createReport = vi.fn(async (_reporter: unknown, input: Record<string, unknown>) => ({
 			report: { id: 'report-id', resolved: false, forwarded: false },
 			createdAt: '2026-07-16T01:02:03.000Z',
@@ -382,6 +416,7 @@ describe(MastodonApiServerService, () => {
 				linkHeader,
 				offsetLinkHeader,
 			} as never,
+			mastodonCollectionService as never,
 			mastodonFilterService,
 			mastodonMarkerService,
 			mastodonNotificationService,
@@ -415,6 +450,7 @@ describe(MastodonApiServerService, () => {
 			getScheduledStatus,
 			mastodonApiStateService,
 			mastodonUserFeatureService,
+			mastodonCollectionService,
 			profiles,
 			noteThreadMutingsRepository,
 			mutedThreads,
@@ -1125,6 +1161,128 @@ describe(MastodonApiServerService, () => {
 		expect(contract('GET', '/api/v1/domain_blocks/preview')).toMatchObject({ behavior: 'unsupported-write', scope: 'read:blocks' });
 		expect(contract('POST', '/api/v1/statuses/:id/mute')).toMatchObject({ behavior: 'implemented', scope: 'write:mutes', entity: 'Status', introducedIn: '1.4.2' });
 		expect(MASTODON_4_6_USER_ROUTES.some(route => route.path.startsWith('/api/v1/tags/:id/'))).toBe(false);
+	});
+
+	test('declares the official July 2026 collection contracts', () => {
+		const contract = (method: string, path: string) => MASTODON_4_6_USER_ROUTES.find(route => route.method === method && route.path === path);
+		expect(contract('POST', '/api/v1/collections')).toMatchObject({ behavior: 'implemented', auth: 'user', scope: 'write:collections', entity: 'WrappedCollection', requiredBody: ['name'] });
+		expect(contract('GET', '/api/v1/collections/:id')).toMatchObject({ behavior: 'implemented', auth: 'public', scope: 'read:collections', entity: 'CollectionWithAccounts' });
+		expect(contract('GET', '/api/v1/accounts/:account_id/collections')).toMatchObject({ behavior: 'implemented', auth: 'public', scope: 'read:collections', entity: 'Collections' });
+		expect(contract('GET', '/api/v1/accounts/:account_id/in_collections')).toMatchObject({ behavior: 'implemented', auth: 'user', scope: 'read:collections', entity: 'Collections' });
+		expect(contract('PATCH', '/api/v1/collections/:id')).toMatchObject({ behavior: 'implemented', entity: 'WrappedCollection' });
+		expect(contract('PUT', '/api/v1/collections/:id')).toMatchObject({ behavior: 'implemented', entity: 'WrappedCollection' });
+		expect(contract('POST', '/api/v1/collections/:collection_id/items')).toMatchObject({ behavior: 'implemented', requiredBody: ['account_id'], entity: 'WrappedCollectionItem' });
+		expect(contract('DELETE', '/api/v1/collections/:collection_id/items/:id')).toMatchObject({ behavior: 'implemented', entity: 'Empty' });
+		expect(contract('POST', '/api/v1/collections/:collection_id/items/:id/revoke')).toMatchObject({ behavior: 'implemented', entity: 'Empty' });
+		expect(contract('POST', '/api/v1/collections/:collection_id/items/:id')).toBeUndefined();
+	});
+
+	test('serves collection create with the wrapped official response', async () => {
+		const { fastify, mastodonCollectionService } = createServer();
+		const response = await fastify.inject({
+			method: 'POST',
+			url: '/api/v1/collections',
+			headers: { authorization: 'Bearer user-token' },
+			payload: { name: 'People' },
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(response.json()).toMatchObject({ collection: { name: 'People' } });
+		expect(mastodonCollectionService.create).toHaveBeenCalledWith('user-id', { name: 'People' });
+	});
+
+	test('normalizes a single form account_ids[] field for collection create', async () => {
+		const { fastify, mastodonCollectionService } = createServer();
+		const response = await fastify.inject({
+			method: 'POST',
+			url: '/api/v1/collections',
+			headers: {
+				authorization: 'Bearer user-token',
+				'content-type': 'application/x-www-form-urlencoded',
+			},
+			payload: 'name=People&account_ids%5B%5D=target-id',
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(mastodonCollectionService.create).toHaveBeenCalledWith('user-id', {
+			name: 'People',
+			account_ids: ['target-id'],
+		});
+	});
+
+	test('rejects collection offsets beyond the bounded scan window', async () => {
+		const { fastify, mastodonCollectionService } = createServer();
+		const response = await fastify.inject({
+			method: 'GET',
+			url: '/api/v1/accounts/user-id/in_collections?offset=961',
+			headers: { authorization: 'Bearer user-token' },
+		});
+
+		expect(response.statusCode).toBe(422);
+		expect(response.json()).toMatchObject({ error: 'collection window exceeds 1000' });
+		expect(mastodonCollectionService.listInCollections).not.toHaveBeenCalled();
+	});
+
+	test('serves all collection reads, mutations, wrappers, pagination, and empty objects', async () => {
+		const { fastify, assert, offsetLinkHeader, mastodonCollectionService } = createServer();
+		const inject = async (method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE', url: string, payload?: Record<string, unknown>, authenticated = true) => await fastify.inject({
+			method,
+			url,
+			...(authenticated ? { headers: { authorization: 'Bearer user-token' } } : {}),
+			...(payload == null ? {} : { payload }),
+		});
+
+		const single = await inject('GET', '/api/v1/collections/collection-id', undefined, false);
+		expect(single.statusCode).toBe(200);
+		expect(single.json()).toMatchObject({ collection: { id: 'collection-id' }, accounts: [{ id: 'user-id' }] });
+		expect(mastodonCollectionService.get).toHaveBeenCalledWith('collection-id', null);
+
+		const accountPage = await inject('GET', '/api/v1/accounts/user-id/collections?limit=999&offset=40', undefined, false);
+		expect(accountPage.json()).toMatchObject({ collections: [{ id: 'collection-id' }] });
+		expect(accountPage.headers.link).toBe('<next:120>; rel="next", <prev:0>; rel="prev"');
+		expect(mastodonCollectionService.listByAccount).toHaveBeenCalledWith('user-id', null, { limit: 80, offset: 40 });
+		expect(offsetLinkHeader).toHaveBeenCalledWith(expect.stringContaining('/api/v1/accounts/user-id/collections'), 40, 80, true);
+
+		const boundaryPage = await inject('GET', '/api/v1/accounts/user-id/collections?limit=80&offset=920', undefined, false);
+		expect(boundaryPage.headers.link).toBe('<prev:840>; rel="prev"');
+		expect(offsetLinkHeader).toHaveBeenCalledWith(expect.stringContaining('/api/v1/accounts/user-id/collections'), 920, 80, false);
+		const nearBoundaryPage = await inject('GET', '/api/v1/accounts/user-id/collections?limit=80&offset=900', undefined, false);
+		expect(nearBoundaryPage.headers.link).toBe('<prev:820>; rel="prev"');
+		expect(offsetLinkHeader).toHaveBeenCalledWith(expect.stringContaining('/api/v1/accounts/user-id/collections'), 900, 80, false);
+
+		const memberships = await inject('GET', '/api/v1/accounts/user-id/in_collections?limit=20&offset=0');
+		expect(memberships.json()).toMatchObject({ collections: [{ id: 'collection-id' }] });
+		expect(mastodonCollectionService.listInCollections).toHaveBeenCalledWith('user-id', 'user-id', { limit: 20, offset: 0 });
+
+		for (const method of ['PATCH', 'PUT'] as const) {
+			const updated = await inject(method, '/api/v1/collections/collection-id', { name: `${method} name` });
+			expect(updated.json()).toMatchObject({ collection: { name: `${method} name` } });
+		}
+
+		const added = await inject('POST', '/api/v1/collections/collection-id/items', { account_id: 'target-id' });
+		expect(added.json()).toEqual({
+			collection_item: {
+				id: 'item-id',
+				account_id: 'target-id',
+				state: 'accepted',
+				created_at: '2026-07-17T00:00:00.000Z',
+			},
+		});
+
+		for (const [method, url] of [
+			['DELETE', '/api/v1/collections/collection-id'],
+			['DELETE', '/api/v1/collections/collection-id/items/item-id'],
+			['POST', '/api/v1/collections/collection-id/items/item-id/revoke'],
+		] as const) {
+			const response = await inject(method, url);
+			expect(response.statusCode).toBe(200);
+			expect(response.json()).toEqual({});
+		}
+
+		expect(assert.mock.calls.map(call => call[1] ?? call[0])).toEqual(expect.arrayContaining([
+			'read:collections',
+			'write:collections',
+		]));
 	});
 
 	test('persists v2 filters and exposes their v1 keyword projections', async () => {

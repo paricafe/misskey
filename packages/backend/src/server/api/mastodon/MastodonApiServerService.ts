@@ -24,6 +24,7 @@ import type { FastifyInstance, FastifyPluginOptions, FastifyReply, FastifyReques
 import { MastodonApiCallService } from './MastodonApiCallService.js';
 import { MASTODON_4_6_USER_ROUTES, type MastodonContractRoute } from './MastodonApiContract.js';
 import { MastodonAuthenticateService } from './MastodonAuthenticateService.js';
+import { MASTODON_COLLECTION_WINDOW_LIMIT, MastodonCollectionService, type MastodonCollectionPage } from './MastodonCollectionService.js';
 import { MastodonEntityService } from './MastodonEntityService.js';
 import { MastodonFilterService, type MastodonFilterApplyOptions, type MastodonFilterContext } from './MastodonFilterService.js';
 import { MastodonMarkerService, type MastodonMarkerTimeline } from './MastodonMarkerService.js';
@@ -66,6 +67,7 @@ export class MastodonApiServerService {
 		private mastodonApiCallService: MastodonApiCallService,
 		private mastodonEntityService: MastodonEntityService,
 		private mastodonPaginationService: MastodonPaginationService,
+		private mastodonCollectionService: MastodonCollectionService,
 		private mastodonFilterService: MastodonFilterService,
 		private mastodonMarkerService: MastodonMarkerService,
 		private mastodonNotificationService: MastodonNotificationService,
@@ -302,6 +304,7 @@ export class MastodonApiServerService {
 		this.registerScheduledStatuses(fastify);
 		this.registerAnnouncements(fastify);
 		this.registerReports(fastify);
+		this.registerCollections(fastify);
 		this.registerFiltersAndMarkers(fastify);
 		this.registerUserFeatures(fastify);
 		this.registerCompatibilityRoutes(fastify);
@@ -1005,6 +1008,80 @@ export class MastodonApiServerService {
 		fastify.post<{ Body: Dictionary }>('/api/v1/markers', request => this.withAuth(request as MastodonRequest, 'write:statuses', async auth => {
 			return await this.mastodonMarkerService.update(auth.user.id, this.markerInput(request.body ?? {}));
 		}));
+	}
+
+	private registerCollections(fastify: FastifyInstance): void {
+		fastify.post<{ Body: Dictionary }>('/api/v1/collections', request => this.withAuth(request as MastodonRequest, 'write:collections', async auth => {
+			const body = request.body ?? {};
+			const input = { ...body };
+			if (Object.hasOwn(body, 'account_ids[]')) {
+				delete input['account_ids[]'];
+				input.account_ids = this.strings(body['account_ids[]']);
+			}
+			const collection = await this.mastodonCollectionService.create(auth.user.id, input);
+			return { collection };
+		}));
+		fastify.get<{ Params: { id: string } }>('/api/v1/collections/:id', request => this.withOptionalScopedUser(request as MastodonRequest, 'read:collections', async auth => {
+			return await this.mastodonCollectionService.get(request.params.id, auth?.user.id ?? null);
+		}));
+		fastify.get<{ Params: { account_id: string } }>('/api/v1/accounts/:account_id/collections', (request, reply) => this.withOptionalScopedUser(request as MastodonRequest, 'read:collections', async auth => {
+			const pagination = this.collectionPagination(request.query as Dictionary);
+			const page = await this.mastodonCollectionService.listByAccount(request.params.account_id, auth?.user.id ?? null, pagination);
+			this.collectionLink(request, reply, pagination, page);
+			return { collections: page.items };
+		}));
+		fastify.get<{ Params: { account_id: string } }>('/api/v1/accounts/:account_id/in_collections', (request, reply) => this.withAuth(request as MastodonRequest, 'read:collections', async auth => {
+			const pagination = this.collectionPagination(request.query as Dictionary);
+			const page = await this.mastodonCollectionService.listInCollections(request.params.account_id, auth.user.id, pagination);
+			this.collectionLink(request, reply, pagination, page);
+			return { collections: page.items };
+		}));
+		for (const method of ['patch', 'put'] as const) {
+			fastify[method]<{ Params: { id: string }; Body: Dictionary }>('/api/v1/collections/:id', request => this.withAuth(request as MastodonRequest, 'write:collections', async auth => ({
+				collection: await this.mastodonCollectionService.update(auth.user.id, request.params.id, request.body ?? {}),
+			})));
+		}
+		fastify.delete<{ Params: { id: string } }>('/api/v1/collections/:id', request => this.withAuth(request as MastodonRequest, 'write:collections', async auth => {
+			return await this.mastodonCollectionService.delete(auth.user.id, request.params.id);
+		}));
+		fastify.post<{ Params: { collection_id: string }; Body: Dictionary }>('/api/v1/collections/:collection_id/items', request => this.withAuth(request as MastodonRequest, 'write:collections', async auth => ({
+			collection_item: await this.mastodonCollectionService.addItem(
+				auth.user.id,
+				request.params.collection_id,
+				this.string(request.body?.account_id) ?? '',
+			),
+		})));
+		fastify.delete<{ Params: { collection_id: string; id: string } }>('/api/v1/collections/:collection_id/items/:id', request => this.withAuth(request as MastodonRequest, 'write:collections', async auth => {
+			return await this.mastodonCollectionService.removeItem(auth.user.id, request.params.collection_id, request.params.id);
+		}));
+		fastify.post<{ Params: { collection_id: string; id: string } }>('/api/v1/collections/:collection_id/items/:id/revoke', request => this.withAuth(request as MastodonRequest, 'write:collections', async auth => {
+			return await this.mastodonCollectionService.revoke(auth.user.id, request.params.collection_id, request.params.id);
+		}));
+	}
+
+	private collectionPagination(query: Dictionary): { limit: number; offset: number } {
+		const limit = this.integer(query.limit, 40, 1, 80);
+		const offset = this.integer(query.offset, 0, 0);
+		if (offset + limit > MASTODON_COLLECTION_WINDOW_LIMIT) {
+			throw new MastodonApiError(422, 'validation_error', `collection window exceeds ${MASTODON_COLLECTION_WINDOW_LIMIT}`);
+		}
+		return { limit, offset };
+	}
+
+	private collectionLink(
+		request: FastifyRequest,
+		reply: FastifyReply,
+		pagination: { limit: number; offset: number },
+		page: MastodonCollectionPage,
+	): void {
+		const hasMoreWithinWindow = page.hasMore && pagination.offset + (2 * pagination.limit) <= MASTODON_COLLECTION_WINDOW_LIMIT;
+		const link = this.mastodonPaginationService.offsetLinkHeader(
+			new URL(request.url, this.config.url).toString(),
+			pagination.offset,
+			pagination.limit,
+			hasMoreWithinWindow,
+		);
+		if (link != null) reply.header('Link', link);
 	}
 
 	private filterInput(body: Dictionary): Dictionary {

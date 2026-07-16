@@ -29,6 +29,11 @@ export type MastodonApiStateConditionalWrite = MastodonApiStateWrite & {
 	expectedVersion: number;
 };
 
+export type MastodonApiStateLock = {
+	userId: MiUser['id'];
+	kind: string;
+};
+
 @Injectable()
 export class MastodonApiStateService {
 	constructor(
@@ -46,6 +51,26 @@ export class MastodonApiStateService {
 
 	public async get(userId: MiUser['id'], kind: string, key: string): Promise<MiMastodonUserState | null> {
 		return await this.mastodonUserStatesRepository.findOneBy({ userId, kind, key });
+	}
+
+	public async getByKindKey(kind: string, key: string): Promise<MiMastodonUserState | null> {
+		return await this.mastodonUserStatesRepository.findOneBy({ kind, key });
+	}
+
+	public async listPage(
+		userId: MiUser['id'],
+		kind: string,
+		options: { offset: number; limit: number },
+	): Promise<{ items: MiMastodonUserState[]; total: number }> {
+		const limit = Math.max(1, Math.min(80, Math.floor(options.limit)));
+		const offset = Math.max(0, Math.floor(options.offset));
+		const [items, total] = await this.mastodonUserStatesRepository.findAndCount({
+			where: { userId, kind },
+			order: { updatedAt: 'DESC', id: 'DESC' },
+			skip: offset,
+			take: limit,
+		});
+		return { items, total };
 	}
 
 	public async put(input: MastodonApiStateWrite): Promise<MiMastodonUserState> {
@@ -100,10 +125,20 @@ export class MastodonApiStateService {
 		kind: string,
 		callback: (stateService: MastodonApiStateService) => Promise<T>,
 	): Promise<T> {
+		return await this.withUserKindLocks([{ userId, kind }], callback);
+	}
+
+	public async withUserKindLocks<T>(
+		locks: MastodonApiStateLock[],
+		callback: (stateService: MastodonApiStateService) => Promise<T>,
+	): Promise<T> {
+		const lockKeys = [...new Set(locks.map(lock => `${lock.userId}\0${lock.kind}`))].sort();
 		return await this.mastodonUserStatesRepository.manager.transaction(async manager => {
 			const repository = manager.getRepository(MiMastodonUserState)
 				.extend(miRepository as MiRepository<MiMastodonUserState>);
-			await repository.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [`${userId}\0${kind}`]);
+			for (const lockKey of lockKeys) {
+				await repository.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [lockKey]);
+			}
 			return await callback(new MastodonApiStateService(repository, this.idService));
 		});
 	}

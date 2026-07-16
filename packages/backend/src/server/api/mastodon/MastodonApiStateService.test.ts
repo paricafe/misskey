@@ -38,6 +38,7 @@ describe(MastodonApiStateService, () => {
 		const repository = {
 			query: vi.fn(),
 			find: vi.fn(),
+			findAndCount: vi.fn(),
 			findOneBy: vi.fn(),
 			delete: vi.fn(),
 			manager: {
@@ -129,6 +130,23 @@ describe(MastodonApiStateService, () => {
 		expect(callback).toHaveBeenCalledTimes(1);
 	});
 
+	test('holds multiple user-kind locks once in stable sorted order inside one transaction', async () => {
+		const { service, repository, scopedRepository } = createService();
+		scopedRepository.query.mockResolvedValue([]);
+
+		await service.withUserKindLocks([
+			{ userId: 'z-user', kind: 'collection_membership' },
+			{ userId: 'a-user', kind: 'collection' },
+			{ userId: 'z-user', kind: 'collection_membership' },
+		], async () => undefined);
+
+		expect(repository.manager.transaction).toHaveBeenCalledTimes(1);
+		expect(scopedRepository.query.mock.calls.map(call => call[1])).toEqual([
+			['a-user\0collection'],
+			['z-user\0collection_membership'],
+		]);
+	});
+
 	test('lists a kind and gets a key within one user', async () => {
 		const row = state(1);
 		const { service, repository } = createService();
@@ -142,6 +160,30 @@ describe(MastodonApiStateService, () => {
 			order: { updatedAt: 'DESC' },
 		});
 		expect(repository.findOneBy).toHaveBeenCalledWith({ userId: 'u1', kind: 'marker', key: 'home' });
+	});
+
+	test('gets a globally unique kind and key without scanning JSON values', async () => {
+		const row = state(1);
+		const { service, repository } = createService();
+		repository.findOneBy.mockResolvedValue(row);
+
+		await expect(service.getByKindKey('collection', 'collection-1')).resolves.toEqual(row);
+		expect(repository.findOneBy).toHaveBeenCalledWith({ kind: 'collection', key: 'collection-1' });
+	});
+
+	test('reads a bounded stable page and returns the total', async () => {
+		const row = state(1);
+		const { service, repository } = createService();
+		repository.findAndCount.mockResolvedValue([[row], 81]);
+
+		await expect(service.listPage('u1', 'collection_membership', { offset: 40, limit: 80 }))
+			.resolves.toEqual({ items: [row], total: 81 });
+		expect(repository.findAndCount).toHaveBeenCalledWith({
+			where: { userId: 'u1', kind: 'collection_membership' },
+			order: { updatedAt: 'DESC', id: 'DESC' },
+			skip: 40,
+			take: 80,
+		});
 	});
 
 	test('deletes only the addressed user, kind, and key', async () => {
