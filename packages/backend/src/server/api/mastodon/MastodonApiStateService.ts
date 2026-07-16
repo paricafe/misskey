@@ -29,6 +29,10 @@ export type MastodonApiStateConditionalWrite = MastodonApiStateWrite & {
 	expectedVersion: number;
 };
 
+export type MastodonApiStateCreateWithId = MastodonApiStateWrite & {
+	id: MiMastodonUserState['id'];
+};
+
 export type MastodonApiStateLock = {
 	userId: MiUser['id'];
 	kind: string;
@@ -53,8 +57,8 @@ export class MastodonApiStateService {
 		return await this.mastodonUserStatesRepository.findOneBy({ userId, kind, key });
 	}
 
-	public async getByKindKey(kind: string, key: string): Promise<MiMastodonUserState | null> {
-		return await this.mastodonUserStatesRepository.findOneBy({ kind, key });
+	public async getById(id: MiMastodonUserState['id']): Promise<MiMastodonUserState | null> {
+		return await this.mastodonUserStatesRepository.findOneBy({ id });
 	}
 
 	public async listPage(
@@ -107,6 +111,28 @@ export class MastodonApiStateService {
 			RETURNING *
 		`, [
 			this.idService.gen(),
+			input.userId,
+			input.tokenId ?? null,
+			input.kind,
+			input.key,
+			JSON.stringify(input.value),
+			now,
+			input.expiresAt ?? null,
+		]);
+		const row = rows[0];
+		if (row == null) this.conflict();
+		return row;
+	}
+
+	public async createWithId(input: MastodonApiStateCreateWithId): Promise<MiMastodonUserState> {
+		const now = new Date();
+		const rows: MiMastodonUserState[] = await this.mastodonUserStatesRepository.query(`
+			INSERT INTO "mastodon_user_state" ("id", "userId", "tokenId", "kind", "key", "value", "version", "createdAt", "updatedAt", "expiresAt")
+			VALUES ($1, $2, $3, $4, $5, $6::jsonb, 1, $7, $7, $8)
+			ON CONFLICT DO NOTHING
+			RETURNING *
+		`, [
+			input.id,
 			input.userId,
 			input.tokenId ?? null,
 			input.kind,

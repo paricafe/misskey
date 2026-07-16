@@ -5,10 +5,8 @@
 
 import { Inject, Injectable } from '@nestjs/common';
 import { In } from 'typeorm';
-import { parse as mfmParse } from 'mfm-js';
 import type { Config } from '@/config.js';
 import { IdService } from '@/core/IdService.js';
-import { MfmService } from '@/core/MfmService.js';
 import { UserEntityService } from '@/core/entities/UserEntityService.js';
 import { DI } from '@/di-symbols.js';
 import { langmap } from '@/misc/langmap.js';
@@ -110,7 +108,6 @@ export class MastodonCollectionService {
 		private blockingsRepository: BlockingsRepository,
 
 		private idService: IdService,
-		private mfmService: MfmService,
 		private userEntityService: UserEntityService,
 		private mastodonEntityService: MastodonEntityService,
 	) {}
@@ -147,7 +144,7 @@ export class MastodonCollectionService {
 				createdAt,
 				updatedAt: createdAt,
 			};
-			await stateService.put({ userId: ownerId, kind: COLLECTION_KIND, key: collectionId, value: stored });
+			await stateService.createWithId({ id: collectionId, userId: ownerId, kind: COLLECTION_KIND, key: collectionId, value: stored });
 			for (const item of items) {
 				await stateService.put({
 					userId: item.account_id,
@@ -160,14 +157,18 @@ export class MastodonCollectionService {
 		});
 	}
 
-	public async get(collectionId: string, viewerId: MiUser['id'] | null = null): Promise<{
+	public async get(
+		collectionId: string,
+		viewerId: MiUser['id'] | null = null,
+		options: { ignoreOwnerBlock?: boolean } = {},
+	): Promise<{
 		collection: MastodonCollection;
 		accounts: ReturnType<MastodonEntityService['account']>[];
 	}> {
-		const row = await this.mastodonApiStateService.getByKindKey(COLLECTION_KIND, collectionId);
+		const row = await this.collectionRow(this.mastodonApiStateService, collectionId);
 		if (row == null) this.notFound();
 		const reconciled = await this.reconcile(row);
-		if (viewerId != null && viewerId !== reconciled.stored.accountId && await this.hasMutualBlock(viewerId, reconciled.stored.accountId)) {
+		if (!options.ignoreOwnerBlock && viewerId != null && viewerId !== reconciled.stored.accountId && await this.hasOwnerBlock(reconciled.stored.accountId, viewerId)) {
 			this.forbidden();
 		}
 		const blockedIds = viewerId == null
@@ -197,7 +198,7 @@ export class MastodonCollectionService {
 	): Promise<MastodonCollectionPage> {
 		const account = await this.users(accountId);
 		if (account == null) this.notFound('Account not found');
-		if (viewerId != null && viewerId !== accountId && await this.hasMutualBlock(viewerId, accountId)) return { items: [], total: 0, hasMore: false };
+		if (viewerId != null && viewerId !== accountId && await this.hasOwnerBlock(accountId, viewerId)) return { items: [], total: 0, hasMore: false };
 		const rows = await this.mastodonApiStateService.list(accountId, COLLECTION_KIND);
 		const collections: MastodonCollection[] = [];
 		for (const row of rows) {
@@ -242,12 +243,8 @@ export class MastodonCollectionService {
 				if (!(await this.validMembership(row))) continue;
 				const membership = this.storedMembership(row);
 				if (membership == null) continue;
-				if (await this.hasMutualBlock(viewerId, membership.collectionOwnerId)) {
-					validInChunk++;
-					continue;
-				}
 				try {
-					const collection = (await this.get(membership.collectionId, viewerId)).collection;
+					const collection = (await this.get(membership.collectionId, viewerId, { ignoreOwnerBlock: true })).collection;
 					validInChunk++;
 					collections.push(collection);
 				} catch (error) {
@@ -273,7 +270,7 @@ export class MastodonCollectionService {
 
 	public async update(ownerId: MiUser['id'], collectionId: string, rawInput: Dictionary): Promise<MastodonCollection> {
 		const input = this.collectionInput(rawInput, false);
-		const row = await this.mastodonApiStateService.getByKindKey(COLLECTION_KIND, collectionId);
+		const row = await this.collectionRow(this.mastodonApiStateService, collectionId);
 		if (row == null) this.notFound();
 		return await this.mastodonApiStateService.withUserKindLocks([{ userId: row.userId, kind: COLLECTION_KIND }], async stateService => {
 			const current = await this.requireOwned(stateService, ownerId, collectionId);
@@ -293,7 +290,7 @@ export class MastodonCollectionService {
 	}
 
 	public async delete(ownerId: MiUser['id'], collectionId: string): Promise<Record<string, never>> {
-		const initial = await this.mastodonApiStateService.getByKindKey(COLLECTION_KIND, collectionId);
+		const initial = await this.collectionRow(this.mastodonApiStateService, collectionId);
 		if (initial == null) return this.notFound();
 		let candidate: MiMastodonUserState = initial;
 		while (true) {
@@ -306,7 +303,7 @@ export class MastodonCollectionService {
 				{ userId: candidate.userId, kind: COLLECTION_KIND },
 				...preflight.items.map(item => ({ userId: item.account_id, kind: MEMBERSHIP_KIND })),
 			], async stateService => {
-				const reread = await stateService.getByKindKey(COLLECTION_KIND, collectionId);
+				const reread = await this.collectionRow(stateService, collectionId);
 				if (reread == null) return this.notFound();
 				const current = this.storedCollection(reread);
 				if (current == null) return this.notFound();
@@ -326,7 +323,7 @@ export class MastodonCollectionService {
 
 	public async addItem(ownerId: MiUser['id'], collectionId: string, accountId: MiUser['id']): Promise<MastodonCollectionItem> {
 		if (typeof accountId !== 'string' || accountId === '') this.invalid('`account_id` parameter is missing');
-		const row = await this.mastodonApiStateService.getByKindKey(COLLECTION_KIND, collectionId);
+		const row = await this.collectionRow(this.mastodonApiStateService, collectionId);
 		if (row == null) this.notFound();
 		const item: MastodonCollectionItem = {
 			id: this.idService.gen(),
@@ -350,7 +347,7 @@ export class MastodonCollectionService {
 	}
 
 	public async removeItem(ownerId: MiUser['id'], collectionId: string, itemId: string): Promise<Record<string, never>> {
-		const row = await this.mastodonApiStateService.getByKindKey(COLLECTION_KIND, collectionId);
+		const row = await this.collectionRow(this.mastodonApiStateService, collectionId);
 		if (row == null) this.notFound();
 		const preflight = this.storedCollection(row);
 		const targetId = preflight?.items.find(item => item.id === itemId)?.account_id;
@@ -367,13 +364,13 @@ export class MastodonCollectionService {
 	}
 
 	public async revoke(accountId: MiUser['id'], collectionId: string, itemId: string): Promise<Record<string, never>> {
-		const row = await this.mastodonApiStateService.getByKindKey(COLLECTION_KIND, collectionId);
+		const row = await this.collectionRow(this.mastodonApiStateService, collectionId);
 		if (row == null) this.notFound();
 		return await this.mastodonApiStateService.withUserKindLocks([
 			{ userId: row.userId, kind: COLLECTION_KIND },
 			{ userId: accountId, kind: MEMBERSHIP_KIND },
 		], async stateService => {
-			const reread = await stateService.getByKindKey(COLLECTION_KIND, collectionId);
+			const reread = await this.collectionRow(stateService, collectionId);
 			const current = reread == null ? null : this.storedCollection(reread);
 			if (current == null) this.notFound();
 			const item = current.items.find(currentItem => currentItem.id === itemId);
@@ -390,7 +387,7 @@ export class MastodonCollectionService {
 			uri: new URL(`/api/v1/collections/${encodeURIComponent(stored.id)}`, this.config.url).toString(),
 			url: null,
 			name: stored.name,
-			description: stored.description == null ? null : this.mfmService.toHtml(mfmParse(stored.description)) ?? '',
+			description: stored.description,
 			language: stored.language,
 			local: true,
 			sensitive: stored.sensitive,
@@ -495,7 +492,7 @@ export class MastodonCollectionService {
 				{ userId: preflight.accountId, kind: COLLECTION_KIND },
 				...preflight.items.map(item => ({ userId: item.account_id, kind: MEMBERSHIP_KIND })),
 			], async stateService => {
-				const reread = await stateService.getByKindKey(COLLECTION_KIND, preflight.id);
+				const reread = await this.collectionRow(stateService, preflight.id);
 				if (reread == null) return this.notFound();
 				const stored = this.storedCollection(reread);
 				if (stored == null) return this.notFound();
@@ -550,7 +547,7 @@ export class MastodonCollectionService {
 			});
 			return false;
 		}
-		const master = await this.mastodonApiStateService.getByKindKey(COLLECTION_KIND, membership.collectionId);
+		const master = await this.collectionRow(this.mastodonApiStateService, membership.collectionId);
 		const stored = master == null ? null : this.storedCollection(master);
 		const valid = stored?.items.some(item => item.id === membership.item.id && item.account_id === row.userId) ?? false;
 		if (valid) return true;
@@ -558,7 +555,7 @@ export class MastodonCollectionService {
 			{ userId: row.userId, kind: MEMBERSHIP_KIND },
 			...(stored == null ? [] : [{ userId: stored.accountId, kind: COLLECTION_KIND }]),
 		], async stateService => {
-			const reread = await stateService.getByKindKey(COLLECTION_KIND, membership.collectionId);
+			const reread = await this.collectionRow(stateService, membership.collectionId);
 			const current = reread == null ? null : this.storedCollection(reread);
 			if (current?.items.some(item => item.id === membership.item.id && item.account_id === row.userId)) return true;
 			await stateService.delete(row.userId, MEMBERSHIP_KIND, membership.collectionId);
@@ -566,8 +563,16 @@ export class MastodonCollectionService {
 		});
 	}
 
+	private async collectionRow(
+		stateService: MastodonApiStateService,
+		collectionId: string,
+	): Promise<MiMastodonUserState | null> {
+		const row = await stateService.getById(collectionId);
+		return row?.kind === COLLECTION_KIND ? row : null;
+	}
+
 	private async requireOwned(stateService: MastodonApiStateService, ownerId: MiUser['id'], collectionId: string): Promise<StoredCollection> {
-		const row = await stateService.getByKindKey(COLLECTION_KIND, collectionId);
+		const row = await this.collectionRow(stateService, collectionId);
 		const stored = row == null ? null : this.storedCollection(row);
 		if (stored == null) this.notFound();
 		if (stored.accountId !== ownerId) this.forbidden();
@@ -588,13 +593,9 @@ export class MastodonCollectionService {
 		return (await this.usersRepository.findBy({ id: In([userId]) })).find(user => user.id === userId) ?? null;
 	}
 
-	private async hasMutualBlock(left: MiUser['id'], right: MiUser['id']): Promise<boolean> {
-		const blocks = await this.blockingsRepository.findBy({ blockerId: In([left, right]), blockeeId: In([left, right]) });
-		return blocks.some(block => (
-			block.blockerId === left && block.blockeeId === right
-		) || (
-			block.blockerId === right && block.blockeeId === left
-		));
+	private async hasOwnerBlock(ownerId: MiUser['id'], viewerId: MiUser['id']): Promise<boolean> {
+		const blocks = await this.blockingsRepository.findBy({ blockerId: ownerId, blockeeId: viewerId });
+		return blocks.some(block => block.blockerId === ownerId && block.blockeeId === viewerId);
 	}
 
 	private async blockedBy(viewerId: MiUser['id'], accountIds: MiUser['id'][]): Promise<Set<MiUser['id']>> {

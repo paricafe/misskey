@@ -162,13 +162,32 @@ describe(MastodonApiStateService, () => {
 		expect(repository.findOneBy).toHaveBeenCalledWith({ userId: 'u1', kind: 'marker', key: 'home' });
 	});
 
-	test('gets a globally unique kind and key without scanning JSON values', async () => {
+	test('gets state by its indexed primary id', async () => {
 		const row = state(1);
 		const { service, repository } = createService();
 		repository.findOneBy.mockResolvedValue(row);
 
-		await expect(service.getByKindKey('collection', 'collection-1')).resolves.toEqual(row);
-		expect(repository.findOneBy).toHaveBeenCalledWith({ kind: 'collection', key: 'collection-1' });
+		await expect(service.getById('collection-1')).resolves.toEqual(row);
+		expect(repository.findOneBy).toHaveBeenCalledWith({ id: 'collection-1' });
+	});
+
+	test('creates one state row with the caller-provided primary id', async () => {
+		const collection = { ...state(1), id: 'collection-1', kind: 'collection', key: 'collection-1' };
+		const { service, repository, idService } = createService([[collection], []]);
+		const input = {
+			id: 'collection-1',
+			userId: 'u1',
+			kind: 'collection',
+			key: 'collection-1',
+			value: { name: 'People' },
+		};
+
+		await expect(service.createWithId(input)).resolves.toEqual(collection);
+		await expect(service.createWithId(input)).rejects.toMatchObject({ statusCode: 409, code: 'conflict' });
+		expect(repository.query.mock.calls[0][0]).toContain('ON CONFLICT DO NOTHING');
+		expect(repository.query.mock.calls[0][0]).not.toContain('DO UPDATE');
+		expect(repository.query.mock.calls[0][1][0]).toBe('collection-1');
+		expect(idService.gen).not.toHaveBeenCalled();
 	});
 
 	test('reads a bounded stable page and returns the total', async () => {

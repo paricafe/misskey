@@ -47,8 +47,7 @@ describe(MastodonCollectionService, () => {
 				.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || b.id.localeCompare(a.id))),
 			get: vi.fn(async (userId: string, kind: string, key: string) => rows
 				.find(row => row.userId === userId && row.kind === kind && row.key === key) ?? null),
-			getByKindKey: vi.fn(async (kind: string, key: string) => rows
-				.find(row => row.kind === kind && row.key === key) ?? null),
+			getById: vi.fn(async (id: string) => rows.find(row => row.id === id) ?? null),
 			listPage: vi.fn(async (userId: string, kind: string, page: { offset: number; limit: number }) => {
 				const all = rows
 					.filter(row => row.userId === userId && row.kind === kind)
@@ -66,6 +65,26 @@ describe(MastodonCollectionService, () => {
 				}
 				const row: Row = {
 					id: `state-${rows.length + 1}`,
+					userId: input.userId,
+					tokenId: null,
+					kind: input.kind,
+					key: input.key,
+					value: input.value,
+					version: 1,
+					createdAt: now,
+					updatedAt: now,
+					expiresAt: null,
+				};
+				rows.push(row);
+				return row;
+			}),
+			createWithId: vi.fn(async (input: { id: string; userId: string; kind: string; key: string; value: unknown }) => {
+				if (rows.some(row => row.id === input.id || (row.userId === input.userId && row.kind === input.kind && row.key === input.key))) {
+					throw Object.assign(new Error('conflict'), { statusCode: 409, code: 'conflict' });
+				}
+				const now = new Date();
+				const row: Row = {
+					id: input.id,
 					userId: input.userId,
 					tokenId: null,
 					kind: input.kind,
@@ -109,7 +128,6 @@ describe(MastodonCollectionService, () => {
 				usersRepository as never,
 				blockingsRepository as never,
 				idService as never,
-				mfmService,
 				userEntityService as never,
 				mastodonEntityService,
 			),
@@ -122,7 +140,7 @@ describe(MastodonCollectionService, () => {
 	}
 
 	test('creates an exact REST-only collection and mirrors accepted items with one public id', async () => {
-		const { service, rows, locks } = createService();
+		const { service, rows, locks, stateService } = createService();
 
 		const collection = await service.create('owner', {
 			name: 'Nice accounts',
@@ -148,16 +166,36 @@ describe(MastodonCollectionService, () => {
 			item_count: 1,
 			items: [{ id: 'id-2', account_id: 'member', state: 'accepted' }],
 		});
-		expect(collection.description).not.toContain('<script>');
-		expect(collection.description).toContain('&lt;script&gt;');
+		expect(collection.description).toBe('<script>alert(1)</script> **nice**');
 		const master = rows.find(row => row.kind === 'collection');
 		const reverse = rows.find(row => row.kind === 'collection_membership');
 		expect((master?.value as { items: { id: string }[] }).items[0].id).toBe('id-2');
+		expect(master?.id).toBe(collection.id);
+		expect(stateService.createWithId).toHaveBeenCalledWith(expect.objectContaining({ id: collection.id, key: collection.id }));
 		expect((reverse?.value as { item: { id: string } }).item.id).toBe('id-2');
 		expect(locks[0]).toEqual(expect.arrayContaining([
 			{ userId: 'owner', kind: 'collection' },
 			{ userId: 'member', kind: 'collection_membership' },
 		]));
+	});
+
+	test('round-trips URL, MFM, and HTML collection descriptions without transforming them', async () => {
+		const { service } = createService();
+		const description = 'https://example.test **bold** <b>raw</b>';
+
+		const created = await service.create('owner', {
+			name: 'Raw description',
+			description,
+		});
+
+		expect(created.description).toBe(description);
+		expect((await service.get(created.id, 'owner')).collection.description).toBe(description);
+
+		const updatedDescription = `${description} updated`;
+		const updated = await service.update('owner', created.id, { description: updatedDescription });
+
+		expect(updated.description).toBe(updatedDescription);
+		expect((await service.get(created.id, 'owner')).collection.description).toBe(updatedDescription);
 	});
 
 	test('enforces collection validation and rejects ineligible item accounts with 422', async () => {
@@ -245,6 +283,32 @@ describe(MastodonCollectionService, () => {
 		await expect(service.update('member', 'missing', { name: 'Nope' })).rejects.toMatchObject({ statusCode: 404 });
 	});
 
+	test('uses the public collection id primary key for unknown reads', async () => {
+		const { service, stateService } = createService();
+
+		await expect(service.get('missing', null)).rejects.toMatchObject({ statusCode: 404 });
+		expect(stateService.getById).toHaveBeenCalledWith('missing');
+	});
+
+	test('rejects a primary-key match that is not collection state', async () => {
+		const { service, rows } = createService();
+		const now = new Date();
+		rows.push({
+			id: 'marker-state',
+			userId: 'owner',
+			tokenId: null,
+			kind: 'marker',
+			key: 'home',
+			value: {},
+			version: 1,
+			createdAt: now,
+			updatedAt: now,
+			expiresAt: null,
+		});
+
+		await expect(service.get('marker-state', null)).rejects.toMatchObject({ statusCode: 404 });
+	});
+
 	test('tailors blocked members, preserves suspended member shape, and keeps owner first', async () => {
 		const context = createService({
 			users: [
@@ -268,7 +332,7 @@ describe(MastodonCollectionService, () => {
 		expect(result.accounts.map(account => account.id)).toEqual(['owner', 'suspended']);
 	});
 
-	test('shows undiscoverable collections only to the owner and hides mutual blocks from lists', async () => {
+	test('shows undiscoverable collections only to the owner and hides an owner block from the viewer', async () => {
 		const context = createService({
 			users: [
 				{ id: 'owner', username: 'owner', host: null, isSuspended: false },
@@ -288,6 +352,32 @@ describe(MastodonCollectionService, () => {
 
 		await expect(context.service.get(hidden.id, 'viewer')).rejects.toMatchObject({ statusCode: 403 });
 		await expect(context.service.listByAccount('owner', 'viewer', { offset: 0, limit: 40 })).resolves.toMatchObject({ items: [] });
+	});
+
+	test('keeps a collection visible when the viewer blocks its owner', async () => {
+		const context = createService({
+			users: [
+				{ id: 'owner', username: 'owner', host: null, isSuspended: false },
+				{ id: 'viewer', username: 'viewer', host: null, isSuspended: false },
+			],
+			blocks: [{ blockerId: 'viewer', blockeeId: 'owner' }],
+		});
+		const created = await context.service.create('owner', { name: 'People', discoverable: true });
+
+		await expect(context.service.get(created.id, 'viewer')).resolves.toMatchObject({ collection: { id: created.id } });
+		await expect(context.service.listByAccount('owner', 'viewer', { offset: 0, limit: 40 })).resolves.toMatchObject({ items: [{ id: created.id }] });
+	});
+
+	test('keeps owner-blocked memberships in in_collections so the item can revoke', async () => {
+		const context = createService();
+		const created = await context.service.create('owner', { name: 'People', account_ids: ['member'] });
+		const itemId = created.items[0].id;
+		context.blockingsRepository.findBy.mockResolvedValue([{ blockerId: 'owner', blockeeId: 'member' }]);
+
+		await expect(context.service.listInCollections('member', 'member', { offset: 0, limit: 40 })).resolves.toMatchObject({
+			items: [{ id: created.id, items: [{ id: itemId, account_id: 'member' }] }],
+		});
+		await expect(context.service.revoke('member', created.id, itemId)).resolves.toEqual({});
 	});
 
 	test('repairs both sides when a member is actually deleted', async () => {
