@@ -774,6 +774,68 @@ describe(MastodonApiServerService, () => {
 		expect(response.json()).toEqual([]);
 	});
 
+	test('enforces every declared fallback shape, authentication boundary, and error envelope', async () => {
+		const { fastify, authenticate, assert, assertAny } = createServer();
+		const routes = MASTODON_4_6_USER_ROUTES.filter(route => route.behavior !== 'implemented' && route.transport !== 'websocket');
+
+		for (const route of routes) {
+			const key = `${route.method} ${route.path}`;
+			const url = new URL(route.samplePath, 'https://misskey.example');
+			for (const name of route.requiredQuery ?? []) url.searchParams.set(name, 'value');
+			const payload = Object.fromEntries((route.requiredBody ?? []).map(name => [name, 'value']));
+			const request = {
+				method: route.method,
+				url: `${url.pathname}${url.search}`,
+				...(route.auth === 'public' ? {} : { headers: { authorization: 'Bearer user-token' } }),
+				...(Object.keys(payload).length === 0 ? {} : { payload }),
+			} as const;
+
+			assert.mockClear();
+			assertAny.mockClear();
+			const response = await fastify.inject(request);
+			const body = response.json();
+
+			if (route.behavior === 'safe-array') {
+				expect(response.statusCode, key).toBe(200);
+				expect(body, key).toEqual(route.fallbackBody ?? []);
+				expect(Array.isArray(body), key).toBe(true);
+			} else if (route.behavior === 'safe-object') {
+				expect(response.statusCode, key).toBe(200);
+				expect(body, key).toEqual(route.fallbackBody ?? {});
+				expect(Array.isArray(body), key).toBe(false);
+				expect(body, key).toBeTypeOf('object');
+			} else if (route.behavior === 'singleton-not-found') {
+				expect(response.statusCode, key).toBe(404);
+				expect(body, key).toEqual({ error: 'Record not found' });
+			} else {
+				expect(response.statusCode, key).toBe(422);
+				expect(body, key).toEqual({ error: 'This operation is not supported by this server' });
+			}
+			expect(JSON.stringify(body), key).not.toMatch(/stack|nativeError|queryFailedError/iu);
+
+			if (route.auth === 'public' || route.scope == null) {
+				expect(assert, key).not.toHaveBeenCalled();
+				expect(assertAny, key).not.toHaveBeenCalled();
+			} else if (typeof route.scope === 'string') {
+				expect(assert, key).toHaveBeenCalledWith(['read'], route.scope);
+			} else {
+				expect(assertAny, key).toHaveBeenCalledWith(['read'], route.scope);
+			}
+
+			if (route.auth === 'public') {
+				authenticate.mockRejectedValueOnce(new MastodonApiError(401, 'invalid_token', 'The access token is invalid'));
+				const invalid = await fastify.inject({
+					...request,
+					headers: { authorization: 'Bearer invalid-token' },
+				});
+				expect(invalid.statusCode, `${key} invalid token`).toBe(401);
+			} else if (route.behavior === 'unsupported-write') {
+				const unauthenticated = await fastify.inject({ ...request, headers: {} });
+				expect(unauthenticated.statusCode, `${key} unauthenticated`).toBe(401);
+			}
+		}
+	});
+
 	test('registers every documented Mastodon 4.6.3 Fastify route exactly once', async () => {
 		const { fastify } = createServer();
 		await fastify.ready();
