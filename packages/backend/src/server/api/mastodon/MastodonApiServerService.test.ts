@@ -42,7 +42,9 @@ describe(MastodonApiServerService, () => {
 				}],
 			};
 			if (name === 'notes/timeline') return [{ id: 'note-id' }];
-			if (name === 'users/show') return { id: data.userId, username: data.userId };
+			if (name === 'users/show') return Array.isArray(data.userIds)
+				? data.userIds.map(id => ({ id, username: id }))
+				: { id: data.userId, username: data.userId };
 			if (name === 'notes/show') return data.noteId === 'note-with-poll'
 				? {
 					id: data.noteId,
@@ -73,9 +75,14 @@ describe(MastodonApiServerService, () => {
 			zremrangebyrank: vi.fn().mockResolvedValue(0),
 			zscore: vi.fn(async (_key: string, id: string) => dismissedNotifications.has(id) ? '1' : null),
 		};
+		const nativeThreads = new Map<string, string | null>([
+			['reply-note', 'root-note'],
+			['sibling-note', 'root-note'],
+		]);
 		const notesRepository = {
 			findBy: vi.fn().mockResolvedValue([]),
-			findOneBy: vi.fn(async ({ id }: { id: string }) => ({ id, threadId: id === 'reply-note' ? 'root-note' : null })),
+			findOneBy: vi.fn(async ({ id }: { id: string }) => ({ id, threadId: nativeThreads.get(id) ?? null })),
+			query: vi.fn().mockResolvedValue([]),
 		};
 		const noteFavoritesRepository = { findBy: vi.fn().mockResolvedValue([]) };
 		const userNotePiningsRepository = { findBy: vi.fn().mockResolvedValue([]) };
@@ -194,22 +201,53 @@ describe(MastodonApiServerService, () => {
 		const userProfilesRepository = {
 			manager: { transaction: vi.fn(async (callback: (manager: { getRepository: () => typeof profileRepository }) => Promise<unknown>) => callback({ getRepository: () => profileRepository })) },
 		};
-		const noteThreadMutingsRepository = { query: vi.fn().mockResolvedValue([]), delete: vi.fn().mockResolvedValue({ affected: 1 }) };
+		const mutedThreads = new Set<string>();
+		const noteThreadMutingsRepository = {
+			query: vi.fn(async (sql: string, parameters: unknown[]) => {
+				if (sql.includes('INSERT INTO "note_thread_muting"')) {
+					mutedThreads.add(parameters[2] as string);
+					return [];
+				}
+				if (sql.includes('JOIN "note_thread_muting"')) {
+					return (parameters[1] as string[]).flatMap(id => mutedThreads.has(nativeThreads.get(id) ?? id) ? [{ id }] : []);
+				}
+				return [];
+			}),
+			delete: vi.fn(async ({ threadId }: { threadId: string }) => {
+				const affected = mutedThreads.delete(threadId) ? 1 : 0;
+				return { affected };
+			}),
+		};
 		const userFeatureCacheService = {
 			userProfileCache: {
 				fetch: vi.fn(async (userId: string) => profiles.get(userId)),
 				set: vi.fn(),
+				delete: vi.fn(),
 			},
 		};
+		const existingUserIds = new Set(['target', 'not-followed']);
+		const followedUserIds = new Set(['target']);
+		const userFeatureUsersRepository = {
+			existsBy: vi.fn(async ({ id }: { id: string }) => existingUserIds.has(id)),
+			findBy: vi.fn(async () => [...existingUserIds].map(id => ({ id }))),
+		};
+		const userFeatureFollowingsRepository = {
+			existsBy: vi.fn(async ({ followerId, followeeId }: { followerId: string; followeeId: string }) => followerId === 'user-id' && followedUserIds.has(followeeId)),
+			findBy: vi.fn(async () => [...followedUserIds].map(followeeId => ({ followerId: 'user-id', followeeId }))),
+		};
+		const userFeatureUserEntityService = { pack: vi.fn(async () => ({ id: 'user-id' })) };
+		const userFeatureGlobalEventService = { publishMainStream: vi.fn() };
 		let compatibilityId = 0;
 		const mastodonUserFeatureService = new MastodonUserFeatureService(
 			mastodonApiStateService as never,
-			{ existsBy: vi.fn(async ({ id }: { id: string }) => id !== 'missing-user') } as never,
-			{ existsBy: vi.fn(async ({ followerId, followeeId }: { followerId: string; followeeId: string }) => followerId === 'user-id' && followeeId !== 'not-followed') } as never,
+			userFeatureUsersRepository as never,
+			userFeatureFollowingsRepository as never,
 			userProfilesRepository as never,
 			noteThreadMutingsRepository as never,
 			userFeatureCacheService as never,
 			{ gen: () => `compatibility-${++compatibilityId}` } as never,
+			userFeatureUserEntityService as never,
+			userFeatureGlobalEventService as never,
 		);
 		const createReport = vi.fn(async (_reporter: unknown, input: Record<string, unknown>) => ({
 			report: { id: 'report-id', resolved: false, forwarded: false },
@@ -361,6 +399,12 @@ describe(MastodonApiServerService, () => {
 			mastodonUserFeatureService,
 			profiles,
 			noteThreadMutingsRepository,
+			mutedThreads,
+			nativeThreads,
+			existingUserIds,
+			followedUserIds,
+			userFeatureCacheService,
+			userFeatureGlobalEventService,
 		};
 	}
 
@@ -3084,8 +3128,21 @@ describe(MastodonApiServerService, () => {
 		expect(unfollowed.json()).toMatchObject({ following: false, featuring: false });
 	});
 
-	test('implements featured tags, suggestions, public account lists, and both feature route styles', async () => {
-		const { fastify, nativeInvoke } = createServer();
+	test('uses compatibility pagination defaults without changing the global pagination default', async () => {
+		const { fastify, toMisskey } = createServer();
+		const headers = { authorization: 'Bearer user-token' };
+
+		await fastify.inject({ method: 'GET', url: '/api/v1/followed_tags', headers });
+		expect(toMisskey).toHaveBeenLastCalledWith(expect.objectContaining({ limit: 100 }), 200);
+		await fastify.inject({ method: 'GET', url: '/api/v1/domain_blocks', headers });
+		expect(toMisskey).toHaveBeenLastCalledWith(expect.objectContaining({ limit: 100 }), 200);
+		await fastify.inject({ method: 'GET', url: '/api/v1/endorsements', headers });
+		expect(toMisskey).toHaveBeenLastCalledWith(expect.objectContaining({ limit: 40 }), 80);
+	});
+
+	test('implements featured tags using one visibility-bounded aggregate, suggestions, public account lists, and both feature route styles', async () => {
+		const { fastify, nativeInvoke, notesRepository } = createServer();
+		notesRepository.query.mockResolvedValue([{ tag: 'art', statusesCount: 2, lastStatusAt: new Date('2026-07-17T03:00:00.000Z') }]);
 		nativeInvoke.mockImplementation(async (name, data) => {
 			if (name === 'users/show') return { id: data.userId, username: 'alice', url: 'https://misskey.example/@alice' };
 			if (name === 'users/notes') return [
@@ -3103,6 +3160,11 @@ describe(MastodonApiServerService, () => {
 		});
 		expect(created.statusCode).toBe(200);
 		expect(created.json()).toMatchObject({ name: 'art', statuses_count: '2', last_status_at: '2026-07-17' });
+		expect(notesRepository.query).toHaveBeenCalledWith(
+			expect.stringMatching(/unnest\(note\."tags"\)[\s\S]*note\."visibility" IN \('public', 'home'\)[\s\S]*GROUP BY/u),
+			['user-id', ['art']],
+		);
+		expect(nativeInvoke).not.toHaveBeenCalledWith('users/notes', expect.objectContaining({ userId: 'user-id', limit: 100 }), expect.anything(), expect.anything());
 
 		const own = await fastify.inject({ method: 'GET', url: '/api/v1/featured_tags', headers: { authorization: 'Bearer user-token' } });
 		const account = await fastify.inject({ method: 'GET', url: '/api/v1/accounts/user-id/featured_tags' });
@@ -3119,6 +3181,30 @@ describe(MastodonApiServerService, () => {
 		const deleted = await fastify.inject({ method: 'DELETE', url: `/api/v1/featured_tags/${created.json().id}`, headers: { authorization: 'Bearer user-token' } });
 		expect(deleted.statusCode).toBe(200);
 		expect(deleted.json()).toEqual({});
+	});
+
+	test('accepts a valid optional token without read:accounts on public user-feature routes', async () => {
+		const { fastify, authenticate, assert } = createServer();
+		authenticate.mockResolvedValue({
+			kind: 'user',
+			user: { id: 'viewer-id' },
+			token: { id: 'token-id', scopes: ['write:statuses'] },
+		});
+
+		const featured = await fastify.inject({
+			method: 'GET',
+			url: '/api/v1/accounts/user-id/featured_tags',
+			headers: { authorization: 'Bearer limited-token' },
+		});
+		const endorsements = await fastify.inject({
+			method: 'GET',
+			url: '/api/v1/accounts/user-id/endorsements',
+			headers: { authorization: 'Bearer limited-token' },
+		});
+
+		expect(featured.statusCode).toBe(200);
+		expect(endorsements.statusCode).toBe(200);
+		expect(assert).not.toHaveBeenCalled();
 	});
 
 	test('implements endorsement lists and current/deprecated relationship actions', async () => {
@@ -3146,8 +3232,85 @@ describe(MastodonApiServerService, () => {
 		}
 	});
 
+	test('prunes stale endorsements from relationship and public account views', async () => {
+		const { fastify, mastodonUserFeatureService, mastodonApiStateService, followedUserIds } = createServer();
+		await mastodonUserFeatureService.endorse('user-id', 'target');
+		followedUserIds.delete('target');
+
+		const relationships = await fastify.inject({
+			method: 'GET',
+			url: '/api/v1/accounts/relationships?id[]=target',
+			headers: { authorization: 'Bearer user-token' },
+		});
+		const own = await fastify.inject({ method: 'GET', url: '/api/v1/endorsements', headers: { authorization: 'Bearer user-token' } });
+		const account = await fastify.inject({ method: 'GET', url: '/api/v1/accounts/user-id/endorsements' });
+
+		expect(relationships.json()).toEqual([expect.objectContaining({ id: 'target', endorsed: false })]);
+		expect(own.json()).toEqual([]);
+		expect(account.json()).toEqual([]);
+		expect(await mastodonApiStateService.get('user-id', 'endorsement', 'target')).toBeNull();
+	});
+
+	test('removes an endorsement immediately after unfollowing through the Mastodon route', async () => {
+		const { fastify, mastodonUserFeatureService, mastodonApiStateService, nativeInvoke } = createServer();
+		await mastodonUserFeatureService.endorse('user-id', 'target');
+
+		const response = await fastify.inject({
+			method: 'POST',
+			url: '/api/v1/accounts/target/unfollow',
+			headers: { authorization: 'Bearer user-token' },
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(nativeInvoke).toHaveBeenCalledWith('following/delete', { userId: 'target' }, expect.any(Object), expect.any(Object));
+		expect(await mastodonApiStateService.get('user-id', 'endorsement', 'target')).toBeNull();
+	});
+
+	test('loads up to 80 endorsements in one native batch while preserving state order and omitting unavailable users', async () => {
+		const {
+			fastify,
+			mastodonApiStateService,
+			existingUserIds,
+			followedUserIds,
+			nativeInvoke,
+			toMisskey,
+			linkHeader,
+		} = createServer();
+		const ids = Array.from({ length: 82 }, (_, index) => `account-${index.toString().padStart(3, '0')}`);
+		for (const id of ids) {
+			existingUserIds.add(id);
+			followedUserIds.add(id);
+			await mastodonApiStateService.put({ userId: 'user-id', kind: 'endorsement', key: id, value: {} });
+		}
+		toMisskey.mockReturnValueOnce({ limit: 80 });
+		nativeInvoke.mockImplementation(async (name, data) => {
+			if (name !== 'users/show' || !Array.isArray(data.userIds)) return [];
+			return [...data.userIds]
+				.reverse()
+				.filter(id => id !== 'account-010')
+				.map(id => ({ id, username: id }));
+		});
+
+		const response = await fastify.inject({
+			method: 'GET',
+			url: '/api/v1/endorsements?limit=80',
+			headers: { authorization: 'Bearer user-token' },
+		});
+		const expectedIds = ids.slice(0, 80).filter(id => id !== 'account-010');
+
+		expect(response.statusCode).toBe(200);
+		expect(response.json().map((account: { id: string }) => account.id)).toEqual(expectedIds);
+		expect(nativeInvoke.mock.calls.filter(([name]) => name === 'users/show')).toEqual([[
+			'users/show',
+			{ userIds: ids.slice(0, 80) },
+			expect.any(Object),
+			expect.any(Object),
+		]]);
+		expect(linkHeader).toHaveBeenCalledWith(expect.any(String), expectedIds.map(id => expect.objectContaining({ id })));
+	});
+
 	test('stores domain blocks as normalized strings on the native profile', async () => {
-		const { fastify, profiles, toMisskey } = createServer();
+		const { fastify, profiles, toMisskey, userFeatureCacheService, userFeatureGlobalEventService } = createServer();
 		toMisskey.mockImplementation((query: Record<string, unknown>) => ({
 			limit: 20,
 			...(typeof query.max_id === 'string' ? { untilId: query.max_id } : {}),
@@ -3166,6 +3329,8 @@ describe(MastodonApiServerService, () => {
 		expect(listed.json()).toEqual(['xn--bcher-kva.example']);
 		expect(afterCursor.json()).toEqual([]);
 		expect(profiles.get('user-id')?.mutedInstances).toEqual(['xn--bcher-kva.example']);
+		expect(userFeatureCacheService.userProfileCache.delete).toHaveBeenCalledWith('user-id');
+		expect(userFeatureGlobalEventService.publishMainStream).toHaveBeenCalledWith('user-id', 'meUpdated', { id: 'user-id' });
 
 		const unblocked = await fastify.inject({
 			method: 'DELETE',
@@ -3174,6 +3339,46 @@ describe(MastodonApiServerService, () => {
 			payload: 'domain=xn--bcher-kva.example',
 		});
 		expect(unblocked.json()).toEqual({});
+	});
+
+	test.each([
+		['missing', {}],
+		['blank', { domain: '   ' }],
+	] as const)('rejects a %s domain block as unprocessable', async (_label, payload) => {
+		const { fastify } = createServer();
+		const response = await fastify.inject({
+			method: 'POST',
+			url: '/api/v1/domain_blocks',
+			headers: { authorization: 'Bearer user-token' },
+			payload,
+		});
+
+		expect(response.statusCode).toBe(422);
+	});
+
+	test('sorts domain blocks before applying cursors and builds links from the returned page', async () => {
+		const { fastify, profiles, linkHeader, toMisskey } = createServer();
+		profiles.get('user-id')!.mutedInstances = ['alpha.example', 'zeta.example', 'middle.example'];
+		toMisskey.mockImplementation((query: Record<string, unknown>) => ({
+			limit: Number(query.limit),
+			...(typeof query.max_id === 'string' ? { untilId: query.max_id } : {}),
+		}));
+
+		const first = await fastify.inject({
+			method: 'GET',
+			url: '/api/v1/domain_blocks?limit=2',
+			headers: { authorization: 'Bearer user-token' },
+		});
+		const next = await fastify.inject({
+			method: 'GET',
+			url: '/api/v1/domain_blocks?limit=2&max_id=middle.example',
+			headers: { authorization: 'Bearer user-token' },
+		});
+
+		expect(first.json()).toEqual(['zeta.example', 'middle.example']);
+		expect(next.json()).toEqual(['alpha.example']);
+		expect(linkHeader).toHaveBeenNthCalledWith(1, expect.any(String), [{ id: 'zeta.example' }, { id: 'middle.example' }]);
+		expect(linkHeader).toHaveBeenNthCalledWith(2, expect.any(String), [{ id: 'alpha.example' }]);
 	});
 
 	test('mutes accessible status threads directly and returns the requested status override', async () => {
@@ -3191,7 +3396,64 @@ describe(MastodonApiServerService, () => {
 		nativeInvoke.mockRejectedValueOnce(new ApiError({ message: 'Hidden', code: 'CONTENT_RESTRICTED_BY_USER', id: 'hidden' }));
 		const hidden = await fastify.inject({ method: 'POST', url: '/api/v1/statuses/hidden/mute', headers: { authorization: 'Bearer user-token' } });
 		expect(hidden.statusCode).toBe(404);
-		expect(noteThreadMutingsRepository.query).toHaveBeenCalledTimes(2);
+		expect(noteThreadMutingsRepository.query.mock.calls.filter(([sql]) => (sql as string).includes('INSERT INTO "note_thread_muting"'))).toHaveLength(2);
+	});
+
+	test('applies a persisted thread mute to sibling statuses, timelines, and notifications with one lookup per batch', async () => {
+		const { fastify, nativeInvoke, noteThreadMutingsRepository } = createServer();
+		nativeInvoke.mockImplementation(async (name, data) => {
+			if (name === 'notes/show') return { id: data.noteId };
+			if (name === 'notes/timeline') return [{ id: 'sibling-note' }, { id: 'other-note' }];
+			if (name === 'i/notifications') return [{
+				id: 'notification-id',
+				type: 'note',
+				user: { id: 'target' },
+				note: { id: 'sibling-note', text: 'same thread', cw: null, files: [], poll: null, renote: null },
+			}];
+			return [];
+		});
+		await fastify.inject({ method: 'POST', url: '/api/v1/statuses/reply-note/mute', headers: { authorization: 'Bearer user-token' } });
+		noteThreadMutingsRepository.query.mockClear();
+
+		const status = await fastify.inject({ method: 'GET', url: '/api/v1/statuses/sibling-note', headers: { authorization: 'Bearer user-token' } });
+		const home = await fastify.inject({ method: 'GET', url: '/api/v1/timelines/home', headers: { authorization: 'Bearer user-token' } });
+		const notifications = await fastify.inject({ method: 'GET', url: '/api/v1/notifications', headers: { authorization: 'Bearer user-token' } });
+		const singleNotification = await fastify.inject({ method: 'GET', url: '/api/v1/notifications/notification-id', headers: { authorization: 'Bearer user-token' } });
+
+		expect(status.json()).toMatchObject({ id: 'sibling-note', muted: true });
+		expect(home.json()).toEqual([
+			expect.objectContaining({ id: 'sibling-note', muted: true }),
+			expect.objectContaining({ id: 'other-note', muted: false }),
+		]);
+		expect(notifications.json()).toEqual([
+			expect.objectContaining({ status: expect.objectContaining({ id: 'sibling-note', muted: true }) }),
+		]);
+		expect(singleNotification.json()).toMatchObject({ status: { id: 'sibling-note', muted: true } });
+		const lookups = noteThreadMutingsRepository.query.mock.calls.filter(([sql]) => (sql as string).includes('JOIN "note_thread_muting"'));
+		expect(lookups).toHaveLength(4);
+		expect(lookups[1]?.[1]).toEqual(['user-id', ['sibling-note', 'other-note']]);
+	});
+
+	test('enforces the native ten-per-hour thread-mute transport limit before writing', async () => {
+		const { fastify, redis, noteThreadMutingsRepository } = createServer();
+		redis.incr.mockResolvedValueOnce(1).mockResolvedValueOnce(11);
+		const first = await fastify.inject({
+			method: 'POST',
+			url: '/api/v1/statuses/reply-note/mute',
+			headers: { authorization: 'Bearer user-token' },
+		});
+		noteThreadMutingsRepository.query.mockClear();
+
+		const response = await fastify.inject({
+			method: 'POST',
+			url: '/api/v1/statuses/reply-note/mute',
+			headers: { authorization: 'Bearer user-token' },
+		});
+
+		expect(first.statusCode).toBe(200);
+		expect(response.statusCode).toBe(429);
+		expect(redis.expire).toHaveBeenCalledWith(expect.stringContaining('user-id'), 3600);
+		expect(noteThreadMutingsRepository.query).not.toHaveBeenCalledWith(expect.stringContaining('INSERT INTO "note_thread_muting"'), expect.anything());
 	});
 
 	test('merges followed-tag notes into home once with bounded fan-in, dedupe, and one filter pass', async () => {

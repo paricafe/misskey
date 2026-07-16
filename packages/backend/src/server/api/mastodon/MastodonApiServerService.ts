@@ -326,6 +326,7 @@ export class MastodonApiServerService {
 					if (Number.isFinite(duration) && duration > 0) data.expiresAt = Date.now() + duration * 1000;
 				}
 				await this.invoke(endpoint, data, auth, request as MastodonRequest);
+				if (action === 'unfollow') await this.mastodonUserFeatureService.unendorse(auth.user.id, request.params.id);
 				const user = await this.invoke('users/show', { userId: request.params.id }, auth, request as MastodonRequest);
 				return this.mastodonEntityService.relationship(user as Packed<'UserDetailed'>);
 			}));
@@ -365,7 +366,7 @@ export class MastodonApiServerService {
 				this.mastodonUserFeatureService.listFollowedTags(auth.user.id),
 				this.mastodonUserFeatureService.listFeaturedTags(auth.user.id),
 			]);
-			const page = this.compatibilityStatePage(followed, request.query as Dictionary, 200);
+			const page = this.compatibilityStatePage(followed, request.query as Dictionary, 200, 100);
 			const featuredNames = new Set(featured.map(tag => tag.name));
 			return this.page(request, reply, page, page.map(tag => this.mastodonEntityService.tag(tag.name, {
 				following: true,
@@ -427,7 +428,7 @@ export class MastodonApiServerService {
 				featuring: false,
 			}));
 		}));
-		fastify.get<{ Params: { id: string } }>('/api/v1/accounts/:id/featured_tags', (request, reply) => this.withOptionalUser(request as MastodonRequest, 'read:accounts', async auth => {
+		fastify.get<{ Params: { id: string } }>('/api/v1/accounts/:id/featured_tags', (request, reply) => this.withOptionalUser(request as MastodonRequest, undefined, async auth => {
 			await this.invokePublic('users/show', { userId: request.params.id }, auth, request as MastodonRequest);
 			const tags = this.compatibilityStatePage(
 				await this.mastodonUserFeatureService.listFeaturedTags(request.params.id),
@@ -440,7 +441,7 @@ export class MastodonApiServerService {
 		fastify.get('/api/v1/endorsements', (request, reply) => this.withAuth(request as MastodonRequest, 'read:accounts', async auth => {
 			return await this.endorsementPage(auth.user.id, request as MastodonRequest, reply, auth);
 		}));
-		fastify.get<{ Params: { id: string } }>('/api/v1/accounts/:id/endorsements', (request, reply) => this.withOptionalUser(request as MastodonRequest, 'read:accounts', async auth => {
+		fastify.get<{ Params: { id: string } }>('/api/v1/accounts/:id/endorsements', (request, reply) => this.withOptionalUser(request as MastodonRequest, undefined, async auth => {
 			await this.invokePublic('users/show', { userId: request.params.id }, auth, request as MastodonRequest);
 			return await this.endorsementPage(request.params.id, request as MastodonRequest, reply, auth);
 		}));
@@ -456,9 +457,12 @@ export class MastodonApiServerService {
 
 		fastify.get('/api/v1/domain_blocks', (request, reply) => this.withAuth(request as MastodonRequest, 'read:blocks', async auth => {
 			const domains = this.compatibilityStatePage(
-				(await this.mastodonUserFeatureService.listDomainBlocks(auth.user.id)).map(id => ({ id })),
+				(await this.mastodonUserFeatureService.listDomainBlocks(auth.user.id))
+					.map(id => ({ id }))
+					.sort((left, right) => right.id.localeCompare(left.id)),
 				request.query as Dictionary,
 				200,
+				100,
 			);
 			return this.page(request, reply, domains, domains.map(domain => domain.id));
 		}));
@@ -468,7 +472,7 @@ export class MastodonApiServerService {
 				url: '/api/v1/domain_blocks',
 				handler: request => this.withAuth(request as MastodonRequest, 'write:blocks', async auth => {
 					const domain = this.string((request.body as Dictionary | undefined)?.domain);
-					if (domain == null || domain === '') throw new MastodonApiError(400, 'invalid_request', 'domain is required');
+					if (domain == null || domain.trim() === '') throw new MastodonApiError(422, 'unprocessable_entity', 'domain is required');
 					return method === 'POST'
 						? await this.mastodonUserFeatureService.blockDomain(auth.user.id, domain)
 						: await this.mastodonUserFeatureService.unblockDomain(auth.user.id, domain);
@@ -684,8 +688,11 @@ export class MastodonApiServerService {
 				const nativeNote = await this.notesRepository.findOneBy({ id: note.id });
 				if (nativeNote == null) throw new MastodonApiError(404, 'not_found', 'Status not found');
 				const threadId = nativeNote.threadId ?? nativeNote.id;
-				if (action === 'mute') await this.mastodonUserFeatureService.muteThread(auth.user.id, threadId);
-				else await this.mastodonUserFeatureService.unmuteThread(auth.user.id, threadId);
+				if (action === 'mute') {
+					await this.assertThreadMuteRate(auth.user.id);
+					// The native endpoint's only durable effect is this row; its additional note query is not consumed.
+					await this.mastodonUserFeatureService.muteThread(auth.user.id, threadId);
+				} else await this.mastodonUserFeatureService.unmuteThread(auth.user.id, threadId);
 				return { ...await this.statusWithState(note, auth, 'thread'), muted: action === 'mute' };
 			}));
 		}
@@ -786,7 +793,9 @@ export class MastodonApiServerService {
 			if (converted == null) throw new MastodonApiError(404, 'not_found', 'Notification not found');
 			const [visible] = await this.mastodonNotificationService.filterDismissed(auth.user.id, [converted]);
 			if (visible == null) throw new MastodonApiError(404, 'not_found', 'Notification not found');
-			return visible;
+			const [filtered] = await this.notificationFilters(auth.user.id, [visible as Dictionary], [notification]);
+			if (filtered == null) throw new MastodonApiError(404, 'not_found', 'Notification not found');
+			return filtered;
 		}));
 		fastify.post<{ Params: { id: string } }>('/api/v1/notifications/:id/dismiss', request => this.withAuth(request as MastodonRequest, 'write:notifications', async auth => {
 			await this.mastodonNotificationService.dismiss(auth.user.id, request.params.id);
@@ -1475,19 +1484,28 @@ export class MastodonApiServerService {
 		request: MastodonRequest,
 	) {
 		if (tags.length === 0) return [];
-		const [user, notes] = await Promise.all([
+		const [user, aggregates] = await Promise.all([
 			this.invokePublic('users/show', { userId }, auth, request) as Promise<Packed<'UserDetailed'>>,
-			this.invokePublic('users/notes', { userId, limit: 100, withReplies: true, withRenotes: false }, auth, request) as Promise<Packed<'Note'>[]>,
+			this.notesRepository.query(`
+				SELECT tag."name" AS "tag",
+					COUNT(*)::integer AS "statusesCount",
+					MAX(note."createdAt") AS "lastStatusAt"
+				FROM "note" note
+				CROSS JOIN LATERAL unnest(note."tags") AS tag("name")
+				WHERE note."userId" = $1
+					AND note."visibility" IN ('public', 'home')
+					AND tag."name" = ANY($2::varchar[])
+				GROUP BY tag."name"
+			`, [userId, tags.map(tag => tag.name)]) as Promise<Array<{ tag: string; statusesCount: number; lastStatusAt: Date | string | null }>>,
 		]);
 		const stats = new Map(tags.map(tag => [tag.name, { statusesCount: 0, lastStatusAt: null as string | null }]));
-		for (const note of notes) {
-			for (const rawTag of note.tags ?? []) {
-				const value = stats.get(this.normalizedHashtag(rawTag));
-				if (value == null) continue;
-				value.statusesCount++;
-				const date = note.createdAt.slice(0, 10);
-				if (value.lastStatusAt == null || date > value.lastStatusAt) value.lastStatusAt = date;
-			}
+		for (const aggregate of aggregates) {
+			const value = stats.get(aggregate.tag);
+			if (value == null) continue;
+			value.statusesCount = Number(aggregate.statusesCount);
+			value.lastStatusAt = aggregate.lastStatusAt == null
+				? null
+				: (aggregate.lastStatusAt instanceof Date ? aggregate.lastStatusAt.toISOString() : aggregate.lastStatusAt).slice(0, 10);
 		}
 		const accountUrl = this.mastodonEntityService.account(user).url;
 		return tags.map(tag => this.mastodonEntityService.featuredTag(tag, accountUrl, stats.get(tag.name)!));
@@ -1503,15 +1521,25 @@ export class MastodonApiServerService {
 			(await this.mastodonUserFeatureService.listEndorsementIds(userId)).map(id => ({ id })),
 			request.query,
 			80,
+			40,
 		);
-		const users = await this.invokePublicBatch('users/show', 'userId', state.map(value => value.id), auth, request) as Packed<'UserDetailed'>[];
-		return this.page(request, reply, state, users.map(user => this.mastodonEntityService.account(user)));
+		if (state.length === 0) return this.page(request, reply, state, []);
+		const users = await this.invokePublic('users/show', { userIds: state.map(value => value.id) }, auth, request) as Packed<'UserDetailed'>[];
+		const usersById = new Map(users.map(user => [user.id, user]));
+		const availableUsers = state.flatMap(value => {
+			const user = usersById.get(value.id);
+			return user == null ? [] : [user];
+		});
+		return this.page(request, reply, availableUsers, availableUsers.map(user => this.mastodonEntityService.account(user)));
 	}
 
-	private compatibilityStatePage<T extends { id: string }>(items: T[], query: Dictionary, maximum: number): T[] {
-		const pagination = this.mastodonPaginationService.toMisskey(query, maximum);
-		return [...items]
-			.sort((left, right) => right.id.localeCompare(left.id))
+	private compatibilityStatePage<T extends { id: string }>(items: T[], query: Dictionary, maximum: number, defaultLimit = 20): T[] {
+		const rawLimit = query.limit;
+		const pagination = this.mastodonPaginationService.toMisskey({
+			...query,
+			limit: typeof rawLimit === 'string' || typeof rawLimit === 'number' ? rawLimit : defaultLimit,
+		}, maximum);
+		return items
 			.filter(item => pagination.untilId == null || item.id < pagination.untilId)
 			.filter(item => pagination.sinceId == null || item.id > pagination.sinceId)
 			.slice(0, pagination.limit);
@@ -1534,10 +1562,11 @@ export class MastodonApiServerService {
 		if (notes.length === 0) return [];
 		if (auth == null) return notes.map(note => this.mastodonEntityService.status(note));
 		const noteIds = [...new Set(notes.map(note => note.id))];
-		const [renotes, favorites, pinings] = await Promise.all([
+		const [renotes, favorites, pinings, mutedNoteIds] = await Promise.all([
 			this.notesRepository.findBy({ userId: auth.user.id, renoteId: In(noteIds) }),
 			this.noteFavoritesRepository.findBy({ userId: auth.user.id, noteId: In(noteIds) }),
 			this.userNotePiningsRepository.findBy({ userId: auth.user.id, noteId: In(noteIds) }),
+			this.mastodonUserFeatureService.mutedNoteIds(auth.user.id, noteIds),
 		]);
 		const renotedIds = new Set(renotes.flatMap(renote => renote.renoteId == null || !this.isPureRenote(renote) ? [] : [renote.renoteId]));
 		const bookmarkedIds = new Set(favorites.map(favorite => favorite.noteId));
@@ -1547,6 +1576,7 @@ export class MastodonApiServerService {
 			reblogged: renotedIds.has(note.id),
 			bookmarked: bookmarkedIds.has(note.id),
 			pinned: pinnedIds.has(note.id),
+			muted: mutedNoteIds.has(note.id),
 		}));
 		const corpora = new Map(notes.map(note => [note.id, this.filterCorpus(note)]));
 		return await this.mastodonFilterService.apply(auth.user.id, context, statuses, { ...options, corpora });
@@ -1562,6 +1592,15 @@ export class MastodonApiServerService {
 			return status != null && typeof status === 'object' && !Array.isArray(status) ? [status as Dictionary] : [];
 		});
 		if (statuses.length === 0) return notifications;
+		const statusIds = [...new Set(statuses.flatMap(status => {
+			const id = this.string(status.id);
+			return id == null ? [] : [id];
+		}))];
+		const mutedNoteIds = await this.mastodonUserFeatureService.mutedNoteIds(userId, statusIds);
+		const statusesWithState: Dictionary[] = statuses.map(status => {
+			const id = this.string(status.id);
+			return { ...status, muted: id != null && mutedNoteIds.has(id) };
+		});
 		const nativeById = new Map(nativeNotifications.map(notification => [notification.id, notification]));
 		const corpora = new Map<string, string[]>();
 		for (const notification of notifications) {
@@ -1572,7 +1611,7 @@ export class MastodonApiServerService {
 			const note = nativeById.get(notificationId)?.note;
 			if (statusId != null && note != null) corpora.set(statusId, this.filterCorpus(note));
 		}
-		const filtered = await this.mastodonFilterService.apply(userId, 'notifications', statuses, { corpora });
+		const filtered = await this.mastodonFilterService.apply(userId, 'notifications', statusesWithState, { corpora });
 		const byId = new Map(filtered.map(status => [this.string(status.id) ?? '', status]));
 		return notifications.flatMap(notification => {
 			const status = notification.status;
@@ -1632,6 +1671,13 @@ export class MastodonApiServerService {
 		if (count > 60) throw new MastodonApiError(429, 'rate_limit_exceeded', 'Too many application registrations');
 	}
 
+	private async assertThreadMuteRate(userId: string): Promise<void> {
+		const key = `mastodon-api:thread-mute:${userId}`;
+		const count = await this.redis.incr(key);
+		if (count === 1) await this.redis.expire(key, 3600);
+		if (count > 10) throw new MastodonApiError(429, 'rate_limit_exceeded', 'Too many thread mutes');
+	}
+
 	private bearerToken(request: MastodonRequest): string | undefined {
 		const authorization = request.headers.authorization;
 		if (authorization == null) return undefined;
@@ -1673,14 +1719,14 @@ export class MastodonApiServerService {
 
 	private async withOptionalUser<T>(
 		request: MastodonRequest,
-		scope: string,
+		scope: string | undefined,
 		action: (auth: MastodonUserAuth | null) => Promise<T>,
 	): Promise<T> {
 		const token = this.bearerToken(request);
 		if (token == null) return await action(null);
 		const auth = await this.mastodonAuthenticateService.authenticate(token);
 		if (auth.kind === 'application') return await action(null);
-		this.mastodonScopeService.assert(auth.token.scopes, scope);
+		if (scope != null) this.mastodonScopeService.assert(auth.token.scopes, scope);
 		return await action(auth);
 	}
 

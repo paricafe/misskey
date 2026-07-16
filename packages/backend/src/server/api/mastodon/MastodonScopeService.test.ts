@@ -18,9 +18,13 @@ describe(MastodonScopeService, () => {
 		expect(service.allows(['read:accounts'], 'read:statuses')).toBe(false);
 	});
 
-	test('deprecated follow scope allows only follow operations', () => {
+	test('deprecated follow scope aliases follow, block, and mute operations', () => {
 		expect(service.allows(['follow'], 'read:follows')).toBe(true);
 		expect(service.allows(['follow'], 'write:follows')).toBe(true);
+		expect(service.allows(['follow'], 'read:blocks')).toBe(true);
+		expect(service.allows(['follow'], 'write:blocks')).toBe(true);
+		expect(service.allows(['follow'], 'read:mutes')).toBe(true);
+		expect(service.allows(['follow'], 'write:mutes')).toBe(true);
 		expect(service.allows(['follow'], 'write:statuses')).toBe(false);
 	});
 
@@ -48,6 +52,14 @@ describe(MastodonScopeService, () => {
 		expect(service.toMisskeyPermissions(['read:notifications'])).toEqual(['read:notifications']);
 		expect(service.toMisskeyPermissions(['profile'])).toEqual(['read:account']);
 		expect(service.toMisskeyPermissions(['read:collections', 'write:collections'])).toEqual([]);
+		expect(service.toMisskeyPermissions(['follow'])).toEqual(expect.arrayContaining([
+			'read:following',
+			'write:following',
+			'read:blocks',
+			'write:blocks',
+			'read:mutes',
+			'write:mutes',
+		]));
 	});
 
 	test('keeps profile distinct while allowing generic read to satisfy account alternatives', () => {
