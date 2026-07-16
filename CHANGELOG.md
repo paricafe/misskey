@@ -11,6 +11,7 @@
 
 ### Server
 - Feat: Mastodon API compatible OAuth, REST, and streaming endpoints are now available for Mastodon clients
+- Enhance: Allow administrators to disable the Mastodon-compatible API with `enableMastodonApi: false`
 - Enhance: Improve Mastodon OAuth application-token support, access-token management, and core API compatibility
 - Fix: Renoteを削除した際に対象ノートのRenote数が減少しない問題を修正
 - Enhance: Improve Mastodon API compatibility for search, trends, suggestions, tags, and entity responses

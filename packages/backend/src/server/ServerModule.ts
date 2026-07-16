@@ -35,6 +35,7 @@ import { MastodonOAuthService } from './api/mastodon/MastodonOAuthService.js';
 import { MastodonNotificationService } from './api/mastodon/MastodonNotificationService.js';
 import { MastodonScopeService } from './api/mastodon/MastodonScopeService.js';
 import { MastodonApiServerService } from './api/mastodon/MastodonApiServerService.js';
+import { MastodonApiIntegrationService } from './api/mastodon/MastodonApiIntegrationService.js';
 import { MastodonEntityService } from './api/mastodon/MastodonEntityService.js';
 import { MastodonPaginationService } from './api/mastodon/MastodonPaginationService.js';
 import { MastodonReportService } from './api/mastodon/MastodonReportService.js';
@@ -119,6 +120,7 @@ import { SigninWithPasskeyApiService } from './api/SigninWithPasskeyApiService.j
 		MastodonOAuthService,
 		MastodonScopeService,
 		MastodonApiServerService,
+		MastodonApiIntegrationService,
 		MastodonEntityService,
 		MastodonPaginationService,
 		MastodonScheduledStatusService,

@@ -51,6 +51,7 @@ type Source = {
 	trustProxy?: FastifyServerOptions['trustProxy'];
 	chmodSocket?: string;
 	enableIpRateLimit?: boolean;
+	enableMastodonApi?: boolean;
 	disableHsts?: boolean;
 	hstsPreload?: boolean;
 	db: {
@@ -153,6 +154,7 @@ export type Config = {
 	trustProxy: NonNullable<FastifyServerOptions['trustProxy']>;
 	chmodSocket: string | undefined;
 	enableIpRateLimit: boolean;
+	enableMastodonApi: boolean;
 	disableHsts: boolean | undefined;
 	hstsPreload: boolean | undefined;
 	db: {
@@ -325,6 +327,7 @@ export function loadConfig(): Config {
 		disableHsts: config.disableHsts,
 		hstsPreload: config.hstsPreload ?? false,
 		enableIpRateLimit: config.enableIpRateLimit ?? true,
+		enableMastodonApi: config.enableMastodonApi ?? true,
 		host,
 		hostname,
 		scheme,
