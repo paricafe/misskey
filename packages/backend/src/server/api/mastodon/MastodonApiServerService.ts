@@ -30,7 +30,7 @@ import { MastodonEntityService } from './MastodonEntityService.js';
 import { MastodonFilterService, type MastodonFilterApplyOptions, type MastodonFilterContext } from './MastodonFilterService.js';
 import { MastodonMarkerService, type MastodonMarkerTimeline } from './MastodonMarkerService.js';
 import { MastodonOAuthService } from './MastodonOAuthService.js';
-import { MastodonNotificationService } from './MastodonNotificationService.js';
+import { MastodonNotificationService, type MastodonNotificationSource } from './MastodonNotificationService.js';
 import { MastodonPaginationService } from './MastodonPaginationService.js';
 import { MastodonReportService } from './MastodonReportService.js';
 import { MastodonScheduledStatusService } from './MastodonScheduledStatusService.js';
@@ -768,41 +768,27 @@ export class MastodonApiServerService {
 	private registerNotifications(fastify: FastifyInstance): void {
 		fastify.get('/api/v1/notifications', (request, reply) => this.withAuth(request as MastodonRequest, 'read:notifications', async auth => {
 			const query = request.query as Dictionary;
-			const includeTypes = this.strings(query['types[]'] ?? query.types);
-			const excludeTypes = this.strings(query['exclude_types[]'] ?? query.exclude_types);
-			const includeMisskeyTypes = this.mastodonNotificationService.toMisskeyTypes(includeTypes).filter(type => type !== 'reaction:grouped' && type !== 'renote:grouped');
-			const excludeMisskeyTypes = this.mastodonNotificationService.toMisskeyTypes(excludeTypes).filter(type => type !== 'reaction:grouped' && type !== 'renote:grouped');
-			const notifications = await this.invoke('i/notifications', {
-				...this.mastodonPaginationService.toMisskey(query, 100),
+			const options = this.notificationOptions(query);
+			const includeMisskeyTypes = this.mastodonNotificationService.toMisskeyTypes(options.types).filter(type => type !== 'reaction:grouped' && type !== 'renote:grouped');
+			const excludeMisskeyTypes = this.mastodonNotificationService.toMisskeyTypes(options.excludeTypes).filter(type => type !== 'reaction:grouped' && type !== 'renote:grouped');
+			const sourcePage = await this.notificationSourcePage(auth, request as MastodonRequest, {
+				...this.mastodonPaginationService.toMisskey(query, 80),
+				limit: this.integer(query.limit, 40, 1, 80),
 				markAsRead: false,
-				...(includeTypes.length > 0 ? { includeTypes: [...new Set(includeMisskeyTypes)] } : {}),
-				...(includeTypes.length === 0 && excludeTypes.length > 0 ? { excludeTypes: [...new Set(excludeMisskeyTypes)] } : {}),
-			}, auth, request as MastodonRequest) as Packed<'Notification'>[];
-			let converted = notifications.map(notification => this.mastodonEntityService.notification(notification)).filter(value => value != null);
-			if (includeTypes.length > 0) {
-				const includedTypes = new Set(includeTypes);
-				converted = converted.filter(notification => includedTypes.has(notification.type));
-			}
-			if (excludeTypes.length > 0) {
-				const excludedTypes = new Set(excludeTypes);
-				converted = converted.filter(notification => !excludedTypes.has(notification.type));
-			}
-			const accountId = this.string(query.account_id);
-			if (accountId != null) converted = converted.filter(notification => notification.account.id === accountId);
-			converted = await this.mastodonNotificationService.filterDismissed(auth.user.id, converted);
-			converted = await this.notificationFilters(auth.user.id, converted as Dictionary[], notifications) as typeof converted;
-			return this.page(request, reply, notifications, converted);
+				...(options.types.length > 0 ? { includeTypes: [...new Set(includeMisskeyTypes)] } : {}),
+				...(options.types.length === 0 && options.excludeTypes.length > 0 ? { excludeTypes: [...new Set(excludeMisskeyTypes)] } : {}),
+			});
+			const sources = sourcePage.sources;
+			const visible = await this.mastodonNotificationService.list(auth.user.id, sources, { ...options, groupedTypes: undefined });
+			return this.page(request, reply, sourcePage.page, visible.map(value => value.entity));
 		}));
 		fastify.get<{ Params: { id: string } }>('/api/v1/notifications/:id', request => this.withAuth(request as MastodonRequest, 'read:notifications', async auth => {
-			const notifications = await this.invoke('i/notifications', { limit: 100, markAsRead: false }, auth, request as MastodonRequest) as Packed<'Notification'>[];
-			const notification = notifications.find(value => value.id === request.params.id);
-			const converted = notification == null ? null : this.mastodonEntityService.notification(notification);
-			if (converted == null) throw new MastodonApiError(404, 'not_found', 'Notification not found');
-			const [visible] = await this.mastodonNotificationService.filterDismissed(auth.user.id, [converted]);
-			if (visible == null) throw new MastodonApiError(404, 'not_found', 'Notification not found');
-			const [filtered] = await this.notificationFilters(auth.user.id, [visible as Dictionary], [notification]);
-			if (filtered == null) throw new MastodonApiError(404, 'not_found', 'Notification not found');
-			return filtered;
+			const query = request.query as Dictionary;
+			const sources = await this.notificationSources(auth, request as MastodonRequest, { limit: 100, markAsRead: false });
+			const visible = await this.mastodonNotificationService.list(auth.user.id, sources, { ...this.notificationOptions(query), groupedTypes: undefined });
+			const notification = visible.find(value => value.entity.id === request.params.id);
+			if (notification == null) throw new MastodonApiError(404, 'not_found', 'Notification not found');
+			return notification.entity;
 		}));
 		fastify.post<{ Params: { id: string } }>('/api/v1/notifications/:id/dismiss', request => this.withAuth(request as MastodonRequest, 'write:notifications', async auth => {
 			await this.mastodonNotificationService.dismiss(auth.user.id, request.params.id);
@@ -812,6 +798,141 @@ export class MastodonApiServerService {
 			await this.invoke('notifications/mark-all-as-read', {}, auth, request as MastodonRequest);
 			return {};
 		}));
+
+		for (const version of ['v1', 'v2'] as const) {
+			fastify.get(`/api/${version}/notifications/unread_count`, request => this.withAuth(request as MastodonRequest, 'read:notifications', async auth => {
+				const query = request.query as Dictionary;
+				const options = this.notificationOptions(query);
+				const sources = await this.notificationSources(auth, request as MastodonRequest, { limit: Math.min(100, this.integer(query.limit, 100, 1, 1000)), markAsRead: false });
+				const marker = await this.mastodonMarkerService.get(auth.user.id, ['notifications']);
+				return await this.mastodonNotificationService.unreadCount(auth.user.id, sources, {
+					...options,
+					groupedTypes: version === 'v1' ? undefined : options.groupedTypes,
+					lastReadId: marker.notifications?.last_read_id,
+					limit: this.integer(query.limit, 100, 1, 1000),
+					includeFiltered: this.boolean(query.include_filtered),
+					grouped: version === 'v2',
+				});
+			}));
+		}
+
+		fastify.get('/api/v2/notifications', (request, reply) => this.withAuth(request as MastodonRequest, 'read:notifications', async auth => {
+			const query = request.query as Dictionary;
+			const options = this.notificationOptions(query);
+			const lowerId = this.notificationLowerId(query);
+			const sourcePage = await this.notificationSourcePage(auth, request as MastodonRequest, {
+				limit: 100,
+				markAsRead: false,
+				...(this.string(query.max_id) == null ? {} : { untilId: this.string(query.max_id) }),
+				...(lowerId == null ? {} : { sinceId: lowerId }),
+			});
+			const sources = this.notificationCursorWindow(sourcePage.sources, query);
+			const visible = await this.mastodonNotificationService.list(auth.user.id, sources, options);
+			const result = await this.mastodonNotificationService.grouped(auth.user.id, visible, {
+				groupedTypes: options.groupedTypes,
+				limit: this.integer(query.limit, 40, 1, 80),
+			});
+			this.notificationGroupLink(request, reply, result.notification_groups, sourcePage.page);
+			return result;
+		}));
+
+		fastify.get<{ Params: { group_key: string } }>('/api/v2/notifications/:group_key', request => this.withAuth(request as MastodonRequest, 'read:notifications', async auth => {
+			const query = request.query as Dictionary;
+			const sources = await this.notificationSources(auth, request as MastodonRequest, { limit: 100, markAsRead: false });
+			const options = this.notificationOptions(query);
+			const visible = await this.mastodonNotificationService.list(auth.user.id, sources, { ...options, groupedTypes: undefined });
+			return await this.mastodonNotificationService.group(auth.user.id, visible, request.params.group_key);
+		}));
+
+		fastify.get<{ Params: { group_key: string } }>('/api/v2/notifications/:group_key/accounts', (request, reply) => this.withAuth(request as MastodonRequest, 'read:notifications', async auth => {
+			const query = request.query as Dictionary;
+			const lowerId = this.notificationLowerId(query);
+			const sources = await this.notificationSources(auth, request as MastodonRequest, {
+				limit: 100,
+				markAsRead: false,
+				...(this.string(query.max_id) == null ? {} : { untilId: this.string(query.max_id) }),
+				...(lowerId == null ? {} : { sinceId: lowerId }),
+			});
+			const options = this.notificationOptions(query);
+			const visible = await this.mastodonNotificationService.list(auth.user.id, sources, { ...options, groupedTypes: undefined });
+			const paginated = ['limit', 'max_id', 'min_id', 'since_id'].some(key => query[key] != null);
+			if (!paginated) return await this.mastodonNotificationService.groupAccounts(auth.user.id, visible, request.params.group_key);
+			const limit = this.integer(query.limit, 40, 1, 80);
+			const page = await this.mastodonNotificationService.groupAccountsPage(auth.user.id, visible, request.params.group_key, {
+				limit,
+				maxId: this.string(query.max_id),
+				minId: this.string(query.min_id),
+				sinceId: this.string(query.since_id),
+			});
+			if (page.accounts.length < limit) return page.accounts;
+			return this.page(request, reply, page.notifications, page.accounts);
+		}));
+
+		fastify.post<{ Params: { group_key: string } }>('/api/v2/notifications/:group_key/dismiss', request => this.withAuth(request as MastodonRequest, 'write:notifications', async auth => {
+			const query = request.query as Dictionary;
+			const sources = await this.notificationSources(auth, request as MastodonRequest, { limit: 100, markAsRead: false });
+			const options = this.notificationOptions(query);
+			const visible = await this.mastodonNotificationService.list(auth.user.id, sources, { ...options, groupedTypes: undefined });
+			return await this.mastodonNotificationService.dismissGroup(auth.user.id, visible, request.params.group_key);
+		}));
+
+		fastify.post('/api/v2/notifications/clear', request => this.withAuth(request as MastodonRequest, 'write:notifications', async auth => {
+			const sources = await this.notificationSources(auth, request as MastodonRequest, { limit: 100, markAsRead: false });
+			const options = this.notificationOptions(request.query as Dictionary);
+			const visible = await this.mastodonNotificationService.list(auth.user.id, sources, { ...options, groupedTypes: undefined });
+			await this.mastodonNotificationService.clearGroups(auth.user.id, visible);
+			await this.invoke('notifications/mark-all-as-read', {}, auth, request as MastodonRequest);
+			return {};
+		}));
+
+		for (const version of ['v1', 'v2'] as const) {
+			fastify.get(`/api/${version}/notifications/policy`, request => this.withAuth(request as MastodonRequest, 'read:notifications', async auth => {
+				const sources = await this.notificationSources(auth, request as MastodonRequest, { limit: 100, markAsRead: false });
+				const policy = await this.mastodonNotificationService.policyWithSummary(auth.user.id, sources);
+				return version === 'v1' ? this.mastodonNotificationService.legacyPolicy(policy) : policy;
+			}));
+			for (const method of ['patch', 'put'] as const) {
+				fastify[method](`/api/${version}/notifications/policy`, request => this.withAuth(request as MastodonRequest, 'write:notifications', async auth => {
+					const body = this.dictionary(request.body) ?? {};
+					if (version === 'v1') await this.mastodonNotificationService.updateLegacyPolicy(auth.user.id, this.notificationLegacyPolicyBody(body));
+					else await this.mastodonNotificationService.updatePolicy(auth.user.id, body);
+					const sources = await this.notificationSources(auth, request as MastodonRequest, { limit: 100, markAsRead: false });
+					const policy = await this.mastodonNotificationService.policyWithSummary(auth.user.id, sources);
+					return version === 'v1' ? this.mastodonNotificationService.legacyPolicy(policy) : policy;
+				}));
+			}
+		}
+
+		fastify.get('/api/v1/notifications/requests/merged', request => this.withAuth(request as MastodonRequest, 'read:notifications', async () => ({ merged: true })));
+		fastify.get('/api/v1/notifications/requests', (request, reply) => this.withAuth(request as MastodonRequest, 'read:notifications', async auth => {
+			const query = request.query as Dictionary;
+			const sources = await this.notificationSources(auth, request as MastodonRequest, { limit: 100, markAsRead: false });
+			const requests = await this.mastodonNotificationService.requests(auth.user.id, sources, {
+				limit: this.integer(query.limit, 40, 1, 80),
+				maxId: this.string(query.max_id),
+				minId: this.string(query.min_id),
+				sinceId: this.string(query.since_id),
+			});
+			return this.page(request, reply, requests, requests);
+		}));
+		fastify.get<{ Params: { id: string } }>('/api/v1/notifications/requests/:id', request => this.withAuth(request as MastodonRequest, 'read:notifications', async auth => {
+			const sources = await this.notificationSources(auth, request as MastodonRequest, { limit: 100, markAsRead: false });
+			return await this.mastodonNotificationService.getRequest(auth.user.id, sources, request.params.id);
+		}));
+		for (const action of ['accept', 'dismiss'] as const) {
+			fastify.post(`/api/v1/notifications/requests/${action}`, request => this.withAuth(request as MastodonRequest, 'write:notifications', async auth => {
+				const ids = this.strings((request.body as Dictionary)?.['id[]'] ?? (request.body as Dictionary)?.ids ?? (request.body as Dictionary)?.id);
+				if (ids.length === 0) throw new MastodonApiError(422, 'unprocessable_entity', 'At least one request id is required');
+				if (action === 'accept') await this.mastodonNotificationService.acceptRequests(auth.user.id, ids);
+				else await this.mastodonNotificationService.dismissRequests(auth.user.id, ids);
+				return {};
+			}));
+			fastify.post<{ Params: { id: string } }>(`/api/v1/notifications/requests/:id/${action}`, request => this.withAuth(request as MastodonRequest, 'write:notifications', async auth => {
+				if (action === 'accept') await this.mastodonNotificationService.acceptRequest(auth.user.id, request.params.id);
+				else await this.mastodonNotificationService.dismissRequest(auth.user.id, request.params.id);
+				return {};
+			}));
+		}
 	}
 
 	private registerSearch(fastify: FastifyInstance): void {
@@ -1698,6 +1819,102 @@ export class MastodonApiServerService {
 		}));
 		const corpora = new Map(notes.map(note => [note.id, this.filterCorpus(note)]));
 		return await this.mastodonFilterService.apply(auth.user.id, context, statuses, { ...options, corpora });
+	}
+
+	private notificationOptions(query: Dictionary): {
+		types: string[];
+		excludeTypes: string[];
+		accountId?: string;
+		includeFiltered: boolean;
+		groupedTypes?: string[];
+	} {
+		const groupedValue = query['grouped_types[]'] ?? query.grouped_types;
+		return {
+			types: this.strings(query['types[]'] ?? query.types),
+			excludeTypes: this.strings(query['exclude_types[]'] ?? query.exclude_types),
+			accountId: this.string(query.account_id),
+			includeFiltered: this.boolean(query.include_filtered),
+			...(groupedValue == null ? {} : { groupedTypes: this.strings(groupedValue) }),
+		};
+	}
+
+	private async notificationSources(
+		auth: MastodonUserAuth,
+		request: MastodonRequest,
+		params: Dictionary,
+	): Promise<MastodonNotificationSource[]> {
+		return (await this.notificationSourcePage(auth, request, params)).sources;
+	}
+
+	private async notificationSourcePage(
+		auth: MastodonUserAuth,
+		request: MastodonRequest,
+		params: Dictionary,
+	): Promise<{ sources: MastodonNotificationSource[]; page: { id: string }[] }> {
+		const notifications = await this.invoke('i/notifications', params, auth, request) as Packed<'Notification'>[];
+		const converted = notifications
+			.map(notification => this.mastodonEntityService.notification(notification))
+			.filter(value => value != null) as Dictionary[];
+		const filtered = await this.notificationFilters(auth.user.id, converted, notifications);
+		const entitiesById = new Map(filtered.flatMap(entity => {
+			const id = this.string(entity.id);
+			return id == null ? [] : [[id, entity] as const];
+		}));
+		const sources = notifications.flatMap(notification => {
+			const entity = entitiesById.get(notification.id);
+			return entity == null ? [] : [{ native: notification as unknown as MastodonNotificationSource['native'], entity: entity as MastodonNotificationSource['entity'] }];
+		});
+		return { sources, page: notifications.map(notification => ({ id: notification.id })) };
+	}
+
+	private notificationGroupLink(
+		request: FastifyRequest,
+		reply: FastifyReply,
+		groups: readonly { most_recent_notification_id: string; page_min_id: string; page_max_id: string }[],
+		fallbackPage: readonly { id: string }[] = [],
+	): void {
+		const pageMaxId = groups.reduce<string | null>((maxId, group) => maxId == null || group.page_max_id > maxId ? group.page_max_id : maxId, null);
+		const pageMinId = groups.reduce<string | null>((minId, group) => minId == null || group.page_min_id < minId ? group.page_min_id : minId, null);
+		const records = groups.length > 0
+			? [{ id: pageMaxId! }, { id: pageMinId! }]
+			: fallbackPage.length > 0
+				? [{ id: fallbackPage[0]!.id }, { id: fallbackPage.at(-1)!.id }]
+				: [];
+		if (records.length === 0) return;
+		const link = this.mastodonPaginationService.linkHeader(
+			new URL(request.url, this.config.url).toString(),
+			records,
+		);
+		if (link != null) reply.header('Link', link);
+	}
+
+	private notificationLowerId(query: Dictionary): string | undefined {
+		const minId = this.string(query.min_id);
+		const sinceId = this.string(query.since_id);
+		if (minId == null || minId === '') return sinceId;
+		if (sinceId == null || sinceId === '') return minId;
+		return minId > sinceId ? minId : sinceId;
+	}
+
+	private notificationCursorWindow(sources: MastodonNotificationSource[], query: Dictionary): MastodonNotificationSource[] {
+		const maxId = this.string(query.max_id);
+		const lowerId = this.notificationLowerId(query);
+		const filtered = sources
+			.filter(source => maxId == null || source.entity.id < maxId)
+			.filter(source => lowerId == null || source.entity.id > lowerId);
+		const window = this.string(query.min_id) == null
+			? filtered.sort((left, right) => right.entity.id.localeCompare(left.entity.id)).slice(0, 100)
+			: filtered.sort((left, right) => left.entity.id.localeCompare(right.entity.id)).slice(0, 100);
+		return window.sort((left, right) => right.entity.id.localeCompare(left.entity.id));
+	}
+
+	private notificationLegacyPolicyBody(body: Dictionary): Dictionary {
+		return Object.fromEntries(Object.entries(body).map(([key, value]) => {
+			const normalized = typeof value === 'string' ? value.toLowerCase() : value;
+			if (normalized === true || normalized === 1 || normalized === '1' || normalized === 'true' || normalized === 'on') return [key, true];
+			if (normalized === false || normalized === 0 || normalized === '0' || normalized === 'false' || normalized === 'off') return [key, false];
+			return [key, value];
+		}));
 	}
 
 	private async notificationFilters(

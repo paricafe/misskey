@@ -4,6 +4,7 @@
  */
 
 import { Inject, Injectable } from '@nestjs/common';
+import { In } from 'typeorm';
 import { DI } from '@/di-symbols.js';
 import { IdService } from '@/core/IdService.js';
 import type { MiMastodonOAuthToken } from '@/models/MastodonOAuthToken.js';
@@ -55,6 +56,14 @@ export class MastodonApiStateService {
 
 	public async get(userId: MiUser['id'], kind: string, key: string): Promise<MiMastodonUserState | null> {
 		return await this.mastodonUserStatesRepository.findOneBy({ userId, kind, key });
+	}
+
+	public async getMany(userId: MiUser['id'], kind: string, keys: string[]): Promise<Map<string, MiMastodonUserState>> {
+		const uniqueKeys = [...new Set(keys)];
+		if (uniqueKeys.length > 100) throw new MastodonApiError(422, 'unprocessable_entity', 'State keys must contain at most 100 items');
+		if (uniqueKeys.length === 0) return new Map();
+		const rows = await this.mastodonUserStatesRepository.findBy({ userId, kind, key: In(uniqueKeys) });
+		return new Map(rows.map(row => [row.key, row]));
 	}
 
 	public async getById(id: MiMastodonUserState['id']): Promise<MiMastodonUserState | null> {

@@ -38,6 +38,7 @@ describe(MastodonApiStateService, () => {
 		const repository = {
 			query: vi.fn(),
 			find: vi.fn(),
+			findBy: vi.fn(),
 			findAndCount: vi.fn(),
 			findOneBy: vi.fn(),
 			delete: vi.fn(),
@@ -160,6 +161,23 @@ describe(MastodonApiStateService, () => {
 			order: { updatedAt: 'DESC' },
 		});
 		expect(repository.findOneBy).toHaveBeenCalledWith({ userId: 'u1', kind: 'marker', key: 'home' });
+	});
+
+	test('gets at most 100 deduplicated keys in one bounded query', async () => {
+		const home = state(1);
+		const timeline = { ...state(2), key: 'timeline' };
+		const { service, repository } = createService();
+		repository.findBy.mockResolvedValue([home, timeline]);
+
+		await expect(service.getMany('u1', 'marker', ['home', 'timeline', 'home'])).resolves.toEqual(new Map([
+			['home', home],
+			['timeline', timeline],
+		]));
+		expect(repository.findBy).toHaveBeenCalledTimes(1);
+		expect(repository.findBy).toHaveBeenCalledWith(expect.objectContaining({ userId: 'u1', kind: 'marker', key: expect.any(Object) }));
+		await expect(service.getMany('u1', 'marker', [])).resolves.toEqual(new Map());
+		expect(repository.findBy).toHaveBeenCalledTimes(1);
+		await expect(service.getMany('u1', 'marker', Array.from({ length: 101 }, (_, index) => `key-${index}`))).rejects.toMatchObject({ statusCode: 422 });
 	});
 
 	test('gets state by its indexed primary id', async () => {

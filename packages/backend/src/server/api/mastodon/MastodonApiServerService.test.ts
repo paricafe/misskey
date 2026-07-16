@@ -96,7 +96,6 @@ describe(MastodonApiServerService, () => {
 			];
 			return links.length === 0 ? null : links.join(', ');
 		});
-		const mastodonNotificationService = new MastodonNotificationService(redis as never);
 		const stateRows = new Map<string, {
 			id: string;
 			userId: string;
@@ -117,6 +116,11 @@ describe(MastodonApiServerService, () => {
 				const row = stateRows.get(stateKey(kind, key));
 				return row?.userId === userId ? row : null;
 			}),
+			getMany: vi.fn(async (userId: string, kind: string, keys: string[]) => new Map(keys.flatMap(key => {
+				const row = stateRows.get(stateKey(kind, key));
+				return row?.userId === userId ? [[key, row] as const] : [];
+			}))),
+			getById: vi.fn(async (id: string) => [...stateRows.values()].find(row => row.id === id) ?? null),
 			put: vi.fn(async (input: { userId: string; kind: string; key: string; value: unknown; expiresAt?: Date | null }) => {
 				const mapKey = stateKey(input.kind, input.key);
 				const previous = stateRows.get(mapKey);
@@ -157,6 +161,14 @@ describe(MastodonApiServerService, () => {
 				stateRows.set(mapKey, row);
 				return row;
 			}),
+			createWithId: vi.fn(async (input: { id: string; userId: string; kind: string; key: string; value: unknown; expiresAt?: Date | null }) => {
+				const mapKey = stateKey(input.kind, input.key);
+				if (stateRows.has(mapKey)) throw new MastodonApiError(409, 'conflict', 'The compatibility state has changed');
+				const now = new Date();
+				const row = { ...input, tokenId: null, version: 1, createdAt: now, updatedAt: now, expiresAt: input.expiresAt ?? null };
+				stateRows.set(mapKey, row);
+				return row;
+			}),
 			compareAndSet: vi.fn(async (input: { userId: string; kind: string; key: string; expectedVersion: number; value: unknown }) => {
 				const mapKey = stateKey(input.kind, input.key);
 				const previous = stateRows.get(mapKey);
@@ -185,6 +197,7 @@ describe(MastodonApiServerService, () => {
 					release();
 				}
 			}),
+			withUserKindLocks: vi.fn(async (_locks: unknown[], callback: (service: unknown) => Promise<unknown>) => await callback(mastodonApiStateService)),
 		};
 		const mastodonFilterService = new MastodonFilterService(mastodonApiStateService as never);
 		const mastodonMarkerService = new MastodonMarkerService(mastodonApiStateService as never);
@@ -239,6 +252,14 @@ describe(MastodonApiServerService, () => {
 		const userFeatureUserEntityService = { pack: vi.fn(async () => ({ id: 'user-id' })) };
 		const userFeatureGlobalEventService = { publishMainStream: vi.fn() };
 		let compatibilityId = 0;
+		const mastodonNotificationService = new MastodonNotificationService(
+			redis as never,
+			mastodonApiStateService as never,
+			{ gen: () => `notification-${++compatibilityId}`, parse: () => ({ date: new Date(0) }) } as never,
+			{ getUserPolicies: vi.fn(async () => ({ canPublicNote: true })) } as never,
+			userFeatureUsersRepository as never,
+			userFeatureFollowingsRepository as never,
+		);
 		const mastodonUserFeatureService = new MastodonUserFeatureService(
 			mastodonApiStateService as never,
 			userFeatureUsersRepository as never,
@@ -463,6 +484,7 @@ describe(MastodonApiServerService, () => {
 			createReport,
 			getScheduledStatus,
 			mastodonApiStateService,
+			mastodonNotificationService,
 			mastodonUserFeatureService,
 			mastodonCollectionService,
 			mastodonConversationService,
@@ -1643,14 +1665,28 @@ describe(MastodonApiServerService, () => {
 			expect.objectContaining({ id: 'notification-a', account: { id: 'account-a' } }),
 		]);
 		expect(nativeInvoke).toHaveBeenCalledWith('i/notifications', {
-			limit: 20,
+			limit: 40,
 			markAsRead: false,
 			includeTypes: ['mention', 'reply', 'quote', 'reaction'],
 		}, expect.any(Object), expect.any(Object));
 	});
 
-	test('applies notification filters against the native notification Note', async () => {
+	test('keeps v1 notification group_key on server grouping when grouped_types is empty', async () => {
 		const { fastify, nativeInvoke } = createServer();
+		nativeInvoke.mockImplementation(async name => name === 'i/notifications' ? [{
+			id: 'grouped-v1', type: 'reaction', createdAt: '2026-07-17T10:00:00.000Z', user: { id: 'actor-a' }, note: { id: 'status-1' },
+		}] : []);
+		const headers = { authorization: 'Bearer user-token' };
+
+		const list = await fastify.inject({ method: 'GET', url: '/api/v1/notifications?grouped_types[]=', headers });
+		const show = await fastify.inject({ method: 'GET', url: '/api/v1/notifications/grouped-v1?grouped_types[]=', headers });
+
+		expect(list.json()[0].group_key).toMatch(/^favourite-status-1-/u);
+		expect(show.json().group_key).toMatch(/^favourite-status-1-/u);
+	});
+
+	test('applies notification filters against the native notification Note', async () => {
+		const { fastify, nativeInvoke, linkHeader } = createServer();
 		nativeInvoke.mockImplementation(async name => name === 'i/notifications' ? [{
 			id: 'notification-native',
 			type: 'note',
@@ -1678,6 +1714,41 @@ describe(MastodonApiServerService, () => {
 
 		expect(response.statusCode).toBe(200);
 		expect(response.json()).toEqual([]);
+		expect(linkHeader).toHaveBeenCalledWith(expect.stringContaining('/api/v1/notifications'), [{ id: 'notification-native' }]);
+	});
+
+	test('keeps v1 notification pagination links when policy filtering hides the whole native page', async () => {
+		const { fastify, nativeInvoke, linkHeader } = createServer();
+		nativeInvoke.mockImplementation(async name => name === 'i/notifications' ? [{
+			id: 'hidden-notification',
+			type: 'follow',
+			createdAt: '2026-07-17T10:00:00.000Z',
+			user: { id: 'actor-a' },
+		}] : []);
+		const headers = { authorization: 'Bearer user-token' };
+		await fastify.inject({ method: 'PATCH', url: '/api/v2/notifications/policy', headers, payload: { for_not_following: 'filter' } });
+
+		const response = await fastify.inject({ method: 'GET', url: '/api/v1/notifications?limit=999&max_id=next-page', headers });
+
+		expect(response.statusCode).toBe(200);
+		expect(response.json()).toEqual([]);
+		expect(linkHeader).toHaveBeenCalledWith(expect.stringContaining('/api/v1/notifications'), [{ id: 'hidden-notification' }]);
+		expect(nativeInvoke).toHaveBeenCalledWith('i/notifications', { limit: 80, markAsRead: false }, expect.any(Object), expect.any(Object));
+	});
+
+	test('keeps v2 notification pagination links on raw page boundaries when policy hides every group', async () => {
+		const { fastify, nativeInvoke, linkHeader } = createServer();
+		nativeInvoke.mockImplementation(async name => name === 'i/notifications' ? [
+			{ id: 'hidden-new', type: 'follow', createdAt: '2026-07-17T11:00:00.000Z', user: { id: 'actor-a' } },
+			{ id: 'hidden-old', type: 'follow', createdAt: '2026-07-17T10:00:00.000Z', user: { id: 'actor-b' } },
+		] : []);
+		const headers = { authorization: 'Bearer user-token' };
+		await fastify.inject({ method: 'PATCH', url: '/api/v2/notifications/policy', headers, payload: { for_not_following: 'drop' } });
+
+		const response = await fastify.inject({ method: 'GET', url: '/api/v2/notifications', headers });
+
+		expect(response.json()).toEqual({ accounts: [], statuses: [], notification_groups: [] });
+		expect(linkHeader).toHaveBeenCalledWith(expect.stringContaining('/api/v2/notifications'), [{ id: 'hidden-new' }, { id: 'hidden-old' }]);
 	});
 
 	test('subtracts excluded notification types from includes before native grouped filtering', async () => {
@@ -1706,7 +1777,7 @@ describe(MastodonApiServerService, () => {
 			expect.objectContaining({ id: 'reblog', type: 'reblog' }),
 		]);
 		expect(nativeInvoke).toHaveBeenCalledWith('i/notifications', {
-			limit: 20,
+			limit: 40,
 			markAsRead: false,
 			includeTypes: ['reaction', 'renote'],
 		}, expect.any(Object), expect.any(Object));
@@ -1733,7 +1804,7 @@ describe(MastodonApiServerService, () => {
 		expect(response.statusCode).toBe(200);
 		expect(response.json()).toEqual([expect.objectContaining({ id: 'status', type: 'status' })]);
 		expect(nativeInvoke).toHaveBeenCalledWith('i/notifications', {
-			limit: 20,
+			limit: 40,
 			markAsRead: false,
 			includeTypes: ['note'],
 		}, expect.any(Object), expect.any(Object));
@@ -1757,7 +1828,7 @@ describe(MastodonApiServerService, () => {
 		expect(response.statusCode).toBe(200);
 		expect(response.json()).toEqual([]);
 		expect(nativeInvoke).toHaveBeenCalledWith('i/notifications', {
-			limit: 20,
+			limit: 40,
 			markAsRead: false,
 			includeTypes: ['note'],
 		}, expect.any(Object), expect.any(Object));
@@ -1788,6 +1859,193 @@ describe(MastodonApiServerService, () => {
 		expect(single.statusCode).toBe(404);
 		expect(assert).toHaveBeenCalledWith(['read'], 'write:notifications');
 		expect(nativeInvoke).not.toHaveBeenCalledWith(expect.stringContaining('delete'), expect.anything(), expect.anything(), expect.anything());
+	});
+
+	test('declares notification groups, policies, requests, and the canonical merged route as implemented', () => {
+		const contract = (method: string, path: string) => MASTODON_4_6_USER_ROUTES.find(route => route.method === method && route.path === path);
+
+		for (const [method, path] of [
+			['GET', '/api/v1/notifications/unread_count'],
+			['GET', '/api/v2/notifications'],
+			['GET', '/api/v2/notifications/:group_key'],
+			['GET', '/api/v2/notifications/:group_key/accounts'],
+			['POST', '/api/v2/notifications/:group_key/dismiss'],
+			['POST', '/api/v2/notifications/clear'],
+			['GET', '/api/v2/notifications/unread_count'],
+			['GET', '/api/v1/notifications/requests'],
+			['GET', '/api/v1/notifications/requests/:id'],
+			['GET', '/api/v1/notifications/requests/merged'],
+			['POST', '/api/v1/notifications/requests/accept'],
+			['POST', '/api/v1/notifications/requests/dismiss'],
+			['POST', '/api/v1/notifications/requests/:id/accept'],
+			['POST', '/api/v1/notifications/requests/:id/dismiss'],
+			['GET', '/api/v1/notifications/policy'],
+			['PATCH', '/api/v1/notifications/policy'],
+			['PUT', '/api/v1/notifications/policy'],
+			['GET', '/api/v2/notifications/policy'],
+			['PATCH', '/api/v2/notifications/policy'],
+			['PUT', '/api/v2/notifications/policy'],
+		] as const) {
+			expect(contract(method, path), `${method} ${path}`).toMatchObject({ behavior: 'implemented' });
+		}
+		expect(contract('GET', '/api/v1/notifications/requests/:id/merged')).toBeUndefined();
+	});
+
+	test('serves exact v2 grouped wrappers, account expansion, unread counts, dismissal, and clear from one bounded native source', async () => {
+		const { fastify, nativeInvoke, assert, linkHeader } = createServer();
+		const notifications = [
+			{ id: '302', type: 'reaction', createdAt: '2026-07-17T10:45:00.000Z', user: { id: 'actor-b' }, note: { id: 'status-1' } },
+			{ id: '301', type: 'reaction', createdAt: '2026-07-17T10:15:00.000Z', user: { id: 'actor-a' }, note: { id: 'status-1' } },
+		];
+		nativeInvoke.mockImplementation(async (name, data) => name === 'i/notifications' ? notifications
+			.filter(notification => typeof data.untilId !== 'string' || notification.id < data.untilId)
+			.filter(notification => typeof data.sinceId !== 'string' || notification.id > data.sinceId) : []);
+		const headers = { authorization: 'Bearer user-token' };
+
+		const listed = await fastify.inject({ method: 'GET', url: '/api/v2/notifications?limit=999', headers });
+		expect(listed.statusCode).toBe(200);
+		expect(listed.json()).toEqual({
+			accounts: [{ id: 'actor-b' }, { id: 'actor-a' }],
+			statuses: [expect.objectContaining({ id: 'status-1' })],
+			notification_groups: [expect.objectContaining({
+				group_key: expect.stringMatching(/^favourite-status-1-/u),
+				notifications_count: 2,
+				type: 'favourite',
+				most_recent_notification_id: '302',
+				page_min_id: '301',
+				page_max_id: '302',
+				sample_account_ids: ['actor-b', 'actor-a'],
+				status_id: 'status-1',
+			})],
+		});
+		const groupKey = listed.json().notification_groups[0].group_key as string;
+		expect(nativeInvoke).toHaveBeenCalledWith('i/notifications', { limit: 100, markAsRead: false }, expect.any(Object), expect.any(Object));
+		expect(linkHeader).toHaveBeenCalledWith(expect.stringContaining('/api/v2/notifications'), [{ id: '302' }, { id: '301' }]);
+
+		const single = await fastify.inject({ method: 'GET', url: `/api/v2/notifications/${groupKey}`, headers });
+		const accounts = await fastify.inject({ method: 'GET', url: `/api/v2/notifications/${groupKey}/accounts`, headers });
+		const firstAccountPage = await fastify.inject({ method: 'GET', url: `/api/v2/notifications/${groupKey}/accounts?limit=1`, headers });
+		const nextAccountPage = await fastify.inject({ method: 'GET', url: `/api/v2/notifications/${groupKey}/accounts?limit=1&max_id=302`, headers });
+		const unread = await fastify.inject({ method: 'GET', url: '/api/v2/notifications/unread_count', headers });
+		expect(single.json()).toEqual(listed.json());
+		expect(accounts.json()).toEqual([{ id: 'actor-b' }, { id: 'actor-a' }]);
+		expect(firstAccountPage.json()).toEqual([{ id: 'actor-b' }]);
+		expect(nextAccountPage.json()).toEqual([{ id: 'actor-a' }]);
+		expect(linkHeader).toHaveBeenCalledWith(expect.stringContaining(`/api/v2/notifications/${groupKey}/accounts`), [expect.objectContaining({ id: '302' })]);
+		linkHeader.mockClear();
+		const partialAccountPage = await fastify.inject({ method: 'GET', url: `/api/v2/notifications/${groupKey}/accounts?limit=2&max_id=302`, headers });
+		const exhaustedAccountPage = await fastify.inject({ method: 'GET', url: `/api/v2/notifications/${groupKey}/accounts?limit=1&max_id=301`, headers });
+		const missingAccountPage = await fastify.inject({ method: 'GET', url: '/api/v2/notifications/missing-group/accounts?limit=1', headers });
+		expect(partialAccountPage.json()).toEqual([{ id: 'actor-a' }]);
+		expect(exhaustedAccountPage.statusCode).toBe(200);
+		expect(exhaustedAccountPage.json()).toEqual([]);
+		expect(missingAccountPage.statusCode).toBe(200);
+		expect(missingAccountPage.json()).toEqual([]);
+		expect(linkHeader).not.toHaveBeenCalled();
+		expect(unread.json()).toEqual({ count: 1 });
+
+		const ungroupedList = await fastify.inject({ method: 'GET', url: '/api/v2/notifications?grouped_types[]=mention', headers });
+		const ungroupedKey = ungroupedList.json().notification_groups[0].group_key as string;
+		expect(ungroupedKey).toBe('ungrouped-302');
+		expect((await fastify.inject({ method: 'GET', url: `/api/v2/notifications/${ungroupedKey}`, headers })).json()).toMatchObject({
+			notification_groups: [expect.objectContaining({ group_key: ungroupedKey })],
+		});
+		expect((await fastify.inject({ method: 'GET', url: `/api/v2/notifications/${ungroupedKey}/accounts`, headers })).json()).toEqual([{ id: 'actor-b' }]);
+		expect((await fastify.inject({ method: 'POST', url: `/api/v2/notifications/${ungroupedKey}/dismiss`, headers })).json()).toEqual({});
+		expect((await fastify.inject({ method: 'GET', url: `/api/v2/notifications/${ungroupedKey}`, headers })).statusCode).toBe(404);
+		expect((await fastify.inject({ method: 'GET', url: '/api/v1/notifications', headers })).json()).not.toEqual(expect.arrayContaining([expect.objectContaining({ id: '302' })]));
+
+		const dismissed = await fastify.inject({ method: 'POST', url: `/api/v2/notifications/${groupKey}/dismiss`, headers });
+		expect(dismissed.json()).toEqual({});
+		expect((await fastify.inject({ method: 'GET', url: `/api/v2/notifications/${groupKey}`, headers })).statusCode).toBe(404);
+		expect((await fastify.inject({ method: 'GET', url: '/api/v2/notifications?grouped_types[]=mention', headers })).json()).toEqual({ accounts: [], statuses: [], notification_groups: [] });
+		notifications.unshift({ id: '303', type: 'reaction', createdAt: '2026-07-17T10:55:00.000Z', user: { id: 'actor-c' }, note: { id: 'status-1' } });
+		expect((await fastify.inject({ method: 'GET', url: '/api/v2/notifications', headers })).json()).toMatchObject({
+			notification_groups: [expect.objectContaining({ most_recent_notification_id: '303' })],
+		});
+		expect((await fastify.inject({ method: 'POST', url: '/api/v2/notifications/clear', headers })).json()).toEqual({});
+		expect(nativeInvoke).toHaveBeenCalledWith('notifications/mark-all-as-read', {}, expect.any(Object), expect.any(Object));
+		expect(assert).toHaveBeenCalledWith(['read'], 'write:notifications');
+	});
+
+	test('uses bounded interleaved group consumption and global notification Link boundaries', async () => {
+		const { fastify, nativeInvoke, linkHeader } = createServer();
+		nativeInvoke.mockImplementation(async name => name === 'i/notifications' ? [
+			{ id: '103', type: 'reaction', createdAt: '2026-07-17T10:30:00.000Z', user: { id: 'actor-a' }, note: { id: 'status-a' } },
+			{ id: '102', type: 'reaction', createdAt: '2026-07-17T10:20:00.000Z', user: { id: 'actor-b' }, note: { id: 'status-b' } },
+			{ id: '101', type: 'reaction', createdAt: '2026-07-17T10:10:00.000Z', user: { id: 'actor-c' }, note: { id: 'status-a' } },
+		] : []);
+		const headers = { authorization: 'Bearer user-token' };
+
+		const one = await fastify.inject({ method: 'GET', url: '/api/v2/notifications?limit=1', headers });
+		expect(one.json().notification_groups).toEqual([expect.objectContaining({ notifications_count: 1, page_min_id: '103', page_max_id: '103' })]);
+		expect(linkHeader).toHaveBeenLastCalledWith(expect.stringContaining('/api/v2/notifications'), [{ id: '103' }, { id: '103' }]);
+		const two = await fastify.inject({ method: 'GET', url: '/api/v2/notifications?limit=2', headers });
+		expect(two.json().notification_groups).toHaveLength(2);
+		expect(linkHeader).toHaveBeenLastCalledWith(expect.stringContaining('/api/v2/notifications'), [{ id: '103' }, { id: '101' }]);
+	});
+
+	test('supports canonical and legacy notification policy shapes, PATCH and PUT aliases, strict enums, and bounded dynamic summary', async () => {
+		const { fastify, nativeInvoke } = createServer();
+		nativeInvoke.mockImplementation(async name => name === 'i/notifications' ? [{
+			id: '401', type: 'follow', createdAt: '2026-07-17T10:00:00.000Z', user: { id: 'actor-a' },
+		}] : []);
+		const headers = { authorization: 'Bearer user-token' };
+
+		const defaults = await fastify.inject({ method: 'GET', url: '/api/v2/notifications/policy', headers });
+		expect(defaults.json()).toEqual({
+			for_not_following: 'accept', for_not_followers: 'accept', for_new_accounts: 'accept',
+			for_private_mentions: 'drop', for_limited_accounts: 'filter',
+			summary: { pending_requests_count: 0, pending_notifications_count: 0 },
+		});
+		const patched = await fastify.inject({ method: 'PATCH', url: '/api/v2/notifications/policy', headers, payload: { for_not_following: 'filter' } });
+		expect(patched.json()).toMatchObject({ for_not_following: 'filter', summary: { pending_requests_count: 1, pending_notifications_count: 1 } });
+		const put = await fastify.inject({ method: 'PUT', url: '/api/v2/notifications/policy', headers, payload: { for_not_followers: 'drop' } });
+		expect(put.json()).toMatchObject({ for_not_following: 'filter', for_not_followers: 'drop' });
+		const invalid = await fastify.inject({ method: 'PATCH', url: '/api/v2/notifications/policy', headers, payload: { for_new_accounts: 'later' } });
+		expect(invalid.statusCode).toBe(422);
+
+		const legacy = await fastify.inject({ method: 'GET', url: '/api/v1/notifications/policy', headers });
+		expect(legacy.json()).toEqual({
+			filter_not_following: true,
+			filter_not_followers: true,
+			filter_new_accounts: false,
+			filter_private_mentions: true,
+			summary: expect.any(Object),
+		});
+		const legacyUpperTrue = await fastify.inject({ method: 'PATCH', url: '/api/v1/notifications/policy', headers, payload: { filter_new_accounts: 'TRUE' } });
+		expect(legacyUpperTrue.json()).toMatchObject({ filter_new_accounts: true });
+		const legacyUpperOff = await fastify.inject({ method: 'PUT', url: '/api/v1/notifications/policy', headers, payload: { filter_new_accounts: 'OFF' } });
+		expect(legacyUpperOff.json()).toMatchObject({ filter_new_accounts: false });
+	});
+
+	test('lists actor requests with public-id cursors and handles canonical merged and bracketed bulk actions', async () => {
+		const { fastify, nativeInvoke, linkHeader } = createServer();
+		nativeInvoke.mockImplementation(async name => name === 'i/notifications' ? [
+			{ id: '502', type: 'follow', createdAt: '2026-07-17T11:00:00.000Z', user: { id: 'actor-a' } },
+			{ id: '501', type: 'follow', createdAt: '2026-07-17T10:00:00.000Z', user: { id: 'actor-a' } },
+		] : []);
+		const headers = { authorization: 'Bearer user-token' };
+		await fastify.inject({ method: 'PATCH', url: '/api/v2/notifications/policy', headers, payload: { for_not_following: 'filter' } });
+
+		const list = await fastify.inject({ method: 'GET', url: '/api/v1/notifications/requests?limit=999&max_id=zzzz', headers });
+		expect(list.statusCode).toBe(200);
+		expect(list.json()).toEqual([{
+			id: expect.any(String),
+			created_at: '2026-07-17T10:00:00.000Z',
+			updated_at: '2026-07-17T11:00:00.000Z',
+			notifications_count: '2',
+			account: { id: 'actor-a' },
+			last_status: null,
+		}]);
+		const requestId = list.json()[0].id as string;
+		expect(linkHeader).toHaveBeenCalledWith(expect.stringContaining('/api/v1/notifications/requests'), [expect.objectContaining({ id: requestId })]);
+		expect((await fastify.inject({ method: 'GET', url: `/api/v1/notifications/requests/${requestId}`, headers })).json()).toEqual(list.json()[0]);
+		expect((await fastify.inject({ method: 'GET', url: '/api/v1/notifications/requests/merged', headers })).json()).toEqual({ merged: true });
+
+		const accepted = await fastify.inject({ method: 'POST', url: '/api/v1/notifications/requests/accept', headers, payload: { 'id[]': [requestId] } });
+		expect(accepted.json()).toEqual({});
+		expect((await fastify.inject({ method: 'GET', url: '/api/v1/notifications/requests', headers })).json()).toEqual([]);
 	});
 
 	test('registers Mastodon applications from JSON', async () => {
