@@ -45,6 +45,7 @@ import { MiHashtag } from '@/models/Hashtag.js';
 import { MiInstance } from '@/models/Instance.js';
 import { MiMastodonOAuthClient } from '@/models/MastodonOAuthClient.js';
 import { MiMastodonOAuthToken } from '@/models/MastodonOAuthToken.js';
+import { MiMastodonUserState } from '@/models/MastodonUserState.js';
 import { MiMeta } from '@/models/Meta.js';
 import { MiModerationLog } from '@/models/ModerationLog.js';
 import { MiMuting } from '@/models/Muting.js';
@@ -127,6 +128,7 @@ export {
 	MiInstance,
 	MiMastodonOAuthClient,
 	MiMastodonOAuthToken,
+	MiMastodonUserState,
 	MiMeta,
 	MiModerationLog,
 	MiMuting,
@@ -209,6 +211,7 @@ export type HashtagsRepository = Repository<MiHashtag> & MiRepository<MiHashtag>
 export type InstancesRepository = Repository<MiInstance> & MiRepository<MiInstance>;
 export type MastodonOAuthClientsRepository = Repository<MiMastodonOAuthClient> & MiRepository<MiMastodonOAuthClient>;
 export type MastodonOAuthTokensRepository = Repository<MiMastodonOAuthToken> & MiRepository<MiMastodonOAuthToken>;
+export type MastodonUserStatesRepository = Repository<MiMastodonUserState> & MiRepository<MiMastodonUserState>;
 export type MetasRepository = Repository<MiMeta> & MiRepository<MiMeta>;
 export type ModerationLogsRepository = Repository<MiModerationLog> & MiRepository<MiModerationLog>;
 export type MutingsRepository = Repository<MiMuting> & MiRepository<MiMuting>;

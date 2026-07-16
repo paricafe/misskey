@@ -30,6 +30,7 @@ import { UrlPreviewService } from './web/UrlPreviewService.js';
 import { ClientLoggerService } from './web/ClientLoggerService.js';
 import { OAuth2ProviderService } from './oauth/OAuth2ProviderService.js';
 import { MastodonApiCallService } from './api/mastodon/MastodonApiCallService.js';
+import { MastodonApiStateService } from './api/mastodon/MastodonApiStateService.js';
 import { MastodonAuthenticateService } from './api/mastodon/MastodonAuthenticateService.js';
 import { MastodonOAuthService } from './api/mastodon/MastodonOAuthService.js';
 import { MastodonNotificationService } from './api/mastodon/MastodonNotificationService.js';
@@ -115,6 +116,7 @@ import { SigninWithPasskeyApiService } from './api/SigninWithPasskeyApiService.j
 		OpenApiServerService,
 		OAuth2ProviderService,
 		MastodonApiCallService,
+		MastodonApiStateService,
 		MastodonAuthenticateService,
 		MastodonNotificationService,
 		MastodonOAuthService,
