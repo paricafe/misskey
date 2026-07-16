@@ -123,6 +123,7 @@ describe(MastodonApiServerService, () => {
 				account: vi.fn(value => ({ id: value.id, username: value.username })),
 				credentialAccount: vi.fn(value => ({ id: value.id, username: value.username })),
 				profile: vi.fn(value => ({ id: value.id, display_name: value.name ?? value.username })),
+				relationship: vi.fn(value => ({ id: value.id, note: value.memo ?? '' })),
 				tag: vi.fn(name => ({
 					name,
 					url: `https://misskey.example/tags/${encodeURIComponent(name)}`,
@@ -585,6 +586,110 @@ describe(MastodonApiServerService, () => {
 		expect(edit.statusCode).toBe(200);
 		expect(nativeInvoke).toHaveBeenCalledWith('notes/update', expect.objectContaining({ cw: 'Existing CW' }), expect.any(Object), expect.any(Object));
 		expect([poll.statusCode, language.statusCode, quotePolicy.statusCode]).toEqual([422, 422, 422]);
+	});
+
+	test('projects legacy v1 suggestions as Accounts while preserving v2 Suggestion envelopes', async () => {
+		const { fastify, nativeInvoke } = createServer();
+		nativeInvoke.mockImplementation(async name => name === 'users/recommendation'
+			? [{ id: 'recommended-id', username: 'recommended' }]
+			: []);
+
+		const v1 = await fastify.inject({
+			method: 'GET',
+			url: '/api/v1/suggestions?limit=7',
+			headers: { authorization: 'Bearer user-token' },
+		});
+		const v2 = await fastify.inject({
+			method: 'GET',
+			url: '/api/v2/suggestions?limit=7',
+			headers: { authorization: 'Bearer user-token' },
+		});
+
+		expect(v1.statusCode).toBe(200);
+		expect(v1.json()).toEqual([{ id: 'recommended-id', username: 'recommended' }]);
+		expect(v2.statusCode).toBe(200);
+		expect(v2.json()).toEqual([expect.objectContaining({
+			source: 'global',
+			account: { id: 'recommended-id', username: 'recommended' },
+		})]);
+		expect(nativeInvoke).toHaveBeenCalledWith('users/recommendation', { limit: 7, offset: 0 }, expect.any(Object), expect.any(Object));
+	});
+
+	test('updates an account note and removes a follower before deriving a fresh Relationship', async () => {
+		const { fastify, assert, nativeInvoke } = createServer();
+		nativeInvoke.mockImplementation(async (name, data) => name === 'users/show'
+			? { id: data.userId, username: 'target', memo: name === 'users/show' ? 'review later' : '' }
+			: {});
+
+		const note = await fastify.inject({
+			method: 'POST',
+			url: '/api/v1/accounts/target-id/note',
+			headers: { authorization: 'Bearer user-token' },
+			payload: { comment: 'review later' },
+		});
+		const remove = await fastify.inject({
+			method: 'POST',
+			url: '/api/v1/accounts/target-id/remove_from_followers',
+			headers: { authorization: 'Bearer user-token' },
+		});
+
+		expect(note.statusCode).toBe(200);
+		expect(remove.statusCode).toBe(200);
+		expect(note.json()).toEqual(expect.objectContaining({ id: 'target-id' }));
+		expect(remove.json()).toEqual(expect.objectContaining({ id: 'target-id' }));
+		expect(nativeInvoke).toHaveBeenCalledWith('users/update-memo', {
+			userId: 'target-id',
+			memo: 'review later',
+		}, expect.any(Object), expect.any(Object));
+		expect(nativeInvoke).toHaveBeenCalledWith('following/invalidate', {
+			userId: 'target-id',
+		}, expect.any(Object), expect.any(Object));
+		expect(nativeInvoke).toHaveBeenCalledWith('users/show', { userId: 'target-id' }, expect.any(Object), expect.any(Object));
+		expect(assert).toHaveBeenCalledWith(['read'], 'write:accounts');
+		expect(assert).toHaveBeenCalledWith(['read'], 'write:follows');
+	});
+
+	test('requires a string account note and does not report success after native action failures', async () => {
+		const { fastify, nativeInvoke } = createServer();
+		const missingComment = await fastify.inject({
+			method: 'POST',
+			url: '/api/v1/accounts/target-id/note',
+			headers: { authorization: 'Bearer user-token' },
+			payload: {},
+		});
+		expect(missingComment.statusCode).toBe(400);
+		expect(nativeInvoke).not.toHaveBeenCalledWith('users/update-memo', expect.anything(), expect.anything(), expect.anything());
+
+		nativeInvoke.mockImplementation(async name => {
+			if (name === 'users/update-memo') throw new ApiError({
+				message: 'No such user.',
+				code: 'NO_SUCH_USER',
+				id: 'missing-user',
+				httpStatusCode: 404,
+			});
+			if (name === 'following/invalidate') throw new ApiError({
+				message: 'Forbidden.',
+				code: 'FORBIDDEN',
+				id: 'forbidden',
+				kind: 'permission',
+			});
+			return { id: 'target-id' };
+		});
+		const missing = await fastify.inject({
+			method: 'POST',
+			url: '/api/v1/accounts/target-id/note',
+			headers: { authorization: 'Bearer user-token' },
+			payload: { comment: 'memo' },
+		});
+		const forbidden = await fastify.inject({
+			method: 'POST',
+			url: '/api/v1/accounts/target-id/remove_from_followers',
+			headers: { authorization: 'Bearer user-token' },
+		});
+
+		expect(missing.statusCode).toBe(404);
+		expect(forbidden.statusCode).toBe(403);
+		expect(nativeInvoke).not.toHaveBeenCalledWith('users/show', expect.anything(), expect.anything(), expect.anything());
 	});
 
 	test('registers every documented Mastodon 4.6.3 Fastify route exactly once', async () => {
@@ -1226,9 +1331,13 @@ describe(MastodonApiServerService, () => {
 		expect(nativeInvoke).not.toHaveBeenCalled();
 	});
 
-	test('serves public batch accounts and token-authenticated batch statuses in input order', async () => {
+	test('serves token-authenticated batch accounts and statuses in input order', async () => {
 		const { fastify, authenticate, publicInvoke } = createServer();
-		const accounts = await fastify.inject({ method: 'GET', url: '/api/v1/accounts?id[]=user-a&id[]=user-b' });
+		const accounts = await fastify.inject({
+			method: 'GET',
+			url: '/api/v1/accounts?id[]=user-a&id[]=user-b',
+			headers: { authorization: 'Bearer user-token' },
+		});
 		const statuses = await fastify.inject({
 			method: 'GET',
 			url: '/api/v1/statuses?id[]=note-a&id[]=note-b',
@@ -1246,7 +1355,7 @@ describe(MastodonApiServerService, () => {
 			expect.objectContaining({ id: 'note-b' }),
 		]);
 		expect(authenticate).toHaveBeenCalledWith('user-token');
-		expect(publicInvoke).toHaveBeenCalledWith('users/show', { userId: 'user-a' }, null, expect.any(Object));
+		expect(publicInvoke).toHaveBeenCalledWith('users/show', { userId: 'user-a' }, expect.objectContaining({ kind: 'user' }), expect.any(Object));
 		expect(publicInvoke).toHaveBeenCalledWith('notes/show', { noteId: 'note-a' }, expect.objectContaining({ kind: 'user' }), expect.any(Object));
 	});
 
@@ -1271,6 +1380,7 @@ describe(MastodonApiServerService, () => {
 		const response = await fastify.inject({
 			method: 'GET',
 			url: '/api/v1/accounts?id[]=user-a&id[]=missing&id[]=hidden&id[]=user-a&id[]=user-b',
+			headers: { authorization: 'Bearer user-token' },
 		});
 
 		expect(response.statusCode).toBe(200);
@@ -1288,7 +1398,11 @@ describe(MastodonApiServerService, () => {
 		const ids = [...cappedIds, 'outside-cap'];
 		const query = ids.map(id => `id[]=${id}`).join('&');
 
-		const response = await fastify.inject({ method: 'GET', url: `/api/v1/accounts?${query}` });
+		const response = await fastify.inject({
+			method: 'GET',
+			url: `/api/v1/accounts?${query}`,
+			headers: { authorization: 'Bearer user-token' },
+		});
 
 		expect(response.statusCode).toBe(200);
 		expect(response.json().map((account: { id: string }) => account.id)).toEqual(cappedIds);

@@ -162,6 +162,14 @@ export class MastodonApiServerService {
 				account: this.mastodonEntityService.account(user),
 			}));
 		}));
+		fastify.get('/api/v1/suggestions', request => this.withAuth(request as MastodonRequest, 'read:accounts', async auth => {
+			const query = request.query as Dictionary;
+			const users = await this.invoke('users/recommendation', {
+				limit: this.integer(query.limit, 40, 1, 80),
+				offset: this.integer(query.offset, 0, 0),
+			}, auth, request as MastodonRequest) as Packed<'UserDetailed'>[];
+			return users.map(user => this.mastodonEntityService.account(user));
+		}));
 		fastify.get<{ Params: { name: string } }>('/api/v1/tags/:name', request => this.withOptionalToken(request as MastodonRequest, async () => {
 			const hashtag = await this.invokePublic('hashtags/show', { tag: request.params.name }, null, request as MastodonRequest) as Packed<'Hashtag'>;
 			return this.mastodonEntityService.tag(hashtag.tag);
@@ -182,7 +190,8 @@ export class MastodonApiServerService {
 			'reading:expand:spoilers': false,
 		} as Dictionary)));
 		this.registerProfile(fastify);
-		fastify.get('/api/v1/accounts', request => this.withOptionalUser(request as MastodonRequest, 'read:accounts', async auth => {
+		fastify.get('/api/v1/accounts', request => this.withToken(request as MastodonRequest, 'read:accounts', async tokenAuth => {
+			const auth = tokenAuth.kind === 'user' ? tokenAuth : null;
 			const users = await this.invokePublicBatch(
 				'users/show',
 				'userId',
@@ -274,6 +283,22 @@ export class MastodonApiServerService {
 				return this.mastodonEntityService.relationship(user as Packed<'UserDetailed'>);
 			}));
 		}
+		fastify.post<{ Params: { id: string }; Body: Dictionary }>('/api/v1/accounts/:id/note', request => this.withAuth(request as MastodonRequest, 'write:accounts', async auth => {
+			if (typeof request.body?.comment !== 'string') {
+				throw new MastodonApiError(400, 'invalid_request', 'comment must be a string');
+			}
+			await this.invoke('users/update-memo', {
+				userId: request.params.id,
+				memo: request.body.comment,
+			}, auth, request as MastodonRequest);
+			const user = await this.invoke('users/show', { userId: request.params.id }, auth, request as MastodonRequest);
+			return this.mastodonEntityService.relationship(user as Packed<'UserDetailed'>);
+		}));
+		fastify.post<{ Params: { id: string } }>('/api/v1/accounts/:id/remove_from_followers', request => this.withAuth(request as MastodonRequest, 'write:follows', async auth => {
+			await this.invoke('following/invalidate', { userId: request.params.id }, auth, request as MastodonRequest);
+			const user = await this.invoke('users/show', { userId: request.params.id }, auth, request as MastodonRequest);
+			return this.mastodonEntityService.relationship(user as Packed<'UserDetailed'>);
+		}));
 		fastify.get('/api/v1/follow_requests', request => this.withAuth(request as MastodonRequest, 'read:follows', async auth => {
 			const requests = await this.invoke('following/requests/list', this.mastodonPaginationService.toMisskey(request.query as Dictionary, 100), auth, request as MastodonRequest) as Array<{ follower: Packed<'UserLite'> }>;
 			return requests.map(followRequest => this.mastodonEntityService.account(followRequest.follower));

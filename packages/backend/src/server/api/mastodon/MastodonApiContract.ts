@@ -185,7 +185,7 @@ export const MASTODON_4_6_USER_ROUTES: readonly MastodonContractRoute[] = [
 	safeArray('GET', '/api/v1/accounts/:id/in_collections', 'user', 'read:collections', 'Collection[]', '4.6.0'),
 	implemented('POST', '/api/v1/accounts/:id/follow', 'user', 'write:follows', 'Relationship'),
 	implemented('POST', '/api/v1/accounts/:id/unfollow', 'user', 'write:follows', 'Relationship'),
-	unsupported('POST', '/api/v1/accounts/:id/remove_from_followers', 'user', 'write:follows', 'Relationship', '3.5.0'),
+	implemented('POST', '/api/v1/accounts/:id/remove_from_followers', 'user', 'write:follows', 'Relationship', '3.5.0'),
 	implemented('POST', '/api/v1/accounts/:id/block', 'user', 'write:blocks', 'Relationship'),
 	implemented('POST', '/api/v1/accounts/:id/unblock', 'user', 'write:blocks', 'Relationship'),
 	implemented('POST', '/api/v1/accounts/:id/mute', 'user', 'write:mutes', 'Relationship'),
@@ -194,7 +194,7 @@ export const MASTODON_4_6_USER_ROUTES: readonly MastodonContractRoute[] = [
 	unsupported('POST', '/api/v1/accounts/:id/endorse', 'user', 'write:accounts', 'Relationship'),
 	unsupported('POST', '/api/v1/accounts/:id/unpin', 'user', 'write:accounts', 'Relationship'),
 	unsupported('POST', '/api/v1/accounts/:id/unendorse', 'user', 'write:accounts', 'Relationship'),
-	unsupported('POST', '/api/v1/accounts/:id/note', 'user', 'write:accounts', 'Relationship', '3.2.0', ['comment']),
+	implemented('POST', '/api/v1/accounts/:id/note', 'user', 'write:accounts', 'Relationship', '3.2.0'),
 	unsupported('POST', '/api/v1/accounts/:id/email_subscriptions', 'user', 'write:accounts', 'Object', '4.6.0'),
 	implemented('GET', '/api/v1/profile', 'user', ['profile', 'read:accounts'], 'Profile', '4.6.0'),
 	implemented('PATCH', '/api/v1/profile', 'user', 'write:accounts', 'Profile', '4.6.0'),
@@ -245,7 +245,7 @@ export const MASTODON_4_6_USER_ROUTES: readonly MastodonContractRoute[] = [
 
 	// Discovery and instance information
 	implemented('GET', '/api/v1/custom_emojis', 'public', undefined, 'CustomEmoji[]'),
-	safeArray('GET', '/api/v1/suggestions', 'user', 'read:accounts', 'Account[]'),
+	implemented('GET', '/api/v1/suggestions', 'user', 'read:accounts', 'Account[]'),
 	unsupported('DELETE', '/api/v1/suggestions/:id', 'user', 'write:accounts', 'Object'),
 	implemented('GET', '/api/v2/suggestions', 'user', 'read:accounts', 'Suggestion[]', '3.4.0'),
 	implemented('GET', '/api/v1/trends', 'public', undefined, 'Tag[]', '3.0.0'),
