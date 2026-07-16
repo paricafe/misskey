@@ -155,10 +155,27 @@ describe(MastodonEntityService, () => {
 	});
 
 	test('converts a tag name to a Mastodon tag entity', () => {
-		expect(service.tag('Fediverse')).toEqual({
+		expect(service.tag('Fediverse', { following: true, featuring: false })).toEqual({
+			id: 'fediverse',
 			name: 'Fediverse',
 			url: 'https://misskey.example/tags/Fediverse',
 			history: [],
+			following: true,
+			featuring: false,
+		});
+	});
+
+	test('converts featured-tag state and bounded note statistics', () => {
+		expect(service.featuredTag(
+			{ id: 'state-id', name: 'fediverse' },
+			'https://misskey.example/@alice',
+			{ statusesCount: 3, lastStatusAt: '2026-07-17' },
+		)).toEqual({
+			id: 'state-id',
+			name: 'fediverse',
+			url: 'https://misskey.example/@alice/tagged/fediverse',
+			statuses_count: '3',
+			last_status_at: '2026-07-17',
 		});
 	});
 

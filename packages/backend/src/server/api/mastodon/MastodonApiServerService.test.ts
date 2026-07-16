@@ -14,6 +14,7 @@ import { MastodonFilterService } from './MastodonFilterService.js';
 import { MastodonMarkerService } from './MastodonMarkerService.js';
 import { MastodonNotificationService } from './MastodonNotificationService.js';
 import { MastodonScopeService } from './MastodonScopeService.js';
+import { MastodonUserFeatureService } from './MastodonUserFeatureService.js';
 
 describe(MastodonApiServerService, () => {
 	const servers: ReturnType<typeof Fastify>[] = [];
@@ -72,7 +73,10 @@ describe(MastodonApiServerService, () => {
 			zremrangebyrank: vi.fn().mockResolvedValue(0),
 			zscore: vi.fn(async (_key: string, id: string) => dismissedNotifications.has(id) ? '1' : null),
 		};
-		const notesRepository = { findBy: vi.fn().mockResolvedValue([]) };
+		const notesRepository = {
+			findBy: vi.fn().mockResolvedValue([]),
+			findOneBy: vi.fn(async ({ id }: { id: string }) => ({ id, threadId: id === 'reply-note' ? 'root-note' : null })),
+		};
 		const noteFavoritesRepository = { findBy: vi.fn().mockResolvedValue([]) };
 		const userNotePiningsRepository = { findBy: vi.fn().mockResolvedValue([]) };
 		const linkHeader = vi.fn().mockReturnValue('<next>; rel="next"');
@@ -176,6 +180,37 @@ describe(MastodonApiServerService, () => {
 		};
 		const mastodonFilterService = new MastodonFilterService(mastodonApiStateService as never);
 		const mastodonMarkerService = new MastodonMarkerService(mastodonApiStateService as never);
+		const profiles = new Map([['user-id', { userId: 'user-id', mutedInstances: [] as string[] }]]);
+		const profileRepository = {
+			findOne: vi.fn(async ({ where }: { where: { userId: string } }) => {
+				const profile = profiles.get(where.userId);
+				return profile == null ? null : { ...profile, mutedInstances: [...profile.mutedInstances] };
+			}),
+			update: vi.fn(async ({ userId }: { userId: string }, value: { mutedInstances: string[] }) => {
+				const profile = profiles.get(userId);
+				if (profile != null) profile.mutedInstances = [...value.mutedInstances];
+			}),
+		};
+		const userProfilesRepository = {
+			manager: { transaction: vi.fn(async (callback: (manager: { getRepository: () => typeof profileRepository }) => Promise<unknown>) => callback({ getRepository: () => profileRepository })) },
+		};
+		const noteThreadMutingsRepository = { query: vi.fn().mockResolvedValue([]), delete: vi.fn().mockResolvedValue({ affected: 1 }) };
+		const userFeatureCacheService = {
+			userProfileCache: {
+				fetch: vi.fn(async (userId: string) => profiles.get(userId)),
+				set: vi.fn(),
+			},
+		};
+		let compatibilityId = 0;
+		const mastodonUserFeatureService = new MastodonUserFeatureService(
+			mastodonApiStateService as never,
+			{ existsBy: vi.fn(async ({ id }: { id: string }) => id !== 'missing-user') } as never,
+			{ existsBy: vi.fn(async ({ followerId, followeeId }: { followerId: string; followeeId: string }) => followerId === 'user-id' && followeeId !== 'not-followed') } as never,
+			userProfilesRepository as never,
+			noteThreadMutingsRepository as never,
+			userFeatureCacheService as never,
+			{ gen: () => `compatibility-${++compatibilityId}` } as never,
+		);
 		const createReport = vi.fn(async (_reporter: unknown, input: Record<string, unknown>) => ({
 			report: { id: 'report-id', resolved: false, forwarded: false },
 			createdAt: '2026-07-16T01:02:03.000Z',
@@ -219,11 +254,20 @@ describe(MastodonApiServerService, () => {
 				account: vi.fn(value => ({ id: value.id, username: value.username })),
 				credentialAccount: vi.fn(value => ({ id: value.id, username: value.username })),
 				profile: vi.fn(value => ({ id: value.id, display_name: value.name ?? value.username })),
-				relationship: vi.fn(value => ({ id: value.id, note: value.memo ?? '' })),
-				tag: vi.fn(name => ({
+				relationship: vi.fn(value => ({ id: value.id, note: value.memo ?? '', endorsed: false })),
+				tag: vi.fn((name, state = {}) => ({
+					id: name.normalize('NFKC').toLowerCase(),
 					name,
 					url: `https://misskey.example/tags/${encodeURIComponent(name)}`,
 					history: [],
+					...state,
+				})),
+				featuredTag: vi.fn((tag, accountUrl, stats) => ({
+					id: tag.id,
+					name: tag.name,
+					url: `${accountUrl}/tagged/${tag.name}`,
+					statuses_count: stats.statusesCount.toString(),
+					last_status_at: stats.lastStatusAt,
 				})),
 				trendLink: vi.fn(url => ({
 					url,
@@ -287,6 +331,7 @@ describe(MastodonApiServerService, () => {
 			mastodonNotificationService,
 			{ get: getScheduledStatus } as never,
 			{ create: createReport } as never,
+			mastodonUserFeatureService,
 			redis as never,
 		);
 		const fastify = Fastify();
@@ -312,6 +357,10 @@ describe(MastodonApiServerService, () => {
 			offsetLinkHeader,
 			createReport,
 			getScheduledStatus,
+			mastodonApiStateService,
+			mastodonUserFeatureService,
+			profiles,
+			noteThreadMutingsRepository,
 		};
 	}
 
@@ -1000,6 +1049,20 @@ describe(MastodonApiServerService, () => {
 				expect(fastify.hasRoute({ method: route.method, url: route.path }), `unregistered contract route: ${key}`).toBe(true);
 			}
 		}
+	});
+
+	test('declares exact stateful tag, endorsement, domain-block, and status-mute contracts', () => {
+		const contract = (method: string, path: string) => MASTODON_4_6_USER_ROUTES.find(route => route.method === method && route.path === path);
+		expect(contract('POST', '/api/v1/tags/:name/follow')).toMatchObject({ behavior: 'implemented', scope: 'write:follows', entity: 'Tag', introducedIn: '4.0.0' });
+		expect(contract('POST', '/api/v1/tags/:name/feature')).toMatchObject({ behavior: 'implemented', scope: 'write:accounts', entity: 'Tag', introducedIn: '4.4.0' });
+		expect(contract('GET', '/api/v1/accounts/:id/featured_tags')).toMatchObject({ behavior: 'implemented', auth: 'public', entity: 'FeaturedTag[]', introducedIn: '3.3.0' });
+		expect(contract('GET', '/api/v1/accounts/:id/endorsements')).toMatchObject({ behavior: 'implemented', auth: 'public', entity: 'Account[]', introducedIn: '4.4.0' });
+		expect(contract('POST', '/api/v1/accounts/:id/endorse')).toMatchObject({ behavior: 'implemented', scope: 'write:accounts', entity: 'Relationship', introducedIn: '4.4.0' });
+		expect(contract('GET', '/api/v1/domain_blocks')).toMatchObject({ behavior: 'implemented', scope: 'read:blocks', entity: 'String[]', introducedIn: '1.4.0' });
+		expect(contract('POST', '/api/v1/domain_blocks')).toMatchObject({ behavior: 'implemented', scope: 'write:blocks', entity: 'Object', introducedIn: '1.4.0' });
+		expect(contract('GET', '/api/v1/domain_blocks/preview')).toMatchObject({ behavior: 'unsupported-write', scope: 'read:blocks' });
+		expect(contract('POST', '/api/v1/statuses/:id/mute')).toMatchObject({ behavior: 'implemented', scope: 'write:mutes', entity: 'Status', introducedIn: '1.4.2' });
+		expect(MASTODON_4_6_USER_ROUTES.some(route => route.path.startsWith('/api/v1/tags/:id/'))).toBe(false);
 	});
 
 	test('persists v2 filters and exposes their v1 keyword projections', async () => {
@@ -1898,7 +1961,7 @@ describe(MastodonApiServerService, () => {
 		expect(response.json()).toEqual({
 			accounts: type === 'accounts' ? [{ id: 'user-a', username: 'alice' }] : [],
 			statuses: type === 'statuses' ? [expect.objectContaining({ id: 'note-a' })] : [],
-			hashtags: type === 'hashtags' ? [{ name: 'Fediverse', url: 'https://misskey.example/tags/Fediverse', history: [] }] : [],
+			hashtags: type === 'hashtags' ? [{ id: 'fediverse', name: 'Fediverse', url: 'https://misskey.example/tags/Fediverse', history: [] }] : [],
 		});
 		expect(authenticate).not.toHaveBeenCalled();
 		expect(publicInvoke).toHaveBeenCalledTimes(1);
@@ -2811,6 +2874,7 @@ describe(MastodonApiServerService, () => {
 		expect(legacy.statusCode).toBe(200);
 		expect(legacy.json()).toHaveLength(10);
 		expect(legacy.json()[0]).toEqual({
+			id: 'tag 0',
 			name: 'tag 0',
 			url: 'https://misskey.example/tags/tag%200',
 			history: [],
@@ -2962,6 +3026,7 @@ describe(MastodonApiServerService, () => {
 
 		expect(response.statusCode).toBe(200);
 		expect(response.json()).toEqual({
+			id: 'fediverse news',
 			name: 'Fediverse News',
 			url: 'https://misskey.example/tags/Fediverse%20News',
 			history: [],
@@ -2983,6 +3048,171 @@ describe(MastodonApiServerService, () => {
 		expect(response.statusCode).toBe(401);
 		expect(authenticate).toHaveBeenCalledWith('invalid-token');
 		expect(publicInvoke).not.toHaveBeenCalledWith('hashtags/show', expect.anything(), expect.anything(), expect.anything());
+	});
+
+	test('implements followed-tag CRUD with normalized Tag state and pagination', async () => {
+		const { fastify, assert } = createServer();
+		const followed = await fastify.inject({
+			method: 'POST',
+			url: '/api/v1/tags/%EF%BC%ADissKey/follow',
+			headers: { authorization: 'Bearer user-token' },
+		});
+		const repeated = await fastify.inject({
+			method: 'POST',
+			url: '/api/v1/tags/misskey/follow',
+			headers: { authorization: 'Bearer user-token' },
+		});
+		const listed = await fastify.inject({
+			method: 'GET',
+			url: '/api/v1/followed_tags?limit=20',
+			headers: { authorization: 'Bearer user-token' },
+		});
+
+		expect(followed.statusCode).toBe(200);
+		expect(followed.json()).toMatchObject({ id: 'misskey', name: 'misskey', following: true, featuring: false });
+		expect(repeated.json()).toEqual(followed.json());
+		expect(listed.json()).toEqual([followed.json()]);
+		expect(listed.headers.link).toBe('<next>; rel="next"');
+		expect(assert).toHaveBeenCalledWith(['read'], 'write:follows');
+		expect(assert).toHaveBeenCalledWith(['read'], 'read:follows');
+
+		const unfollowed = await fastify.inject({
+			method: 'POST',
+			url: '/api/v1/tags/MISSKEY/unfollow',
+			headers: { authorization: 'Bearer user-token' },
+		});
+		expect(unfollowed.json()).toMatchObject({ following: false, featuring: false });
+	});
+
+	test('implements featured tags, suggestions, public account lists, and both feature route styles', async () => {
+		const { fastify, nativeInvoke } = createServer();
+		nativeInvoke.mockImplementation(async (name, data) => {
+			if (name === 'users/show') return { id: data.userId, username: 'alice', url: 'https://misskey.example/@alice' };
+			if (name === 'users/notes') return [
+				{ id: 'note-2', createdAt: '2026-07-17T03:00:00.000Z', tags: ['Art', 'News'] },
+				{ id: 'note-1', createdAt: '2026-07-16T03:00:00.000Z', tags: ['art'] },
+			];
+			return [];
+		});
+
+		const created = await fastify.inject({
+			method: 'POST',
+			url: '/api/v1/featured_tags',
+			headers: { authorization: 'Bearer user-token', 'content-type': 'application/x-www-form-urlencoded' },
+			payload: 'name=%EF%BC%A1rt',
+		});
+		expect(created.statusCode).toBe(200);
+		expect(created.json()).toMatchObject({ name: 'art', statuses_count: '2', last_status_at: '2026-07-17' });
+
+		const own = await fastify.inject({ method: 'GET', url: '/api/v1/featured_tags', headers: { authorization: 'Bearer user-token' } });
+		const account = await fastify.inject({ method: 'GET', url: '/api/v1/accounts/user-id/featured_tags' });
+		const suggestions = await fastify.inject({ method: 'GET', url: '/api/v1/featured_tags/suggestions', headers: { authorization: 'Bearer user-token' } });
+		expect(own.json()).toEqual([created.json()]);
+		expect(account.json()).toEqual([created.json()]);
+		expect(suggestions.json()).toEqual([expect.objectContaining({ name: 'news', following: false, featuring: false })]);
+
+		const featured = await fastify.inject({ method: 'POST', url: '/api/v1/tags/News/feature', headers: { authorization: 'Bearer user-token' } });
+		expect(featured.json()).toMatchObject({ name: 'news', featuring: true });
+		const unfeatured = await fastify.inject({ method: 'POST', url: '/api/v1/tags/NEWS/unfeature', headers: { authorization: 'Bearer user-token' } });
+		expect(unfeatured.json()).toMatchObject({ name: 'news', featuring: false });
+
+		const deleted = await fastify.inject({ method: 'DELETE', url: `/api/v1/featured_tags/${created.json().id}`, headers: { authorization: 'Bearer user-token' } });
+		expect(deleted.statusCode).toBe(200);
+		expect(deleted.json()).toEqual({});
+	});
+
+	test('implements endorsement lists and current/deprecated relationship actions', async () => {
+		const { fastify } = createServer();
+		for (const action of ['endorse', 'pin'] as const) {
+			const response = await fastify.inject({ method: 'POST', url: `/api/v1/accounts/target/${action}`, headers: { authorization: 'Bearer user-token' } });
+			expect(response.statusCode).toBe(200);
+			expect(response.json()).toMatchObject({ id: 'target', endorsed: true });
+		}
+		const own = await fastify.inject({ method: 'GET', url: '/api/v1/endorsements', headers: { authorization: 'Bearer user-token' } });
+		const account = await fastify.inject({ method: 'GET', url: '/api/v1/accounts/user-id/endorsements' });
+		const relationships = await fastify.inject({ method: 'GET', url: '/api/v1/accounts/relationships?id[]=target', headers: { authorization: 'Bearer user-token' } });
+		expect(own.json()).toEqual([{ id: 'target', username: 'target' }]);
+		expect(account.json()).toEqual(own.json());
+		expect(relationships.json()).toEqual([expect.objectContaining({ id: 'target', endorsed: true })]);
+
+		for (const action of ['unendorse', 'unpin'] as const) {
+			const response = await fastify.inject({ method: 'POST', url: `/api/v1/accounts/target/${action}`, headers: { authorization: 'Bearer user-token' } });
+			expect(response.json()).toMatchObject({ id: 'target', endorsed: false });
+		}
+		for (const target of ['missing-user', 'not-followed']) {
+			const response = await fastify.inject({ method: 'POST', url: `/api/v1/accounts/${target}/endorse`, headers: { authorization: 'Bearer user-token' } });
+			expect(response.statusCode).toBe(422);
+			expect(response.json()).toEqual({ error: 'You can endorse only an account you follow' });
+		}
+	});
+
+	test('stores domain blocks as normalized strings on the native profile', async () => {
+		const { fastify, profiles, toMisskey } = createServer();
+		toMisskey.mockImplementation((query: Record<string, unknown>) => ({
+			limit: 20,
+			...(typeof query.max_id === 'string' ? { untilId: query.max_id } : {}),
+			...(typeof query.since_id === 'string' ? { sinceId: query.since_id } : {}),
+		}));
+		const blocked = await fastify.inject({
+			method: 'POST',
+			url: '/api/v1/domain_blocks',
+			headers: { authorization: 'Bearer user-token', 'content-type': 'application/json' },
+			payload: { domain: 'BÜCHER.Example' },
+		});
+		const listed = await fastify.inject({ method: 'GET', url: '/api/v1/domain_blocks', headers: { authorization: 'Bearer user-token' } });
+		const afterCursor = await fastify.inject({ method: 'GET', url: '/api/v1/domain_blocks?since_id=zzzz', headers: { authorization: 'Bearer user-token' } });
+		expect(blocked.statusCode).toBe(200);
+		expect(blocked.json()).toEqual({});
+		expect(listed.json()).toEqual(['xn--bcher-kva.example']);
+		expect(afterCursor.json()).toEqual([]);
+		expect(profiles.get('user-id')?.mutedInstances).toEqual(['xn--bcher-kva.example']);
+
+		const unblocked = await fastify.inject({
+			method: 'DELETE',
+			url: '/api/v1/domain_blocks',
+			headers: { authorization: 'Bearer user-token', 'content-type': 'application/x-www-form-urlencoded' },
+			payload: 'domain=xn--bcher-kva.example',
+		});
+		expect(unblocked.json()).toEqual({});
+	});
+
+	test('mutes accessible status threads directly and returns the requested status override', async () => {
+		const { fastify, nativeInvoke, noteThreadMutingsRepository } = createServer();
+		const muted = await fastify.inject({ method: 'POST', url: '/api/v1/statuses/reply-note/mute', headers: { authorization: 'Bearer user-token' } });
+		const repeated = await fastify.inject({ method: 'POST', url: '/api/v1/statuses/reply-note/mute', headers: { authorization: 'Bearer user-token' } });
+		expect(muted.statusCode).toBe(200);
+		expect(muted.json()).toMatchObject({ id: 'reply-note', muted: true });
+		expect(repeated.statusCode).toBe(200);
+		expect(noteThreadMutingsRepository.query).toHaveBeenCalledWith(expect.stringContaining('ON CONFLICT'), [expect.any(String), 'user-id', 'root-note']);
+
+		const unmuted = await fastify.inject({ method: 'POST', url: '/api/v1/statuses/reply-note/unmute', headers: { authorization: 'Bearer user-token' } });
+		expect(unmuted.json()).toMatchObject({ id: 'reply-note', muted: false });
+
+		nativeInvoke.mockRejectedValueOnce(new ApiError({ message: 'Hidden', code: 'CONTENT_RESTRICTED_BY_USER', id: 'hidden' }));
+		const hidden = await fastify.inject({ method: 'POST', url: '/api/v1/statuses/hidden/mute', headers: { authorization: 'Bearer user-token' } });
+		expect(hidden.statusCode).toBe(404);
+		expect(noteThreadMutingsRepository.query).toHaveBeenCalledTimes(2);
+	});
+
+	test('merges followed-tag notes into home once with bounded fan-in, dedupe, and one filter pass', async () => {
+		const { fastify, nativeInvoke, mastodonApiStateService, mastodonUserFeatureService, notesRepository } = createServer();
+		await mastodonUserFeatureService.followTag('user-id', 'news');
+		nativeInvoke.mockImplementation(async name => {
+			if (name === 'notes/timeline') return [{ id: 'note-3' }, { id: 'note-2' }];
+			if (name === 'notes/search-by-tag') return [{ id: 'note-4' }, { id: 'note-2' }];
+			return [];
+		});
+		mastodonApiStateService.list.mockClear();
+
+		const response = await fastify.inject({ method: 'GET', url: '/api/v1/timelines/home?limit=20', headers: { authorization: 'Bearer user-token' } });
+		expect(response.statusCode).toBe(200);
+		expect(response.json().map((status: { id: string }) => status.id)).toEqual(['note-4', 'note-3', 'note-2']);
+		expect(nativeInvoke).toHaveBeenCalledWith('notes/search-by-tag', {
+			limit: 60,
+			query: [['news']],
+		}, expect.any(Object), expect.any(Object));
+		expect(notesRepository.findBy).toHaveBeenCalledTimes(1);
+		expect(mastodonApiStateService.list.mock.calls.filter((call: unknown[]) => call[1] === 'filter')).toHaveLength(1);
 	});
 
 	test.each([

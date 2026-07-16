@@ -33,6 +33,7 @@ import { MastodonPaginationService } from './MastodonPaginationService.js';
 import { MastodonReportService } from './MastodonReportService.js';
 import { MastodonScheduledStatusService } from './MastodonScheduledStatusService.js';
 import { MastodonScopeService } from './MastodonScopeService.js';
+import { MastodonUserFeatureService, type MastodonUserTagState } from './MastodonUserFeatureService.js';
 import { MastodonApiError, sendMastodonError } from './errors.js';
 import type { MastodonAuth, MastodonUserAuth } from './types.js';
 import type { MastodonApplicationRegistration } from './types.js';
@@ -70,6 +71,7 @@ export class MastodonApiServerService {
 		private mastodonNotificationService: MastodonNotificationService,
 		private mastodonScheduledStatusService: MastodonScheduledStatusService,
 		private mastodonReportService: MastodonReportService,
+		private mastodonUserFeatureService: MastodonUserFeatureService,
 
 		@Inject(DI.redis)
 		private redis: Redis.Redis,
@@ -261,9 +263,10 @@ export class MastodonApiServerService {
 		}));
 		fastify.get('/api/v1/accounts/relationships', request => this.withAuth(request as MastodonRequest, 'read:follows', async auth => {
 			const ids = this.strings((request.query as Dictionary)['id[]'] ?? (request.query as Dictionary).id);
+			const endorsedIds = new Set(await this.mastodonUserFeatureService.listEndorsementIds(auth.user.id));
 			return await Promise.all(ids.map(async id => {
 				const user = await this.invoke('users/show', { userId: id }, auth, request as MastodonRequest);
-				return this.mastodonEntityService.relationship(user as Packed<'UserDetailed'>);
+				return { ...this.mastodonEntityService.relationship(user as Packed<'UserDetailed'>), endorsed: endorsedIds.has(id) };
 			}));
 		}));
 		fastify.get<{ Params: { id: string } }>('/api/v1/accounts/:id', request => this.account(request as MastodonRequest, request.params.id));
@@ -300,6 +303,7 @@ export class MastodonApiServerService {
 		this.registerAnnouncements(fastify);
 		this.registerReports(fastify);
 		this.registerFiltersAndMarkers(fastify);
+		this.registerUserFeatures(fastify);
 		this.registerCompatibilityRoutes(fastify);
 
 		done();
@@ -355,9 +359,126 @@ export class MastodonApiServerService {
 		}
 	}
 
+	private registerUserFeatures(fastify: FastifyInstance): void {
+		fastify.get('/api/v1/followed_tags', (request, reply) => this.withAuth(request as MastodonRequest, 'read:follows', async auth => {
+			const [followed, featured] = await Promise.all([
+				this.mastodonUserFeatureService.listFollowedTags(auth.user.id),
+				this.mastodonUserFeatureService.listFeaturedTags(auth.user.id),
+			]);
+			const page = this.compatibilityStatePage(followed, request.query as Dictionary, 200);
+			const featuredNames = new Set(featured.map(tag => tag.name));
+			return this.page(request, reply, page, page.map(tag => this.mastodonEntityService.tag(tag.name, {
+				following: true,
+				featuring: featuredNames.has(tag.name),
+			})));
+		}));
+
+		for (const action of ['follow', 'unfollow', 'feature', 'unfeature'] as const) {
+			const scope = action === 'follow' || action === 'unfollow' ? 'write:follows' : 'write:accounts';
+			fastify.post<{ Params: { name: string } }>(`/api/v1/tags/:name/${action}`, request => this.withAuth(request as MastodonRequest, scope, async auth => {
+				if (action === 'follow') await this.mastodonUserFeatureService.followTag(auth.user.id, request.params.name);
+				else if (action === 'unfollow') await this.mastodonUserFeatureService.unfollowTag(auth.user.id, request.params.name);
+				else if (action === 'feature') await this.mastodonUserFeatureService.featureTag(auth.user.id, request.params.name);
+				else await this.mastodonUserFeatureService.unfeatureTag(auth.user.id, request.params.name);
+				const state = await this.mastodonUserFeatureService.tagFlags(auth.user.id, request.params.name);
+				return this.mastodonEntityService.tag(state.name, state);
+			}));
+		}
+
+		fastify.get('/api/v1/featured_tags', (request, reply) => this.withAuth(request as MastodonRequest, 'read:accounts', async auth => {
+			const tags = this.compatibilityStatePage(
+				await this.mastodonUserFeatureService.listFeaturedTags(auth.user.id),
+				request.query as Dictionary,
+				100,
+			);
+			return this.page(request, reply, tags, await this.featuredTagEntities(auth.user.id, tags, auth, request as MastodonRequest));
+		}));
+		fastify.post<{ Body: Dictionary }>('/api/v1/featured_tags', request => this.withAuth(request as MastodonRequest, 'write:accounts', async auth => {
+			const name = this.string(request.body?.name);
+			if (name == null || name === '') throw new MastodonApiError(400, 'invalid_request', 'name is required');
+			const tag = await this.mastodonUserFeatureService.featureTag(auth.user.id, name);
+			return (await this.featuredTagEntities(auth.user.id, [tag], auth, request as MastodonRequest))[0]!;
+		}));
+		fastify.delete<{ Params: { id: string } }>('/api/v1/featured_tags/:id', request => this.withAuth(request as MastodonRequest, 'write:accounts', async auth => {
+			return await this.mastodonUserFeatureService.unfeatureTagById(auth.user.id, request.params.id);
+		}));
+		fastify.get('/api/v1/featured_tags/suggestions', request => this.withAuth(request as MastodonRequest, 'read:accounts', async auth => {
+			const [notes, followed, featured] = await Promise.all([
+				this.invoke('users/notes', { userId: auth.user.id, limit: 100, withReplies: true, withRenotes: false }, auth, request as MastodonRequest) as Promise<Packed<'Note'>[]>,
+				this.mastodonUserFeatureService.listFollowedTags(auth.user.id),
+				this.mastodonUserFeatureService.listFeaturedTags(auth.user.id),
+			]);
+			const followedNames = new Set(followed.map(tag => tag.name));
+			const featuredNames = new Set(featured.map(tag => tag.name));
+			const names: string[] = [];
+			const seen = new Set<string>();
+			for (const note of notes) {
+				for (const tag of note.tags ?? []) {
+					const name = this.normalizedHashtag(tag);
+					if (name === '' || seen.has(name) || featuredNames.has(name)) continue;
+					seen.add(name);
+					names.push(name);
+					if (names.length === 10) break;
+				}
+				if (names.length === 10) break;
+			}
+			return names.map(name => this.mastodonEntityService.tag(name, {
+				following: followedNames.has(name),
+				featuring: false,
+			}));
+		}));
+		fastify.get<{ Params: { id: string } }>('/api/v1/accounts/:id/featured_tags', (request, reply) => this.withOptionalUser(request as MastodonRequest, 'read:accounts', async auth => {
+			await this.invokePublic('users/show', { userId: request.params.id }, auth, request as MastodonRequest);
+			const tags = this.compatibilityStatePage(
+				await this.mastodonUserFeatureService.listFeaturedTags(request.params.id),
+				request.query as Dictionary,
+				100,
+			);
+			return this.page(request, reply, tags, await this.featuredTagEntities(request.params.id, tags, auth, request as MastodonRequest));
+		}));
+
+		fastify.get('/api/v1/endorsements', (request, reply) => this.withAuth(request as MastodonRequest, 'read:accounts', async auth => {
+			return await this.endorsementPage(auth.user.id, request as MastodonRequest, reply, auth);
+		}));
+		fastify.get<{ Params: { id: string } }>('/api/v1/accounts/:id/endorsements', (request, reply) => this.withOptionalUser(request as MastodonRequest, 'read:accounts', async auth => {
+			await this.invokePublic('users/show', { userId: request.params.id }, auth, request as MastodonRequest);
+			return await this.endorsementPage(request.params.id, request as MastodonRequest, reply, auth);
+		}));
+		for (const action of ['endorse', 'pin', 'unendorse', 'unpin'] as const) {
+			fastify.post<{ Params: { id: string } }>(`/api/v1/accounts/:id/${action}`, request => this.withAuth(request as MastodonRequest, 'write:accounts', async auth => {
+				const endorsed = action === 'endorse' || action === 'pin';
+				if (endorsed) await this.mastodonUserFeatureService.endorse(auth.user.id, request.params.id);
+				const user = await this.invokePublic('users/show', { userId: request.params.id }, auth, request as MastodonRequest) as Packed<'UserDetailed'>;
+				if (!endorsed) await this.mastodonUserFeatureService.unendorse(auth.user.id, request.params.id);
+				return { ...this.mastodonEntityService.relationship(user), endorsed };
+			}));
+		}
+
+		fastify.get('/api/v1/domain_blocks', (request, reply) => this.withAuth(request as MastodonRequest, 'read:blocks', async auth => {
+			const domains = this.compatibilityStatePage(
+				(await this.mastodonUserFeatureService.listDomainBlocks(auth.user.id)).map(id => ({ id })),
+				request.query as Dictionary,
+				200,
+			);
+			return this.page(request, reply, domains, domains.map(domain => domain.id));
+		}));
+		for (const method of ['POST', 'DELETE'] as const) {
+			fastify.route({
+				method,
+				url: '/api/v1/domain_blocks',
+				handler: request => this.withAuth(request as MastodonRequest, 'write:blocks', async auth => {
+					const domain = this.string((request.body as Dictionary | undefined)?.domain);
+					if (domain == null || domain === '') throw new MastodonApiError(400, 'invalid_request', 'domain is required');
+					return method === 'POST'
+						? await this.mastodonUserFeatureService.blockDomain(auth.user.id, domain)
+						: await this.mastodonUserFeatureService.unblockDomain(auth.user.id, domain);
+				}),
+			});
+		}
+	}
+
 	private registerTimelines(fastify: FastifyInstance): void {
 		const timelines: Array<[string, string, string, (query: Dictionary, params: Dictionary) => Dictionary]> = [
-			['/api/v1/timelines/home', 'notes/timeline', 'read:statuses', query => this.mastodonPaginationService.toMisskey(query)],
 			['/api/v1/timelines/public', 'notes/global-timeline', 'read:statuses', query => ({
 				...this.mastodonPaginationService.toMisskey(query),
 				withFiles: this.boolean(query.only_media),
@@ -370,6 +491,25 @@ export class MastodonApiServerService {
 			})],
 			['/api/v1/timelines/list/:id', 'notes/user-list-timeline', 'read:statuses', (query, params) => ({ ...this.mastodonPaginationService.toMisskey(query), listId: params.id })],
 		];
+		fastify.get('/api/v1/timelines/home', (request, reply) => this.withAuth(request as MastodonRequest, 'read:statuses', async auth => {
+			const pagination = this.mastodonPaginationService.toMisskey(request.query as Dictionary);
+			const [homeNotes, followedTags] = await Promise.all([
+				this.invoke('notes/timeline', pagination, auth, request as MastodonRequest) as Promise<Packed<'Note'>[]>,
+				this.mastodonUserFeatureService.listFollowedTags(auth.user.id),
+			]);
+			const homeTags = followedTags.slice(0, 20);
+			const tagNotes = homeTags.length === 0
+				? []
+				: await this.invoke('notes/search-by-tag', {
+					...pagination,
+					limit: Math.min(100, pagination.limit * 3),
+					query: homeTags.map(tag => [tag.name]),
+				}, auth, request as MastodonRequest) as Packed<'Note'>[];
+			const notes = [...new Map([...homeNotes, ...tagNotes].map(note => [note.id, note])).values()]
+				.sort((left, right) => right.id.localeCompare(left.id))
+				.slice(0, pagination.limit);
+			return this.page(request, reply, notes, await this.statusesWithState(notes, auth, 'home'));
+		}));
 		for (const [path, endpoint, scope, data] of timelines) {
 			const isPublic = path === '/api/v1/timelines/public' || path === '/api/v1/timelines/tag/:tag';
 			const context: MastodonFilterContext = isPublic ? 'public' : 'home';
@@ -536,6 +676,17 @@ export class MastodonApiServerService {
 				if (action === 'favourite' || action === 'unfavourite') status.favourited = action === 'favourite';
 				if (action === 'bookmark' || action === 'unbookmark') status.bookmarked = action === 'bookmark';
 				return status;
+			}));
+		}
+		for (const action of ['mute', 'unmute'] as const) {
+			fastify.post<{ Params: { id: string } }>(`/api/v1/statuses/:id/${action}`, request => this.withAuth(request as MastodonRequest, 'write:mutes', async auth => {
+				const note = await this.invokePublic('notes/show', { noteId: request.params.id }, auth, request as MastodonRequest) as Packed<'Note'>;
+				const nativeNote = await this.notesRepository.findOneBy({ id: note.id });
+				if (nativeNote == null) throw new MastodonApiError(404, 'not_found', 'Status not found');
+				const threadId = nativeNote.threadId ?? nativeNote.id;
+				if (action === 'mute') await this.mastodonUserFeatureService.muteThread(auth.user.id, threadId);
+				else await this.mastodonUserFeatureService.unmuteThread(auth.user.id, threadId);
+				return { ...await this.statusWithState(note, auth, 'thread'), muted: action === 'mute' };
 			}));
 		}
 		fastify.post<{ Params: { id: string } }>('/api/v1/statuses/:id/reblog', request => this.withAuth(request as MastodonRequest, 'write:statuses', async auth => {
@@ -1315,6 +1466,59 @@ export class MastodonApiServerService {
 		if (!Number.isFinite(date.getTime())) throw new MastodonApiError(400, 'invalid_request', 'scheduled_at must be an ISO 8601 date-time');
 		if (date.getTime() <= Date.now()) throw new MastodonApiError(422, 'unprocessable_entity', 'scheduled_at must be in the future');
 		return date;
+	}
+
+	private async featuredTagEntities(
+		userId: string,
+		tags: MastodonUserTagState[],
+		auth: MastodonUserAuth | null,
+		request: MastodonRequest,
+	) {
+		if (tags.length === 0) return [];
+		const [user, notes] = await Promise.all([
+			this.invokePublic('users/show', { userId }, auth, request) as Promise<Packed<'UserDetailed'>>,
+			this.invokePublic('users/notes', { userId, limit: 100, withReplies: true, withRenotes: false }, auth, request) as Promise<Packed<'Note'>[]>,
+		]);
+		const stats = new Map(tags.map(tag => [tag.name, { statusesCount: 0, lastStatusAt: null as string | null }]));
+		for (const note of notes) {
+			for (const rawTag of note.tags ?? []) {
+				const value = stats.get(this.normalizedHashtag(rawTag));
+				if (value == null) continue;
+				value.statusesCount++;
+				const date = note.createdAt.slice(0, 10);
+				if (value.lastStatusAt == null || date > value.lastStatusAt) value.lastStatusAt = date;
+			}
+		}
+		const accountUrl = this.mastodonEntityService.account(user).url;
+		return tags.map(tag => this.mastodonEntityService.featuredTag(tag, accountUrl, stats.get(tag.name)!));
+	}
+
+	private async endorsementPage(
+		userId: string,
+		request: MastodonRequest,
+		reply: FastifyReply,
+		auth: MastodonUserAuth | null,
+	) {
+		const state = this.compatibilityStatePage(
+			(await this.mastodonUserFeatureService.listEndorsementIds(userId)).map(id => ({ id })),
+			request.query,
+			80,
+		);
+		const users = await this.invokePublicBatch('users/show', 'userId', state.map(value => value.id), auth, request) as Packed<'UserDetailed'>[];
+		return this.page(request, reply, state, users.map(user => this.mastodonEntityService.account(user)));
+	}
+
+	private compatibilityStatePage<T extends { id: string }>(items: T[], query: Dictionary, maximum: number): T[] {
+		const pagination = this.mastodonPaginationService.toMisskey(query, maximum);
+		return [...items]
+			.sort((left, right) => right.id.localeCompare(left.id))
+			.filter(item => pagination.untilId == null || item.id < pagination.untilId)
+			.filter(item => pagination.sinceId == null || item.id > pagination.sinceId)
+			.slice(0, pagination.limit);
+	}
+
+	private normalizedHashtag(value: string): string {
+		return value.normalize('NFKC').replace(/^#+/u, '').toLowerCase();
 	}
 
 	private async statusWithState(note: Packed<'Note'>, auth: MastodonUserAuth | null, context: MastodonFilterContext): Promise<Record<string, unknown>> {

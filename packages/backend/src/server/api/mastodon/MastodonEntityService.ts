@@ -396,11 +396,28 @@ export class MastodonEntityService {
 		};
 	}
 
-	public tag(name: string) {
+	public tag(name: string, state: { following?: boolean; featuring?: boolean } = {}) {
 		return {
+			id: name.normalize('NFKC').toLowerCase(),
 			name,
 			url: new URL(`/tags/${encodeURIComponent(name)}`, this.config.url).toString(),
 			history: [],
+			...(state.following == null ? {} : { following: state.following }),
+			...(state.featuring == null ? {} : { featuring: state.featuring }),
+		};
+	}
+
+	public featuredTag(
+		tag: { id: string; name: string },
+		accountUrl: string,
+		stats: { statusesCount: number; lastStatusAt: string | null },
+	) {
+		return {
+			id: tag.id,
+			name: tag.name,
+			url: `${accountUrl.replace(/\/+$/u, '')}/tagged/${encodeURIComponent(tag.name)}`,
+			statuses_count: stats.statusesCount.toString(),
+			last_status_at: stats.lastStatusAt,
 		};
 	}
 

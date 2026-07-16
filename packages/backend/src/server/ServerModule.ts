@@ -33,6 +33,7 @@ import { MastodonApiCallService } from './api/mastodon/MastodonApiCallService.js
 import { MastodonApiStateService } from './api/mastodon/MastodonApiStateService.js';
 import { MastodonFilterService } from './api/mastodon/MastodonFilterService.js';
 import { MastodonMarkerService } from './api/mastodon/MastodonMarkerService.js';
+import { MastodonUserFeatureService } from './api/mastodon/MastodonUserFeatureService.js';
 import { MastodonAuthenticateService } from './api/mastodon/MastodonAuthenticateService.js';
 import { MastodonOAuthService } from './api/mastodon/MastodonOAuthService.js';
 import { MastodonNotificationService } from './api/mastodon/MastodonNotificationService.js';
@@ -121,6 +122,7 @@ import { SigninWithPasskeyApiService } from './api/SigninWithPasskeyApiService.j
 		MastodonApiStateService,
 		MastodonFilterService,
 		MastodonMarkerService,
+		MastodonUserFeatureService,
 		MastodonAuthenticateService,
 		MastodonNotificationService,
 		MastodonOAuthService,
