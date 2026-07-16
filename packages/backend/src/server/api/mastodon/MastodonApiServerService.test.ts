@@ -20,7 +20,10 @@ describe(MastodonApiServerService, () => {
 		await Promise.all(servers.splice(0).map(server => server.close()));
 	});
 
-	function createServer(meta: Record<string, unknown> = {}) {
+	function createServer(
+		meta: Record<string, unknown> = {},
+		registerBeforeMastodon?: (fastify: ReturnType<typeof Fastify>) => void,
+	) {
 		const auth = { kind: 'user', user: { id: 'user-id' }, token: { id: 'token-id', scopes: ['read'] } };
 		const dismissedNotifications = new Set<string>();
 		const authenticate = vi.fn().mockResolvedValue(auth);
@@ -191,6 +194,7 @@ describe(MastodonApiServerService, () => {
 			redis as never,
 		);
 		const fastify = Fastify();
+		registerBeforeMastodon?.(fastify);
 		fastify.register(service.createServer);
 		servers.push(fastify);
 
@@ -746,6 +750,22 @@ describe(MastodonApiServerService, () => {
 		expect(response.statusCode).toBe(200);
 		expect(response.json()).toEqual(['remote.example', 'other.example']);
 		expect(publicInvoke).toHaveBeenCalledWith('federation/instances', { limit: 100, offset: 0 }, null, expect.any(Object));
+	});
+
+	test('starts when the core API server already owns the instance peers route', async () => {
+		const { fastify, publicInvoke } = createServer({}, server => {
+			server.register((coreApi, _options, done) => {
+				coreApi.get('/v1/instance/peers', async () => ['core.example']);
+				done();
+			}, { prefix: '/api' });
+		});
+
+		await fastify.ready();
+		const response = await fastify.inject({ method: 'GET', url: '/api/v1/instance/peers' });
+
+		expect(response.statusCode).toBe(200);
+		expect(response.json()).toEqual(['core.example']);
+		expect(publicInvoke).not.toHaveBeenCalled();
 	});
 
 	test('builds instance activity from 84 daily Note and user chart points and preserves rule source', async () => {

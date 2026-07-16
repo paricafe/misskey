@@ -122,12 +122,14 @@ export class MastodonApiServerService {
 			if (link != null) reply.header('Link', link);
 			return users.map(user => this.mastodonEntityService.account(user));
 		}));
-		fastify.get('/api/v1/instance/peers', request => this.withOptionalToken(request as MastodonRequest, async () => {
-			const instances = await this.invokePublic('federation/instances', { limit: 100, offset: 0 }, null, request as MastodonRequest) as Array<{ host?: unknown }>;
-			return [...new Set(instances.flatMap(instance => typeof instance.host === 'string' && instance.host.trim() !== ''
-				? [instance.host.trim().toLowerCase()]
-				: []))];
-		}));
+		if (!fastify.hasRoute({ method: 'GET', url: '/api/v1/instance/peers' })) {
+			fastify.get('/api/v1/instance/peers', request => this.withOptionalToken(request as MastodonRequest, async () => {
+				const instances = await this.invokePublic('federation/instances', { limit: 100, offset: 0 }, null, request as MastodonRequest) as Array<{ host?: unknown }>;
+				return [...new Set(instances.flatMap(instance => typeof instance.host === 'string' && instance.host.trim() !== ''
+					? [instance.host.trim().toLowerCase()]
+					: []))];
+			}));
+		}
 		fastify.get('/api/v1/instance/activity', request => this.withOptionalToken(request as MastodonRequest, async () => {
 			const [notes, users] = await Promise.all([
 				this.invokePublic('charts/notes', { span: 'day', limit: 84 }, null, request as MastodonRequest),
