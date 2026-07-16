@@ -25,6 +25,7 @@ import { MastodonApiCallService } from './MastodonApiCallService.js';
 import { MASTODON_4_6_USER_ROUTES, type MastodonContractRoute } from './MastodonApiContract.js';
 import { MastodonAuthenticateService } from './MastodonAuthenticateService.js';
 import { MASTODON_COLLECTION_WINDOW_LIMIT, MastodonCollectionService, type MastodonCollectionPage } from './MastodonCollectionService.js';
+import { MastodonConversationService, type MastodonConversation } from './MastodonConversationService.js';
 import { MastodonEntityService } from './MastodonEntityService.js';
 import { MastodonFilterService, type MastodonFilterApplyOptions, type MastodonFilterContext } from './MastodonFilterService.js';
 import { MastodonMarkerService, type MastodonMarkerTimeline } from './MastodonMarkerService.js';
@@ -68,6 +69,7 @@ export class MastodonApiServerService {
 		private mastodonEntityService: MastodonEntityService,
 		private mastodonPaginationService: MastodonPaginationService,
 		private mastodonCollectionService: MastodonCollectionService,
+		private mastodonConversationService: MastodonConversationService,
 		private mastodonFilterService: MastodonFilterService,
 		private mastodonMarkerService: MastodonMarkerService,
 		private mastodonNotificationService: MastodonNotificationService,
@@ -305,6 +307,7 @@ export class MastodonApiServerService {
 		this.registerAnnouncements(fastify);
 		this.registerReports(fastify);
 		this.registerCollections(fastify);
+		this.registerConversations(fastify);
 		this.registerFiltersAndMarkers(fastify);
 		this.registerUserFeatures(fastify);
 		this.registerCompatibilityRoutes(fastify);
@@ -1154,6 +1157,40 @@ export class MastodonApiServerService {
 				},
 			});
 		}
+	}
+
+	private registerConversations(fastify: FastifyInstance): void {
+		fastify.get('/api/v1/conversations', (request, reply) => this.withAuth(request as MastodonRequest, 'read:statuses', async auth => {
+			const query = request.query as Dictionary;
+			const conversations = await this.mastodonConversationService.list(auth.user, {
+				limit: this.integer(query.limit, 20, 1, 40),
+				maxId: this.string(query.max_id),
+				minId: this.string(query.min_id),
+				sinceId: this.string(query.since_id),
+			});
+			const entities = await Promise.all(conversations.map(conversation => this.conversation(conversation, auth)));
+			return this.page(request, reply, conversations.map(conversation => ({ id: conversation.lastStatus.id })), entities);
+		}));
+
+		fastify.delete<{ Params: { id: string } }>('/api/v1/conversations/:id', request => this.withAuth(request as MastodonRequest, 'write:conversations', async auth => {
+			return await this.mastodonConversationService.delete(auth.user, request.params.id);
+		}));
+
+		for (const action of ['read', 'unread'] as const) {
+			fastify.post<{ Params: { id: string } }>(`/api/v1/conversations/:id/${action}`, request => this.withAuth(request as MastodonRequest, 'write:conversations', async auth => {
+				const conversation = await this.mastodonConversationService[action](auth.user, request.params.id);
+				return await this.conversation(conversation, auth);
+			}));
+		}
+	}
+
+	private async conversation(conversation: MastodonConversation, auth: MastodonUserAuth): Promise<Dictionary> {
+		return {
+			id: conversation.id,
+			unread: conversation.unread,
+			accounts: conversation.accounts,
+			last_status: await this.statusWithState(conversation.lastStatus, auth, 'thread'),
+		};
 	}
 
 	private registerProfile(fastify: FastifyInstance): void {

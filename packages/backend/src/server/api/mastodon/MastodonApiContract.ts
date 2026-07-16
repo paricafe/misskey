@@ -238,10 +238,10 @@ export const MASTODON_4_6_USER_ROUTES: readonly MastodonContractRoute[] = [
 	safeArray('GET', '/api/v2/notifications/:group_key/accounts', 'user', 'read:notifications', 'Account[]', '4.3.0'),
 	safeObject('GET', '/api/v2/notifications/policy', 'user', 'read:notifications', 'NotificationPolicy', '4.3.0', NOTIFICATION_POLICY),
 	unsupported('PUT', '/api/v2/notifications/policy', 'user', 'write:notifications', 'NotificationPolicy', '4.3.0'),
-	safeArray('GET', '/api/v1/conversations', 'user', 'read:statuses', 'Conversation[]', '2.6.0'),
-	unsupported('DELETE', '/api/v1/conversations/:id', 'user', 'write:conversations', 'Object', '2.6.0'),
-	unsupported('POST', '/api/v1/conversations/:id/read', 'user', 'write:conversations', 'Conversation', '2.6.0'),
-	unsupported('POST', '/api/v1/conversations/:id/unread', 'user', 'write:conversations', 'Conversation', '4.3.0'),
+	implemented('GET', '/api/v1/conversations', 'user', 'read:statuses', 'Conversation[]', '2.6.0'),
+	implemented('DELETE', '/api/v1/conversations/:id', 'user', 'write:conversations', 'Object', '2.6.0'),
+	implemented('POST', '/api/v1/conversations/:id/read', 'user', 'write:conversations', 'Conversation', '2.6.0'),
+	implemented('POST', '/api/v1/conversations/:id/unread', 'user', 'write:conversations', 'Conversation', '4.3.0'),
 
 	// Discovery and instance information
 	implemented('GET', '/api/v1/custom_emojis', 'public', undefined, 'CustomEmoji[]'),

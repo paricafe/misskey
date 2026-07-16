@@ -284,6 +284,19 @@ describe(MastodonApiServerService, () => {
 			removeItem: vi.fn(async () => ({})),
 			revoke: vi.fn(async () => ({})),
 		};
+		const conversation = (overrides: Record<string, unknown> = {}) => ({
+			id: 'conversation-id',
+			unread: true,
+			accounts: [{ id: 'alice', username: 'alice' }],
+			lastStatus: { id: 'last-status-id' },
+			...overrides,
+		});
+		const mastodonConversationService = {
+			list: vi.fn(async () => [conversation()]),
+			read: vi.fn(async () => conversation({ unread: false })),
+			unread: vi.fn(async () => conversation({ unread: true })),
+			delete: vi.fn(async () => ({})),
+		};
 		const createReport = vi.fn(async (_reporter: unknown, input: Record<string, unknown>) => ({
 			report: { id: 'report-id', resolved: false, forwarded: false },
 			createdAt: '2026-07-16T01:02:03.000Z',
@@ -417,6 +430,7 @@ describe(MastodonApiServerService, () => {
 				offsetLinkHeader,
 			} as never,
 			mastodonCollectionService as never,
+			mastodonConversationService as never,
 			mastodonFilterService,
 			mastodonMarkerService,
 			mastodonNotificationService,
@@ -451,6 +465,8 @@ describe(MastodonApiServerService, () => {
 			mastodonApiStateService,
 			mastodonUserFeatureService,
 			mastodonCollectionService,
+			mastodonConversationService,
+			mastodonFilterService,
 			profiles,
 			noteThreadMutingsRepository,
 			mutedThreads,
@@ -461,6 +477,120 @@ describe(MastodonApiServerService, () => {
 			userFeatureGlobalEventService,
 		};
 	}
+
+	test('declares all four conversation routes as implemented with the official scopes', () => {
+		const contract = (method: string, path: string) => MASTODON_4_6_USER_ROUTES.find(route => route.method === method && route.path === path);
+
+		expect(contract('GET', '/api/v1/conversations')).toMatchObject({ behavior: 'implemented', scope: 'read:statuses', entity: 'Conversation[]' });
+		expect(contract('DELETE', '/api/v1/conversations/:id')).toMatchObject({ behavior: 'implemented', scope: 'write:conversations', entity: 'Object' });
+		expect(contract('POST', '/api/v1/conversations/:id/read')).toMatchObject({ behavior: 'implemented', scope: 'write:conversations', entity: 'Conversation' });
+		expect(contract('POST', '/api/v1/conversations/:id/unread')).toMatchObject({ behavior: 'implemented', scope: 'write:conversations', entity: 'Conversation' });
+	});
+
+	test('lists exact conversation entities with last-status cursors and bounded min_id pagination', async () => {
+		const { fastify, assert, linkHeader, mastodonConversationService } = createServer();
+		const response = await fastify.inject({
+			method: 'GET',
+			url: '/api/v1/conversations?limit=999&max_id=older&min_id=newer&since_id=ignored',
+			headers: { authorization: 'Bearer user-token' },
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(response.json()).toEqual([{
+			id: 'conversation-id',
+			unread: true,
+			accounts: [{ id: 'alice', username: 'alice' }],
+			last_status: expect.objectContaining({ id: 'last-status-id' }),
+		}]);
+		expect(mastodonConversationService.list).toHaveBeenCalledWith(expect.objectContaining({ id: 'user-id' }), {
+			limit: 40,
+			maxId: 'older',
+			minId: 'newer',
+			sinceId: 'ignored',
+		});
+		expect(linkHeader).toHaveBeenCalledWith(
+			'https://misskey.example/api/v1/conversations?limit=999&max_id=older&min_id=newer&since_id=ignored',
+			[{ id: 'last-status-id' }],
+		);
+		expect(response.headers.link).toBe('<next>; rel="next"');
+		expect(assert).toHaveBeenCalledWith(['read'], 'read:statuses');
+	});
+
+	test('uses a default conversation limit of 20', async () => {
+		const { fastify, mastodonConversationService } = createServer();
+		await fastify.inject({ method: 'GET', url: '/api/v1/conversations', headers: { authorization: 'Bearer user-token' } });
+
+		expect(mastodonConversationService.list).toHaveBeenCalledWith(expect.anything(), {
+			limit: 20,
+			maxId: undefined,
+			minId: undefined,
+			sinceId: undefined,
+		});
+	});
+
+	test.each([
+		['POST', '/api/v1/conversations/conversation-id/read', 'read', false],
+		['POST', '/api/v1/conversations/conversation-id/unread', 'unread', true],
+	] as const)('serves conversation mutation %s %s with an exact entity', async (method, url, action, unread) => {
+		const { fastify, assert, mastodonConversationService } = createServer();
+		const response = await fastify.inject({ method, url, headers: { authorization: 'Bearer user-token' } });
+
+		expect(response.statusCode).toBe(200);
+		expect(response.json()).toEqual({
+			id: 'conversation-id',
+			unread,
+			accounts: [{ id: 'alice', username: 'alice' }],
+			last_status: expect.objectContaining({ id: 'last-status-id' }),
+		});
+		expect(mastodonConversationService[action]).toHaveBeenCalledWith(expect.objectContaining({ id: 'user-id' }), 'conversation-id');
+		expect(assert).toHaveBeenCalledWith(['read'], 'write:conversations');
+	});
+
+	test('deletes a conversation projection without deleting a native note', async () => {
+		const { fastify, assert, nativeInvoke, mastodonConversationService } = createServer();
+		const response = await fastify.inject({
+			method: 'DELETE',
+			url: '/api/v1/conversations/conversation-id',
+			headers: { authorization: 'Bearer user-token' },
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(response.json()).toEqual({});
+		expect(mastodonConversationService.delete).toHaveBeenCalledWith(expect.objectContaining({ id: 'user-id' }), 'conversation-id');
+		expect(nativeInvoke).not.toHaveBeenCalledWith('notes/delete', expect.anything(), expect.anything(), expect.anything());
+		expect(assert).toHaveBeenCalledWith(['read'], 'write:conversations');
+	});
+
+	test('requires a user token and preserves conversation 404 errors', async () => {
+		const { fastify, authenticate, mastodonConversationService } = createServer();
+		authenticate.mockResolvedValueOnce({ kind: 'application', token: { id: 'app-token', scopes: ['read'] } });
+		const application = await fastify.inject({
+			method: 'GET',
+			url: '/api/v1/conversations',
+			headers: { authorization: 'Bearer app-token' },
+		});
+
+		mastodonConversationService.read.mockRejectedValueOnce(new MastodonApiError(404, 'not_found', 'Conversation not found'));
+		const missing = await fastify.inject({
+			method: 'POST',
+			url: '/api/v1/conversations/missing/read',
+			headers: { authorization: 'Bearer user-token' },
+		});
+
+		expect(application.statusCode).toBe(401);
+		expect(missing.statusCode).toBe(404);
+		expect(missing.json()).toEqual({ error: 'Conversation not found' });
+	});
+
+	test('preserves a conversation when a single-status thread filter would otherwise hide its last status', async () => {
+		const { fastify, mastodonFilterService } = createServer();
+		const apply = vi.spyOn(mastodonFilterService, 'apply').mockImplementation(async (_userId, _context, statuses, options) => options?.preserveHidden ? statuses : []);
+		const response = await fastify.inject({ method: 'GET', url: '/api/v1/conversations', headers: { authorization: 'Bearer user-token' } });
+
+		expect(response.statusCode).toBe(200);
+		expect(response.json()).toHaveLength(1);
+		expect(apply).toHaveBeenCalledWith('user-id', 'thread', expect.any(Array), expect.objectContaining({ preserveHidden: true }));
+	});
 
 	test('lists announcements for user tokens with bounded Mastodon pagination', async () => {
 		const { fastify, authenticate, assert, nativeInvoke, toMisskey } = createServer();
