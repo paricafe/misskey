@@ -351,6 +351,81 @@ describe(MastodonEntityService, () => {
 		})]);
 		expect(status.poll).toMatchObject({ votes_count: 3, voters_count: 3, multiple: true, voted: true });
 		expect(status.tags).toEqual([expect.objectContaining({ name: 'fediverse' })]);
+		expect(status).toMatchObject({
+			quotes_count: 0,
+			tagged_collections: [],
+			quote_approval: { automatic: ['public'], manual: [], current_user: null },
+			filtered: [],
+		});
+	});
+
+	test('wraps quoted statuses in the Mastodon 4.6 quote envelope without recursive expansion', () => {
+		const quoted = {
+			...note,
+			id: 'quoted-note-id',
+			text: 'Quoted note',
+			renoteId: null,
+			renote: null,
+		};
+		const status = service.status({
+			...note,
+			text: 'My comment',
+			renoteId: quoted.id,
+			renote: quoted,
+		} as never);
+
+		expect(status.quote).toEqual({
+			state: 'accepted',
+			quoted_status: expect.objectContaining({
+				id: 'quoted-note-id',
+				quote: null,
+				reblog: null,
+			}),
+		});
+	});
+
+	test('converts stored Note revisions oldest-to-newest and includes the current revision', () => {
+		const edits = service.statusEdits({
+			...note,
+			history: [
+				{ createdAt: '2025-02-03T03:00:00.000Z', text: 'Second', cw: null },
+				{ createdAt: '2025-02-03T02:00:00.000Z', text: 'First', cw: 'Old CW' },
+			],
+		} as never);
+
+		expect(edits.map(edit => edit.created_at)).toEqual([
+			'2025-02-03T02:00:00.000Z',
+			'2025-02-03T03:00:00.000Z',
+			'2025-02-03T05:05:06.000Z',
+		]);
+		expect(edits[0]).toMatchObject({
+			account: expect.objectContaining({ id: 'user-id' }),
+			content: expect.any(String),
+			spoiler_text: 'Old CW',
+			sensitive: false,
+			media_attachments: [],
+			emojis: [],
+		});
+		expect(edits[0]).not.toHaveProperty('poll');
+		expect(edits[0]).not.toHaveProperty('quote');
+		expect(edits.at(-1)).toMatchObject({
+			spoiler_text: 'CW',
+			sensitive: true,
+			media_attachments: [expect.objectContaining({ id: 'file-id' })],
+			poll: expect.objectContaining({ id: 'note-id' }),
+		});
+	});
+
+	test('converts native translation results to Mastodon Translation', () => {
+		expect(service.translation({ sourceLang: 'JA', text: 'Translated **text**' }, 'en')).toEqual({
+			detected_source_language: 'JA',
+			language: 'en',
+			provider: null,
+			spoiler_text: '',
+			content: expect.any(String),
+			poll: null,
+			media_attachments: [],
+		});
 	});
 
 	test('exposes poll conversion for the poll retrieval route', () => {

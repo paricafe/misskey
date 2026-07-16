@@ -129,6 +129,10 @@ export class MastodonEntityService {
 	}
 
 	public status(note: Packed<'Note'>): Record<string, unknown> {
+		return this.statusEntity(note, false);
+	}
+
+	private statusEntity(note: Packed<'Note'>, shallow: boolean): Record<string, unknown> {
 		const localUrl = new URL(`/notes/${note.id}`, this.config.url).toString();
 		const url = note.url ?? note.uri ?? localUrl;
 		const files = note.files ?? [];
@@ -149,9 +153,13 @@ export class MastodonEntityService {
 			replies_count: note.repliesCount,
 			reblogs_count: note.renoteCount,
 			favourites_count: note.reactionCount,
+			quotes_count: 0,
 			content: this.render(note.text ?? ''),
-			reblog: isPureRenote ? this.status(note.renote!) : null,
-			quote: !isPureRenote && note.renote != null ? this.status(note.renote) : null,
+			reblog: !shallow && isPureRenote ? this.statusEntity(note.renote!, true) : null,
+			quote: !shallow && !isPureRenote && note.renote != null ? {
+				state: 'accepted',
+				quoted_status: this.statusEntity(note.renote, true),
+			} : null,
 			application: null,
 			account: this.account(note.user),
 			media_attachments: files.map(file => this.attachment(file)),
@@ -169,6 +177,56 @@ export class MastodonEntityService {
 			bookmarked: false,
 			pinned: false,
 			filtered: [],
+			tagged_collections: [],
+			quote_approval: {
+				automatic: ['public'],
+				manual: [],
+				current_user: null,
+			},
+		};
+	}
+
+	public statusEdits(note: Packed<'Note'>) {
+		const historical = [...(note.history ?? [])]
+			.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+			.map(revision => ({
+				account: this.account(note.user),
+				content: this.render(revision.text ?? ''),
+				spoiler_text: revision.cw ?? '',
+				sensitive: false,
+				created_at: revision.createdAt,
+				media_attachments: [],
+				emojis: [],
+			}));
+		const files = note.files ?? [];
+		const current = {
+			account: this.account(note.user),
+			content: this.render(note.text ?? ''),
+			spoiler_text: note.cw ?? '',
+			sensitive: files.some(file => file.isSensitive) || note.channel?.isSensitive === true,
+			created_at: note.updatedAt ?? note.createdAt,
+			media_attachments: files.map(file => this.attachment(file)),
+			emojis: this.emojis(note.emojis),
+			...(note.poll == null ? {} : { poll: this.poll(note.id, note.poll) }),
+			...(note.renote != null && !(note.text == null && files.length === 0 && note.poll == null && note.replyId == null) ? {
+				quote: {
+					state: 'accepted',
+					quoted_status: this.statusEntity(note.renote, true),
+				},
+			} : {}),
+		};
+		return [...historical, current];
+	}
+
+	public translation(result: { sourceLang: string; text: string }, targetLanguage: string) {
+		return {
+			detected_source_language: result.sourceLang,
+			language: targetLanguage,
+			provider: null,
+			spoiler_text: '',
+			content: this.render(result.text),
+			poll: null,
+			media_attachments: [],
 		};
 	}
 

@@ -352,7 +352,8 @@ export class MastodonApiServerService {
 	}
 
 	private registerStatuses(fastify: FastifyInstance): void {
-		fastify.get('/api/v1/statuses', request => this.withOptionalUser(request as MastodonRequest, 'read:statuses', async auth => {
+		fastify.get('/api/v1/statuses', request => this.withToken(request as MastodonRequest, 'read:statuses', async tokenAuth => {
+			const auth = tokenAuth.kind === 'user' ? tokenAuth : null;
 			const notes = await this.invokePublicBatch(
 				'notes/show',
 				'noteId',
@@ -382,6 +383,44 @@ export class MastodonApiServerService {
 			if (note.userId !== auth.user.id) throw new MastodonApiError(403, 'forbidden', 'Only the author can view the status source');
 			return { id: note.id, text: note.text ?? '', spoiler_text: note.cw ?? '' };
 		}));
+		fastify.get<{ Params: { id: string } }>('/api/v1/statuses/:id/history', request => this.withOptionalScopedUser(request as MastodonRequest, 'read:statuses', async auth => {
+			const note = await this.invokePublic('notes/show', { noteId: request.params.id }, auth, request as MastodonRequest) as Packed<'Note'>;
+			return this.mastodonEntityService.statusEdits(note);
+		}));
+		fastify.post<{ Params: { id: string }; Body: Dictionary }>('/api/v1/statuses/:id/translate', request => this.withAuth(request as MastodonRequest, 'read:statuses', async auth => {
+			const query = request.query as Dictionary;
+			const acceptLanguage = this.string(request.headers['accept-language'])
+				?.split(',')[0]
+				?.split(';')[0]
+				?.trim();
+			const targetLanguage = this.string(request.body?.lang) ?? this.string(query.lang) ?? acceptLanguage;
+			if (targetLanguage == null || targetLanguage === '') {
+				throw new MastodonApiError(400, 'invalid_request', 'A target language is required');
+			}
+			let result: { sourceLang: string; text: string } | undefined;
+			try {
+				result = await this.invoke('notes/translate', {
+					noteId: request.params.id,
+					targetLang: targetLanguage,
+				}, auth, request as MastodonRequest) as { sourceLang: string; text: string } | undefined;
+			} catch (error) {
+				if (error instanceof ApiError && error.code === 'UNAVAILABLE') {
+					throw new MastodonApiError(422, 'unprocessable_entity', 'Translation is unavailable');
+				}
+				throw error;
+			}
+			if (result == null) throw new MastodonApiError(422, 'unprocessable_entity', 'Translation is unavailable');
+			return this.mastodonEntityService.translation(result, targetLanguage);
+		}));
+		fastify.get<{ Params: { id: string } }>('/api/v1/statuses/:id/quotes', (request, reply) => this.withToken(request as MastodonRequest, 'read:statuses', async tokenAuth => {
+			const auth = tokenAuth.kind === 'user' ? tokenAuth : null;
+			const renotes = await this.invokePublic('notes/renotes', {
+				noteId: request.params.id,
+				...this.mastodonPaginationService.toMisskey(request.query as Dictionary, 100),
+			}, auth, request as MastodonRequest) as Packed<'Note'>[];
+			const quotes = renotes.filter(note => note.renoteId != null && !this.isPurePackedRenote(note));
+			return this.page(request, reply, quotes, await this.statusesWithState(quotes, auth));
+		}));
 		fastify.get<{ Params: { id: string } }>('/api/v1/statuses/:id/reblogged_by', request => this.withOptionalUser(request as MastodonRequest, 'read:statuses', async auth => {
 			const renotes = await this.invokePublic('notes/renotes', { noteId: request.params.id, ...this.mastodonPaginationService.toMisskey(request.query as Dictionary, 100) }, auth, request as MastodonRequest) as Packed<'Note'>[];
 			return renotes.map(note => this.mastodonEntityService.account(note.user));
@@ -394,6 +433,7 @@ export class MastodonApiServerService {
 			return await this.createStatus(request as MastodonRequest, auth);
 		}));
 		fastify.put<{ Params: { id: string }; Body: Dictionary }>('/api/v1/statuses/:id', request => this.withAuth(request as MastodonRequest, 'write:statuses', async auth => {
+			this.validateStatusUpdateSemantics(request.body ?? {});
 			const fileIds = this.strings(request.body?.['media_ids[]'] ?? request.body?.media_ids);
 			const current = await this.invoke('notes/show', { noteId: request.params.id }, auth, request as MastodonRequest) as Packed<'Note'>;
 			const hasMediaIds = Object.hasOwn(request.body ?? {}, 'media_ids') || Object.hasOwn(request.body ?? {}, 'media_ids[]');
@@ -402,7 +442,7 @@ export class MastodonApiServerService {
 			const result = await this.invoke('notes/update', {
 				noteId: request.params.id,
 				text: this.string(request.body?.status) ?? current.text ?? '',
-				cw: this.string(request.body?.spoiler_text) || null,
+				cw: Object.hasOwn(request.body ?? {}, 'spoiler_text') ? this.string(request.body?.spoiler_text) || null : current.cw ?? null,
 				...(effectiveFileIds.length > 0 ? { fileIds: effectiveFileIds } : {}),
 			}, auth, request as MastodonRequest) as { updatedNote: Packed<'Note'> };
 			return (await this.statusesWithState([result.updatedNote], auth))[0];
@@ -478,6 +518,20 @@ export class MastodonApiServerService {
 			await this.invoke('drive/files/delete', { fileId: request.params.id }, auth, request as MastodonRequest);
 			return {};
 		}));
+	}
+
+	private validateStatusUpdateSemantics(body: Dictionary): void {
+		if (Object.keys(body).some(key => key === 'poll' || key.startsWith('poll['))) {
+			throw new MastodonApiError(422, 'unprocessable_entity', 'Poll changes cannot be persisted by this server');
+		}
+		const language = this.string(body.language);
+		if (language != null && language !== '') {
+			throw new MastodonApiError(422, 'unprocessable_entity', 'Status language cannot be persisted by this server');
+		}
+		const quoteApprovalPolicy = this.string(body.quote_approval_policy);
+		if (quoteApprovalPolicy != null && quoteApprovalPolicy !== '' && quoteApprovalPolicy !== 'public') {
+			throw new MastodonApiError(422, 'unprocessable_entity', `Unsupported quote approval policy: ${quoteApprovalPolicy}`);
+		}
 	}
 
 	private registerNotifications(fastify: FastifyInstance): void {
@@ -1099,6 +1153,10 @@ export class MastodonApiServerService {
 		return note.text == null && note.cw == null && note.fileIds.length === 0 && !note.hasPoll && note.replyId == null;
 	}
 
+	private isPurePackedRenote(note: Packed<'Note'>): boolean {
+		return note.text == null && note.cw == null && (note.files?.length ?? 0) === 0 && note.poll == null && note.replyId == null;
+	}
+
 	private async resolveDirectRecipientIds(text: string, replyId: string | null, auth: MastodonUserAuth, request: MastodonRequest): Promise<string[]> {
 		const users = new Set<string>();
 		for (const mention of extractMentions(mfmParse(text))) {
@@ -1179,6 +1237,18 @@ export class MastodonApiServerService {
 		if (auth.kind === 'application') return await action(null);
 		this.mastodonScopeService.assert(auth.token.scopes, scope);
 		return await action(auth);
+	}
+
+	private async withOptionalScopedUser<T>(
+		request: MastodonRequest,
+		scope: string,
+		action: (auth: MastodonUserAuth | null) => Promise<T>,
+	): Promise<T> {
+		const token = this.bearerToken(request);
+		if (token == null) return await action(null);
+		const auth = await this.mastodonAuthenticateService.authenticate(token);
+		this.mastodonScopeService.assert(auth.token.scopes, scope);
+		return await action(auth.kind === 'user' ? auth : null);
 	}
 
 	private async withAuth<T>(

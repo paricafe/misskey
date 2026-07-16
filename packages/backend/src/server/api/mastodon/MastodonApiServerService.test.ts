@@ -154,6 +154,8 @@ describe(MastodonApiServerService, () => {
 					media_attachments: value.files ?? [],
 					poll: value.poll ?? null,
 				})),
+				statusEdits: vi.fn(value => [...(value.history ?? []), { createdAt: value.updatedAt ?? value.createdAt }].map(edit => ({ created_at: edit.createdAt }))),
+				translation: vi.fn((value, language) => ({ detected_source_language: value.sourceLang, language, content: value.text })),
 				poll: vi.fn((noteId, poll) => ({ id: noteId, votes_count: poll.choices.reduce((total: number, choice: { votes: number }) => total + choice.votes, 0) })),
 				scheduledStatus: vi.fn(value => ({ id: value.id, scheduled_at: new Date(value.scheduledAt).toISOString() })),
 				announcement: vi.fn(value => ({ id: value.id, content: value.text, read: value.isRead ?? false })),
@@ -452,6 +454,137 @@ describe(MastodonApiServerService, () => {
 
 		expect(response.statusCode).toBe(statusCode);
 		expect(nativeInvoke).not.toHaveBeenCalledWith('notes/drafts/create', expect.anything(), expect.anything(), expect.anything());
+	});
+
+	test('serves status edit history publicly and scope-checks an explicitly supplied token', async () => {
+		const { fastify, authenticate, assert, nativeInvoke } = createServer();
+		nativeInvoke.mockResolvedValue({
+			id: 'note-id',
+			createdAt: '2025-01-01T00:00:00.000Z',
+			updatedAt: '2025-01-02T00:00:00.000Z',
+			history: [{ createdAt: '2025-01-01T00:00:00.000Z', text: 'old' }],
+		});
+
+		const anonymous = await fastify.inject({ method: 'GET', url: '/api/v1/statuses/note-id/history' });
+		const authenticated = await fastify.inject({
+			method: 'GET',
+			url: '/api/v1/statuses/note-id/history',
+			headers: { authorization: 'Bearer user-token' },
+		});
+
+		expect(anonymous.statusCode).toBe(200);
+		expect(anonymous.json()).toEqual([
+			{ created_at: '2025-01-01T00:00:00.000Z' },
+			{ created_at: '2025-01-02T00:00:00.000Z' },
+		]);
+		expect(authenticated.statusCode).toBe(200);
+		expect(authenticate).toHaveBeenCalledWith('user-token');
+		expect(assert).toHaveBeenCalledWith(['read'], 'read:statuses');
+	});
+
+	test('translates statuses using lang and Accept-Language, and reports unavailable translation truthfully', async () => {
+		const { fastify, nativeInvoke } = createServer();
+		nativeInvoke.mockImplementation(async name => name === 'notes/translate'
+			? { sourceLang: 'JA', text: 'Hello' }
+			: []);
+		const explicit = await fastify.inject({
+			method: 'POST',
+			url: '/api/v1/statuses/note-id/translate',
+			headers: { authorization: 'Bearer user-token' },
+			payload: { lang: 'fr' },
+		});
+		const header = await fastify.inject({
+			method: 'POST',
+			url: '/api/v1/statuses/note-id/translate',
+			headers: { authorization: 'Bearer user-token', 'accept-language': 'de-DE,de;q=0.8' },
+		});
+
+		expect(explicit.statusCode).toBe(200);
+		expect(explicit.json()).toEqual({ detected_source_language: 'JA', language: 'fr', content: 'Hello' });
+		expect(header.statusCode).toBe(200);
+		expect(nativeInvoke).toHaveBeenCalledWith('notes/translate', { noteId: 'note-id', targetLang: 'fr' }, expect.any(Object), expect.any(Object));
+		expect(nativeInvoke).toHaveBeenCalledWith('notes/translate', { noteId: 'note-id', targetLang: 'de-DE' }, expect.any(Object), expect.any(Object));
+
+		nativeInvoke.mockResolvedValueOnce(undefined);
+		const unavailable = await fastify.inject({
+			method: 'POST',
+			url: '/api/v1/statuses/note-id/translate?lang=en',
+			headers: { authorization: 'Bearer user-token' },
+		});
+		expect(unavailable.statusCode).toBe(422);
+	});
+
+	test('lists quote Notes for application tokens and filters pure boosts', async () => {
+		const { fastify, authenticate, assert, nativeInvoke, linkHeader } = createServer();
+		authenticate.mockResolvedValue({
+			kind: 'application',
+			user: null,
+			token: { id: 'app-token', scopes: ['read'] },
+		});
+		nativeInvoke.mockImplementation(async name => name === 'notes/renotes' ? [
+			{ id: 'boost-id', renoteId: 'note-id', text: null, cw: null, files: [], poll: null, replyId: null },
+			{ id: 'quote-id', renoteId: 'note-id', text: 'My quote', cw: null, files: [], poll: null, replyId: null },
+		] : []);
+
+		const response = await fastify.inject({
+			method: 'GET',
+			url: '/api/v1/statuses/note-id/quotes?limit=20',
+			headers: { authorization: 'Bearer app-token' },
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(response.json()).toEqual([expect.objectContaining({ id: 'quote-id' })]);
+		expect(assert).toHaveBeenCalledWith(['read'], 'read:statuses');
+		expect(nativeInvoke).toHaveBeenCalledWith('notes/renotes', expect.objectContaining({ noteId: 'note-id', limit: 20 }), null, expect.any(Object));
+		expect(linkHeader).toHaveBeenCalledWith(expect.any(String), [expect.objectContaining({ id: 'quote-id' })]);
+	});
+
+	test.each([
+		['POST', '/api/v1/statuses/status-id/quotes/quote-id/revoke'],
+		['PUT', '/api/v1/statuses/status-id/interaction_policy'],
+	] as const)('authenticates unsupported status-policy write %s %s before returning 422', async (method, url) => {
+		const { fastify, assert } = createServer();
+		const response = await fastify.inject({ method, url, headers: { authorization: 'Bearer user-token' } });
+
+		expect(response.statusCode).toBe(422);
+		expect(assert).toHaveBeenCalledWith(['read'], 'write:statuses');
+	});
+
+	test('preserves an omitted CW on status edits and rejects unsupported edit semantics', async () => {
+		const { fastify, nativeInvoke } = createServer();
+		nativeInvoke.mockImplementation(async name => {
+			if (name === 'notes/show') return { id: 'note-id', text: 'old', cw: 'Existing CW', fileIds: [] };
+			if (name === 'notes/update') return { updatedNote: { id: 'note-id' } };
+			return [];
+		});
+		const edit = await fastify.inject({
+			method: 'PUT',
+			url: '/api/v1/statuses/note-id',
+			headers: { authorization: 'Bearer user-token' },
+			payload: { status: 'edited' },
+		});
+		const poll = await fastify.inject({
+			method: 'PUT',
+			url: '/api/v1/statuses/note-id',
+			headers: { authorization: 'Bearer user-token' },
+			payload: { status: 'edited', poll: { options: ['A', 'B'] } },
+		});
+		const language = await fastify.inject({
+			method: 'PUT',
+			url: '/api/v1/statuses/note-id',
+			headers: { authorization: 'Bearer user-token' },
+			payload: { status: 'edited', language: 'en' },
+		});
+		const quotePolicy = await fastify.inject({
+			method: 'PUT',
+			url: '/api/v1/statuses/note-id',
+			headers: { authorization: 'Bearer user-token' },
+			payload: { status: 'edited', quote_approval_policy: 'followers' },
+		});
+
+		expect(edit.statusCode).toBe(200);
+		expect(nativeInvoke).toHaveBeenCalledWith('notes/update', expect.objectContaining({ cw: 'Existing CW' }), expect.any(Object), expect.any(Object));
+		expect([poll.statusCode, language.statusCode, quotePolicy.statusCode]).toEqual([422, 422, 422]);
 	});
 
 	test('registers every documented Mastodon 4.6.3 Fastify route exactly once', async () => {
@@ -1093,10 +1226,14 @@ describe(MastodonApiServerService, () => {
 		expect(nativeInvoke).not.toHaveBeenCalled();
 	});
 
-	test('serves batch accounts and statuses publicly in input order', async () => {
+	test('serves public batch accounts and token-authenticated batch statuses in input order', async () => {
 		const { fastify, authenticate, publicInvoke } = createServer();
 		const accounts = await fastify.inject({ method: 'GET', url: '/api/v1/accounts?id[]=user-a&id[]=user-b' });
-		const statuses = await fastify.inject({ method: 'GET', url: '/api/v1/statuses?id[]=note-a&id[]=note-b' });
+		const statuses = await fastify.inject({
+			method: 'GET',
+			url: '/api/v1/statuses?id[]=note-a&id[]=note-b',
+			headers: { authorization: 'Bearer user-token' },
+		});
 
 		expect(accounts.statusCode).toBe(200);
 		expect(accounts.json()).toEqual([
@@ -1108,9 +1245,9 @@ describe(MastodonApiServerService, () => {
 			expect.objectContaining({ id: 'note-a' }),
 			expect.objectContaining({ id: 'note-b' }),
 		]);
-		expect(authenticate).not.toHaveBeenCalled();
+		expect(authenticate).toHaveBeenCalledWith('user-token');
 		expect(publicInvoke).toHaveBeenCalledWith('users/show', { userId: 'user-a' }, null, expect.any(Object));
-		expect(publicInvoke).toHaveBeenCalledWith('notes/show', { noteId: 'note-a' }, null, expect.any(Object));
+		expect(publicInvoke).toHaveBeenCalledWith('notes/show', { noteId: 'note-a' }, expect.objectContaining({ kind: 'user' }), expect.any(Object));
 	});
 
 	test('fetches batch IDs once while preserving duplicates and omitting inaccessible records', async () => {
@@ -1163,7 +1300,11 @@ describe(MastodonApiServerService, () => {
 		const { fastify, nativeInvoke } = createServer();
 		nativeInvoke.mockRejectedValue(new MastodonApiError(statusCode, 'server_error', 'Failure'));
 
-		const response = await fastify.inject({ method: 'GET', url: '/api/v1/statuses?id[]=note-a&id[]=note-b' });
+		const response = await fastify.inject({
+			method: 'GET',
+			url: '/api/v1/statuses?id[]=note-a&id[]=note-b',
+			headers: { authorization: 'Bearer user-token' },
+		});
 
 		expect(response.statusCode).toBe(statusCode);
 	});
