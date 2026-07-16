@@ -73,6 +73,38 @@ describe(MastodonApiStateService, () => {
 		]);
 	});
 
+	test('allows only one concurrent insert-only write to create version one', async () => {
+		const results = await Promise.allSettled([
+			service.createIfAbsent({ userId, kind: 'marker', key: 'initial-create', value: { lastReadId: '10' } }),
+			service.createIfAbsent({ userId, kind: 'marker', key: 'initial-create', value: { lastReadId: '20' } }),
+		]);
+
+		expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(1);
+		expect(results.filter(result => result.status === 'rejected')).toMatchObject([{
+			reason: { statusCode: 409, error: 'conflict', code: 'conflict' },
+		}]);
+		await expect(repository.findBy({ userId, kind: 'marker', key: 'initial-create' })).resolves.toMatchObject([{
+			version: 1,
+		}]);
+	});
+
+	test('serializes callbacks holding the same user-kind advisory lock', async () => {
+		let active = 0;
+		let maximumActive = 0;
+		const run = async (key: string) => await service.withUserKindLock(userId, 'filter-lock', async stateService => {
+			active++;
+			maximumActive = Math.max(maximumActive, active);
+			await new Promise(resolve => setTimeout(resolve, 25));
+			await stateService.put({ userId, kind: 'filter-lock', key, value: {} });
+			active--;
+		});
+
+		await Promise.all([run('first'), run('second')]);
+
+		expect(maximumActive).toBe(1);
+		await expect(repository.findBy({ userId, kind: 'filter-lock' })).resolves.toHaveLength(2);
+	});
+
 	test('deletes expired and explicitly addressed state without touching unexpired rows', async () => {
 		const now = new Date();
 		await service.put({

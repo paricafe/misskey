@@ -26,18 +26,20 @@ describe(MastodonMarkerService, () => {
 				const row = rows.get(key);
 				return row?.userId === userId && row.kind === kind ? row : null;
 			}),
-			put: vi.fn(async (input: { userId: string; kind: string; key: string; value: { lastReadId: string } }) => {
-				const previous = rows.get(input.key);
+			createIfAbsent: vi.fn(async (input: { userId: string; kind: string; key: string; value: { lastReadId: string } }) => {
+				if (rows.has(input.key)) {
+					throw Object.assign(new MastodonApiError(409, 'conflict', 'The compatibility state has changed'), { code: 'conflict' });
+				}
 				const now = new Date('2026-07-17T01:02:03.000Z');
 				const row = {
-					id: previous?.id ?? `state-${input.key}`,
+					id: `state-${input.key}`,
 					userId: input.userId,
 					tokenId: null,
 					kind: input.kind,
 					key: input.key,
 					value: input.value,
-					version: (previous?.version ?? 0) + 1,
-					createdAt: previous?.createdAt ?? now,
+					version: 1,
+					createdAt: now,
 					updatedAt: now,
 					expiresAt: null,
 				};
@@ -94,6 +96,21 @@ describe(MastodonMarkerService, () => {
 			statusCode: 409,
 			code: 'conflict',
 		});
+	});
+
+	test('allows only one of two concurrent initial marker writes to create version one', async () => {
+		const { service, rows } = createService();
+
+		const results = await Promise.allSettled([
+			service.update('u1', { home: { last_read_id: '10' } }),
+			service.update('u1', { home: { last_read_id: '20' } }),
+		]);
+
+		expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(1);
+		expect(results.filter(result => result.status === 'rejected')).toMatchObject([{
+			reason: { statusCode: 409, code: 'conflict' },
+		}]);
+		expect(rows.get('home')).toMatchObject({ version: 1 });
 	});
 
 	test('rejects unsupported timelines and malformed last-read ids', async () => {

@@ -56,7 +56,7 @@ export class MastodonMarkerService {
 			let row: MiMastodonUserState;
 			if (current == null) {
 				if (suppliedVersion != null && suppliedVersion !== 0) this.conflict();
-				row = await this.mastodonApiStateService.put({
+				row = await this.mastodonApiStateService.createIfAbsent({
 					userId,
 					kind: MARKER_KIND,
 					key: timeline,

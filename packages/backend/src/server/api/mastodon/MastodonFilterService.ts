@@ -3,9 +3,9 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { Injectable } from '@nestjs/common';
 import { Buffer } from 'node:buffer';
 import { randomUUID } from 'node:crypto';
+import { Injectable } from '@nestjs/common';
 import type { MiUser } from '@/models/User.js';
 import { MastodonApiError } from './errors.js';
 import { MastodonApiStateService } from './MastodonApiStateService.js';
@@ -46,6 +46,11 @@ export type MastodonV1Filter = {
 	irreversible: boolean;
 };
 
+export type MastodonFilterApplyOptions = {
+	preserveHidden?: boolean;
+	corpora?: ReadonlyMap<string, readonly string[]>;
+};
+
 type Dictionary = Record<string, unknown>;
 
 const FILTER_KIND = 'filter';
@@ -71,7 +76,11 @@ export class MastodonFilterService {
 	}
 
 	public async createV2(userId: MiUser['id'], input: Dictionary): Promise<MastodonFilter> {
-		const filters = await this.snapshot(userId);
+		return await this.mutate(userId, async stateService => await this.createV2Locked(stateService, userId, input));
+	}
+
+	private async createV2Locked(stateService: MastodonApiStateService, userId: MiUser['id'], input: Dictionary): Promise<MastodonFilter> {
+		const filters = await this.snapshot(userId, stateService);
 		if (filters.length >= MAX_FILTERS) this.invalid(`Filters are limited to ${MAX_FILTERS}`);
 		const filter: MastodonFilter = {
 			id: randomUUID(),
@@ -82,32 +91,36 @@ export class MastodonFilterService {
 			keywords: this.newKeywords(input.keywords ?? input.keywords_attributes),
 			statuses: this.newStatuses(input.statuses),
 		};
-		await this.save(userId, filter, filters);
+		await this.save(userId, filter, filters, stateService);
 		return filter;
 	}
 
 	public async updateV2(userId: MiUser['id'], filterId: string, input: Dictionary): Promise<MastodonFilter> {
-		const filters = await this.snapshot(userId);
-		const current = this.requireFilter(filters, filterId);
-		let keywords = current.keywords;
-		if (Object.hasOwn(input, 'keywords')) keywords = this.newKeywords(input.keywords);
-		if (Object.hasOwn(input, 'keywords_attributes')) keywords = this.updateKeywords(keywords, input.keywords_attributes);
-		const filter: MastodonFilter = {
-			...current,
-			title: Object.hasOwn(input, 'title') ? this.title(input.title) : current.title,
-			context: Object.hasOwn(input, 'context') ? this.contexts(input.context) : current.context,
-			expires_at: Object.hasOwn(input, 'expires_in') ? this.expiresAt(input.expires_in, null) : current.expires_at,
-			filter_action: Object.hasOwn(input, 'filter_action') ? this.action(input.filter_action, current.filter_action) : current.filter_action,
-			keywords,
-		};
-		await this.save(userId, filter, filters);
-		return filter;
+		return await this.mutate(userId, async stateService => {
+			const filters = await this.snapshot(userId, stateService);
+			const current = this.requireFilter(filters, filterId);
+			let keywords = current.keywords;
+			if (Object.hasOwn(input, 'keywords')) keywords = this.newKeywords(input.keywords);
+			if (Object.hasOwn(input, 'keywords_attributes')) keywords = this.updateKeywords(keywords, input.keywords_attributes);
+			const filter: MastodonFilter = {
+				...current,
+				title: Object.hasOwn(input, 'title') ? this.title(input.title) : current.title,
+				context: Object.hasOwn(input, 'context') ? this.contexts(input.context) : current.context,
+				expires_at: Object.hasOwn(input, 'expires_in') ? this.expiresAt(input.expires_in, null) : current.expires_at,
+				filter_action: Object.hasOwn(input, 'filter_action') ? this.action(input.filter_action, current.filter_action) : current.filter_action,
+				keywords,
+			};
+			await this.save(userId, filter, filters, stateService);
+			return filter;
+		});
 	}
 
 	public async deleteV2(userId: MiUser['id'], filterId: string): Promise<Record<string, never>> {
-		this.requireFilter(await this.snapshot(userId), filterId);
-		await this.mastodonApiStateService.delete(userId, FILTER_KIND, filterId);
-		return {};
+		return await this.mutate(userId, async stateService => {
+			this.requireFilter(await this.snapshot(userId, stateService), filterId);
+			await stateService.delete(userId, FILTER_KIND, filterId);
+			return {};
+		});
 	}
 
 	public async listKeywords(userId: MiUser['id'], filterId: string): Promise<MastodonFilterKeyword[]> {
@@ -119,36 +132,44 @@ export class MastodonFilterService {
 	}
 
 	public async createKeyword(userId: MiUser['id'], filterId: string, input: Dictionary): Promise<MastodonFilterKeyword> {
-		const filters = await this.snapshot(userId);
-		const filter = this.requireFilter(filters, filterId);
-		if (filter.keywords.length >= MAX_KEYWORDS) this.invalid(`Keywords are limited to ${MAX_KEYWORDS} per filter`);
-		const keyword = this.newKeyword(input);
-		await this.save(userId, { ...filter, keywords: [...filter.keywords, keyword] }, filters);
-		return keyword;
+		return await this.mutate(userId, async stateService => {
+			const filters = await this.snapshot(userId, stateService);
+			const filter = this.requireFilter(filters, filterId);
+			if (filter.keywords.length >= MAX_KEYWORDS) this.invalid(`Keywords are limited to ${MAX_KEYWORDS} per filter`);
+			const keyword = this.newKeyword(input);
+			await this.save(userId, { ...filter, keywords: [...filter.keywords, keyword] }, filters, stateService);
+			return keyword;
+		});
 	}
 
 	public async updateKeyword(userId: MiUser['id'], keywordId: string, input: Dictionary): Promise<MastodonFilterKeyword> {
-		const filters = await this.snapshot(userId);
-		const { filter, keyword } = this.requireKeyword(filters, keywordId);
-		const updated: MastodonFilterKeyword = {
-			...keyword,
-			keyword: Object.hasOwn(input, 'keyword') ? this.keyword(input.keyword) : keyword.keyword,
-			whole_word: Object.hasOwn(input, 'whole_word') ? this.boolean(input.whole_word, 'whole_word') : keyword.whole_word,
-		};
-		await this.save(userId, {
-			...filter,
-			keywords: filter.keywords.map(value => value.id === keywordId ? updated : value),
-		}, filters);
-		return updated;
+		return await this.mutate(userId, async stateService => {
+			const filters = await this.snapshot(userId, stateService);
+			const { filter, keyword } = this.requireKeyword(filters, keywordId);
+			const updated: MastodonFilterKeyword = {
+				...keyword,
+				keyword: Object.hasOwn(input, 'keyword') ? this.keyword(input.keyword) : keyword.keyword,
+				whole_word: Object.hasOwn(input, 'whole_word') ? this.boolean(input.whole_word, 'whole_word') : keyword.whole_word,
+			};
+			await this.save(userId, {
+				...filter,
+				keywords: filter.keywords.map(value => value.id === keywordId ? updated : value),
+			}, filters, stateService);
+			return updated;
+		});
 	}
 
 	public async deleteKeyword(userId: MiUser['id'], keywordId: string): Promise<Record<string, never>> {
-		const filters = await this.snapshot(userId);
+		return await this.mutate(userId, async stateService => await this.deleteKeywordLocked(stateService, userId, keywordId));
+	}
+
+	private async deleteKeywordLocked(stateService: MastodonApiStateService, userId: MiUser['id'], keywordId: string): Promise<Record<string, never>> {
+		const filters = await this.snapshot(userId, stateService);
 		const { filter } = this.requireKeyword(filters, keywordId);
 		await this.save(userId, {
 			...filter,
 			keywords: filter.keywords.filter(value => value.id !== keywordId),
-		}, filters);
+		}, filters, stateService);
 		return {};
 	}
 
@@ -161,22 +182,26 @@ export class MastodonFilterService {
 	}
 
 	public async createStatus(userId: MiUser['id'], filterId: string, input: Dictionary): Promise<MastodonFilterStatus> {
-		const filters = await this.snapshot(userId);
-		const filter = this.requireFilter(filters, filterId);
-		if (filter.statuses.length >= MAX_STATUSES) this.invalid(`Statuses are limited to ${MAX_STATUSES} per filter`);
-		const status = this.newStatus(input);
-		await this.save(userId, { ...filter, statuses: [...filter.statuses, status] }, filters);
-		return status;
+		return await this.mutate(userId, async stateService => {
+			const filters = await this.snapshot(userId, stateService);
+			const filter = this.requireFilter(filters, filterId);
+			if (filter.statuses.length >= MAX_STATUSES) this.invalid(`Statuses are limited to ${MAX_STATUSES} per filter`);
+			const status = this.newStatus(input);
+			await this.save(userId, { ...filter, statuses: [...filter.statuses, status] }, filters, stateService);
+			return status;
+		});
 	}
 
 	public async deleteStatus(userId: MiUser['id'], filterStatusId: string): Promise<Record<string, never>> {
-		const filters = await this.snapshot(userId);
-		const { filter } = this.requireStatus(filters, filterStatusId);
-		await this.save(userId, {
-			...filter,
-			statuses: filter.statuses.filter(value => value.id !== filterStatusId),
-		}, filters);
-		return {};
+		return await this.mutate(userId, async stateService => {
+			const filters = await this.snapshot(userId, stateService);
+			const { filter } = this.requireStatus(filters, filterStatusId);
+			await this.save(userId, {
+				...filter,
+				statuses: filter.statuses.filter(value => value.id !== filterStatusId),
+			}, filters, stateService);
+			return {};
+		});
 	}
 
 	public async listV1(userId: MiUser['id']): Promise<MastodonV1Filter[]> {
@@ -189,57 +214,61 @@ export class MastodonFilterService {
 	}
 
 	public async createV1(userId: MiUser['id'], input: Dictionary): Promise<MastodonV1Filter> {
-		const phrase = this.keyword(input.phrase);
-		const filter = await this.createV2(userId, {
-			title: phrase,
-			context: input.context,
-			filter_action: this.boolean(input.irreversible, 'irreversible', false) ? 'hide' : 'warn',
-			expires_in: input.expires_in,
-			keywords: [{ keyword: phrase, whole_word: this.boolean(input.whole_word, 'whole_word', false) }],
+		return await this.mutate(userId, async stateService => {
+			const phrase = this.keyword(input.phrase);
+			const filter = await this.createV2Locked(stateService, userId, {
+				title: phrase,
+				context: input.context,
+				filter_action: this.boolean(input.irreversible, 'irreversible', false) ? 'hide' : 'warn',
+				expires_in: input.expires_in,
+				keywords: [{ keyword: phrase, whole_word: this.boolean(input.whole_word, 'whole_word', false) }],
+			});
+			return this.v1(filter, filter.keywords[0]!);
 		});
-		return this.v1(filter, filter.keywords[0]!);
 	}
 
 	public async updateV1(userId: MiUser['id'], keywordId: string, input: Dictionary): Promise<MastodonV1Filter> {
-		const filters = await this.snapshot(userId);
-		const { filter, keyword } = this.requireKeyword(filters, keywordId);
-		const phrase = Object.hasOwn(input, 'phrase') ? this.keyword(input.phrase) : keyword.keyword;
-		const context = Object.hasOwn(input, 'context') ? this.contexts(input.context) : filter.context;
-		const action = Object.hasOwn(input, 'irreversible')
-			? this.boolean(input.irreversible, 'irreversible') ? 'hide' : 'warn'
-			: filter.filter_action;
-		const expiresAt = Object.hasOwn(input, 'expires_in') ? this.expiresAt(input.expires_in, null) : filter.expires_at;
-		if (filter.keywords.length > 1 && (
-			JSON.stringify(context) !== JSON.stringify(filter.context) ||
+		return await this.mutate(userId, async stateService => {
+			const filters = await this.snapshot(userId, stateService);
+			const { filter, keyword } = this.requireKeyword(filters, keywordId);
+			const phrase = Object.hasOwn(input, 'phrase') ? this.keyword(input.phrase) : keyword.keyword;
+			const context = Object.hasOwn(input, 'context') ? this.contexts(input.context) : filter.context;
+			const action = Object.hasOwn(input, 'irreversible')
+				? this.boolean(input.irreversible, 'irreversible') ? 'hide' : 'warn'
+				: filter.filter_action;
+			const expiresAt = Object.hasOwn(input, 'expires_in') ? this.expiresAt(input.expires_in, null) : filter.expires_at;
+			if (filter.keywords.length > 1 && (
+				JSON.stringify(context) !== JSON.stringify(filter.context) ||
 			action !== filter.filter_action ||
 			expiresAt !== filter.expires_at
-		)) this.invalid('A v1 filter cannot change shared attributes while its v2 filter has multiple keywords');
-		const updatedKeyword = {
-			...keyword,
-			keyword: phrase,
-			whole_word: Object.hasOwn(input, 'whole_word') ? this.boolean(input.whole_word, 'whole_word') : keyword.whole_word,
-		};
-		const updatedFilter: MastodonFilter = {
-			...filter,
-			title: filter.keywords.length === 1 ? phrase : filter.title,
-			context,
-			filter_action: action,
-			expires_at: expiresAt,
-			keywords: filter.keywords.map(value => value.id === keywordId ? updatedKeyword : value),
-		};
-		await this.save(userId, updatedFilter, filters);
-		return this.v1(updatedFilter, updatedKeyword);
+			)) this.invalid('A v1 filter cannot change shared attributes while its v2 filter has multiple keywords');
+			const updatedKeyword = {
+				...keyword,
+				keyword: phrase,
+				whole_word: Object.hasOwn(input, 'whole_word') ? this.boolean(input.whole_word, 'whole_word') : keyword.whole_word,
+			};
+			const updatedFilter: MastodonFilter = {
+				...filter,
+				title: filter.keywords.length === 1 ? phrase : filter.title,
+				context,
+				filter_action: action,
+				expires_at: expiresAt,
+				keywords: filter.keywords.map(value => value.id === keywordId ? updatedKeyword : value),
+			};
+			await this.save(userId, updatedFilter, filters, stateService);
+			return this.v1(updatedFilter, updatedKeyword);
+		});
 	}
 
 	public async deleteV1(userId: MiUser['id'], keywordId: string): Promise<Record<string, never>> {
-		return await this.deleteKeyword(userId, keywordId);
+		return await this.mutate(userId, async stateService => await this.deleteKeywordLocked(stateService, userId, keywordId));
 	}
 
 	public async apply<T extends Record<string, unknown>>(
 		userId: MiUser['id'],
 		context: MastodonFilterContext,
 		statuses: T[],
-		options: { preserveHidden?: boolean } = {},
+		options: MastodonFilterApplyOptions = {},
 	): Promise<T[]> {
 		if (!MASTODON_FILTER_CONTEXTS.includes(context)) this.invalid('Invalid filter context');
 		const now = Date.now();
@@ -248,7 +277,7 @@ export class MastodonFilterService {
 			(filter.expires_at == null || Date.parse(filter.expires_at) > now));
 		return statuses.flatMap(status => {
 			const statusId = typeof status.id === 'string' ? status.id : String(status.id ?? '');
-			const corpus = this.corpus(status);
+			const corpus = options.corpora?.get(statusId) ?? [];
 			const matches = filters.flatMap(filter => {
 				const keywordMatches = filter.keywords.filter(keyword => corpus.some(text => this.matches(text, keyword.keyword, keyword.whole_word)));
 				const statusMatches = filter.statuses.filter(value => value.status_id === statusId);
@@ -272,19 +301,23 @@ export class MastodonFilterService {
 		});
 	}
 
-	private async snapshot(userId: MiUser['id']): Promise<MastodonFilter[]> {
-		const rows = await this.mastodonApiStateService.list(userId, FILTER_KIND);
+	private async mutate<T>(userId: MiUser['id'], callback: (stateService: MastodonApiStateService) => Promise<T>): Promise<T> {
+		return await this.mastodonApiStateService.withUserKindLock(userId, FILTER_KIND, callback);
+	}
+
+	private async snapshot(userId: MiUser['id'], stateService = this.mastodonApiStateService): Promise<MastodonFilter[]> {
+		const rows = await stateService.list(userId, FILTER_KIND);
 		return rows.flatMap(row => this.isFilter(row.value) ? [row.value] : []);
 	}
 
-	private async save(userId: MiUser['id'], filter: MastodonFilter, current: MastodonFilter[]): Promise<void> {
+	private async save(userId: MiUser['id'], filter: MastodonFilter, current: MastodonFilter[], stateService = this.mastodonApiStateService): Promise<void> {
 		const next = current.some(value => value.id === filter.id)
 			? current.map(value => value.id === filter.id ? filter : value)
 			: [...current, filter];
 		if (Buffer.byteLength(JSON.stringify(next), 'utf8') > MAX_FILTER_STATE_BYTES) {
 			this.invalid(`Filter state is limited to ${MAX_FILTER_STATE_BYTES} bytes`);
 		}
-		await this.mastodonApiStateService.put({
+		await stateService.put({
 			userId,
 			kind: FILTER_KIND,
 			key: filter.id,
@@ -430,27 +463,6 @@ export class MastodonFilterService {
 			expires_at: filter.expires_at,
 			irreversible: filter.filter_action === 'hide',
 		};
-	}
-
-	private corpus(status: Record<string, unknown>): string[] {
-		const strings: string[] = [];
-		for (const key of ['content', 'spoiler_text'] as const) {
-			if (typeof status[key] === 'string') strings.push(status[key]);
-		}
-		if (Array.isArray(status.media_attachments)) {
-			for (const attachment of status.media_attachments) {
-				if (attachment != null && typeof attachment === 'object' && typeof (attachment as Dictionary).description === 'string') {
-					strings.push((attachment as Dictionary).description as string);
-				}
-			}
-		}
-		if (status.poll != null && typeof status.poll === 'object' && Array.isArray((status.poll as Dictionary).options)) {
-			for (const option of (status.poll as Dictionary).options as unknown[]) {
-				if (option != null && typeof option === 'object' && typeof (option as Dictionary).title === 'string') strings.push((option as Dictionary).title as string);
-			}
-		}
-		if (status.reblog != null && typeof status.reblog === 'object' && !Array.isArray(status.reblog)) strings.push(...this.corpus(status.reblog as Dictionary));
-		return strings;
 	}
 
 	private matches(text: string, literal: string, wholeWord: boolean): boolean {

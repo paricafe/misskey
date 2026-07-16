@@ -7,9 +7,13 @@ import { Inject, Injectable } from '@nestjs/common';
 import { DI } from '@/di-symbols.js';
 import { IdService } from '@/core/IdService.js';
 import type { MiMastodonOAuthToken } from '@/models/MastodonOAuthToken.js';
-import type { MiMastodonUserState } from '@/models/MastodonUserState.js';
 import type { MiUser } from '@/models/User.js';
-import type { MastodonUserStatesRepository } from '@/models/_.js';
+import {
+	MiMastodonUserState,
+	miRepository,
+	type MastodonUserStatesRepository,
+	type MiRepository,
+} from '@/models/_.js';
 import { MastodonApiError } from './errors.js';
 
 export type MastodonApiStateWrite = {
@@ -69,6 +73,41 @@ export class MastodonApiStateService {
 		return rows[0];
 	}
 
+	public async createIfAbsent(input: MastodonApiStateWrite): Promise<MiMastodonUserState> {
+		const now = new Date();
+		const rows: MiMastodonUserState[] = await this.mastodonUserStatesRepository.query(`
+			INSERT INTO "mastodon_user_state" ("id", "userId", "tokenId", "kind", "key", "value", "version", "createdAt", "updatedAt", "expiresAt")
+			VALUES ($1, $2, $3, $4, $5, $6::jsonb, 1, $7, $7, $8)
+			ON CONFLICT ("userId", "kind", "key") DO NOTHING
+			RETURNING *
+		`, [
+			this.idService.gen(),
+			input.userId,
+			input.tokenId ?? null,
+			input.kind,
+			input.key,
+			JSON.stringify(input.value),
+			now,
+			input.expiresAt ?? null,
+		]);
+		const row = rows[0];
+		if (row == null) this.conflict();
+		return row;
+	}
+
+	public async withUserKindLock<T>(
+		userId: MiUser['id'],
+		kind: string,
+		callback: (stateService: MastodonApiStateService) => Promise<T>,
+	): Promise<T> {
+		return await this.mastodonUserStatesRepository.manager.transaction(async manager => {
+			const repository = manager.getRepository(MiMastodonUserState)
+				.extend(miRepository as MiRepository<MiMastodonUserState>);
+			await repository.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [`${userId}\0${kind}`]);
+			return await callback(new MastodonApiStateService(repository, this.idService));
+		});
+	}
+
 	public async compareAndSet(input: MastodonApiStateConditionalWrite): Promise<MiMastodonUserState> {
 		const rows: MiMastodonUserState[] = await this.mastodonUserStatesRepository.query(`
 			UPDATE "mastodon_user_state" SET
@@ -91,12 +130,7 @@ export class MastodonApiStateService {
 			input.expiresAt ?? null,
 		]);
 		const row = rows[0];
-		if (row == null) {
-			throw Object.assign(
-				new MastodonApiError(409, 'conflict', 'The compatibility state has changed'),
-				{ code: 'conflict' as const },
-			);
-		}
+		if (row == null) this.conflict();
 		return row;
 	}
 
@@ -112,5 +146,12 @@ export class MastodonApiStateService {
 			RETURNING "id"
 		`, [now]);
 		return rows.length;
+	}
+
+	private conflict(): never {
+		throw Object.assign(
+			new MastodonApiError(409, 'conflict', 'The compatibility state has changed'),
+			{ code: 'conflict' as const },
+		);
 	}
 }

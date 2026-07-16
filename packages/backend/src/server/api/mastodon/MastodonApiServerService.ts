@@ -25,7 +25,7 @@ import { MastodonApiCallService } from './MastodonApiCallService.js';
 import { MASTODON_4_6_USER_ROUTES, type MastodonContractRoute } from './MastodonApiContract.js';
 import { MastodonAuthenticateService } from './MastodonAuthenticateService.js';
 import { MastodonEntityService } from './MastodonEntityService.js';
-import { MastodonFilterService, type MastodonFilterContext } from './MastodonFilterService.js';
+import { MastodonFilterService, type MastodonFilterApplyOptions, type MastodonFilterContext } from './MastodonFilterService.js';
 import { MastodonMarkerService, type MastodonMarkerTimeline } from './MastodonMarkerService.js';
 import { MastodonOAuthService } from './MastodonOAuthService.js';
 import { MastodonNotificationService } from './MastodonNotificationService.js';
@@ -625,7 +625,7 @@ export class MastodonApiServerService {
 			const accountId = this.string(query.account_id);
 			if (accountId != null) converted = converted.filter(notification => notification.account.id === accountId);
 			converted = await this.mastodonNotificationService.filterDismissed(auth.user.id, converted);
-			converted = await this.notificationFilters(auth.user.id, converted as Dictionary[]) as typeof converted;
+			converted = await this.notificationFilters(auth.user.id, converted as Dictionary[], notifications) as typeof converted;
 			return this.page(request, reply, notifications, converted);
 		}));
 		fastify.get<{ Params: { id: string } }>('/api/v1/notifications/:id', request => this.withAuth(request as MastodonRequest, 'read:notifications', async auth => {
@@ -1325,7 +1325,7 @@ export class MastodonApiServerService {
 		notes: Packed<'Note'>[],
 		auth: MastodonUserAuth | null,
 		context: MastodonFilterContext,
-		options: { preserveHidden?: boolean } = {},
+		options: MastodonFilterApplyOptions = {},
 	): Promise<Record<string, unknown>[]> {
 		if (notes.length === 0) return [];
 		if (auth == null) return notes.map(note => this.mastodonEntityService.status(note));
@@ -1344,16 +1344,31 @@ export class MastodonApiServerService {
 			bookmarked: bookmarkedIds.has(note.id),
 			pinned: pinnedIds.has(note.id),
 		}));
-		return await this.mastodonFilterService.apply(auth.user.id, context, statuses, options);
+		const corpora = new Map(notes.map(note => [note.id, this.filterCorpus(note)]));
+		return await this.mastodonFilterService.apply(auth.user.id, context, statuses, { ...options, corpora });
 	}
 
-	private async notificationFilters(userId: string, notifications: Dictionary[]): Promise<Dictionary[]> {
+	private async notificationFilters(
+		userId: string,
+		notifications: Dictionary[],
+		nativeNotifications: Packed<'Notification'>[],
+	): Promise<Dictionary[]> {
 		const statuses = notifications.flatMap(notification => {
 			const status = notification.status;
 			return status != null && typeof status === 'object' && !Array.isArray(status) ? [status as Dictionary] : [];
 		});
 		if (statuses.length === 0) return notifications;
-		const filtered = await this.mastodonFilterService.apply(userId, 'notifications', statuses);
+		const nativeById = new Map(nativeNotifications.map(notification => [notification.id, notification]));
+		const corpora = new Map<string, string[]>();
+		for (const notification of notifications) {
+			const notificationId = this.string(notification.id);
+			const status = notification.status;
+			if (notificationId == null || status == null || typeof status !== 'object' || Array.isArray(status)) continue;
+			const statusId = this.string((status as Dictionary).id);
+			const note = nativeById.get(notificationId)?.note;
+			if (statusId != null && note != null) corpora.set(statusId, this.filterCorpus(note));
+		}
+		const filtered = await this.mastodonFilterService.apply(userId, 'notifications', statuses, { corpora });
 		const byId = new Map(filtered.map(status => [this.string(status.id) ?? '', status]));
 		return notifications.flatMap(notification => {
 			const status = notification.status;
@@ -1361,6 +1376,18 @@ export class MastodonApiServerService {
 			const visible = byId.get(this.string((status as Dictionary).id) ?? '');
 			return visible == null ? [] : [{ ...notification, status: visible }];
 		});
+	}
+
+	private filterCorpus(note: Packed<'Note'>): string[] {
+		const corpus: string[] = [];
+		if (note.text != null) corpus.push(note.text);
+		if (note.cw != null) corpus.push(note.cw);
+		for (const file of note.files ?? []) {
+			if (file.comment != null) corpus.push(file.comment);
+		}
+		for (const choice of note.poll?.choices ?? []) corpus.push(choice.text);
+		if (note.renote != null) corpus.push(...this.filterCorpus(note.renote));
+		return corpus;
 	}
 
 	private isPureRenote(note: { text: string | null; cw: string | null; fileIds: string[]; hasPoll: boolean; replyId: string | null }): boolean {

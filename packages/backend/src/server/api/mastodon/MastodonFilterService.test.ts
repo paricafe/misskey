@@ -24,6 +24,7 @@ describe(MastodonFilterService, () => {
 			updatedAt: Date;
 			expiresAt: Date | null;
 		}>();
+		let lockTail = Promise.resolve();
 		const stateService = {
 			list: vi.fn(async (userId: string, kind: string) => [...rows.values()].filter(row => row.userId === userId && row.kind === kind)),
 			put: vi.fn(async (input: { userId: string; kind: string; key: string; value: unknown; expiresAt?: Date | null }) => {
@@ -45,12 +46,25 @@ describe(MastodonFilterService, () => {
 				return row;
 			}),
 			delete: vi.fn(async (_userId: string, _kind: string, key: string) => rows.delete(key)),
+			withUserKindLock: vi.fn(async (_userId: string, _kind: string, callback: (service: unknown) => Promise<unknown>) => {
+				const previous = lockTail;
+				let release!: () => void;
+				lockTail = new Promise<void>(resolve => {
+					release = resolve;
+				});
+				await previous;
+				try {
+					return await callback(stateService);
+				} finally {
+					release();
+				}
+			}),
 		};
 		return { service: new MastodonFilterService(stateService as never), stateService, rows };
 	}
 
 	test('projects v2 keywords as authoritative v1 filters and keeps v1 CRUD keyed by keyword id', async () => {
-		const { service } = createService();
+		const { service, stateService } = createService();
 		const filter = await service.createV2('u1', {
 			title: 'spoilers',
 			context: ['home'],
@@ -86,10 +100,11 @@ describe(MastodonFilterService, () => {
 			title: 'legacy',
 			filter_action: 'warn',
 		});
+		expect(stateService.withUserKindLock).toHaveBeenCalledTimes(4);
 	});
 
 	test('supports v2 filter, keyword, and status CRUD while enforcing bounded inputs', async () => {
-		const { service } = createService();
+		const { service, stateService } = createService();
 		const filter = await service.createV2('u1', {
 			title: 'bounded',
 			context: ['home', 'notifications', 'public', 'thread', 'account'],
@@ -121,6 +136,31 @@ describe(MastodonFilterService, () => {
 			context: ['home'],
 			keywords: [{ keyword: 'x'.repeat(201), whole_word: false }],
 		})).rejects.toMatchObject({ statusCode: 422 });
+
+		expect(stateService.withUserKindLock).toHaveBeenCalledTimes(13);
+		for (const [userId, kind, callback] of stateService.withUserKindLock.mock.calls) {
+			expect(userId).toBe('u1');
+			expect(kind).toBe('filter');
+			expect(callback).toEqual(expect.any(Function));
+		}
+	});
+
+	test('serializes concurrent mutations so the filter-count limit cannot be bypassed', async () => {
+		const { service } = createService();
+		for (let index = 0; index < 99; index++) {
+			await service.createV2('u1', { title: `filter-${index}`, context: ['home'] });
+		}
+
+		const results = await Promise.allSettled([
+			service.createV2('u1', { title: 'concurrent-a', context: ['home'] }),
+			service.createV2('u1', { title: 'concurrent-b', context: ['home'] }),
+		]);
+
+		expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(1);
+		expect(results.filter(result => result.status === 'rejected')).toMatchObject([{
+			reason: { statusCode: 422, description: expect.stringContaining('100') },
+		}]);
+		expect(await service.listV2('u1')).toHaveLength(100);
 	});
 
 	test('enforces filter, per-filter keyword/status, and total serialized state limits', async () => {
@@ -194,8 +234,15 @@ describe(MastodonFilterService, () => {
 			{ id: 'status-match', content: '<p>clean</p>', pinned: true },
 			{ id: 'expired', content: '<p>old</p>' },
 		];
+		const corpora = new Map([
+			['hidden', ['これは、秘密！']],
+			['not-hidden', ['極秘密文書']],
+			['warned', ['sPoIlEr[.] literal']],
+			['status-match', ['clean']],
+			['expired', ['old']],
+		]);
 
-		const collection = await service.apply('u1', 'home', statuses);
+		const collection = await service.apply('u1', 'home', statuses, { corpora });
 
 		expect(stateService.list).toHaveBeenCalledTimes(1);
 		expect(collection.map(status => status.id)).toEqual(['not-hidden', 'warned', 'status-match', 'expired']);
@@ -213,7 +260,35 @@ describe(MastodonFilterService, () => {
 		});
 		expect(collection.find(status => status.id === 'expired')).not.toHaveProperty('filtered');
 
-		const [single] = await service.apply('u1', 'home', [statuses[0]!], { preserveHidden: true });
+		const [single] = await service.apply('u1', 'home', [statuses[0]!], { preserveHidden: true, corpora });
 		expect(single).toMatchObject({ id: 'hidden', reblogged: true, filtered: [expect.any(Object)] });
+	});
+
+	test('matches only supplied native-visible text, not generated HTML tags or entities', async () => {
+		const { service } = createService();
+		for (const keyword of ['span', 'foobar', 'fish & chips']) {
+			await service.createV2('u1', {
+				title: keyword,
+				context: ['home'],
+				filter_action: 'warn',
+				keywords: [{ keyword, whole_word: false }],
+			});
+		}
+		const statuses = [
+			{ id: 'tag-name', content: '<p><span>clean</span></p>' },
+			{ id: 'tag-split', content: '<p>foo<span>bar</span></p>' },
+			{ id: 'entity', content: '<p>fish &amp; chips</p>' },
+		];
+		const corpora = new Map([
+			['tag-name', ['clean']],
+			['tag-split', ['foobar']],
+			['entity', ['fish & chips']],
+		]);
+
+		const result = await service.apply('u1', 'home', statuses, { corpora });
+
+		expect(result.find(status => status.id === 'tag-name')).not.toHaveProperty('filtered');
+		expect(result.find(status => status.id === 'tag-split')).toMatchObject({ filtered: [{ keyword_matches: ['foobar'] }] });
+		expect(result.find(status => status.id === 'entity')).toMatchObject({ filtered: [{ keyword_matches: ['fish & chips'] }] });
 	});
 });

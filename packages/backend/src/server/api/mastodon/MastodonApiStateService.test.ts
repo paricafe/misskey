@@ -27,17 +27,30 @@ describe(MastodonApiStateService, () => {
 	}
 
 	function createService(queryResults: unknown[][] = []) {
+		const scopedRepository = {
+			query: vi.fn(),
+		};
+		const manager = {
+			getRepository: vi.fn(() => ({
+				extend: vi.fn(() => scopedRepository),
+			})),
+		};
 		const repository = {
 			query: vi.fn(),
 			find: vi.fn(),
 			findOneBy: vi.fn(),
 			delete: vi.fn(),
+			manager: {
+				transaction: vi.fn(async (callback: (transactionManager: typeof manager) => unknown) => await callback(manager)),
+			},
 		};
 		for (const result of queryResults) repository.query.mockResolvedValueOnce(result);
 		const idService = { gen: vi.fn().mockReturnValue('state-id') };
 		return {
 			service: new MastodonApiStateService(repository as never, idService as never),
 			repository,
+			scopedRepository,
+			manager,
 			idService,
 		};
 	}
@@ -71,6 +84,49 @@ describe(MastodonApiStateService, () => {
 		} satisfies Partial<MastodonApiError> & { code: string });
 		expect(repository.query.mock.calls[0][0]).toContain('AND "version" = $4');
 		expect(repository.query.mock.calls[0][1]).toEqual(expect.arrayContaining(['u1', 'marker', 'home', 1]));
+	});
+
+	test('creates a key only when absent and reports a concurrent insert as a conflict', async () => {
+		const { service, repository } = createService([[state(1)], []]);
+
+		await expect(service.createIfAbsent({
+			userId: 'u1',
+			kind: 'marker',
+			key: 'home',
+			value: { lastReadId: '1' },
+		})).resolves.toEqual(state(1));
+		await expect(service.createIfAbsent({
+			userId: 'u1',
+			kind: 'marker',
+			key: 'home',
+			value: { lastReadId: '2' },
+		})).rejects.toMatchObject({
+			statusCode: 409,
+			code: 'conflict',
+		} satisfies Partial<MastodonApiError> & { code: string });
+
+		expect(repository.query.mock.calls[0][0]).toContain('ON CONFLICT ("userId", "kind", "key") DO NOTHING');
+		expect(repository.query.mock.calls[0][0]).toContain('RETURNING *');
+	});
+
+	test('holds a transaction-scoped advisory lock and gives the callback a scoped state service', async () => {
+		const { service, repository, scopedRepository, manager } = createService();
+		const callback = vi.fn(async (scopedState: MastodonApiStateService) => {
+			await scopedState.put({ userId: 'u1', kind: 'filter', key: 'filter-1', value: {} });
+			return 'result';
+		});
+		scopedRepository.query
+			.mockResolvedValueOnce([])
+			.mockResolvedValueOnce([state(1, {})]);
+
+		await expect(service.withUserKindLock('u1', 'filter', callback)).resolves.toBe('result');
+
+		expect(repository.manager.transaction).toHaveBeenCalledTimes(1);
+		expect(manager.getRepository).toHaveBeenCalledTimes(1);
+		expect(scopedRepository.query.mock.calls[0][0]).toContain('pg_advisory_xact_lock(hashtextextended($1, 0))');
+		expect(scopedRepository.query.mock.calls[0][1]).toEqual(['u1\0filter']);
+		expect(scopedRepository.query.mock.calls[1][0]).toContain('INSERT INTO "mastodon_user_state"');
+		expect(callback).toHaveBeenCalledTimes(1);
 	});
 
 	test('lists a kind and gets a key within one user', async () => {

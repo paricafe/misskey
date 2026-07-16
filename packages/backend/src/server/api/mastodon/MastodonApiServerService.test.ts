@@ -98,6 +98,7 @@ describe(MastodonApiServerService, () => {
 			expiresAt: Date | null;
 		}>();
 		const stateKey = (kind: string, key: string) => `${kind}:${key}`;
+		let stateLockTail = Promise.resolve();
 		const mastodonApiStateService = {
 			list: vi.fn(async (userId: string, kind: string) => [...stateRows.values()].filter(row => row.userId === userId && row.kind === kind)),
 			get: vi.fn(async (userId: string, kind: string, key: string) => {
@@ -123,6 +124,27 @@ describe(MastodonApiServerService, () => {
 				stateRows.set(mapKey, row);
 				return row;
 			}),
+			createIfAbsent: vi.fn(async (input: { userId: string; kind: string; key: string; value: unknown; expiresAt?: Date | null }) => {
+				const mapKey = stateKey(input.kind, input.key);
+				if (stateRows.has(mapKey)) {
+					throw Object.assign(new MastodonApiError(409, 'conflict', 'The compatibility state has changed'), { code: 'conflict' });
+				}
+				const now = new Date();
+				const row = {
+					id: `state-${mapKey}`,
+					userId: input.userId,
+					tokenId: null,
+					kind: input.kind,
+					key: input.key,
+					value: input.value,
+					version: 1,
+					createdAt: now,
+					updatedAt: now,
+					expiresAt: input.expiresAt ?? null,
+				};
+				stateRows.set(mapKey, row);
+				return row;
+			}),
 			compareAndSet: vi.fn(async (input: { userId: string; kind: string; key: string; expectedVersion: number; value: unknown }) => {
 				const mapKey = stateKey(input.kind, input.key);
 				const previous = stateRows.get(mapKey);
@@ -137,6 +159,19 @@ describe(MastodonApiServerService, () => {
 				const mapKey = stateKey(kind, key);
 				const row = stateRows.get(mapKey);
 				return row?.userId === userId ? stateRows.delete(mapKey) : false;
+			}),
+			withUserKindLock: vi.fn(async (_userId: string, _kind: string, callback: (service: unknown) => Promise<unknown>) => {
+				const previous = stateLockTail;
+				let release!: () => void;
+				stateLockTail = new Promise<void>(resolve => {
+					release = resolve;
+				});
+				await previous;
+				try {
+					return await callback(mastodonApiStateService);
+				} finally {
+					release();
+				}
 			}),
 		};
 		const mastodonFilterService = new MastodonFilterService(mastodonApiStateService as never);
@@ -239,6 +274,7 @@ describe(MastodonApiServerService, () => {
 								? 'status'
 								: value.type ?? 'mention',
 					account: { id: value.user.id },
+					...(value.note == null ? {} : { status: { id: value.note.id, content: value.renderedContent ?? '' } }),
 				}),
 			} as never,
 			{
@@ -1062,6 +1098,50 @@ describe(MastodonApiServerService, () => {
 		expect(single.json()).toMatchObject({ id: 'note-id', filtered: [expect.any(Object)] });
 	});
 
+	test('builds filter text from native Note fields, including nested renotes', async () => {
+		const { fastify, nativeInvoke } = createServer();
+		nativeInvoke.mockImplementation(async name => name === 'notes/timeline' ? [{
+			id: 'native-note',
+			text: 'body needle',
+			cw: 'cw needle',
+			files: [{ comment: 'media needle' }],
+			poll: { choices: [{ text: 'poll needle' }] },
+			renote: {
+				id: 'renoted-note',
+				text: 'renote needle',
+				cw: null,
+				files: [],
+				poll: null,
+				renote: null,
+			},
+		}] : []);
+		const keywords = ['body needle', 'cw needle', 'media needle', 'poll needle', 'renote needle'];
+		const created = await fastify.inject({
+			method: 'POST',
+			url: '/api/v2/filters',
+			headers: { authorization: 'Bearer user-token' },
+			payload: {
+				title: 'native fields',
+				context: ['home'],
+				filter_action: 'warn',
+				keywords: keywords.map(keyword => ({ keyword, whole_word: false })),
+			},
+		});
+
+		const response = await fastify.inject({
+			method: 'GET',
+			url: '/api/v1/timelines/home',
+			headers: { authorization: 'Bearer user-token' },
+		});
+
+		expect(created.statusCode).toBe(200);
+		expect(response.statusCode).toBe(200);
+		expect(response.json()).toMatchObject([{
+			id: 'native-note',
+			filtered: [{ keyword_matches: keywords }],
+		}]);
+	});
+
 	test('authenticates unavailable singleton reads before returning 404', async () => {
 		const { fastify } = createServer();
 		const unauthenticated = await fastify.inject({ method: 'GET', url: '/api/v1/push/subscription' });
@@ -1154,6 +1234,37 @@ describe(MastodonApiServerService, () => {
 			markAsRead: false,
 			includeTypes: ['mention', 'reply', 'quote', 'reaction'],
 		}, expect.any(Object), expect.any(Object));
+	});
+
+	test('applies notification filters against the native notification Note', async () => {
+		const { fastify, nativeInvoke } = createServer();
+		nativeInvoke.mockImplementation(async name => name === 'i/notifications' ? [{
+			id: 'notification-native',
+			type: 'note',
+			user: { id: 'account-a' },
+			note: { id: 'notification-note', text: 'notification needle', cw: null, files: [], poll: null, renote: null },
+			renderedContent: '<p>unrelated generated content</p>',
+		}] : []);
+		await fastify.inject({
+			method: 'POST',
+			url: '/api/v2/filters',
+			headers: { authorization: 'Bearer user-token' },
+			payload: {
+				title: 'hide native notification',
+				context: ['notifications'],
+				filter_action: 'hide',
+				keywords: [{ keyword: 'notification needle', whole_word: false }],
+			},
+		});
+
+		const response = await fastify.inject({
+			method: 'GET',
+			url: '/api/v1/notifications',
+			headers: { authorization: 'Bearer user-token' },
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(response.json()).toEqual([]);
 	});
 
 	test('subtracts excluded notification types from includes before native grouped filtering', async () => {
