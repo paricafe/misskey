@@ -662,8 +662,9 @@ export class MastodonApiServerService {
 		}));
 		fastify.delete<{ Params: { id: string } }>('/api/v1/statuses/:id', request => this.withAuth(request as MastodonRequest, 'write:statuses', async auth => {
 			const note = await this.invoke('notes/show', { noteId: request.params.id }, auth, request as MastodonRequest) as Packed<'Note'>;
+			const status = await this.statusWithState(note, auth, 'thread');
 			await this.invoke('notes/delete', { noteId: request.params.id }, auth, request as MastodonRequest);
-			return { ...this.mastodonEntityService.status(note), text: note.text ?? '' };
+			return { ...status, text: note.text ?? '' };
 		}));
 
 		const actions: Array<[string, string, string, Dictionary]> = [
@@ -676,7 +677,7 @@ export class MastodonApiServerService {
 			fastify.post<{ Params: { id: string } }>(`/api/v1/statuses/:id/${action}`, request => this.withAuth(request as MastodonRequest, scope, async auth => {
 				await this.invoke(endpoint, { noteId: request.params.id, ...extra }, auth, request as MastodonRequest);
 				const note = await this.invoke('notes/show', { noteId: request.params.id }, auth, request as MastodonRequest);
-				const status = this.mastodonEntityService.status(note as Packed<'Note'>);
+				const status = await this.statusWithState(note as Packed<'Note'>, auth, 'thread');
 				if (action === 'favourite' || action === 'unfavourite') status.favourited = action === 'favourite';
 				if (action === 'bookmark' || action === 'unbookmark') status.bookmarked = action === 'bookmark';
 				return status;
@@ -698,7 +699,7 @@ export class MastodonApiServerService {
 		}
 		fastify.post<{ Params: { id: string } }>('/api/v1/statuses/:id/reblog', request => this.withAuth(request as MastodonRequest, 'write:statuses', async auth => {
 			const result = await this.invoke('notes/create', { renoteId: request.params.id }, auth, request as MastodonRequest) as { createdNote: Packed<'Note'> };
-			return { ...this.mastodonEntityService.status(result.createdNote), reblogged: true };
+			return { ...await this.statusWithState(result.createdNote, auth, 'thread'), reblogged: true };
 		}));
 		fastify.post<{ Params: { id: string } }>('/api/v1/statuses/:id/unreblog', request => this.withAuth(request as MastodonRequest, 'write:statuses', async auth => {
 			const renotes = await this.notesRepository.findBy({ userId: auth.user.id, renoteId: request.params.id });
@@ -706,13 +707,13 @@ export class MastodonApiServerService {
 				await this.invoke('notes/delete', { noteId: renote.id }, auth, request as MastodonRequest);
 			}
 			const note = await this.invoke('notes/show', { noteId: request.params.id }, auth, request as MastodonRequest);
-			return { ...this.mastodonEntityService.status(note as Packed<'Note'>), reblogged: false };
+			return { ...await this.statusWithState(note as Packed<'Note'>, auth, 'thread'), reblogged: false };
 		}));
 		for (const [action, endpoint] of [['pin', 'i/pin'], ['unpin', 'i/unpin']] as const) {
 			fastify.post<{ Params: { id: string } }>(`/api/v1/statuses/:id/${action}`, request => this.withAuth(request as MastodonRequest, 'write:accounts', async auth => {
 				await this.invoke(endpoint, { noteId: request.params.id }, auth, request as MastodonRequest);
 				const note = await this.invoke('notes/show', { noteId: request.params.id }, auth, request as MastodonRequest) as Packed<'Note'>;
-				return { ...this.mastodonEntityService.status(note), pinned: action === 'pin' };
+				return { ...await this.statusWithState(note, auth, 'thread'), pinned: action === 'pin' };
 			}));
 		}
 		fastify.get<{ Params: { id: string } }>('/api/v1/polls/:id', request => this.withOptionalUser(request as MastodonRequest, 'read:statuses', async auth => {
@@ -729,7 +730,7 @@ export class MastodonApiServerService {
 				await this.invoke('notes/polls/vote', { noteId: request.params.id, choice }, auth, request as MastodonRequest);
 			}
 			const note = await this.invoke('notes/show', { noteId: request.params.id }, auth, request as MastodonRequest) as Packed<'Note'>;
-			return this.mastodonEntityService.status(note).poll;
+			return note.poll == null ? null : this.mastodonEntityService.poll(note.id, note.poll);
 		}));
 		fastify.post('/api/v1/media', request => this.upload(request as MastodonRequest));
 		fastify.post('/api/v2/media', request => this.upload(request as MastodonRequest));
@@ -1446,7 +1447,7 @@ export class MastodonApiServerService {
 			const result = await this.invoke('notes/create', {
 				...common,
 			}, auth, request) as { createdNote: Packed<'Note'> };
-			const status = this.mastodonEntityService.status(result.createdNote);
+			const status = await this.statusWithState(result.createdNote, auth, 'thread');
 			if (cacheKey != null) await this.redis.set(cacheKey, JSON.stringify(status), 'EX', 86400);
 			return status;
 		} finally {
@@ -1494,6 +1495,8 @@ export class MastodonApiServerService {
 				CROSS JOIN LATERAL unnest(note."tags") AS tag("name")
 				WHERE note."userId" = $1
 					AND note."visibility" IN ('public', 'home')
+					AND note."localOnly" = FALSE
+					AND note."channelId" IS NULL
 					AND tag."name" = ANY($2::varchar[])
 				GROUP BY tag."name"
 			`, [userId, tags.map(tag => tag.name)]) as Promise<Array<{ tag: string; statusesCount: number; lastStatusAt: Date | string | null }>>,
@@ -1530,7 +1533,7 @@ export class MastodonApiServerService {
 			const user = usersById.get(value.id);
 			return user == null ? [] : [user];
 		});
-		return this.page(request, reply, availableUsers, availableUsers.map(user => this.mastodonEntityService.account(user)));
+		return this.page(request, reply, state, availableUsers.map(user => this.mastodonEntityService.account(user)));
 	}
 
 	private compatibilityStatePage<T extends { id: string }>(items: T[], query: Dictionary, maximum: number, defaultLimit = 20): T[] {
@@ -1561,18 +1564,19 @@ export class MastodonApiServerService {
 	): Promise<Record<string, unknown>[]> {
 		if (notes.length === 0) return [];
 		if (auth == null) return notes.map(note => this.mastodonEntityService.status(note));
-		const noteIds = [...new Set(notes.map(note => note.id))];
+		const rootNoteIds = [...new Set(notes.map(note => note.id))];
+		const noteIds = this.collectNoteIds(notes);
 		const [renotes, favorites, pinings, mutedNoteIds] = await Promise.all([
-			this.notesRepository.findBy({ userId: auth.user.id, renoteId: In(noteIds) }),
-			this.noteFavoritesRepository.findBy({ userId: auth.user.id, noteId: In(noteIds) }),
-			this.userNotePiningsRepository.findBy({ userId: auth.user.id, noteId: In(noteIds) }),
+			this.notesRepository.findBy({ userId: auth.user.id, renoteId: In(rootNoteIds) }),
+			this.noteFavoritesRepository.findBy({ userId: auth.user.id, noteId: In(rootNoteIds) }),
+			this.userNotePiningsRepository.findBy({ userId: auth.user.id, noteId: In(rootNoteIds) }),
 			this.mastodonUserFeatureService.mutedNoteIds(auth.user.id, noteIds),
 		]);
 		const renotedIds = new Set(renotes.flatMap(renote => renote.renoteId == null || !this.isPureRenote(renote) ? [] : [renote.renoteId]));
 		const bookmarkedIds = new Set(favorites.map(favorite => favorite.noteId));
 		const pinnedIds = new Set(pinings.map(pining => pining.noteId));
 		const statuses = notes.map(note => ({
-			...this.mastodonEntityService.status(note),
+			...this.applyMutedState(this.mastodonEntityService.status(note), mutedNoteIds),
 			reblogged: renotedIds.has(note.id),
 			bookmarked: bookmarkedIds.has(note.id),
 			pinned: pinnedIds.has(note.id),
@@ -1592,15 +1596,9 @@ export class MastodonApiServerService {
 			return status != null && typeof status === 'object' && !Array.isArray(status) ? [status as Dictionary] : [];
 		});
 		if (statuses.length === 0) return notifications;
-		const statusIds = [...new Set(statuses.flatMap(status => {
-			const id = this.string(status.id);
-			return id == null ? [] : [id];
-		}))];
+		const statusIds = this.collectStatusIds(statuses);
 		const mutedNoteIds = await this.mastodonUserFeatureService.mutedNoteIds(userId, statusIds);
-		const statusesWithState: Dictionary[] = statuses.map(status => {
-			const id = this.string(status.id);
-			return { ...status, muted: id != null && mutedNoteIds.has(id) };
-		});
+		const statusesWithState = statuses.map(status => this.applyMutedState(status, mutedNoteIds));
 		const nativeById = new Map(nativeNotifications.map(notification => [notification.id, notification]));
 		const corpora = new Map<string, string[]>();
 		for (const notification of notifications) {
@@ -1619,6 +1617,47 @@ export class MastodonApiServerService {
 			const visible = byId.get(this.string((status as Dictionary).id) ?? '');
 			return visible == null ? [] : [{ ...notification, status: visible }];
 		});
+	}
+
+	private collectNoteIds(notes: Packed<'Note'>[]): string[] {
+		const ids = new Set<string>();
+		const visit = (note: Packed<'Note'>): void => {
+			if (ids.has(note.id)) return;
+			ids.add(note.id);
+			if (note.renote != null) visit(note.renote);
+		};
+		for (const note of notes) visit(note);
+		return [...ids];
+	}
+
+	private collectStatusIds(statuses: Dictionary[]): string[] {
+		const ids = new Set<string>();
+		const visit = (status: Dictionary): void => {
+			const id = this.string(status.id);
+			if (id != null) ids.add(id);
+			const reblog = this.dictionary(status.reblog);
+			if (reblog != null) visit(reblog);
+			const quote = this.dictionary(status.quote);
+			const quotedStatus = quote == null ? null : this.dictionary(quote.quoted_status);
+			if (quotedStatus != null) visit(quotedStatus);
+		};
+		for (const status of statuses) visit(status);
+		return [...ids];
+	}
+
+	private applyMutedState(status: Dictionary, mutedNoteIds: Set<string>): Dictionary {
+		const id = this.string(status.id);
+		const reblog = this.dictionary(status.reblog);
+		const quote = this.dictionary(status.quote);
+		const quotedStatus = quote == null ? null : this.dictionary(quote.quoted_status);
+		return {
+			...status,
+			muted: id != null && mutedNoteIds.has(id),
+			...(reblog == null ? {} : { reblog: this.applyMutedState(reblog, mutedNoteIds) }),
+			...(quote == null || quotedStatus == null ? {} : {
+				quote: { ...quote, quoted_status: this.applyMutedState(quotedStatus, mutedNoteIds) },
+			}),
+		};
 	}
 
 	private filterCorpus(note: Packed<'Note'>): string[] {
@@ -1672,6 +1711,7 @@ export class MastodonApiServerService {
 	}
 
 	private async assertThreadMuteRate(userId: string): Promise<void> {
+		// This limiter is transport-specific: the native endpoint requires write:account, so a Mastodon write:mutes token cannot reuse its scope/rate-limit path.
 		const key = `mastodon-api:thread-mute:${userId}`;
 		const count = await this.redis.incr(key);
 		if (count === 1) await this.redis.expire(key, 3600);
@@ -1935,6 +1975,10 @@ export class MastodonApiServerService {
 		const visibility = { public: 'public', unlisted: 'home', private: 'followers', direct: 'specified' }[value] as 'public' | 'home' | 'followers' | 'specified' | undefined;
 		if (visibility == null) throw new MastodonApiError(422, 'invalid_request', `Unsupported visibility: ${value}`);
 		return visibility;
+	}
+
+	private dictionary(value: unknown): Dictionary | null {
+		return value != null && typeof value === 'object' && !Array.isArray(value) ? value as Dictionary : null;
 	}
 
 	private string(value: unknown): string | undefined {

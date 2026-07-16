@@ -78,6 +78,7 @@ describe(MastodonApiServerService, () => {
 		const nativeThreads = new Map<string, string | null>([
 			['reply-note', 'root-note'],
 			['sibling-note', 'root-note'],
+			['created-note-id', 'root-note'],
 		]);
 		const notesRepository = {
 			findBy: vi.fn().mockResolvedValue([]),
@@ -269,6 +270,27 @@ describe(MastodonApiServerService, () => {
 			renoteId: null,
 			poll: null,
 		});
+		type TestNote = {
+			id: string;
+			files?: unknown[];
+			poll?: unknown;
+			renote?: TestNote | null;
+			text?: string | null;
+			replyId?: string | null;
+		};
+		const serializeStatus = (value: TestNote) => {
+			const files = value.files ?? [];
+			const isPureRenote = value.renote != null && value.text == null && files.length === 0 && value.poll == null && value.replyId == null;
+			const nestedStatus = value.renote == null ? null : { id: value.renote.id, muted: false };
+			return {
+				id: value.id,
+				media_attachments: files,
+				poll: value.poll ?? null,
+				...(nestedStatus == null ? {} : isPureRenote
+					? { reblog: nestedStatus }
+					: { quote: { quoted_status: nestedStatus } }),
+			};
+		};
 		const service = new MastodonApiServerService(
 			{ url: 'https://misskey.example/', host: 'misskey.example', version: '2026.7.0', maxFileSize: 10_000_000 } as never,
 			{
@@ -328,11 +350,7 @@ describe(MastodonApiServerService, () => {
 					published_at: null,
 					history: [],
 				})),
-				status: vi.fn(value => ({
-					id: value.id,
-					media_attachments: value.files ?? [],
-					poll: value.poll ?? null,
-				})),
+				status: vi.fn(serializeStatus),
 				statusEdits: vi.fn(value => [...(value.history ?? []), { createdAt: value.updatedAt ?? value.createdAt }].map(edit => ({ created_at: edit.createdAt }))),
 				translation: vi.fn((value, language) => ({ detected_source_language: value.sourceLang, language, content: value.text })),
 				instanceActivity: vi.fn((notes, users) => notes.local.inc.length === 84 && users.local.inc.length === 84
@@ -356,7 +374,7 @@ describe(MastodonApiServerService, () => {
 								? 'status'
 								: value.type ?? 'mention',
 					account: { id: value.user.id },
-					...(value.note == null ? {} : { status: { id: value.note.id, content: value.renderedContent ?? '' } }),
+					...(value.note == null ? {} : { status: { ...serializeStatus(value.note), content: value.renderedContent ?? '' } }),
 				}),
 			} as never,
 			{
@@ -3164,6 +3182,8 @@ describe(MastodonApiServerService, () => {
 			expect.stringMatching(/unnest\(note\."tags"\)[\s\S]*note\."visibility" IN \('public', 'home'\)[\s\S]*GROUP BY/u),
 			['user-id', ['art']],
 		);
+		expect(notesRepository.query.mock.calls[0]?.[0]).toContain('note."localOnly" = FALSE');
+		expect(notesRepository.query.mock.calls[0]?.[0]).toContain('note."channelId" IS NULL');
 		expect(nativeInvoke).not.toHaveBeenCalledWith('users/notes', expect.objectContaining({ userId: 'user-id', limit: 100 }), expect.anything(), expect.anything());
 
 		const own = await fastify.inject({ method: 'GET', url: '/api/v1/featured_tags', headers: { authorization: 'Bearer user-token' } });
@@ -3306,7 +3326,49 @@ describe(MastodonApiServerService, () => {
 			expect.any(Object),
 			expect.any(Object),
 		]]);
-		expect(linkHeader).toHaveBeenCalledWith(expect.any(String), expectedIds.map(id => expect.objectContaining({ id })));
+		expect(linkHeader).toHaveBeenCalledWith(expect.any(String), ids.slice(0, 80).map(id => expect.objectContaining({ id })));
+	});
+
+	test('keeps endorsement cursors reachable when users/show omits an entire state page', async () => {
+		const {
+			fastify,
+			mastodonApiStateService,
+			existingUserIds,
+			followedUserIds,
+			nativeInvoke,
+			toMisskey,
+			linkHeader,
+		} = createServer();
+		const ids = ['account-003', 'account-002', 'account-001'];
+		for (const id of ids) {
+			existingUserIds.add(id);
+			followedUserIds.add(id);
+			await mastodonApiStateService.put({ userId: 'user-id', kind: 'endorsement', key: id, value: {} });
+		}
+		toMisskey.mockImplementation((query: Record<string, unknown>) => ({
+			limit: 2,
+			...(typeof query.max_id === 'string' ? { untilId: query.max_id } : {}),
+		}));
+		nativeInvoke.mockImplementation(async (name, data) => {
+			if (name !== 'users/show' || !Array.isArray(data.userIds)) return [];
+			return data.userIds.includes('account-001') ? [{ id: 'account-001', username: 'account-001' }] : [];
+		});
+
+		const omitted = await fastify.inject({
+			method: 'GET',
+			url: '/api/v1/endorsements?limit=2',
+			headers: { authorization: 'Bearer user-token' },
+		});
+		const older = await fastify.inject({
+			method: 'GET',
+			url: '/api/v1/endorsements?limit=2&max_id=account-002',
+			headers: { authorization: 'Bearer user-token' },
+		});
+
+		expect(omitted.json()).toEqual([]);
+		expect(older.json()).toEqual([{ id: 'account-001', username: 'account-001' }]);
+		expect(linkHeader).toHaveBeenNthCalledWith(1, expect.any(String), [{ id: 'account-003' }, { id: 'account-002' }]);
+		expect(linkHeader).toHaveBeenNthCalledWith(2, expect.any(String), [{ id: 'account-001' }]);
 	});
 
 	test('stores domain blocks as normalized strings on the native profile', async () => {
@@ -3434,8 +3496,73 @@ describe(MastodonApiServerService, () => {
 		expect(lookups[1]?.[1]).toEqual(['user-id', ['sibling-note', 'other-note']]);
 	});
 
-	test('enforces the native ten-per-hour thread-mute transport limit before writing', async () => {
-		const { fastify, redis, noteThreadMutingsRepository } = createServer();
+	test('applies persisted thread mute state to every authenticated Status mutation', async () => {
+		const { fastify, noteThreadMutingsRepository } = createServer();
+		const headers = { authorization: 'Bearer user-token' };
+		await fastify.inject({ method: 'POST', url: '/api/v1/statuses/reply-note/mute', headers });
+		noteThreadMutingsRepository.query.mockClear();
+		const mutations = [
+			{ method: 'DELETE', url: '/api/v1/statuses/reply-note' },
+			{ method: 'POST', url: '/api/v1/statuses/reply-note/favourite' },
+			{ method: 'POST', url: '/api/v1/statuses/reply-note/unfavourite' },
+			{ method: 'POST', url: '/api/v1/statuses/reply-note/bookmark' },
+			{ method: 'POST', url: '/api/v1/statuses/reply-note/unbookmark' },
+			{ method: 'POST', url: '/api/v1/statuses/reply-note/reblog' },
+			{ method: 'POST', url: '/api/v1/statuses/reply-note/unreblog' },
+			{ method: 'POST', url: '/api/v1/statuses/reply-note/pin' },
+			{ method: 'POST', url: '/api/v1/statuses/reply-note/unpin' },
+			{ method: 'POST', url: '/api/v1/statuses', payload: { status: 'created status' } },
+		] as const;
+
+		for (const mutation of mutations) {
+			const response = await fastify.inject({ ...mutation, headers });
+			expect(response.statusCode, `${mutation.method} ${mutation.url}`).toBe(200);
+			expect(response.json(), `${mutation.method} ${mutation.url}`).toMatchObject({ muted: true });
+		}
+		const lookups = noteThreadMutingsRepository.query.mock.calls.filter(([sql]) => (sql as string).includes('JOIN "note_thread_muting"'));
+		expect(lookups).toHaveLength(mutations.length);
+	});
+
+	test('looks up nested reblog and quote mutes once per authenticated batch while anonymous statuses stay false', async () => {
+		const { fastify, nativeInvoke, noteThreadMutingsRepository } = createServer();
+		const notes = [
+			{ id: 'boost-note', text: null, files: [], poll: null, replyId: null, renote: { id: 'sibling-note' } },
+			{ id: 'quote-note', text: 'quoted', files: [], poll: null, replyId: null, renote: { id: 'sibling-note' } },
+		];
+		nativeInvoke.mockImplementation(async (name, data) => {
+			if (name === 'notes/show') return { id: data.noteId };
+			if (name === 'notes/timeline' || name === 'notes/global-timeline') return notes;
+			if (name === 'i/notifications') return [{
+				id: 'nested-notification',
+				type: 'note',
+				user: { id: 'target' },
+				note: { id: 'notification-note', text: 'quoted', files: [], poll: null, replyId: null, renote: { id: 'sibling-note' } },
+			}];
+			return [];
+		});
+		await fastify.inject({ method: 'POST', url: '/api/v1/statuses/reply-note/mute', headers: { authorization: 'Bearer user-token' } });
+		noteThreadMutingsRepository.query.mockClear();
+
+		const authenticated = await fastify.inject({ method: 'GET', url: '/api/v1/timelines/home', headers: { authorization: 'Bearer user-token' } });
+		const anonymous = await fastify.inject({ method: 'GET', url: '/api/v1/timelines/public' });
+		const notifications = await fastify.inject({ method: 'GET', url: '/api/v1/notifications', headers: { authorization: 'Bearer user-token' } });
+		const authenticatedById = new Map(authenticated.json().map((status: { id: string }) => [status.id, status]));
+		const anonymousById = new Map(anonymous.json().map((status: { id: string }) => [status.id, status]));
+
+		expect(authenticatedById.get('boost-note')).toMatchObject({ reblog: { id: 'sibling-note', muted: true } });
+		expect(authenticatedById.get('quote-note')).toMatchObject({ quote: { quoted_status: { id: 'sibling-note', muted: true } } });
+		expect(anonymousById.get('boost-note')).toMatchObject({ reblog: { id: 'sibling-note', muted: false } });
+		expect(anonymousById.get('quote-note')).toMatchObject({ quote: { quoted_status: { id: 'sibling-note', muted: false } } });
+		expect(notifications.json()[0]).toMatchObject({ status: { quote: { quoted_status: { id: 'sibling-note', muted: true } } } });
+		const lookups = noteThreadMutingsRepository.query.mock.calls.filter(([sql]) => (sql as string).includes('JOIN "note_thread_muting"'));
+		expect(lookups).toHaveLength(2);
+		expect(lookups[0]?.[1]?.[0]).toBe('user-id');
+		expect(new Set(lookups[0]?.[1]?.[1] as string[])).toEqual(new Set(['boost-note', 'sibling-note', 'quote-note']));
+		expect(lookups[1]?.[1]).toEqual(['user-id', ['notification-note', 'sibling-note']]);
+	});
+
+	test('enforces a transport-specific ten-per-hour mute limit without invoking the scope-incompatible native endpoint', async () => {
+		const { fastify, redis, noteThreadMutingsRepository, nativeInvoke } = createServer();
 		redis.incr.mockResolvedValueOnce(1).mockResolvedValueOnce(11);
 		const first = await fastify.inject({
 			method: 'POST',
@@ -3452,8 +3579,10 @@ describe(MastodonApiServerService, () => {
 
 		expect(first.statusCode).toBe(200);
 		expect(response.statusCode).toBe(429);
+		expect(redis.incr).toHaveBeenCalledWith('mastodon-api:thread-mute:user-id');
 		expect(redis.expire).toHaveBeenCalledWith(expect.stringContaining('user-id'), 3600);
 		expect(noteThreadMutingsRepository.query).not.toHaveBeenCalledWith(expect.stringContaining('INSERT INTO "note_thread_muting"'), expect.anything());
+		expect(nativeInvoke).not.toHaveBeenCalledWith('notes/thread-muting/create', expect.anything(), expect.anything(), expect.anything());
 	});
 
 	test('merges followed-tag notes into home once with bounded fan-in, dedupe, and one filter pass', async () => {
