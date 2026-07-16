@@ -7,10 +7,17 @@ import { EventEmitter, once } from 'node:events';
 import * as http from 'node:http';
 import * as WebSocket from 'ws';
 import { describe, expect, test, vi } from 'vitest';
+import { MASTODON_4_6_USER_ROUTES } from './MastodonApiContract.js';
 import { isMastodonStreamingPath, mastodonStreamEvent } from './MastodonStreamingApiServerService.js';
 import { MastodonStreamingApiServerService } from './MastodonStreamingApiServerService.js';
 
 describe('Mastodon streaming compatibility', () => {
+	test('recognizes every documented Mastodon streaming contract path', () => {
+		const routes = MASTODON_4_6_USER_ROUTES.filter(route => route.transport === 'websocket');
+		expect(routes).toHaveLength(2);
+		for (const route of routes) expect(isMastodonStreamingPath(route.samplePath)).toBe(true);
+	});
+
 	test('accepts only Mastodon streaming paths', () => {
 		expect(isMastodonStreamingPath('/api/v1/streaming')).toBe(true);
 		expect(isMastodonStreamingPath('/api/v1/streaming/user')).toBe(true);

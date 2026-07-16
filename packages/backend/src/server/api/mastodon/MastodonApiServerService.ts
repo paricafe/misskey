@@ -22,6 +22,7 @@ import { bindThis } from '@/decorators.js';
 import { ApiError } from '@/server/api/error.js';
 import type { FastifyInstance, FastifyPluginOptions, FastifyReply, FastifyRequest } from 'fastify';
 import { MastodonApiCallService } from './MastodonApiCallService.js';
+import { MASTODON_4_6_USER_ROUTES, type MastodonContractRoute } from './MastodonApiContract.js';
 import { MastodonAuthenticateService } from './MastodonAuthenticateService.js';
 import { MastodonEntityService } from './MastodonEntityService.js';
 import { MastodonOAuthService } from './MastodonOAuthService.js';
@@ -239,7 +240,7 @@ export class MastodonApiServerService {
 		this.registerNotifications(fastify);
 		this.registerSearch(fastify);
 		this.registerLists(fastify);
-		this.registerSafeEmptyRoutes(fastify);
+		this.registerCompatibilityRoutes(fastify);
 
 		done();
 	}
@@ -642,19 +643,42 @@ export class MastodonApiServerService {
 		}
 	}
 
-	private registerSafeEmptyRoutes(fastify: FastifyInstance): void {
-		const routes: Array<[string, string]> = [
-			['/api/v1/filters', 'read:filters'],
-			['/api/v2/filters', 'read:filters'],
-			['/api/v1/announcements', 'read:notifications'],
-			['/api/v1/conversations', 'read:statuses'],
-			['/api/v1/featured_tags', 'read:accounts'],
-			['/api/v1/followed_tags', 'read:follows'],
-		];
-		for (const [path, scope] of routes) {
-			fastify.get(path, request => this.withAuth(request as MastodonRequest, scope, async () => []));
+	private registerCompatibilityRoutes(fastify: FastifyInstance): void {
+		for (const route of MASTODON_4_6_USER_ROUTES) {
+			if (route.transport === 'websocket' || route.behavior === 'implemented') continue;
+			fastify.route({
+				method: route.method,
+				url: route.path,
+				handler: request => {
+					const mastodonRequest = request as MastodonRequest;
+					this.validateCompatibilityRequest(route, mastodonRequest);
+					const respond = async () => this.compatibilityResponse(route);
+					if (route.auth === 'public') return this.withOptionalToken(mastodonRequest, respond, route.scope);
+					if (route.auth === 'token') return this.withToken(mastodonRequest, route.scope, respond);
+					return this.withAuth(mastodonRequest, route.scope, respond);
+				},
+			});
 		}
-		fastify.get('/api/v1/markers', request => this.withAuth(request as MastodonRequest, 'read:statuses', async () => ({})));
+	}
+
+	private validateCompatibilityRequest(route: MastodonContractRoute, request: MastodonRequest): void {
+		for (const [source, names] of [[request.body ?? {}, route.requiredBody], [request.query ?? {}, route.requiredQuery]] as const) {
+			for (const name of names ?? []) {
+				const value = source[name];
+				if (value == null || value === '') {
+					throw new MastodonApiError(400, 'invalid_request', `${name} is required`);
+				}
+			}
+		}
+	}
+
+	private compatibilityResponse(route: MastodonContractRoute): readonly unknown[] | Readonly<Record<string, unknown>> {
+		if (route.behavior === 'safe-array') return route.fallbackBody ?? [];
+		if (route.behavior === 'safe-object') return route.fallbackBody ?? {};
+		if (route.behavior === 'singleton-not-found') {
+			throw new MastodonApiError(404, 'not_found', 'Record not found');
+		}
+		throw new MastodonApiError(422, 'unprocessable_entity', 'This operation is not supported by this server');
 	}
 
 	private async account(request: MastodonRequest, userId: string) {
@@ -815,14 +839,31 @@ export class MastodonApiServerService {
 	}
 
 	private async withAnyToken<T>(request: MastodonRequest, action: (auth: MastodonAuth) => Promise<T>): Promise<T> {
-		const token = this.bearerToken(request);
-		if (token == null) throw new MastodonApiError(401, 'invalid_token', 'The access token is invalid');
-		return await action(await this.mastodonAuthenticateService.authenticate(token));
+		return await this.withToken(request, undefined, action);
 	}
 
-	private async withOptionalToken<T>(request: MastodonRequest, action: () => Promise<T>): Promise<T> {
+	private async withToken<T>(
+		request: MastodonRequest,
+		scope: string | readonly string[] | undefined,
+		action: (auth: MastodonAuth) => Promise<T>,
+	): Promise<T> {
 		const token = this.bearerToken(request);
-		if (token != null) await this.mastodonAuthenticateService.authenticate(token);
+		if (token == null) throw new MastodonApiError(401, 'invalid_token', 'The access token is invalid');
+		const auth = await this.mastodonAuthenticateService.authenticate(token);
+		this.assertScope(auth.token.scopes, scope);
+		return await action(auth);
+	}
+
+	private async withOptionalToken<T>(
+		request: MastodonRequest,
+		action: () => Promise<T>,
+		scope?: string | readonly string[],
+	): Promise<T> {
+		const token = this.bearerToken(request);
+		if (token != null) {
+			const auth = await this.mastodonAuthenticateService.authenticate(token);
+			this.assertScope(auth.token.scopes, scope);
+		}
 		return await action();
 	}
 
@@ -839,13 +880,28 @@ export class MastodonApiServerService {
 		return await action(auth);
 	}
 
-	private async withAuth<T>(request: MastodonRequest, scope: string, action: (auth: MastodonUserAuth) => Promise<T>): Promise<T> {
+	private async withAuth<T>(
+		request: MastodonRequest,
+		scope: string | readonly string[] | undefined,
+		action: (auth: MastodonUserAuth) => Promise<T>,
+	): Promise<T> {
 		const token = this.bearerToken(request);
 		if (token == null) throw new MastodonApiError(401, 'invalid_token', 'The access token is invalid');
 		const auth = await this.mastodonAuthenticateService.authenticate(token);
-		if (auth.kind === 'application') throw new MastodonApiError(422, 'invalid_request', 'This endpoint requires a user token');
-		this.mastodonScopeService.assert(auth.token.scopes, scope);
+		if (auth.kind === 'application') throw new MastodonApiError(401, 'invalid_token', 'This endpoint requires a user token');
+		this.assertScope(auth.token.scopes, scope);
 		return await action(auth);
+	}
+
+	private assertScope(tokenScopes: readonly string[], scope: string | readonly string[] | undefined): void {
+		if (scope == null) return;
+		if (typeof scope === 'string') {
+			this.mastodonScopeService.assert(tokenScopes, scope);
+			return;
+		}
+		if (!scope.some(required => this.mastodonScopeService.allows(tokenScopes, required))) {
+			throw new MastodonApiError(403, 'insufficient_scope', `One of these scopes is required: ${scope.join(', ')}`);
+		}
 	}
 
 	private async invoke(name: string, data: Dictionary, auth: MastodonUserAuth, request: MastodonRequest): Promise<unknown> {

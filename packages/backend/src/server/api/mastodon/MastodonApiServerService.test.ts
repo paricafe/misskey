@@ -8,6 +8,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import { ApiError } from '@/server/api/error.js';
 import UsersNotesEndpoint from '@/server/api/endpoints/users/notes.js';
 import { MastodonApiError } from './errors.js';
+import { MASTODON_4_6_USER_ROUTES } from './MastodonApiContract.js';
 import { MastodonApiServerService } from './MastodonApiServerService.js';
 import { MastodonNotificationService } from './MastodonNotificationService.js';
 
@@ -170,6 +171,119 @@ describe(MastodonApiServerService, () => {
 			offsetLinkHeader,
 		};
 	}
+
+	test('registers every documented Mastodon 4.6.3 Fastify route exactly once', async () => {
+		const { fastify } = createServer();
+		await fastify.ready();
+		const keys = new Set<string>();
+
+		for (const route of MASTODON_4_6_USER_ROUTES) {
+			const key = `${route.method} ${route.path}`;
+			expect(keys.has(key), `duplicate contract route: ${key}`).toBe(false);
+			keys.add(key);
+			expect(route.path).not.toMatch(/^\/api\/(?:v1|v2)\/admin(?:\/|$)|^\/api\/v1_alpha(?:\/|$)/u);
+			expect(route.introducedIn).toMatch(/^\d+\.\d+\.\d+$/u);
+			const [major, minor, patch] = route.introducedIn.split('.').map(Number) as [number, number, number];
+			expect(
+				major < 4 ||
+				(major === 4 && minor < 6) ||
+				(major === 4 && minor === 6 && patch <= 3),
+				`contract route is newer than 4.6.3: ${key}`,
+			).toBe(true);
+			if (route.transport !== 'websocket') {
+				expect(fastify.hasRoute({ method: route.method, url: route.path }), `unregistered contract route: ${key}`).toBe(true);
+			}
+		}
+	});
+
+	test('applies truthful fallback shapes after user authentication', async () => {
+		const { fastify } = createServer();
+		const filters = await fastify.inject({
+			method: 'GET',
+			url: '/api/v2/filters',
+			headers: { authorization: 'Bearer user-token' },
+		});
+		const markers = await fastify.inject({
+			method: 'GET',
+			url: '/api/v1/markers',
+			headers: { authorization: 'Bearer user-token' },
+		});
+
+		expect(filters.statusCode).toBe(200);
+		expect(filters.json()).toEqual([]);
+		expect(markers.statusCode).toBe(200);
+		expect(markers.json()).toEqual({});
+	});
+
+	test('authenticates unavailable singleton reads before returning 404', async () => {
+		const { fastify } = createServer();
+		const unauthenticated = await fastify.inject({ method: 'GET', url: '/api/v1/push/subscription' });
+		const authenticated = await fastify.inject({
+			method: 'GET',
+			url: '/api/v1/push/subscription',
+			headers: { authorization: 'Bearer user-token' },
+		});
+
+		expect(unauthenticated.statusCode).toBe(401);
+		expect(authenticated.statusCode).toBe(404);
+		expect(authenticated.json()).toEqual({ error: 'Record not found' });
+	});
+
+	test('returns unsupported writes only after authentication and scope checks', async () => {
+		const { fastify, assert } = createServer();
+		const payload = { phrase: 'spoiler', context: ['home'] };
+		const unauthenticated = await fastify.inject({ method: 'POST', url: '/api/v1/filters', payload });
+
+		assert.mockImplementationOnce(() => {
+			throw new MastodonApiError(403, 'insufficient_scope', 'Scope write:filters is required');
+		});
+		const insufficient = await fastify.inject({
+			method: 'POST',
+			url: '/api/v1/filters',
+			headers: { authorization: 'Bearer user-token' },
+			payload,
+		});
+		const authorized = await fastify.inject({
+			method: 'POST',
+			url: '/api/v1/filters',
+			headers: { authorization: 'Bearer user-token' },
+			payload,
+		});
+
+		expect(unauthenticated.statusCode).toBe(401);
+		expect(insufficient.statusCode).toBe(403);
+		expect(authorized.statusCode).toBe(422);
+		expect(authorized.json()).toEqual({ error: 'This operation is not supported by this server' });
+	});
+
+	test('validates required fallback parameters before authentication', async () => {
+		const { fastify, authenticate } = createServer();
+		const response = await fastify.inject({
+			method: 'POST',
+			url: '/api/v1/filters',
+			payload: { context: ['home'] },
+		});
+
+		expect(response.statusCode).toBe(400);
+		expect(authenticate).not.toHaveBeenCalled();
+	});
+
+	test('rejects application tokens on user-only compatibility routes with 401', async () => {
+		const { fastify, authenticate } = createServer();
+		authenticate.mockResolvedValue({
+			kind: 'application',
+			user: null,
+			token: { id: 'app-token-id', scopes: ['read:filters'] },
+		});
+
+		const response = await fastify.inject({
+			method: 'GET',
+			url: '/api/v2/filters',
+			headers: { authorization: 'Bearer application-token' },
+		});
+
+		expect(response.statusCode).toBe(401);
+	});
 
 	test('maps and applies notification type and account filters', async () => {
 		const { fastify, nativeInvoke } = createServer();
@@ -357,7 +471,7 @@ describe(MastodonApiServerService, () => {
 			headers: { authorization: 'Bearer app-token' },
 		});
 
-		expect(response.statusCode).toBe(422);
+		expect(response.statusCode).toBe(401);
 	});
 
 	test('serves public routes anonymously when Authorization is absent', async () => {
@@ -641,7 +755,7 @@ describe(MastodonApiServerService, () => {
 			headers: { authorization: 'Bearer app-token' },
 		});
 
-		expect(response.statusCode).toBe(422);
+		expect(response.statusCode).toBe(401);
 		expect(nativeInvoke).not.toHaveBeenCalled();
 		expect(publicInvoke).not.toHaveBeenCalled();
 	});
@@ -842,7 +956,7 @@ describe(MastodonApiServerService, () => {
 			headers: { authorization: 'Bearer app-token' },
 		});
 
-		expect(response.statusCode).toBe(422);
+		expect(response.statusCode).toBe(401);
 		expect(nativeInvoke).not.toHaveBeenCalled();
 	});
 
@@ -1587,7 +1701,7 @@ describe(MastodonApiServerService, () => {
 			headers: { authorization: 'Bearer application-token' },
 		});
 
-		expect(response.statusCode).toBe(422);
+		expect(response.statusCode).toBe(401);
 		expect(nativeInvoke).not.toHaveBeenCalledWith('users/recommendation', expect.anything(), expect.anything(), expect.anything());
 	});
 
