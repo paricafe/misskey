@@ -44,10 +44,10 @@ describe(MastodonScheduledStatusService, () => {
 	])('returns 404 for a %s', async (_label, draft) => {
 		const { service, pack } = createService(draft);
 
-		await expect(service.get(me as never, 'draft-id')).rejects.toMatchObject<MastodonApiError>({
+		await expect(service.get(me as never, 'draft-id')).rejects.toMatchObject({
 			statusCode: 404,
 			error: 'not_found',
-		});
+		} satisfies Partial<MastodonApiError>);
 		expect(pack).not.toHaveBeenCalled();
 	});
 });

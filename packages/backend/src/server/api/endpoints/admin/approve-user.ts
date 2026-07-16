@@ -1,5 +1,11 @@
+/*
+ * SPDX-FileCopyrightText: syuilo and misskey-project
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
 import { Inject, Injectable } from '@nestjs/common';
 import { Endpoint } from '@/server/api/endpoint-base.js';
+import { ApiError } from '@/server/api/error.js';
 import type { UserProfilesRepository, UsersRepository } from '@/models/_.js';
 import { ModerationLogService } from '@/core/ModerationLogService.js';
 import { DI } from '@/di-symbols.js';
@@ -11,6 +17,14 @@ export const meta = {
 	requireCredential: true,
 	requireModerator: true,
 	kind: 'write:admin:approve-user',
+
+	errors: {
+		noSuchUser: {
+			message: 'No such user.',
+			code: 'NO_SUCH_USER',
+			id: '19864b34-80e8-4a3b-9564-230624044dd4',
+		},
+	},
 } as const;
 
 export const paramDef = {
@@ -33,11 +47,11 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 		private moderationLogService: ModerationLogService,
 		private emailService: EmailService,
 	) {
-		super(meta, paramDef, async (ps, me) => {
+			super(meta, paramDef, async (ps, me) => {
 			const user = await this.usersRepository.findOneBy({ id: ps.userId });
 
 			if (user == null) {
-				throw new Error('user not found');
+				throw new ApiError(meta.errors.noSuchUser);
 			}
 
 			const profile = await this.userProfilesRepository.findOneBy({ userId: ps.userId });

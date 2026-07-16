@@ -152,7 +152,7 @@ export const ROUTE_DEF = [{
 		path: '/pari',
 		name: 'pari',
 		component: page(() => import('@/pages/settings/pari.vue')),
-	},{
+	}, {
 		path: '/account-data',
 		name: 'account-data',
 		component: page(() => import('@/pages/settings/account-data.vue')),

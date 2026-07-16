@@ -4,9 +4,10 @@
  */
 
 import { describe, expect, test, vi } from 'vitest';
+import type { MiLocalUser } from '@/models/User.js';
 import RecommendationEndpoint from './recommendation.js';
 
-const me = { id: 'user-id' } as never;
+const me = { id: 'user-id' } as MiLocalUser;
 
 function createEndpoint() {
 	const query = {

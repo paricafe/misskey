@@ -246,10 +246,14 @@ async function generateApiClientJSDoc(
 	endpointOutputLine.push('  export interface APIClient {');
 	for (let i = 0; i < endpoints.length; i++) {
 		const endpoint = endpoints[i];
+		const description = endpoint.description
+			.split('\n')
+			.map(line => line.length > 0 ? `     * ${line}` : '     *')
+			.join('\n');
 
 		endpointOutputLine.push(
 			'    /**',
-			`     * ${endpoint.description.split('\n').join('\n     * ')}`,
+			description,
 			'     */',
 			`    request<E extends '${endpoint.path}', P extends Endpoints[E][\'req\']>(`,
 			'      endpoint: E,',

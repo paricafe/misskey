@@ -153,10 +153,6 @@ export interface Locale extends ILocale {
      */
     "signup": string;
     /**
-     * Signup Reason
-     */
-    "signupReason": string;
-    /**
      * アップロード中
      */
     "uploading": string;
@@ -6398,6 +6394,296 @@ export interface Locale extends ILocale {
          */
         "notesOlderThanSpecifiedDateAndTime": string;
     };
+    "_mfm": {
+        /**
+         * MFMはMisskey、Sharkey、Firefish、Akkomaなどで使用できるマークアップ言語です。ここでは利用可能なMFM構文を確認できます。
+         */
+        "intro": string;
+        /**
+         * Pari Cafeへようこそ
+         */
+        "dummy": string;
+        /**
+         * メンション
+         */
+        "mention": string;
+        /**
+         * アットマークとユーザー名を使ってユーザーを指定できます。
+         */
+        "mentionDescription": string;
+        /**
+         * ハッシュタグ
+         */
+        "hashtag": string;
+        /**
+         * 番号記号と文字列を使ってハッシュタグを指定できます。
+         */
+        "hashtagDescription": string;
+        /**
+         * URL
+         */
+        "url": string;
+        /**
+         * URLを表示できます。
+         */
+        "urlDescription": string;
+        /**
+         * リンク
+         */
+        "link": string;
+        /**
+         * 任意の文字列をURLへのリンクとして表示できます。
+         */
+        "linkDescription": string;
+        /**
+         * 太字
+         */
+        "bold": string;
+        /**
+         * 文字を太くして強調します。
+         */
+        "boldDescription": string;
+        /**
+         * 小さく
+         */
+        "small": string;
+        /**
+         * 内容を小さく細く表示します。
+         */
+        "smallDescription": string;
+        /**
+         * 中央寄せ
+         */
+        "center": string;
+        /**
+         * 内容を中央寄せで表示します。
+         */
+        "centerDescription": string;
+        /**
+         * コード（インライン）
+         */
+        "inlineCode": string;
+        /**
+         * プログラムコードをインラインでシンタックスハイライト表示します。
+         */
+        "inlineCodeDescription": string;
+        /**
+         * コード（ブロック）
+         */
+        "blockCode": string;
+        /**
+         * 複数行のプログラムコードをブロックでシンタックスハイライト表示します。
+         */
+        "blockCodeDescription": string;
+        /**
+         * 引用
+         */
+        "quote": string;
+        /**
+         * 内容を引用として表示します。
+         */
+        "quoteDescription": string;
+        /**
+         * カスタム絵文字
+         */
+        "emoji": string;
+        /**
+         * カスタム絵文字名をコロンで囲むと、カスタム絵文字を表示できます。
+         */
+        "emojiDescription": string;
+        /**
+         * 検索
+         */
+        "search": string;
+        /**
+         * 入力済みの検索ボックスを表示します。
+         */
+        "searchDescription": string;
+        /**
+         * 反転
+         */
+        "flip": string;
+        /**
+         * 内容を水平または垂直方向に反転します。
+         */
+        "flipDescription": string;
+        /**
+         * アニメーション（ぷるん）
+         */
+        "jelly": string;
+        /**
+         * 内容にゼリーのようなアニメーションを付けます。
+         */
+        "jellyDescription": string;
+        /**
+         * アニメーション（じゃーん）
+         */
+        "tada": string;
+        /**
+         * 内容に「じゃーん！」というようなアニメーションを付けます。
+         */
+        "tadaDescription": string;
+        /**
+         * アニメーション（ジャンプ）
+         */
+        "jump": string;
+        /**
+         * 内容にジャンプするアニメーションを付けます。
+         */
+        "jumpDescription": string;
+        /**
+         * アニメーション（バウンド）
+         */
+        "bounce": string;
+        /**
+         * 内容に弾むアニメーションを付けます。
+         */
+        "bounceDescription": string;
+        /**
+         * アニメーション（ぶるぶる）
+         */
+        "shake": string;
+        /**
+         * 内容に震えるアニメーションを付けます。
+         */
+        "shakeDescription": string;
+        /**
+         * アニメーション（びくびく）
+         */
+        "twitch": string;
+        /**
+         * 内容に激しく震えるアニメーションを付けます。
+         */
+        "twitchDescription": string;
+        /**
+         * アニメーション（回転）
+         */
+        "spin": string;
+        /**
+         * 内容に回転するアニメーションを付けます。
+         */
+        "spinDescription": string;
+        /**
+         * 大きく
+         */
+        "x2": string;
+        /**
+         * 内容を大きく表示します。
+         */
+        "x2Description": string;
+        /**
+         * とても大きく
+         */
+        "x3": string;
+        /**
+         * 内容をさらに大きく表示します。
+         */
+        "x3Description": string;
+        /**
+         * ものすごく大きく
+         */
+        "x4": string;
+        /**
+         * 内容を非常に大きく表示します。
+         */
+        "x4Description": string;
+        /**
+         * ぼかし
+         */
+        "blur": string;
+        /**
+         * 内容をぼかします。マウスポインターを合わせると明瞭に表示されます。
+         */
+        "blurDescription": string;
+        /**
+         * フォント
+         */
+        "font": string;
+        /**
+         * 内容を表示するフォントを設定します。
+         */
+        "fontDescription": string;
+        /**
+         * 虹色
+         */
+        "rainbow": string;
+        /**
+         * 内容を虹色で表示します。
+         */
+        "rainbowDescription": string;
+        /**
+         * キラキラ
+         */
+        "sparkle": string;
+        /**
+         * 内容にきらめく粒子のエフェクトを付けます。
+         */
+        "sparkleDescription": string;
+        /**
+         * 回転
+         */
+        "rotate": string;
+        /**
+         * 内容を指定した角度だけ回転します。
+         */
+        "rotateDescription": string;
+        /**
+         * 位置
+         */
+        "position": string;
+        /**
+         * 内容を指定した量だけ移動します。
+         */
+        "positionDescription": string;
+        /**
+         * 切り抜き
+         */
+        "crop": string;
+        /**
+         * 内容を切り抜きます。
+         */
+        "cropDescription": string;
+        /**
+         * 拡大縮小
+         */
+        "scale": string;
+        /**
+         * 内容を指定した量だけ拡大または縮小します。
+         */
+        "scaleDescription": string;
+        /**
+         * 文字色
+         */
+        "foreground": string;
+        /**
+         * 文字の前景色を変更します。
+         */
+        "foregroundDescription": string;
+        /**
+         * フェード
+         */
+        "fade": string;
+        /**
+         * 文字をフェードイン・フェードアウトさせます。
+         */
+        "fadeDescription": string;
+        /**
+         * 背景色
+         */
+        "background": string;
+        /**
+         * 文字の背景色を変更します。
+         */
+        "backgroundDescription": string;
+        /**
+         * プレーン
+         */
+        "plain": string;
+        /**
+         * 内側に含まれるすべてのMFM効果を無効にします。
+         */
+        "plainDescription": string;
+    };
     "_abuseUserReport": {
         /**
          * 転送
@@ -8130,13 +8416,13 @@ export interface Locale extends ILocale {
              */
             "canPublicNote": string;
             /**
-             * ノート内の最大メンション数
-             */
-            "mentionMax": string;
-            /**
              * ノートの編集
              */
             "canEditNote": string;
+            /**
+             * ノート内の最大メンション数
+             */
+            "mentionMax": string;
             /**
              * サーバー招待コードの発行
              */
@@ -8250,9 +8536,12 @@ export interface Locale extends ILocale {
              */
             "avatarDecorationLimit": string;
             /**
-             * アンテナのインポートを許可
+             * ノートのインポートを許可
              */
             "canImportNotes": string;
+            /**
+             * アンテナのインポートを許可
+             */
             "canImportAntennas": string;
             /**
              * ブロックのインポートを許可
@@ -8498,11 +8787,11 @@ export interface Locale extends ILocale {
          */
         "emailSent": ParameterizedString<"email">;
         /**
-         * Your account has been created and is awaiting approval.
+         * アカウントが作成され、承認待ちの状態です。
          */
         "approvalPending": string;
         /**
-         * Please enter a reason as to why you want to join the instance.
+         * このサーバーに参加したい理由を入力してください。
          */
         "reasonInfo": string;
     };
@@ -9639,6 +9928,14 @@ export interface Locale extends ILocale {
          * ユーザーを凍結する
          */
         "write:admin:suspend-user": string;
+        /**
+         * ユーザー登録を承認する
+         */
+        "write:admin:approve-user": string;
+        /**
+         * ユーザー登録を拒否する
+         */
+        "write:admin:decline-user": string;
         /**
          * ユーザーの二要素認証を解除する
          */
@@ -11490,6 +11787,14 @@ export interface Locale extends ILocale {
          */
         "unassignRole": string;
         /**
+         * 承認済み
+         */
+        "approve": string;
+        /**
+         * 登録拒否
+         */
+        "decline": string;
+        /**
          * 凍結
          */
         "suspend": string;
@@ -11669,10 +11974,6 @@ export interface Locale extends ILocale {
          * ダイレクトメッセージのグループを削除
          */
         "deleteChatRoom": string;
-        /**
-         * Approved
-         */
-        "approve": string;
         /**
          * プロキシアカウントの説明を更新
          */
@@ -12443,10 +12744,6 @@ export interface Locale extends ILocale {
          */
         "codeGeneratedDescription": string;
     };
-    /**
-     * Approvals
-     */
-    "approvals": string;
     "_selfXssPrevention": {
         /**
          * 警告
@@ -12478,6 +12775,196 @@ export interface Locale extends ILocale {
          * 送った申請
          */
         "sent": string;
+    };
+    /**
+     * 承認
+     */
+    "approvals": string;
+    /**
+     * 登録を承認しますか？
+     */
+    "registerApproveConfirm": string;
+    /**
+     * この操作は取り消せません。承認後、このユーザーに登録が承認された旨が記載されたメールが送信されます。
+     */
+    "registerApproveConfirmDescription": string;
+    /**
+     * アカウント登録を承認制にする
+     */
+    "approvalRequiredForSignup": string;
+    /**
+     * アカウント登録の承認
+     */
+    "signupPendingApprovals": string;
+    /**
+     * 承認待ちのユーザーがいます。
+     */
+    "pendingUserApprovals": string;
+    /**
+     * 承認する
+     */
+    "approveAccount": string;
+    /**
+     * 拒否してアカウント削除
+     */
+    "denyAccount": string;
+    /**
+     * 承認済み
+     */
+    "approved": string;
+    /**
+     * 未承認
+     */
+    "notApproved": string;
+    /**
+     * 承認状況
+     */
+    "approvalStatus": string;
+    /**
+     * 現在このサーバーは承認制です。参加したい理由を記入し、承認された方のみ登録できます。
+     */
+    "approvalRequiredToRegister": string;
+    /**
+     * 登録理由
+     */
+    "registerReason": string;
+    /**
+     * サーバーへの登録はまだ承認されていません。しばらくしてから再度お試しください。登録時にメールアドレスを記入した場合は、登録が承認されたらメールでお知らせします。
+     */
+    "registerHasNotBeenApprovedYet": string;
+    /**
+     * サーバーへの登録が承認されたかどうかの通知を行うために、併せてアカウント登録にメールアドレスを必須にすることを強く推奨します。
+     */
+    "registerApprovalEmailRecommended": string;
+    /**
+     * Pari Cafe使用のブランチは、原版に対してカスタマイズを行っています。
+     */
+    "pariMisskeyAbout": string;
+    /**
+     * Time Travel
+     */
+    "timeTravel": string;
+    /**
+     * Show posts before this date.
+     */
+    "timeTravelDescription": string;
+    /**
+     * Undo
+     */
+    "undoPostForm": string;
+    /**
+     * Clear
+     */
+    "clearPostForm": string;
+    /**
+     * Pari Plus! customized Misskey~!
+     */
+    "pariPlusInfo": string;
+    /**
+     * Pari Plus! system settings
+     */
+    "pariPlusSystemSettings": string;
+    /**
+     * Pari Plus! note settings
+     */
+    "pariPlusNoteSettings": string;
+    /**
+     * Pari Plus! appearance settings
+     */
+    "pariPlusAppearanceSettings": string;
+    /**
+     * Default fonts
+     */
+    "pariPlusFontPicker": string;
+    /**
+     * Enable rendering optimization
+     */
+    "enableRenderingOptimization": string;
+    /**
+     * Display translation function on notes in different languages
+     */
+    "autoTranslateButton": string;
+    /**
+     * Hover the timestamp of the note to expand the detailed time
+     */
+    "showDetailTimeWhenHover": string;
+    /**
+     * Click to open note details
+     */
+    "noteClickToOpen": string;
+    /**
+     * Enable fallback reaction button
+     */
+    "enableFallbackReactButton": string;
+    /**
+     * Enable MFM Cheatsheet in post form
+     */
+    "enableMFMCheatsheet": string;
+    /**
+     * Enable undo & clear button in post form
+     */
+    "enableUndoClearPostForm": string;
+    /**
+     * Always collapse renotes
+     */
+    "alwaysCollapseRenotes": string;
+    /**
+     * Collapse everything
+     */
+    "collapseEverything": string;
+    /**
+     * Collapse all notes when enabled, click to expand
+     */
+    "collapseEverythingDescription": string;
+    /**
+     * Disable emoji reactions viewer
+     */
+    "disableReactionsViewer": string;
+    /**
+     * Collapse notes using unexpected languages
+     */
+    "collapsedUnexpectedLangs": string;
+    /**
+     * Automatically add spaces when inserting emoji
+     */
+    "emojiAutoSpacing": string;
+    /**
+     * Auto Spacing
+     */
+    "autoSpacing": string;
+    /**
+     * ブラウザの機能を使用して、CJK文字と英数字の間隔を視覚的に調整します
+     */
+    "autoSpacingDescription": string;
+    /**
+     * Click InstanceTicker to show instance info
+     */
+    "clickToShowInstanceTickerWindow": string;
+    /**
+     * Default like reaction
+     */
+    "defaultLike": string;
+    "_dataRequest": {
+        /**
+         * Data Export
+         */
+        "lable": string;
+        /**
+         * Request Data
+         */
+        "title": string;
+        /**
+         * Data requests are only possible every 3 days.
+         */
+        "warn": string;
+        /**
+         * Once the data is ready to download, an email will be sent to the email address registered to this account.
+         */
+        "text": string;
+        /**
+         * Request
+         */
+        "button": string;
     };
     "_remoteLookupErrors": {
         "_federationNotAllowed": {
@@ -12532,28 +13019,6 @@ export interface Locale extends ILocale {
             "description": string;
         };
     };
-		"_dataRequest": {
-			/**
-			 * lable
-			 * 			*/
-			"lable": string;
-			/**
-			 * title
-			 * 			*/
-			"title": string;
-			/**
-			 * warning
-			 * 			*/
-			"warn": string;
-			/**
-			 * text
-			 * 			*/
-			"text": string;
-			/**
-			 * button
-			 * 			*/
-			"button": string;
-		};
     "_captcha": {
         /**
          * CAPTCHAを通過してください

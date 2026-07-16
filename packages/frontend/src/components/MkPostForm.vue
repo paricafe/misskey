@@ -71,7 +71,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 		</I18n> - <button class="_textButton" @click="cancelSchedule()">{{ i18n.ts.cancel }}</button>
 	</MkInfo>
 	<MkInfo v-if="hasNotSpecifiedMentions" warn :class="$style.hasNotSpecifiedMentions">{{ i18n.ts.notSpecifiedMentionWarning }} - <button class="_textButton" @click="addMissingMention()">{{ i18n.ts.add }}</button></MkInfo>
-	<textarea v-show="useCw" ref="cwInputEl" v-model="cw" :class="$style.cw" :placeholder="i18n.ts.annotation" @keydown="onKeydown"/>
+	<textarea v-show="useCw" ref="cwInputEl" v-model="cw" :class="$style.cw" :placeholder="i18n.ts.annotation" @keydown="onKeydown"></textarea>
 	<div :class="[$style.textOuter, { [$style.withCw]: useCw }]">
 		<div v-if="targetChannel" :class="$style.colorBar" :style="{ background: targetChannel.color }"></div>
 		<textarea ref="textareaEl" v-model="text" :class="[$style.text]" :disabled="posting || posted" :readonly="textAreaReadOnly" :placeholder="placeholder" data-testid="post-form-text" @keydown="onKeydown" @keyup="onKeyup" @paste="onPaste" @compositionupdate="onCompositionUpdate" @compositionend="onCompositionEnd"></textarea>
@@ -1160,9 +1160,19 @@ async function post(ev?: PointerEvent) {
 			clear();
 		}
 
-		if (props.updateMode) {
+		if ('updatedNote' in res) {
 			globalEvents.emit('noteUpdated', res.updatedNote);
-			noteEvents.emit(`updated:${res.updatedNote.id}`, res.updatedNote);
+			if (res.updatedNote.updatedAt != null) {
+				noteEvents.emit(`updated:${res.updatedNote.id}`, {
+					cw: res.updatedNote.cw ?? null,
+					text: res.updatedNote.text ?? '',
+					updatedAt: res.updatedNote.updatedAt,
+					tags: res.updatedNote.tags,
+					emojis: res.updatedNote.emojis,
+					fileIds: res.updatedNote.fileIds,
+					files: res.updatedNote.files,
+				});
+			}
 		} else {
 			globalEvents.emit('notePosted', res.createdNote);
 		}

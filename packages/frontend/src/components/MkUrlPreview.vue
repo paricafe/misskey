@@ -187,13 +187,7 @@ window.fetch(`/url?url=${encodeURIComponent(requestUrl.href)}&lang=${versatileLa
 		fetching.value = false;
 		unknownUrl.value = false;
 
-		title.value = info.title;
-		description.value = info.description;
-		thumbnail.value = info.thumbnail;
-		icon.value = info.icon;
-		sitename.value = info.sitename;
-		player.value = info.player;
-		sensitive.value = info.sensitive ?? false;
+		summalyResult.value = info;
 
 		if (info.activityPub) {
 			misskeyApi('ap/show', {
@@ -204,8 +198,6 @@ window.fetch(`/url?url=${encodeURIComponent(requestUrl.href)}&lang=${versatileLa
 				}
 			});
 		}
-
-		summalyResult.value = info;
 	});
 
 function adjustTweetHeight(message: MessageEvent) {

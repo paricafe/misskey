@@ -587,10 +587,7 @@ export class MastodonApiServerService {
 		if (Object.keys(body).some(key => key === 'poll' || key.startsWith('poll['))) {
 			throw new MastodonApiError(422, 'unprocessable_entity', 'Poll changes cannot be persisted by this server');
 		}
-		const language = this.string(body.language);
-		if (language != null && language !== '') {
-			throw new MastodonApiError(422, 'unprocessable_entity', 'Status language cannot be persisted by this server');
-		}
+		// Mastodon clients commonly send language by default. Notes cannot persist it, so accept and ignore it.
 		const quoteApprovalPolicy = this.string(body.quote_approval_policy);
 		if (quoteApprovalPolicy != null && quoteApprovalPolicy !== '' && quoteApprovalPolicy !== 'public') {
 			throw new MastodonApiError(422, 'unprocessable_entity', `Unsupported quote approval policy: ${quoteApprovalPolicy}`);
@@ -1163,10 +1160,7 @@ export class MastodonApiServerService {
 	}
 
 	private validateStatusCreateSemantics(body: Dictionary): void {
-		const language = this.string(body.language);
-		if (language != null && language !== '') {
-			throw new MastodonApiError(422, 'unprocessable_entity', 'Status language cannot be persisted by this server');
-		}
+		// Mastodon clients commonly send language by default. Notes cannot persist it, so accept and ignore it.
 		if (Object.keys(body).some(key => key === 'allowed_mentions' || key.startsWith('allowed_mentions['))) {
 			throw new MastodonApiError(422, 'unprocessable_entity', 'Allowed mention constraints cannot be enforced by this server');
 		}

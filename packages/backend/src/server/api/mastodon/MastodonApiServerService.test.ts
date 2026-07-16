@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import Fastify from 'fastify';
+import Fastify, { type FastifyInstance } from 'fastify';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { ApiError } from '@/server/api/error.js';
 import UsersNotesEndpoint from '@/server/api/endpoints/users/notes.js';
@@ -389,6 +389,7 @@ describe(MastodonApiServerService, () => {
 				media_ids: ['file-id'],
 				sensitive: true,
 				poll: { options: ['A', 'B'], multiple: true, expires_in: 3600 },
+				language: 'en',
 				scheduled_at: '2099-01-02T03:04:05.000Z',
 			},
 		});
@@ -406,6 +407,7 @@ describe(MastodonApiServerService, () => {
 			scheduledAt: Date.parse('2099-01-02T03:04:05.000Z'),
 			isActuallyScheduled: true,
 		}, expect.any(Object), expect.any(Object));
+		expect(nativeInvoke.mock.calls.find(([name]) => name === 'notes/drafts/create')?.[1]).not.toHaveProperty('language');
 		expect(nativeInvoke).toHaveBeenCalledWith('drive/files/update', {
 			fileId: 'file-id',
 			isSensitive: true,
@@ -413,7 +415,7 @@ describe(MastodonApiServerService, () => {
 		expect(nativeInvoke).not.toHaveBeenCalledWith('notes/create', expect.anything(), expect.anything(), expect.anything());
 	});
 
-	test('maps an immediate quote and rejects semantics that Misskey cannot persist', async () => {
+	test('maps an immediate quote and rejects semantics that Misskey cannot enforce', async () => {
 		const { fastify, nativeInvoke } = createServer();
 		const quote = await fastify.inject({
 			method: 'POST',
@@ -427,12 +429,6 @@ describe(MastodonApiServerService, () => {
 			headers: { authorization: 'Bearer user-token' },
 			payload: { status: 'No', quote_approval_policy: 'followers' },
 		});
-		const language = await fastify.inject({
-			method: 'POST',
-			url: '/api/v1/statuses',
-			headers: { authorization: 'Bearer user-token' },
-			payload: { status: 'No', language: 'en' },
-		});
 		const allowedMentions = await fastify.inject({
 			method: 'POST',
 			url: '/api/v1/statuses',
@@ -445,7 +441,23 @@ describe(MastodonApiServerService, () => {
 			text: 'Quoted',
 			renoteId: 'quote-id',
 		}), expect.any(Object), expect.any(Object));
-		expect([invalidPolicy.statusCode, language.statusCode, allowedMentions.statusCode]).toEqual([422, 422, 422]);
+		expect([invalidPolicy.statusCode, allowedMentions.statusCode]).toEqual([422, 422]);
+	});
+
+	test('accepts a status language from Mastodon clients when Notes cannot persist it', async () => {
+		const { fastify, nativeInvoke } = createServer();
+		const response = await fastify.inject({
+			method: 'POST',
+			url: '/api/v1/statuses',
+			headers: { authorization: 'Bearer user-token' },
+			payload: { status: 'Posted from Elk', language: 'en' },
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(nativeInvoke).toHaveBeenCalledWith('notes/create', expect.objectContaining({
+			text: 'Posted from Elk',
+		}), expect.any(Object), expect.any(Object));
+		expect(nativeInvoke.mock.calls.find(([name]) => name === 'notes/create')?.[1]).not.toHaveProperty('language');
 	});
 
 	test.each([
@@ -577,12 +589,6 @@ describe(MastodonApiServerService, () => {
 			headers: { authorization: 'Bearer user-token' },
 			payload: { status: 'edited', poll: { options: ['A', 'B'] } },
 		});
-		const language = await fastify.inject({
-			method: 'PUT',
-			url: '/api/v1/statuses/note-id',
-			headers: { authorization: 'Bearer user-token' },
-			payload: { status: 'edited', language: 'en' },
-		});
 		const quotePolicy = await fastify.inject({
 			method: 'PUT',
 			url: '/api/v1/statuses/note-id',
@@ -592,7 +598,28 @@ describe(MastodonApiServerService, () => {
 
 		expect(edit.statusCode).toBe(200);
 		expect(nativeInvoke).toHaveBeenCalledWith('notes/update', expect.objectContaining({ cw: 'Existing CW' }), expect.any(Object), expect.any(Object));
-		expect([poll.statusCode, language.statusCode, quotePolicy.statusCode]).toEqual([422, 422, 422]);
+		expect([poll.statusCode, quotePolicy.statusCode]).toEqual([422, 422]);
+	});
+
+	test('accepts a status language on edits when Notes cannot persist it', async () => {
+		const { fastify, nativeInvoke } = createServer();
+		nativeInvoke.mockImplementation(async name => {
+			if (name === 'notes/show') return { id: 'note-id', text: 'old', cw: null, fileIds: [] };
+			if (name === 'notes/update') return { updatedNote: { id: 'note-id' } };
+			return [];
+		});
+		const response = await fastify.inject({
+			method: 'PUT',
+			url: '/api/v1/statuses/note-id',
+			headers: { authorization: 'Bearer user-token' },
+			payload: { status: 'edited from Elk', language: 'en' },
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(nativeInvoke).toHaveBeenCalledWith('notes/update', expect.objectContaining({
+			text: 'edited from Elk',
+		}), expect.any(Object), expect.any(Object));
+		expect(nativeInvoke.mock.calls.find(([name]) => name === 'notes/update')?.[1]).not.toHaveProperty('language');
 	});
 
 	test('projects legacy v1 suggestions as Accounts while preserving v2 Suggestion envelopes', async () => {
@@ -754,9 +781,8 @@ describe(MastodonApiServerService, () => {
 
 	test('starts when the core API server already owns the instance peers route', async () => {
 		const { fastify, publicInvoke } = createServer({}, server => {
-			server.register((coreApi, _options, done) => {
+			server.register(async (coreApi: FastifyInstance) => {
 				coreApi.get('/v1/instance/peers', async () => ['core.example']);
-				done();
 			}, { prefix: '/api' });
 		});
 

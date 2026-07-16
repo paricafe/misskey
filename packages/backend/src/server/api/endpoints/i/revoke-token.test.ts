@@ -4,10 +4,11 @@
  */
 
 import { describe, expect, test, vi } from 'vitest';
+import type { MiLocalUser } from '@/models/User.js';
 import { digestCredential } from '@/server/api/mastodon/utils.js';
 import RevokeTokenEndpoint from './revoke-token.js';
 
-const me = { id: 'user-id' } as never;
+const me = { id: 'user-id' } as MiLocalUser;
 
 function createEndpoint(options: {
 	enableMastodonApi?: boolean;

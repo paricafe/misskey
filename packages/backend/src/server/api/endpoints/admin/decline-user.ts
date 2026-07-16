@@ -1,5 +1,11 @@
+/*
+ * SPDX-FileCopyrightText: syuilo and misskey-project
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
 import { Inject, Injectable } from '@nestjs/common';
 import { Endpoint } from '@/server/api/endpoint-base.js';
+import { ApiError } from '@/server/api/error.js';
 import type { UsedUsernamesRepository, UserProfilesRepository, UsersRepository } from '@/models/_.js';
 import { ModerationLogService } from '@/core/ModerationLogService.js';
 import { DI } from '@/di-symbols.js';
@@ -12,6 +18,24 @@ export const meta = {
 	requireCredential: true,
 	requireModerator: true,
 	kind: 'write:admin:decline-user',
+
+	errors: {
+		noSuchUser: {
+			message: 'No such user.',
+			code: 'NO_SUCH_USER',
+			id: 'fa87acf5-be30-4ef8-a0e4-57e90f7a9172',
+		},
+		alreadyApproved: {
+			message: 'The user is already approved.',
+			code: 'ALREADY_APPROVED',
+			id: '631d94cf-c229-4c66-9bd3-241389083fab',
+		},
+		notLocal: {
+			message: 'The user is not local.',
+			code: 'NOT_LOCAL_USER',
+			id: '82f7233d-cf7d-4c24-95d1-35728cfbfbf5',
+		},
+	},
 } as const;
 
 export const paramDef = {
@@ -42,15 +66,15 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 			const user = await this.usersRepository.findOneBy({ id: ps.userId });
 
 			if (user == null || user.isDeleted) {
-				throw new Error('user not found or already deleted');
+				throw new ApiError(meta.errors.noSuchUser);
 			}
 
 			if (user.approved) {
-				throw new Error('user is already approved');
+				throw new ApiError(meta.errors.alreadyApproved);
 			}
 
 			if (user.host) {
-				throw new Error('user is not local');
+				throw new ApiError(meta.errors.notLocal);
 			}
 
 			const profile = await this.userProfilesRepository.findOneBy({ userId: ps.userId });

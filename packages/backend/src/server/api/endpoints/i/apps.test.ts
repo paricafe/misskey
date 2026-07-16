@@ -4,12 +4,13 @@
  */
 
 import { describe, expect, test, vi } from 'vitest';
-import { MODULE_METADATA } from '@nestjs/common/constants';
+import { MODULE_METADATA } from '@nestjs/common/constants.js';
+import type { MiLocalUser } from '@/models/User.js';
 import { MastodonScopeService } from '@/server/api/mastodon/MastodonScopeService.js';
 import { EndpointsModule } from '@/server/api/EndpointsModule.js';
 import AppsEndpoint from './apps.js';
 
-const me = { id: 'user-id' } as never;
+const me = { id: 'user-id' } as MiLocalUser;
 
 function createNativeToken(overrides: Record<string, unknown> = {}) {
 	return {

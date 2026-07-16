@@ -9,9 +9,13 @@ import type { MiLocalUser } from '@/models/User.js';
 import { GetterService } from '@/server/api/GetterService.js';
 import { NoteEntityService } from '@/core/entities/NoteEntityService.js';
 import { NoteUpdateService } from '@/core/NoteUpdateService.js';
-import NotesUpdateEndpoint from '@/server/api/endpoints/notes/update.js';
+import NotesUpdateEndpoint, { meta } from '@/server/api/endpoints/notes/update.js';
 
 describe('notes/update', () => {
+	test('requires the note editing role policy', () => {
+		expect(meta.requiredRolePolicy).toBe('canEditNote');
+	});
+
 	test('returns the updated note content', async () => {
 		const me = { id: 'userid' } as MiLocalUser;
 		const originalNote = {
@@ -20,7 +24,7 @@ describe('notes/update', () => {
 			text: 'before',
 			cw: null,
 			fileIds: [],
-		} as MiNote;
+		} as unknown as MiNote;
 		const updatedNote = {
 			...originalNote,
 			text: 'after',

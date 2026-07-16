@@ -11,6 +11,22 @@ import { MastodonApiError } from '@/server/api/mastodon/errors.js';
 import { MastodonScopeService } from '@/server/api/mastodon/MastodonScopeService.js';
 import { OAuth2ProviderService } from './OAuth2ProviderService.js';
 
+type AuthenticationFixture = {
+	kind: 'user';
+	user: {
+		id: string;
+		username: string;
+		name: string | null;
+		uri: string | null;
+		avatarUrl: string | null;
+	};
+	token: { id: string; scopes: string[] };
+} | {
+	kind: 'application';
+	user: null;
+	token: { id: string; scopes: string[] };
+};
+
 describe(OAuth2ProviderService, () => {
 	const servers: ReturnType<typeof Fastify>[] = [];
 	const services: OAuth2ProviderService[] = [];
@@ -21,7 +37,7 @@ describe(OAuth2ProviderService, () => {
 	});
 
 	function createService(enableMastodonApi = true) {
-		const authenticate = vi.fn(async (token: string | undefined) => {
+		const authenticate = vi.fn<(token: string | undefined) => Promise<AuthenticationFixture>>(async (token: string | undefined) => {
 			if (token == null) throw new MastodonApiError(401, 'invalid_token', 'The access token is invalid');
 			return {
 				kind: 'user',

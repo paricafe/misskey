@@ -8,6 +8,7 @@
 - Fix: ノートの返信・Renote数と詳細画面の返信一覧がリアルタイムに更新されない問題を修正
 - Fix: 「ノートをクリックして詳細を表示」が有効なとき、メディアのクリックやCWの展開でもノート詳細が開く問題を修正
 - Fix: ノートを編集した直後に、表示中の内容が更新されない問題を修正
+- Fix: ノートインポートの形式選択が正しく動作しない問題を修正
 
 ### Server
 - Feat: Mastodon API compatible OAuth, REST, and streaming endpoints are now available for Mastodon clients
@@ -18,6 +19,8 @@
 - Enhance: Expand Mastodon API compatibility for profiles, reports, announcements, scheduled statuses, status history, quotes, account relationships, and instance discovery
 - Fix: Prevent a duplicate Mastodon instance peers route from blocking server startup
 - Fix: Prevent `users/recommendation` from generating invalid SQL when filtering blocked users
+- Fix: 一部のAPIスキーマとmisskey-jsの型定義が実装と一致していない問題を修正
+- Fix: Mastodonクライアントから言語指定付きでノートを投稿・編集できない問題を修正
 
 ## 2026.7.0
 
