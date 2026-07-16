@@ -157,6 +157,9 @@ describe(MastodonApiServerService, () => {
 				})),
 				statusEdits: vi.fn(value => [...(value.history ?? []), { createdAt: value.updatedAt ?? value.createdAt }].map(edit => ({ created_at: edit.createdAt }))),
 				translation: vi.fn((value, language) => ({ detected_source_language: value.sourceLang, language, content: value.text })),
+				instanceActivity: vi.fn((notes, users) => notes.local.inc.length === 84 && users.local.inc.length === 84
+					? Array.from({ length: 12 }, (_, index) => ({ week: index.toString(), statuses: '7', logins: '0', registrations: '7' }))
+					: []),
 				poll: vi.fn((noteId, poll) => ({ id: noteId, votes_count: poll.choices.reduce((total: number, choice: { votes: number }) => total + choice.votes, 0) })),
 				scheduledStatus: vi.fn(value => ({ id: value.id, scheduled_at: new Date(value.scheduledAt).toISOString() })),
 				announcement: vi.fn(value => ({ id: value.id, content: value.text, read: value.isRead ?? false })),
@@ -690,6 +693,85 @@ describe(MastodonApiServerService, () => {
 		expect(missing.statusCode).toBe(404);
 		expect(forbidden.statusCode).toBe(403);
 		expect(nativeInvoke).not.toHaveBeenCalledWith('users/show', expect.anything(), expect.anything(), expect.anything());
+	});
+
+	test('maps the public directory to alive users with bounded offset pagination', async () => {
+		const { fastify, publicInvoke, offsetLinkHeader } = createServer();
+		publicInvoke.mockImplementation(async name => name === 'users'
+			? [{ id: 'directory-user', username: 'directory' }]
+			: []);
+
+		const localNew = await fastify.inject({
+			method: 'GET',
+			url: '/api/v1/directory?order=new&local=true&limit=100&offset=5',
+		});
+		const active = await fastify.inject({
+			method: 'GET',
+			url: '/api/v1/directory?order=active&local=false&limit=20',
+		});
+
+		expect(localNew.statusCode).toBe(200);
+		expect(localNew.json()).toEqual([{ id: 'directory-user', username: 'directory' }]);
+		expect(localNew.headers.link).toContain('rel="prev"');
+		expect(publicInvoke).toHaveBeenCalledWith('users', {
+			limit: 80,
+			offset: 5,
+			sort: '-createdAt',
+			state: 'alive',
+			origin: 'local',
+		}, null, expect.any(Object));
+		expect(publicInvoke).toHaveBeenCalledWith('users', {
+			limit: 20,
+			offset: 0,
+			sort: '-updatedAt',
+			state: 'alive',
+			origin: 'combined',
+		}, null, expect.any(Object));
+		expect(offsetLinkHeader).toHaveBeenCalledWith(expect.any(String), 5, 80, false);
+		expect(active.statusCode).toBe(200);
+	});
+
+	test('returns unique lowercase federation peer hostnames', async () => {
+		const { fastify, publicInvoke } = createServer();
+		publicInvoke.mockImplementation(async name => name === 'federation/instances' ? [
+			{ host: 'Remote.Example' },
+			{ host: 'remote.example' },
+			{ host: 'Other.Example' },
+			{ host: '' },
+			{},
+		] : []);
+
+		const response = await fastify.inject({ method: 'GET', url: '/api/v1/instance/peers' });
+
+		expect(response.statusCode).toBe(200);
+		expect(response.json()).toEqual(['remote.example', 'other.example']);
+		expect(publicInvoke).toHaveBeenCalledWith('federation/instances', { limit: 100, offset: 0 }, null, expect.any(Object));
+	});
+
+	test('builds instance activity from 84 daily Note and user chart points and preserves rule source', async () => {
+		const { fastify, publicInvoke } = createServer();
+		publicInvoke.mockImplementation(async name => name === 'charts/notes' || name === 'charts/users'
+			? { local: { inc: Array.from({ length: 84 }, () => 1) } }
+			: []);
+
+		const activity = await fastify.inject({ method: 'GET', url: '/api/v1/instance/activity' });
+		const rules = await fastify.inject({ method: 'GET', url: '/api/v1/instance/rules' });
+
+		expect(activity.statusCode).toBe(200);
+		expect(activity.json()).toHaveLength(12);
+		expect(activity.json()[0]).toEqual({ week: '0', statuses: '7', logins: '0', registrations: '7' });
+		expect(publicInvoke).toHaveBeenCalledWith('charts/notes', { span: 'day', limit: 84 }, null, expect.any(Object));
+		expect(publicInvoke).toHaveBeenCalledWith('charts/users', { span: 'day', limit: 84 }, null, expect.any(Object));
+		expect(rules.json()).toEqual([{ id: '1', text: 'Be kind', hint: '' }]);
+	});
+
+	test('returns no instance activity when chart data is empty', async () => {
+		const { fastify, publicInvoke } = createServer();
+		publicInvoke.mockResolvedValue({ local: { inc: [] } });
+		const response = await fastify.inject({ method: 'GET', url: '/api/v1/instance/activity' });
+
+		expect(response.statusCode).toBe(200);
+		expect(response.json()).toEqual([]);
 	});
 
 	test('registers every documented Mastodon 4.6.3 Fastify route exactly once', async () => {

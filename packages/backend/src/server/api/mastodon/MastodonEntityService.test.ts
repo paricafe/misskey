@@ -428,6 +428,23 @@ describe(MastodonEntityService, () => {
 		});
 	});
 
+	test('groups complete daily charts into twelve weeks and documents unavailable logins as zero', () => {
+		const notes = { local: { inc: Array.from({ length: 84 }, (_, index) => index + 1) } };
+		const users = { local: { inc: Array.from({ length: 84 }, () => 2) } };
+		const activity = service.instanceActivity(notes, users, new Date('2026-07-16T18:00:00.000Z'));
+
+		expect(activity).toHaveLength(12);
+		expect(activity[0]).toEqual({
+			week: (Date.UTC(2026, 6, 10) / 1000).toString(),
+			statuses: '28',
+			logins: '0',
+			registrations: '14',
+		});
+		expect(activity[1]).toMatchObject({ statuses: '77', logins: '0', registrations: '14' });
+		expect(service.instanceActivity({ local: { inc: [] } }, { local: { inc: [] } })).toEqual([]);
+		expect(service.instanceActivity(notes, { local: { inc: users.local.inc.slice(1) } })).toEqual([]);
+	});
+
 	test('exposes poll conversion for the poll retrieval route', () => {
 		const poll = service.poll('note-id', note.poll as never);
 

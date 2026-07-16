@@ -230,6 +230,31 @@ export class MastodonEntityService {
 		};
 	}
 
+	public instanceActivity(
+		notesChart: { local: { inc: number[] } },
+		usersChart: { local: { inc: number[] } },
+		now = new Date(),
+	) {
+		const notes = notesChart.local.inc;
+		const users = usersChart.local.inc;
+		if (notes.length !== 84 || users.length !== 84 ||
+			notes.some(value => !Number.isFinite(value)) || users.some(value => !Number.isFinite(value))) {
+			return [];
+		}
+
+		const daySeconds = 24 * 60 * 60;
+		const newestDay = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) / 1000;
+		return Array.from({ length: 12 }, (_, index) => {
+			const offset = index * 7;
+			return {
+				week: (newestDay - (offset + 6) * daySeconds).toString(),
+				statuses: notes.slice(offset, offset + 7).reduce((sum, value) => sum + value, 0).toString(),
+				logins: '0',
+				registrations: users.slice(offset, offset + 7).reduce((sum, value) => sum + value, 0).toString(),
+			};
+		});
+	}
+
 	public attachment(file: Packed<'DriveFile'>) {
 		const width = file.properties.width ?? null;
 		const height = file.properties.height ?? null;

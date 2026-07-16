@@ -102,6 +102,42 @@ export class MastodonApiServerService {
 		fastify.get('/api/v1/instance', request => this.withOptionalToken(request as MastodonRequest, async () => this.instanceV1()));
 		fastify.get('/api/v2/instance', request => this.withOptionalToken(request as MastodonRequest, async () => this.instanceV2()));
 		fastify.get('/api/v1/instance/rules', request => this.withOptionalToken(request as MastodonRequest, async () => this.rules()));
+		fastify.get('/api/v1/directory', (request, reply) => this.withOptionalToken(request as MastodonRequest, async () => {
+			const query = request.query as Dictionary;
+			const limit = this.integer(query.limit, 40, 1, 80);
+			const offset = this.integer(query.offset, 0, 0);
+			const users = await this.invokePublic('users', {
+				limit,
+				offset,
+				sort: this.string(query.order) === 'new' ? '-createdAt' : '-updatedAt',
+				state: 'alive',
+				origin: this.boolean(query.local) ? 'local' : 'combined',
+			}, null, request as MastodonRequest) as Packed<'UserDetailed'>[];
+			const link = this.mastodonPaginationService.offsetLinkHeader(
+				new URL(request.url, this.config.url).toString(),
+				offset,
+				limit,
+				users.length === limit,
+			);
+			if (link != null) reply.header('Link', link);
+			return users.map(user => this.mastodonEntityService.account(user));
+		}));
+		fastify.get('/api/v1/instance/peers', request => this.withOptionalToken(request as MastodonRequest, async () => {
+			const instances = await this.invokePublic('federation/instances', { limit: 100, offset: 0 }, null, request as MastodonRequest) as Array<{ host?: unknown }>;
+			return [...new Set(instances.flatMap(instance => typeof instance.host === 'string' && instance.host.trim() !== ''
+				? [instance.host.trim().toLowerCase()]
+				: []))];
+		}));
+		fastify.get('/api/v1/instance/activity', request => this.withOptionalToken(request as MastodonRequest, async () => {
+			const [notes, users] = await Promise.all([
+				this.invokePublic('charts/notes', { span: 'day', limit: 84 }, null, request as MastodonRequest),
+				this.invokePublic('charts/users', { span: 'day', limit: 84 }, null, request as MastodonRequest),
+			]);
+			return this.mastodonEntityService.instanceActivity(
+				notes as { local: { inc: number[] } },
+				users as { local: { inc: number[] } },
+			);
+		}));
 		fastify.get('/api/v1/custom_emojis', request => this.withOptionalToken(request as MastodonRequest, async () => {
 			const response = await this.invokePublic('emojis', {}, null, request as MastodonRequest) as {
 				emojis: Array<{ name: string; url: string; category?: string | null }>;
