@@ -10,6 +10,8 @@ import UsersNotesEndpoint from '@/server/api/endpoints/users/notes.js';
 import { MastodonApiError } from './errors.js';
 import { MASTODON_4_6_USER_ROUTES } from './MastodonApiContract.js';
 import { MastodonApiServerService } from './MastodonApiServerService.js';
+import { MastodonFilterService } from './MastodonFilterService.js';
+import { MastodonMarkerService } from './MastodonMarkerService.js';
 import { MastodonNotificationService } from './MastodonNotificationService.js';
 import { MastodonScopeService } from './MastodonScopeService.js';
 
@@ -83,6 +85,62 @@ describe(MastodonApiServerService, () => {
 			return links.length === 0 ? null : links.join(', ');
 		});
 		const mastodonNotificationService = new MastodonNotificationService(redis as never);
+		const stateRows = new Map<string, {
+			id: string;
+			userId: string;
+			tokenId: null;
+			kind: string;
+			key: string;
+			value: unknown;
+			version: number;
+			createdAt: Date;
+			updatedAt: Date;
+			expiresAt: Date | null;
+		}>();
+		const stateKey = (kind: string, key: string) => `${kind}:${key}`;
+		const mastodonApiStateService = {
+			list: vi.fn(async (userId: string, kind: string) => [...stateRows.values()].filter(row => row.userId === userId && row.kind === kind)),
+			get: vi.fn(async (userId: string, kind: string, key: string) => {
+				const row = stateRows.get(stateKey(kind, key));
+				return row?.userId === userId ? row : null;
+			}),
+			put: vi.fn(async (input: { userId: string; kind: string; key: string; value: unknown; expiresAt?: Date | null }) => {
+				const mapKey = stateKey(input.kind, input.key);
+				const previous = stateRows.get(mapKey);
+				const now = new Date();
+				const row = {
+					id: previous?.id ?? `state-${mapKey}`,
+					userId: input.userId,
+					tokenId: null,
+					kind: input.kind,
+					key: input.key,
+					value: input.value,
+					version: (previous?.version ?? 0) + 1,
+					createdAt: previous?.createdAt ?? now,
+					updatedAt: now,
+					expiresAt: input.expiresAt ?? null,
+				};
+				stateRows.set(mapKey, row);
+				return row;
+			}),
+			compareAndSet: vi.fn(async (input: { userId: string; kind: string; key: string; expectedVersion: number; value: unknown }) => {
+				const mapKey = stateKey(input.kind, input.key);
+				const previous = stateRows.get(mapKey);
+				if (previous == null || previous.userId !== input.userId || previous.version !== input.expectedVersion) {
+					throw Object.assign(new MastodonApiError(409, 'conflict', 'The compatibility state has changed'), { code: 'conflict' });
+				}
+				const row = { ...previous, value: input.value, version: previous.version + 1, updatedAt: new Date() };
+				stateRows.set(mapKey, row);
+				return row;
+			}),
+			delete: vi.fn(async (userId: string, kind: string, key: string) => {
+				const mapKey = stateKey(kind, key);
+				const row = stateRows.get(mapKey);
+				return row?.userId === userId ? stateRows.delete(mapKey) : false;
+			}),
+		};
+		const mastodonFilterService = new MastodonFilterService(mastodonApiStateService as never);
+		const mastodonMarkerService = new MastodonMarkerService(mastodonApiStateService as never);
 		const createReport = vi.fn(async (_reporter: unknown, input: Record<string, unknown>) => ({
 			report: { id: 'report-id', resolved: false, forwarded: false },
 			createdAt: '2026-07-16T01:02:03.000Z',
@@ -188,6 +246,8 @@ describe(MastodonApiServerService, () => {
 				linkHeader,
 				offsetLinkHeader,
 			} as never,
+			mastodonFilterService,
+			mastodonMarkerService,
 			mastodonNotificationService,
 			{ get: getScheduledStatus } as never,
 			{ create: createReport } as never,
@@ -906,23 +966,100 @@ describe(MastodonApiServerService, () => {
 		}
 	});
 
-	test('applies truthful fallback shapes after user authentication', async () => {
+	test('persists v2 filters and exposes their v1 keyword projections', async () => {
 		const { fastify } = createServer();
+		const created = await fastify.inject({
+			method: 'POST',
+			url: '/api/v2/filters',
+			headers: { authorization: 'Bearer user-token' },
+			payload: {
+				title: 'spoilers',
+				context: ['home'],
+				filter_action: 'warn',
+				keywords: [{ keyword: 'ending', whole_word: true }],
+			},
+		});
 		const filters = await fastify.inject({
 			method: 'GET',
 			url: '/api/v2/filters',
 			headers: { authorization: 'Bearer user-token' },
 		});
-		const markers = await fastify.inject({
+		const legacy = await fastify.inject({
 			method: 'GET',
-			url: '/api/v1/markers',
+			url: '/api/v1/filters',
 			headers: { authorization: 'Bearer user-token' },
 		});
 
+		expect(created.statusCode).toBe(200);
 		expect(filters.statusCode).toBe(200);
-		expect(filters.json()).toEqual([]);
-		expect(markers.statusCode).toBe(200);
-		expect(markers.json()).toEqual({});
+		expect(filters.json()).toEqual([expect.objectContaining({ title: 'spoilers' })]);
+		expect(legacy.statusCode).toBe(200);
+		expect(legacy.json()).toEqual([expect.objectContaining({ phrase: 'ending', whole_word: true })]);
+	});
+
+	test('accepts JSON and form bracket marker updates with independently versioned timelines', async () => {
+		const { fastify } = createServer();
+		const json = await fastify.inject({
+			method: 'POST',
+			url: '/api/v1/markers',
+			headers: { authorization: 'Bearer user-token' },
+			payload: { home: { last_read_id: '10' } },
+		});
+		const form = await fastify.inject({
+			method: 'POST',
+			url: '/api/v1/markers',
+			headers: {
+				authorization: 'Bearer user-token',
+				'content-type': 'application/x-www-form-urlencoded',
+			},
+			payload: 'notifications%5Blast_read_id%5D=20',
+		});
+		const read = await fastify.inject({
+			method: 'GET',
+			url: '/api/v1/markers?timeline%5B%5D=home&timeline%5B%5D=notifications',
+			headers: { authorization: 'Bearer user-token' },
+		});
+
+		expect(json.statusCode).toBe(200);
+		expect(json.json()).toMatchObject({ home: { last_read_id: '10', version: 1 } });
+		expect(form.statusCode).toBe(200);
+		expect(form.json()).toMatchObject({ notifications: { last_read_id: '20', version: 1 } });
+		expect(read.statusCode).toBe(200);
+		expect(read.json()).toMatchObject({
+			home: { last_read_id: '10' },
+			notifications: { last_read_id: '20' },
+		});
+	});
+
+	test('removes hidden matches from home collections but preserves a single status response', async () => {
+		const { fastify } = createServer();
+		const created = await fastify.inject({
+			method: 'POST',
+			url: '/api/v2/filters',
+			headers: { authorization: 'Bearer user-token' },
+			payload: {
+				title: 'hide note',
+				context: ['home', 'thread'],
+				filter_action: 'hide',
+				statuses: [{ status_id: 'note-id' }],
+			},
+		});
+		const timeline = await fastify.inject({
+			method: 'GET',
+			url: '/api/v1/timelines/home',
+			headers: { authorization: 'Bearer user-token' },
+		});
+		const single = await fastify.inject({
+			method: 'GET',
+			url: '/api/v1/statuses/note-id',
+			headers: { authorization: 'Bearer user-token' },
+		});
+
+		expect(created.statusCode).toBe(200);
+		expect(timeline.statusCode).toBe(200);
+		expect(timeline.json()).toEqual([]);
+		expect(single.statusCode).toBe(200);
+		expect(single.json()).toMatchObject({ id: 'note-id', filtered: [expect.any(Object)] });
 	});
 
 	test('authenticates unavailable singleton reads before returning 404', async () => {
@@ -939,7 +1076,7 @@ describe(MastodonApiServerService, () => {
 		expect(authenticated.json()).toEqual({ error: 'Record not found' });
 	});
 
-	test('returns unsupported writes only after authentication and scope checks', async () => {
+	test('persists filter writes only after authentication and scope checks', async () => {
 		const { fastify, assert } = createServer();
 		const payload = { phrase: 'spoiler', context: ['home'] };
 		const unauthenticated = await fastify.inject({ method: 'POST', url: '/api/v1/filters', payload });
@@ -962,11 +1099,11 @@ describe(MastodonApiServerService, () => {
 
 		expect(unauthenticated.statusCode).toBe(401);
 		expect(insufficient.statusCode).toBe(403);
-		expect(authorized.statusCode).toBe(422);
-		expect(authorized.json()).toEqual({ error: 'This operation is not supported by this server' });
+		expect(authorized.statusCode).toBe(200);
+		expect(authorized.json()).toMatchObject({ phrase: 'spoiler', context: ['home'] });
 	});
 
-	test('validates required fallback parameters before authentication', async () => {
+	test('rejects unauthenticated filter writes before validating their parameters', async () => {
 		const { fastify, authenticate } = createServer();
 		const response = await fastify.inject({
 			method: 'POST',
@@ -974,7 +1111,7 @@ describe(MastodonApiServerService, () => {
 			payload: { context: ['home'] },
 		});
 
-		expect(response.statusCode).toBe(400);
+		expect(response.statusCode).toBe(401);
 		expect(authenticate).not.toHaveBeenCalled();
 	});
 

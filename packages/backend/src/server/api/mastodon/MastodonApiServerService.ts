@@ -25,6 +25,8 @@ import { MastodonApiCallService } from './MastodonApiCallService.js';
 import { MASTODON_4_6_USER_ROUTES, type MastodonContractRoute } from './MastodonApiContract.js';
 import { MastodonAuthenticateService } from './MastodonAuthenticateService.js';
 import { MastodonEntityService } from './MastodonEntityService.js';
+import { MastodonFilterService, type MastodonFilterContext } from './MastodonFilterService.js';
+import { MastodonMarkerService, type MastodonMarkerTimeline } from './MastodonMarkerService.js';
 import { MastodonOAuthService } from './MastodonOAuthService.js';
 import { MastodonNotificationService } from './MastodonNotificationService.js';
 import { MastodonPaginationService } from './MastodonPaginationService.js';
@@ -63,6 +65,8 @@ export class MastodonApiServerService {
 		private mastodonApiCallService: MastodonApiCallService,
 		private mastodonEntityService: MastodonEntityService,
 		private mastodonPaginationService: MastodonPaginationService,
+		private mastodonFilterService: MastodonFilterService,
+		private mastodonMarkerService: MastodonMarkerService,
 		private mastodonNotificationService: MastodonNotificationService,
 		private mastodonScheduledStatusService: MastodonScheduledStatusService,
 		private mastodonReportService: MastodonReportService,
@@ -163,7 +167,7 @@ export class MastodonApiServerService {
 			const pagination = this.offsetPagination(request.query as Dictionary, 20, 40);
 			const notes = await this.invokePublic('notes/featured', { limit: pagination.readLimit }, auth, request as MastodonRequest) as Packed<'Note'>[];
 			const page = this.offsetPage(request, reply, notes, pagination);
-			return await this.statusesWithState(page, auth);
+			return await this.statusesWithState(page, auth, 'public');
 		}));
 		fastify.get('/api/v1/trends/links', (request, reply) => this.withOptionalToken(request as MastodonRequest, async () => {
 			const pagination = this.offsetPagination(request.query as Dictionary, 10, 20);
@@ -268,7 +272,7 @@ export class MastodonApiServerService {
 			if (this.boolean(query.pinned)) {
 				const user = await this.invokePublic('users/show', { userId: request.params.id }, auth, request as MastodonRequest) as Packed<'UserDetailed'>;
 				const notes = this.filterAccountStatuses(user.pinnedNotes, query);
-				return this.page(request, reply, notes, await this.statusesWithState(notes, auth));
+				return this.page(request, reply, notes, await this.statusesWithState(notes, auth, 'account'));
 			}
 			const nativeNotes = await this.invokePublic('users/notes', {
 				userId: request.params.id,
@@ -277,7 +281,7 @@ export class MastodonApiServerService {
 				withRenotes: !this.boolean(query.exclude_reblogs),
 			}, auth, request as MastodonRequest) as Packed<'Note'>[];
 			const notes = this.filterAccountStatuses(nativeNotes, query);
-			return this.page(request, reply, nativeNotes, await this.statusesWithState(notes, auth));
+			return this.page(request, reply, nativeNotes, await this.statusesWithState(notes, auth, 'account'));
 		}));
 		fastify.get<{ Params: { id: string } }>('/api/v1/accounts/:id/followers', (request, reply) => this.userPage(request as MastodonRequest, reply, 'users/followers', request.params.id));
 		fastify.get<{ Params: { id: string } }>('/api/v1/accounts/:id/following', (request, reply) => this.userPage(request as MastodonRequest, reply, 'users/following', request.params.id));
@@ -295,6 +299,7 @@ export class MastodonApiServerService {
 		this.registerScheduledStatuses(fastify);
 		this.registerAnnouncements(fastify);
 		this.registerReports(fastify);
+		this.registerFiltersAndMarkers(fastify);
 		this.registerCompatibilityRoutes(fastify);
 
 		done();
@@ -367,6 +372,7 @@ export class MastodonApiServerService {
 		];
 		for (const [path, endpoint, scope, data] of timelines) {
 			const isPublic = path === '/api/v1/timelines/public' || path === '/api/v1/timelines/tag/:tag';
+			const context: MastodonFilterContext = isPublic ? 'public' : 'home';
 			if (isPublic) {
 				fastify.get(path, (request, reply) => this.withOptionalUser(request as MastodonRequest, scope, async auth => {
 					const query = request.query as Dictionary;
@@ -384,25 +390,25 @@ export class MastodonApiServerService {
 						? 'notes/local-timeline'
 						: endpoint;
 					const notes = await this.invokePublic(selectedEndpoint, data(query, request.params as Dictionary), auth, request as MastodonRequest) as Packed<'Note'>[];
-					return this.page(request, reply, notes, await this.statusesWithState(notes, auth));
+					return this.page(request, reply, notes, await this.statusesWithState(notes, auth, context));
 				}));
 			} else {
 				fastify.get(path, (request, reply) => this.withAuth(request as MastodonRequest, scope, async auth => {
 					const notes = await this.invoke(endpoint, data(request.query as Dictionary, request.params as Dictionary), auth, request as MastodonRequest) as Packed<'Note'>[];
-					return this.page(request, reply, notes, await this.statusesWithState(notes, auth));
+					return this.page(request, reply, notes, await this.statusesWithState(notes, auth, context));
 				}));
 			}
 		}
 		fastify.get('/api/v1/bookmarks', (request, reply) => this.withAuth(request as MastodonRequest, 'read:bookmarks', async auth => {
 			const favorites = await this.invoke('i/favorites', this.mastodonPaginationService.toMisskey(request.query as Dictionary), auth, request as MastodonRequest) as Array<{ id: string; note: Packed<'Note'> }>;
-			return this.page(request, reply, favorites, await this.statusesWithState(favorites.map(favorite => favorite.note), auth));
+			return this.page(request, reply, favorites, await this.statusesWithState(favorites.map(favorite => favorite.note), auth, 'home'));
 		}));
 		fastify.get('/api/v1/favourites', (request, reply) => this.withAuth(request as MastodonRequest, 'read:favourites', async auth => {
 			const reactions = await this.invoke('users/reactions', {
 				userId: auth.user.id,
 				...this.mastodonPaginationService.toMisskey(request.query as Dictionary, 100),
 			}, auth, request as MastodonRequest) as Array<{ id: string; note: Packed<'Note'> }>;
-			return this.page(request, reply, reactions, await this.statusesWithState(reactions.map(reaction => reaction.note), auth));
+			return this.page(request, reply, reactions, await this.statusesWithState(reactions.map(reaction => reaction.note), auth, 'home'));
 		}));
 		fastify.get('/api/v1/blocks', (request, reply) => this.withAuth(request as MastodonRequest, 'read:blocks', async auth => {
 			const blockings = await this.invoke('blocking/list', this.mastodonPaginationService.toMisskey(request.query as Dictionary, 100), auth, request as MastodonRequest) as Packed<'Blocking'>[];
@@ -424,11 +430,11 @@ export class MastodonApiServerService {
 				auth,
 				request as MastodonRequest,
 			) as Packed<'Note'>[];
-			return await this.statusesWithState(notes, auth);
+			return await this.statusesWithState(notes, auth, 'thread');
 		}));
 		fastify.get<{ Params: { id: string } }>('/api/v1/statuses/:id', request => this.withOptionalUser(request as MastodonRequest, 'read:statuses', async auth => {
 			const note = await this.invokePublic('notes/show', { noteId: request.params.id }, auth, request as MastodonRequest) as Packed<'Note'>;
-			return await this.statusWithState(note, auth, request as MastodonRequest);
+			return await this.statusWithState(note, auth, 'thread');
 		}));
 		fastify.get<{ Params: { id: string } }>('/api/v1/statuses/:id/context', request => this.withOptionalUser(request as MastodonRequest, 'read:statuses', async auth => {
 			const [ancestors, descendants] = await Promise.all([
@@ -437,8 +443,8 @@ export class MastodonApiServerService {
 			]);
 			const orderedAncestors = (ancestors as Packed<'Note'>[]).reverse();
 			return {
-				ancestors: await this.statusesWithState(orderedAncestors, auth),
-				descendants: await this.statusesWithState(descendants as Packed<'Note'>[], auth),
+				ancestors: await this.statusesWithState(orderedAncestors, auth, 'thread'),
+				descendants: await this.statusesWithState(descendants as Packed<'Note'>[], auth, 'thread'),
 			};
 		}));
 		fastify.get<{ Params: { id: string } }>('/api/v1/statuses/:id/source', request => this.withAuth(request as MastodonRequest, 'read:statuses', async auth => {
@@ -482,7 +488,7 @@ export class MastodonApiServerService {
 				...this.mastodonPaginationService.toMisskey(request.query as Dictionary, 100),
 			}, auth, request as MastodonRequest) as Packed<'Note'>[];
 			const quotes = renotes.filter(note => note.renoteId != null && !this.isPurePackedRenote(note));
-			return this.page(request, reply, quotes, await this.statusesWithState(quotes, auth));
+			return this.page(request, reply, quotes, await this.statusesWithState(quotes, auth, 'thread'));
 		}));
 		fastify.get<{ Params: { id: string } }>('/api/v1/statuses/:id/reblogged_by', request => this.withOptionalUser(request as MastodonRequest, 'read:statuses', async auth => {
 			const renotes = await this.invokePublic('notes/renotes', { noteId: request.params.id, ...this.mastodonPaginationService.toMisskey(request.query as Dictionary, 100) }, auth, request as MastodonRequest) as Packed<'Note'>[];
@@ -508,7 +514,7 @@ export class MastodonApiServerService {
 				cw: Object.hasOwn(request.body ?? {}, 'spoiler_text') ? this.string(request.body?.spoiler_text) || null : current.cw ?? null,
 				...(effectiveFileIds.length > 0 ? { fileIds: effectiveFileIds } : {}),
 			}, auth, request as MastodonRequest) as { updatedNote: Packed<'Note'> };
-			return (await this.statusesWithState([result.updatedNote], auth))[0];
+			return await this.statusWithState(result.updatedNote, auth, 'thread');
 		}));
 		fastify.delete<{ Params: { id: string } }>('/api/v1/statuses/:id', request => this.withAuth(request as MastodonRequest, 'write:statuses', async auth => {
 			const note = await this.invoke('notes/show', { noteId: request.params.id }, auth, request as MastodonRequest) as Packed<'Note'>;
@@ -619,6 +625,7 @@ export class MastodonApiServerService {
 			const accountId = this.string(query.account_id);
 			if (accountId != null) converted = converted.filter(notification => notification.account.id === accountId);
 			converted = await this.mastodonNotificationService.filterDismissed(auth.user.id, converted);
+			converted = await this.notificationFilters(auth.user.id, converted as Dictionary[]) as typeof converted;
 			return this.page(request, reply, notifications, converted);
 		}));
 		fastify.get<{ Params: { id: string } }>('/api/v1/notifications/:id', request => this.withAuth(request as MastodonRequest, 'read:notifications', async auth => {
@@ -681,7 +688,7 @@ export class MastodonApiServerService {
 							? [this.mastodonEntityService.account(result.object)]
 							: [],
 						statuses: result?.type === 'Note' && (type == null || type === 'statuses')
-							? await this.statusesWithState([result.object], auth)
+							? await this.statusesWithState([result.object], auth, 'public')
 							: [],
 						hashtags: [],
 					};
@@ -717,7 +724,7 @@ export class MastodonApiServerService {
 					: statuses;
 				return {
 					accounts: visibleAccounts.map(user => this.mastodonEntityService.account(user)),
-					statuses: await this.statusesWithState(visibleStatuses, auth),
+					statuses: await this.statusesWithState(visibleStatuses, auth, 'public'),
 					hashtags: hashtags.map(hashtag => this.mastodonEntityService.tag(hashtag)),
 				};
 			};
@@ -763,6 +770,134 @@ export class MastodonApiServerService {
 				return {};
 			}));
 		}
+	}
+
+	private registerFiltersAndMarkers(fastify: FastifyInstance): void {
+		fastify.get('/api/v1/filters', request => this.withAuth(request as MastodonRequest, 'read:filters', async auth => {
+			return await this.mastodonFilterService.listV1(auth.user.id);
+		}));
+		fastify.post<{ Body: Dictionary }>('/api/v1/filters', request => this.withAuth(request as MastodonRequest, 'write:filters', async auth => {
+			return await this.mastodonFilterService.createV1(auth.user.id, this.filterInput(request.body ?? {}));
+		}));
+		fastify.get<{ Params: { id: string } }>('/api/v1/filters/:id', request => this.withAuth(request as MastodonRequest, 'read:filters', async auth => {
+			return await this.mastodonFilterService.getV1(auth.user.id, request.params.id);
+		}));
+		fastify.put<{ Params: { id: string }; Body: Dictionary }>('/api/v1/filters/:id', request => this.withAuth(request as MastodonRequest, 'write:filters', async auth => {
+			return await this.mastodonFilterService.updateV1(auth.user.id, request.params.id, this.filterInput(request.body ?? {}));
+		}));
+		fastify.delete<{ Params: { id: string } }>('/api/v1/filters/:id', request => this.withAuth(request as MastodonRequest, 'write:filters', async auth => {
+			return await this.mastodonFilterService.deleteV1(auth.user.id, request.params.id);
+		}));
+
+		fastify.get('/api/v2/filters', request => this.withAuth(request as MastodonRequest, 'read:filters', async auth => {
+			return await this.mastodonFilterService.listV2(auth.user.id);
+		}));
+		fastify.post<{ Body: Dictionary }>('/api/v2/filters', request => this.withAuth(request as MastodonRequest, 'write:filters', async auth => {
+			return await this.mastodonFilterService.createV2(auth.user.id, this.filterInput(request.body ?? {}));
+		}));
+		fastify.get<{ Params: { id: string } }>('/api/v2/filters/:id', request => this.withAuth(request as MastodonRequest, 'read:filters', async auth => {
+			return await this.mastodonFilterService.getV2(auth.user.id, request.params.id);
+		}));
+		fastify.put<{ Params: { id: string }; Body: Dictionary }>('/api/v2/filters/:id', request => this.withAuth(request as MastodonRequest, 'write:filters', async auth => {
+			return await this.mastodonFilterService.updateV2(auth.user.id, request.params.id, this.filterInput(request.body ?? {}));
+		}));
+		fastify.delete<{ Params: { id: string } }>('/api/v2/filters/:id', request => this.withAuth(request as MastodonRequest, 'write:filters', async auth => {
+			return await this.mastodonFilterService.deleteV2(auth.user.id, request.params.id);
+		}));
+
+		fastify.get<{ Params: { filter_id: string } }>('/api/v2/filters/:filter_id/keywords', request => this.withAuth(request as MastodonRequest, 'read:filters', async auth => {
+			return await this.mastodonFilterService.listKeywords(auth.user.id, request.params.filter_id);
+		}));
+		fastify.post<{ Params: { filter_id: string }; Body: Dictionary }>('/api/v2/filters/:filter_id/keywords', request => this.withAuth(request as MastodonRequest, 'write:filters', async auth => {
+			return await this.mastodonFilterService.createKeyword(auth.user.id, request.params.filter_id, request.body ?? {});
+		}));
+		fastify.get<{ Params: { id: string } }>('/api/v2/filters/keywords/:id', request => this.withAuth(request as MastodonRequest, 'read:filters', async auth => {
+			return await this.mastodonFilterService.getKeyword(auth.user.id, request.params.id);
+		}));
+		fastify.put<{ Params: { id: string }; Body: Dictionary }>('/api/v2/filters/keywords/:id', request => this.withAuth(request as MastodonRequest, 'write:filters', async auth => {
+			return await this.mastodonFilterService.updateKeyword(auth.user.id, request.params.id, request.body ?? {});
+		}));
+		fastify.delete<{ Params: { id: string } }>('/api/v2/filters/keywords/:id', request => this.withAuth(request as MastodonRequest, 'write:filters', async auth => {
+			return await this.mastodonFilterService.deleteKeyword(auth.user.id, request.params.id);
+		}));
+
+		fastify.get<{ Params: { filter_id: string } }>('/api/v2/filters/:filter_id/statuses', request => this.withAuth(request as MastodonRequest, 'read:filters', async auth => {
+			return await this.mastodonFilterService.listStatuses(auth.user.id, request.params.filter_id);
+		}));
+		fastify.post<{ Params: { filter_id: string }; Body: Dictionary }>('/api/v2/filters/:filter_id/statuses', request => this.withAuth(request as MastodonRequest, 'write:filters', async auth => {
+			return await this.mastodonFilterService.createStatus(auth.user.id, request.params.filter_id, request.body ?? {});
+		}));
+		fastify.get<{ Params: { id: string } }>('/api/v2/filters/statuses/:id', request => this.withAuth(request as MastodonRequest, 'read:filters', async auth => {
+			return await this.mastodonFilterService.getStatus(auth.user.id, request.params.id);
+		}));
+		fastify.delete<{ Params: { id: string } }>('/api/v2/filters/statuses/:id', request => this.withAuth(request as MastodonRequest, 'write:filters', async auth => {
+			return await this.mastodonFilterService.deleteStatus(auth.user.id, request.params.id);
+		}));
+
+		fastify.get('/api/v1/markers', request => this.withAuth(request as MastodonRequest, 'read:statuses', async auth => {
+			const query = request.query as Dictionary;
+			return await this.mastodonMarkerService.get(
+				auth.user.id,
+				this.strings(query['timeline[]'] ?? query.timeline) as MastodonMarkerTimeline[],
+			);
+		}));
+		fastify.post<{ Body: Dictionary }>('/api/v1/markers', request => this.withAuth(request as MastodonRequest, 'write:statuses', async auth => {
+			return await this.mastodonMarkerService.update(auth.user.id, this.markerInput(request.body ?? {}));
+		}));
+	}
+
+	private filterInput(body: Dictionary): Dictionary {
+		const input: Dictionary = {
+			...body,
+			context: body['context[]'] ?? body.context,
+		};
+		const keywordAttributes = this.keywordAttributes(body);
+		if (keywordAttributes != null) input.keywords_attributes = keywordAttributes;
+		return input;
+	}
+
+	private keywordAttributes(body: Dictionary): Dictionary[] | null {
+		if (Array.isArray(body.keywords_attributes)) {
+			return body.keywords_attributes.flatMap(value => value != null && typeof value === 'object' && !Array.isArray(value) ? [value as Dictionary] : []);
+		}
+		if (body.keywords_attributes != null && typeof body.keywords_attributes === 'object') {
+			return Object.values(body.keywords_attributes).flatMap(value => value != null && typeof value === 'object' && !Array.isArray(value) ? [value as Dictionary] : []);
+		}
+		const attributes = new Map<number, Dictionary>();
+		for (const [key, rawValue] of Object.entries(body)) {
+			const match = /^keywords_attributes\[(\d*)\]\[(id|keyword|whole_word|_destroy)\]$/u.exec(key);
+			if (match == null) continue;
+			const values = Array.isArray(rawValue) ? rawValue : [rawValue];
+			const explicitIndex = match[1] === '' ? null : Number(match[1]);
+			values.forEach((value, valueIndex) => {
+				const index = explicitIndex ?? valueIndex;
+				const attribute = attributes.get(index) ?? {};
+				attribute[match[2]] = value;
+				attributes.set(index, attribute);
+			});
+		}
+		return attributes.size === 0 ? null : [...attributes.entries()].sort(([left], [right]) => left - right).map(([, value]) => value);
+	}
+
+	private markerInput(body: Dictionary): Dictionary {
+		const result: Dictionary = {};
+		for (const [key, value] of Object.entries(body)) {
+			if (key === 'home' || key === 'notifications') {
+				result[key] = value;
+				continue;
+			}
+			const match = /^(home|notifications)\[(last_read_id|version)\]$/u.exec(key);
+			if (match == null) {
+				result[key] = value;
+				continue;
+			}
+			const marker = result[match[1]] != null && typeof result[match[1]] === 'object' && !Array.isArray(result[match[1]])
+				? result[match[1]] as Dictionary
+				: {};
+			marker[match[2]] = value;
+			result[match[1]] = marker;
+		}
+		return result;
 	}
 
 	private registerCompatibilityRoutes(fastify: FastifyInstance): void {
@@ -1182,11 +1317,16 @@ export class MastodonApiServerService {
 		return date;
 	}
 
-	private async statusWithState(note: Packed<'Note'>, auth: MastodonUserAuth | null, _request: MastodonRequest): Promise<Record<string, unknown>> {
-		return (await this.statusesWithState([note], auth))[0]!;
+	private async statusWithState(note: Packed<'Note'>, auth: MastodonUserAuth | null, context: MastodonFilterContext): Promise<Record<string, unknown>> {
+		return (await this.statusesWithState([note], auth, context, { preserveHidden: true }))[0]!;
 	}
 
-	private async statusesWithState(notes: Packed<'Note'>[], auth: MastodonUserAuth | null): Promise<Record<string, unknown>[]> {
+	private async statusesWithState(
+		notes: Packed<'Note'>[],
+		auth: MastodonUserAuth | null,
+		context: MastodonFilterContext,
+		options: { preserveHidden?: boolean } = {},
+	): Promise<Record<string, unknown>[]> {
 		if (notes.length === 0) return [];
 		if (auth == null) return notes.map(note => this.mastodonEntityService.status(note));
 		const noteIds = [...new Set(notes.map(note => note.id))];
@@ -1198,12 +1338,29 @@ export class MastodonApiServerService {
 		const renotedIds = new Set(renotes.flatMap(renote => renote.renoteId == null || !this.isPureRenote(renote) ? [] : [renote.renoteId]));
 		const bookmarkedIds = new Set(favorites.map(favorite => favorite.noteId));
 		const pinnedIds = new Set(pinings.map(pining => pining.noteId));
-		return notes.map(note => ({
+		const statuses = notes.map(note => ({
 			...this.mastodonEntityService.status(note),
 			reblogged: renotedIds.has(note.id),
 			bookmarked: bookmarkedIds.has(note.id),
 			pinned: pinnedIds.has(note.id),
 		}));
+		return await this.mastodonFilterService.apply(auth.user.id, context, statuses, options);
+	}
+
+	private async notificationFilters(userId: string, notifications: Dictionary[]): Promise<Dictionary[]> {
+		const statuses = notifications.flatMap(notification => {
+			const status = notification.status;
+			return status != null && typeof status === 'object' && !Array.isArray(status) ? [status as Dictionary] : [];
+		});
+		if (statuses.length === 0) return notifications;
+		const filtered = await this.mastodonFilterService.apply(userId, 'notifications', statuses);
+		const byId = new Map(filtered.map(status => [this.string(status.id) ?? '', status]));
+		return notifications.flatMap(notification => {
+			const status = notification.status;
+			if (status == null || typeof status !== 'object' || Array.isArray(status)) return [notification];
+			const visible = byId.get(this.string((status as Dictionary).id) ?? '');
+			return visible == null ? [] : [{ ...notification, status: visible }];
+		});
 	}
 
 	private isPureRenote(note: { text: string | null; cw: string | null; fileIds: string[]; hasPoll: boolean; replyId: string | null }): boolean {

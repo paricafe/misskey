@@ -1,0 +1,106 @@
+/*
+ * SPDX-FileCopyrightText: syuilo and misskey-project
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
+import { describe, expect, test, vi } from 'vitest';
+import { MastodonApiError } from './errors.js';
+import { MastodonMarkerService } from './MastodonMarkerService.js';
+
+describe(MastodonMarkerService, () => {
+	function createService() {
+		const rows = new Map<string, {
+			id: string;
+			userId: string;
+			tokenId: null;
+			kind: string;
+			key: string;
+			value: { lastReadId: string };
+			version: number;
+			createdAt: Date;
+			updatedAt: Date;
+			expiresAt: null;
+		}>();
+		const stateService = {
+			get: vi.fn(async (userId: string, kind: string, key: string) => {
+				const row = rows.get(key);
+				return row?.userId === userId && row.kind === kind ? row : null;
+			}),
+			put: vi.fn(async (input: { userId: string; kind: string; key: string; value: { lastReadId: string } }) => {
+				const previous = rows.get(input.key);
+				const now = new Date('2026-07-17T01:02:03.000Z');
+				const row = {
+					id: previous?.id ?? `state-${input.key}`,
+					userId: input.userId,
+					tokenId: null,
+					kind: input.kind,
+					key: input.key,
+					value: input.value,
+					version: (previous?.version ?? 0) + 1,
+					createdAt: previous?.createdAt ?? now,
+					updatedAt: now,
+					expiresAt: null,
+				};
+				rows.set(input.key, row);
+				return row;
+			}),
+			compareAndSet: vi.fn(async (input: { userId: string; kind: string; key: string; expectedVersion: number; value: { lastReadId: string } }) => {
+				const previous = rows.get(input.key);
+				if (previous == null || previous.version !== input.expectedVersion) {
+					throw Object.assign(new MastodonApiError(409, 'conflict', 'The compatibility state has changed'), { code: 'conflict' });
+				}
+				const row = {
+					...previous,
+					value: input.value,
+					version: previous.version + 1,
+					updatedAt: new Date('2026-07-17T01:03:00.000Z'),
+				};
+				rows.set(input.key, row);
+				return row;
+			}),
+		};
+		return { service: new MastodonMarkerService(stateService as never), stateService, rows };
+	}
+
+	test('updates home and notifications markers independently and returns Mastodon marker fields', async () => {
+		const { service } = createService();
+
+		await expect(service.update('u1', {
+			home: { last_read_id: '10' },
+			notifications: { last_read_id: '20' },
+		})).resolves.toMatchObject({
+			home: { last_read_id: '10', version: 1, updated_at: '2026-07-17T01:02:03.000Z' },
+			notifications: { last_read_id: '20', version: 1, updated_at: '2026-07-17T01:02:03.000Z' },
+		});
+		await expect(service.get('u1', ['notifications'])).resolves.toEqual({
+			notifications: { last_read_id: '20', version: 1, updated_at: '2026-07-17T01:02:03.000Z' },
+		});
+	});
+
+	test('uses an atomic expected version and reports stale marker updates as 409 conflicts', async () => {
+		const { service, stateService } = createService();
+		await service.update('u1', { home: { last_read_id: '10' } });
+
+		await expect(service.update('u1', { home: { last_read_id: '11', version: 1 } })).resolves.toMatchObject({
+			home: { last_read_id: '11', version: 2 },
+		});
+		expect(stateService.compareAndSet).toHaveBeenCalledWith(expect.objectContaining({
+			userId: 'u1',
+			kind: 'marker',
+			key: 'home',
+			expectedVersion: 1,
+		}));
+		await expect(service.update('u1', { home: { last_read_id: '12', version: 1 } })).rejects.toMatchObject({
+			statusCode: 409,
+			code: 'conflict',
+		});
+	});
+
+	test('rejects unsupported timelines and malformed last-read ids', async () => {
+		const { service } = createService();
+
+		await expect(service.get('u1', ['direct'] as never)).rejects.toMatchObject({ statusCode: 422 });
+		await expect(service.update('u1', { home: { last_read_id: '' } })).rejects.toMatchObject({ statusCode: 422 });
+		await expect(service.update('u1', { direct: { last_read_id: '1' } } as never)).rejects.toMatchObject({ statusCode: 422 });
+	});
+});
