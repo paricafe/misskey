@@ -387,4 +387,3 @@ Expected: exit 0 or an exact report of unrelated baseline failures, with no new 
 - [ ] **Step 5: Review configuration and CHANGELOG**
 
 Confirm the Unreleased Server entry appears once and all three configuration examples document the default-enabled switch.
-
