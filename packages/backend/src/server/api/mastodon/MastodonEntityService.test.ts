@@ -237,6 +237,53 @@ describe(MastodonEntityService, () => {
 		});
 	});
 
+	test('converts a scheduled Note draft to a complete Mastodon ScheduledStatus', () => {
+		const draft = {
+			id: 'draft-id',
+			isActuallyScheduled: true,
+			scheduledAt: Date.parse('2099-01-02T03:04:05.000Z'),
+			text: 'Scheduled text',
+			fileIds: ['file-id'],
+			files: note.files,
+			cw: 'CW',
+			visibility: 'home',
+			replyId: 'reply-id',
+			renoteId: 'quote-id',
+			poll: {
+				choices: ['A', 'B'],
+				multiple: true,
+				expiredAfter: 3500,
+			},
+		};
+
+		expect(service.scheduledStatus(draft as never)).toEqual({
+			id: 'draft-id',
+			scheduled_at: '2099-01-02T03:04:05.000Z',
+			params: {
+				text: 'Scheduled text',
+				media_ids: ['file-id'],
+				sensitive: true,
+				spoiler_text: 'CW',
+				visibility: 'unlisted',
+				in_reply_to_id: 'reply-id',
+				language: null,
+				application_id: null,
+				poll: {
+					options: ['A', 'B'],
+					multiple: true,
+					expires_in: 4,
+				},
+				idempotency: null,
+				with_rate_limit: false,
+				quoted_status_id: 'quote-id',
+				quote_approval_policy: 'nobody',
+			},
+			media_attachments: [expect.objectContaining({ id: 'file-id', type: 'image', description: 'alt text' })],
+		});
+		expect(() => service.scheduledStatus({ ...draft, isActuallyScheduled: false } as never)).toThrow('scheduled Note draft');
+		expect(() => service.scheduledStatus({ ...draft, scheduledAt: null } as never)).toThrow('scheduled Note draft');
+	});
+
 	test('converts a URL to a complete Mastodon trend link entity', () => {
 		expect(service.trendLink('https://example.com/article')).toEqual({
 			url: 'https://example.com/article',

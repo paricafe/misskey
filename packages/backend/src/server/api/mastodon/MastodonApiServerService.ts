@@ -29,6 +29,7 @@ import { MastodonOAuthService } from './MastodonOAuthService.js';
 import { MastodonNotificationService } from './MastodonNotificationService.js';
 import { MastodonPaginationService } from './MastodonPaginationService.js';
 import { MastodonReportService } from './MastodonReportService.js';
+import { MastodonScheduledStatusService } from './MastodonScheduledStatusService.js';
 import { MastodonScopeService } from './MastodonScopeService.js';
 import { MastodonApiError, sendMastodonError } from './errors.js';
 import type { MastodonAuth, MastodonUserAuth } from './types.js';
@@ -63,6 +64,7 @@ export class MastodonApiServerService {
 		private mastodonEntityService: MastodonEntityService,
 		private mastodonPaginationService: MastodonPaginationService,
 		private mastodonNotificationService: MastodonNotificationService,
+		private mastodonScheduledStatusService: MastodonScheduledStatusService,
 		private mastodonReportService: MastodonReportService,
 
 		@Inject(DI.redis)
@@ -243,6 +245,7 @@ export class MastodonApiServerService {
 		this.registerNotifications(fastify);
 		this.registerSearch(fastify);
 		this.registerLists(fastify);
+		this.registerScheduledStatuses(fastify);
 		this.registerAnnouncements(fastify);
 		this.registerReports(fastify);
 		this.registerCompatibilityRoutes(fastify);
@@ -730,6 +733,35 @@ export class MastodonApiServerService {
 		}));
 	}
 
+	private registerScheduledStatuses(fastify: FastifyInstance): void {
+		fastify.get('/api/v1/scheduled_statuses', (request, reply) => this.withAuth(request as MastodonRequest, 'read:statuses', async auth => {
+			const drafts = await this.invoke('notes/drafts/list', {
+				...this.mastodonPaginationService.toMisskey(request.query as Dictionary, 100),
+				scheduled: true,
+			}, auth, request as MastodonRequest) as Packed<'NoteDraft'>[];
+			return this.page(request, reply, drafts, drafts.map(draft => this.mastodonEntityService.scheduledStatus(draft)));
+		}));
+		fastify.get<{ Params: { id: string } }>('/api/v1/scheduled_statuses/:id', request => this.withAuth(request as MastodonRequest, 'read:statuses', async auth => {
+			const draft = await this.mastodonScheduledStatusService.get(auth.user, request.params.id);
+			return this.mastodonEntityService.scheduledStatus(draft);
+		}));
+		fastify.put<{ Params: { id: string }; Body: Dictionary }>('/api/v1/scheduled_statuses/:id', request => this.withAuth(request as MastodonRequest, 'write:statuses', async auth => {
+			await this.mastodonScheduledStatusService.get(auth.user, request.params.id);
+			const scheduledAt = this.parseScheduledAt(request.body?.scheduled_at, true)!;
+			const result = await this.invoke('notes/drafts/update', {
+				draftId: request.params.id,
+				scheduledAt: scheduledAt.getTime(),
+				isActuallyScheduled: true,
+			}, auth, request as MastodonRequest) as { updatedDraft: Packed<'NoteDraft'> };
+			return this.mastodonEntityService.scheduledStatus(result.updatedDraft);
+		}));
+		fastify.delete<{ Params: { id: string } }>('/api/v1/scheduled_statuses/:id', request => this.withAuth(request as MastodonRequest, 'write:statuses', async auth => {
+			await this.mastodonScheduledStatusService.get(auth.user, request.params.id);
+			await this.invoke('notes/drafts/delete', { draftId: request.params.id }, auth, request as MastodonRequest);
+			return {};
+		}));
+	}
+
 	private async updateProfile(request: MastodonRequest, response: 'profile' | 'credential-account'): Promise<Dictionary> {
 		return await this.withAuth(request, 'write:accounts', async auth => {
 			let body = request.body ?? {};
@@ -950,9 +982,11 @@ export class MastodonApiServerService {
 
 	private async createStatus(request: MastodonRequest, auth: MastodonUserAuth): Promise<Record<string, unknown>> {
 		const body = request.body ?? {};
-		if (Object.hasOwn(body, 'scheduled_at') && body.scheduled_at !== '') {
-			throw new MastodonApiError(422, 'unprocessable_entity', 'Scheduled statuses are not supported');
+		this.validateStatusCreateSemantics(body);
+		if (Object.hasOwn(body, 'scheduled_at') && body.scheduled_at == null) {
+			throw new MastodonApiError(400, 'invalid_request', 'scheduled_at must be an ISO 8601 date-time');
 		}
+		const scheduledAt = this.parseScheduledAt(body.scheduled_at, false);
 		const idempotencyKey = this.string(request.headers['idempotency-key']);
 		const cacheKey = idempotencyKey == null || idempotencyKey === ''
 			? null
@@ -972,21 +1006,36 @@ export class MastodonApiServerService {
 			const fileIds = this.strings(body['media_ids[]'] ?? body.media_ids);
 			await this.updateMediaSensitivity(fileIds, body.sensitive, auth, request);
 			const replyId = this.string(body.in_reply_to_id) ?? null;
+			const renoteId = this.string(body.quoted_status_id) ?? null;
 			const visibleUserIds = misskeyVisibility === 'specified'
 				? await this.resolveDirectRecipientIds(text ?? '', replyId, auth, request)
 				: [];
-			const result = await this.invoke('notes/create', {
+			const common = {
 				text,
 				cw: this.string(body.spoiler_text) || null,
 				visibility: misskeyVisibility,
 				...(misskeyVisibility === 'specified' ? { visibleUserIds } : {}),
 				replyId,
+				renoteId,
 				...(fileIds.length > 0 ? { fileIds } : {}),
 				...(choices.length >= 2 ? { poll: {
 					choices,
 					multiple: this.boolean(body['poll[multiple]'] ?? (body.poll as Dictionary | undefined)?.multiple),
 					expiredAfter: Math.max(1, Number(this.string(body['poll[expires_in]'] ?? (body.poll as Dictionary | undefined)?.expires_in) ?? 300)) * 1000,
 				} } : {}),
+			};
+			if (scheduledAt != null) {
+				const result = await this.invoke('notes/drafts/create', {
+					...common,
+					scheduledAt: scheduledAt.getTime(),
+					isActuallyScheduled: true,
+				}, auth, request) as { createdDraft: Packed<'NoteDraft'> };
+				const scheduledStatus = this.mastodonEntityService.scheduledStatus(result.createdDraft);
+				if (cacheKey != null) await this.redis.set(cacheKey, JSON.stringify(scheduledStatus), 'EX', 86400);
+				return scheduledStatus;
+			}
+			const result = await this.invoke('notes/create', {
+				...common,
 			}, auth, request) as { createdNote: Packed<'Note'> };
 			const status = this.mastodonEntityService.status(result.createdNote);
 			if (cacheKey != null) await this.redis.set(cacheKey, JSON.stringify(status), 'EX', 86400);
@@ -994,6 +1043,32 @@ export class MastodonApiServerService {
 		} finally {
 			if (cacheKey != null) await this.redis.del(`${cacheKey}:lock`);
 		}
+	}
+
+	private validateStatusCreateSemantics(body: Dictionary): void {
+		const language = this.string(body.language);
+		if (language != null && language !== '') {
+			throw new MastodonApiError(422, 'unprocessable_entity', 'Status language cannot be persisted by this server');
+		}
+		if (Object.keys(body).some(key => key === 'allowed_mentions' || key.startsWith('allowed_mentions['))) {
+			throw new MastodonApiError(422, 'unprocessable_entity', 'Allowed mention constraints cannot be enforced by this server');
+		}
+		const quoteApprovalPolicy = this.string(body.quote_approval_policy);
+		if (quoteApprovalPolicy != null && quoteApprovalPolicy !== '' && quoteApprovalPolicy !== 'public') {
+			throw new MastodonApiError(422, 'unprocessable_entity', `Unsupported quote approval policy: ${quoteApprovalPolicy}`);
+		}
+	}
+
+	private parseScheduledAt(rawValue: unknown, required: boolean): Date | null {
+		if (rawValue == null || rawValue === '') {
+			if (required) throw new MastodonApiError(400, 'invalid_request', 'scheduled_at is required');
+			return null;
+		}
+		if (typeof rawValue !== 'string') throw new MastodonApiError(400, 'invalid_request', 'scheduled_at must be an ISO 8601 date-time');
+		const date = new Date(rawValue);
+		if (!Number.isFinite(date.getTime())) throw new MastodonApiError(400, 'invalid_request', 'scheduled_at must be an ISO 8601 date-time');
+		if (date.getTime() <= Date.now()) throw new MastodonApiError(422, 'unprocessable_entity', 'scheduled_at must be in the future');
+		return date;
 	}
 
 	private async statusWithState(note: Packed<'Note'>, auth: MastodonUserAuth | null, _request: MastodonRequest): Promise<Record<string, unknown>> {

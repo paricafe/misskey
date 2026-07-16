@@ -86,6 +86,20 @@ describe(MastodonApiServerService, () => {
 			targetUser: { id: input.accountId, username: 'reported' },
 			input,
 		}));
+		const getScheduledStatus = vi.fn().mockResolvedValue({
+			id: 'scheduled-draft-id',
+			userId: 'user-id',
+			isActuallyScheduled: true,
+			scheduledAt: Date.parse('2099-01-02T03:04:05.000Z'),
+			text: 'Scheduled text',
+			fileIds: [],
+			files: [],
+			cw: null,
+			visibility: 'public',
+			replyId: null,
+			renoteId: null,
+			poll: null,
+		});
 		const service = new MastodonApiServerService(
 			{ url: 'https://misskey.example/', host: 'misskey.example', version: '2026.7.0', maxFileSize: 10_000_000 } as never,
 			{
@@ -141,6 +155,7 @@ describe(MastodonApiServerService, () => {
 					poll: value.poll ?? null,
 				})),
 				poll: vi.fn((noteId, poll) => ({ id: noteId, votes_count: poll.choices.reduce((total: number, choice: { votes: number }) => total + choice.votes, 0) })),
+				scheduledStatus: vi.fn(value => ({ id: value.id, scheduled_at: new Date(value.scheduledAt).toISOString() })),
 				announcement: vi.fn(value => ({ id: value.id, content: value.text, read: value.isRead ?? false })),
 				report: vi.fn((report, _createdAt, _targetUser, input) => ({
 					id: report.id,
@@ -165,6 +180,7 @@ describe(MastodonApiServerService, () => {
 				offsetLinkHeader,
 			} as never,
 			mastodonNotificationService,
+			{ get: getScheduledStatus } as never,
 			{ create: createReport } as never,
 			redis as never,
 		);
@@ -189,6 +205,7 @@ describe(MastodonApiServerService, () => {
 			toMisskey,
 			offsetLinkHeader,
 			createReport,
+			getScheduledStatus,
 		};
 	}
 
@@ -267,6 +284,174 @@ describe(MastodonApiServerService, () => {
 
 		expect(response.statusCode).toBe(422);
 		expect(assert).toHaveBeenCalledWith(['read'], 'write:accounts');
+	});
+
+	test('lists and gets scheduled statuses through Note drafts', async () => {
+		const { fastify, assert, nativeInvoke, toMisskey, getScheduledStatus } = createServer();
+		toMisskey.mockReturnValueOnce({ limit: 21, untilId: 'older' });
+		nativeInvoke.mockImplementation(async name => name === 'notes/drafts/list' ? [{
+			id: 'scheduled-draft-id',
+			isActuallyScheduled: true,
+			scheduledAt: Date.parse('2099-01-02T03:04:05.000Z'),
+		}] : []);
+
+		const list = await fastify.inject({
+			method: 'GET',
+			url: '/api/v1/scheduled_statuses?limit=21&max_id=older',
+			headers: { authorization: 'Bearer user-token' },
+		});
+		const show = await fastify.inject({
+			method: 'GET',
+			url: '/api/v1/scheduled_statuses/scheduled-draft-id',
+			headers: { authorization: 'Bearer user-token' },
+		});
+
+		expect(list.statusCode).toBe(200);
+		expect(list.json()).toEqual([{ id: 'scheduled-draft-id', scheduled_at: '2099-01-02T03:04:05.000Z' }]);
+		expect(toMisskey).toHaveBeenCalledWith(expect.objectContaining({ limit: '21', max_id: 'older' }), 100);
+		expect(nativeInvoke).toHaveBeenCalledWith('notes/drafts/list', {
+			limit: 21,
+			untilId: 'older',
+			scheduled: true,
+		}, expect.any(Object), expect.any(Object));
+		expect(show.statusCode).toBe(200);
+		expect(show.json()).toEqual({ id: 'scheduled-draft-id', scheduled_at: '2099-01-02T03:04:05.000Z' });
+		expect(getScheduledStatus).toHaveBeenCalledWith(expect.objectContaining({ id: 'user-id' }), 'scheduled-draft-id');
+		expect(assert).toHaveBeenCalledWith(['read'], 'read:statuses');
+	});
+
+	test('reschedules and deletes only an owned scheduled Note draft', async () => {
+		const { fastify, assert, nativeInvoke, getScheduledStatus } = createServer();
+		nativeInvoke.mockImplementation(async (name, data) => name === 'notes/drafts/update'
+			? { updatedDraft: { ...await getScheduledStatus(), scheduledAt: data.scheduledAt } }
+			: []);
+
+		const update = await fastify.inject({
+			method: 'PUT',
+			url: '/api/v1/scheduled_statuses/scheduled-draft-id',
+			headers: { authorization: 'Bearer user-token' },
+			payload: { scheduled_at: '2099-02-03T04:05:06.000Z', status: 'must not overwrite the draft' },
+		});
+		const remove = await fastify.inject({
+			method: 'DELETE',
+			url: '/api/v1/scheduled_statuses/scheduled-draft-id',
+			headers: { authorization: 'Bearer user-token' },
+		});
+
+		expect(update.statusCode).toBe(200);
+		expect(update.json()).toEqual({ id: 'scheduled-draft-id', scheduled_at: '2099-02-03T04:05:06.000Z' });
+		expect(nativeInvoke).toHaveBeenCalledWith('notes/drafts/update', {
+			draftId: 'scheduled-draft-id',
+			scheduledAt: Date.parse('2099-02-03T04:05:06.000Z'),
+			isActuallyScheduled: true,
+		}, expect.any(Object), expect.any(Object));
+		expect(nativeInvoke).toHaveBeenCalledWith('notes/drafts/delete', {
+			draftId: 'scheduled-draft-id',
+		}, expect.any(Object), expect.any(Object));
+		expect(getScheduledStatus).toHaveBeenCalledTimes(3);
+		expect(remove.statusCode).toBe(200);
+		expect(remove.json()).toEqual({});
+		expect(assert).toHaveBeenCalledWith(['read'], 'write:statuses');
+	});
+
+	test('creates a future scheduled status as a Note draft with all supported fields', async () => {
+		const { fastify, nativeInvoke } = createServer();
+		nativeInvoke.mockImplementation(async (name, data) => {
+			if (name === 'notes/drafts/create') return { createdDraft: {
+				id: 'new-scheduled-id',
+				isActuallyScheduled: true,
+				scheduledAt: data.scheduledAt,
+			} };
+			return {};
+		});
+
+		const response = await fastify.inject({
+			method: 'POST',
+			url: '/api/v1/statuses',
+			headers: { authorization: 'Bearer user-token' },
+			payload: {
+				status: 'Scheduled text',
+				spoiler_text: 'CW',
+				visibility: 'unlisted',
+				in_reply_to_id: 'reply-id',
+				quoted_status_id: 'quote-id',
+				quote_approval_policy: 'public',
+				media_ids: ['file-id'],
+				sensitive: true,
+				poll: { options: ['A', 'B'], multiple: true, expires_in: 3600 },
+				scheduled_at: '2099-01-02T03:04:05.000Z',
+			},
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(response.json()).toEqual({ id: 'new-scheduled-id', scheduled_at: '2099-01-02T03:04:05.000Z' });
+		expect(nativeInvoke).toHaveBeenCalledWith('notes/drafts/create', {
+			text: 'Scheduled text',
+			cw: 'CW',
+			visibility: 'home',
+			replyId: 'reply-id',
+			renoteId: 'quote-id',
+			fileIds: ['file-id'],
+			poll: { choices: ['A', 'B'], multiple: true, expiredAfter: 3600000 },
+			scheduledAt: Date.parse('2099-01-02T03:04:05.000Z'),
+			isActuallyScheduled: true,
+		}, expect.any(Object), expect.any(Object));
+		expect(nativeInvoke).toHaveBeenCalledWith('drive/files/update', {
+			fileId: 'file-id',
+			isSensitive: true,
+		}, expect.any(Object), expect.any(Object));
+		expect(nativeInvoke).not.toHaveBeenCalledWith('notes/create', expect.anything(), expect.anything(), expect.anything());
+	});
+
+	test('maps an immediate quote and rejects semantics that Misskey cannot persist', async () => {
+		const { fastify, nativeInvoke } = createServer();
+		const quote = await fastify.inject({
+			method: 'POST',
+			url: '/api/v1/statuses',
+			headers: { authorization: 'Bearer user-token' },
+			payload: { status: 'Quoted', quoted_status_id: 'quote-id' },
+		});
+		const invalidPolicy = await fastify.inject({
+			method: 'POST',
+			url: '/api/v1/statuses',
+			headers: { authorization: 'Bearer user-token' },
+			payload: { status: 'No', quote_approval_policy: 'followers' },
+		});
+		const language = await fastify.inject({
+			method: 'POST',
+			url: '/api/v1/statuses',
+			headers: { authorization: 'Bearer user-token' },
+			payload: { status: 'No', language: 'en' },
+		});
+		const allowedMentions = await fastify.inject({
+			method: 'POST',
+			url: '/api/v1/statuses',
+			headers: { authorization: 'Bearer user-token' },
+			payload: { status: 'No', allowed_mentions: { replied_to: false } },
+		});
+
+		expect(quote.statusCode).toBe(200);
+		expect(nativeInvoke).toHaveBeenCalledWith('notes/create', expect.objectContaining({
+			text: 'Quoted',
+			renoteId: 'quote-id',
+		}), expect.any(Object), expect.any(Object));
+		expect([invalidPolicy.statusCode, language.statusCode, allowedMentions.statusCode]).toEqual([422, 422, 422]);
+	});
+
+	test.each([
+		['malformed', 'not-a-date', 400],
+		['past', '2000-01-02T03:04:05.000Z', 422],
+	] as const)('rejects a %s scheduled_at without creating a Note draft', async (_label, scheduledAt, statusCode) => {
+		const { fastify, nativeInvoke } = createServer();
+		const response = await fastify.inject({
+			method: 'POST',
+			url: '/api/v1/statuses',
+			headers: { authorization: 'Bearer user-token' },
+			payload: { status: 'No', scheduled_at: scheduledAt },
+		});
+
+		expect(response.statusCode).toBe(statusCode);
+		expect(nativeInvoke).not.toHaveBeenCalledWith('notes/drafts/create', expect.anything(), expect.anything(), expect.anything());
 	});
 
 	test('registers every documented Mastodon 4.6.3 Fastify route exactly once', async () => {
@@ -1632,8 +1817,11 @@ describe(MastodonApiServerService, () => {
 		expect(publicInvoke).not.toHaveBeenCalled();
 	});
 
-	test('rejects scheduled statuses before creating a native note', async () => {
+	test('creates scheduled statuses without creating a native note', async () => {
 		const { fastify, nativeInvoke } = createServer();
+		nativeInvoke.mockImplementation(async (name, data) => name === 'notes/drafts/create'
+			? { createdDraft: { id: 'draft-id', isActuallyScheduled: true, scheduledAt: data.scheduledAt } }
+			: []);
 		const response = await fastify.inject({
 			method: 'POST',
 			url: '/api/v1/statuses',
@@ -1641,7 +1829,10 @@ describe(MastodonApiServerService, () => {
 			payload: { status: 'later', scheduled_at: '2099-01-01T00:00:00.000Z' },
 		});
 
-		expect(response.statusCode).toBe(422);
+		expect(response.statusCode).toBe(200);
+		expect(nativeInvoke).toHaveBeenCalledWith('notes/drafts/create', expect.objectContaining({
+			isActuallyScheduled: true,
+		}), expect.anything(), expect.anything());
 		expect(nativeInvoke).not.toHaveBeenCalledWith('notes/create', expect.anything(), expect.anything(), expect.anything());
 	});
 
@@ -1670,7 +1861,7 @@ describe(MastodonApiServerService, () => {
 			payload,
 		});
 
-		expect(response.statusCode).toBe(422);
+		expect(response.statusCode).toBe(400);
 		expect(redis.get).not.toHaveBeenCalled();
 		expect(redis.set).not.toHaveBeenCalled();
 		expect(nativeInvoke).not.toHaveBeenCalledWith('notes/create', expect.anything(), expect.anything(), expect.anything());

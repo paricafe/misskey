@@ -159,10 +159,10 @@ export const MASTODON_4_6_USER_ROUTES: readonly MastodonContractRoute[] = [
 	implemented('DELETE', '/api/v1/media/:id', 'user', 'write:media', 'Object', '4.2.0'),
 	implemented('GET', '/api/v1/polls/:id', 'public', 'read:statuses', 'Poll', '2.8.0'),
 	implemented('POST', '/api/v1/polls/:id/votes', 'user', 'write:statuses', 'Poll', '2.8.0'),
-	safeArray('GET', '/api/v1/scheduled_statuses', 'user', 'read:statuses', 'ScheduledStatus[]', '2.7.0'),
-	notFound('GET', '/api/v1/scheduled_statuses/:id', 'user', 'read:statuses', 'ScheduledStatus', '2.7.0'),
-	unsupported('PUT', '/api/v1/scheduled_statuses/:id', 'user', 'write:statuses', 'ScheduledStatus', '2.7.0', ['scheduled_at']),
-	unsupported('DELETE', '/api/v1/scheduled_statuses/:id', 'user', 'write:statuses', 'Object', '2.7.0'),
+	implemented('GET', '/api/v1/scheduled_statuses', 'user', 'read:statuses', 'ScheduledStatus[]', '2.7.0'),
+	implemented('GET', '/api/v1/scheduled_statuses/:id', 'user', 'read:statuses', 'ScheduledStatus', '2.7.0'),
+	implemented('PUT', '/api/v1/scheduled_statuses/:id', 'user', 'write:statuses', 'ScheduledStatus', '2.7.0'),
+	implemented('DELETE', '/api/v1/scheduled_statuses/:id', 'user', 'write:statuses', 'Object', '2.7.0'),
 
 	// Accounts and profile
 	implemented('GET', '/api/v1/accounts', 'token', 'read:accounts', 'Account[]', '4.6.0'),

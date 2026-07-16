@@ -283,6 +283,36 @@ export class MastodonEntityService {
 		};
 	}
 
+	public scheduledStatus(draft: Packed<'NoteDraft'>) {
+		if (!draft.isActuallyScheduled || draft.scheduledAt == null) {
+			throw new Error('Expected a scheduled Note draft with scheduledAt');
+		}
+		return {
+			id: draft.id,
+			scheduled_at: new Date(draft.scheduledAt).toISOString(),
+			params: {
+				text: draft.text,
+				media_ids: draft.fileIds,
+				sensitive: (draft.files ?? []).some(file => file.isSensitive),
+				spoiler_text: draft.cw ?? null,
+				visibility: this.visibility(draft.visibility),
+				in_reply_to_id: draft.replyId,
+				language: null,
+				application_id: null,
+				poll: draft.poll == null ? null : {
+					options: draft.poll.choices,
+					multiple: draft.poll.multiple,
+					expires_in: draft.poll.expiredAfter == null ? null : Math.ceil(draft.poll.expiredAfter / 1000),
+				},
+				idempotency: null,
+				with_rate_limit: false,
+				quoted_status_id: draft.renoteId,
+				quote_approval_policy: 'nobody',
+			},
+			media_attachments: (draft.files ?? []).map(file => this.attachment(file)),
+		};
+	}
+
 	public tag(name: string) {
 		return {
 			name,
