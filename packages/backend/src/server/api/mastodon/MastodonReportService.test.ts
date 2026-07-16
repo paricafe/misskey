@@ -29,16 +29,17 @@ describe(MastodonReportService, () => {
 		const getUser = vi.fn().mockResolvedValue(target);
 		const isAdministrator = vi.fn().mockResolvedValue(false);
 		const report = vi.fn().mockResolvedValue([insertedReport]);
+		const reportAndGetCreated = vi.fn().mockResolvedValue([insertedReport]);
 		const pack = vi.fn().mockResolvedValue(packedTarget);
 		const parse = vi.fn().mockReturnValue({ date: new Date('2026-07-16T01:02:03.000Z') });
 		const service = new MastodonReportService(
 			{ getUser } as never,
 			{ isAdministrator } as never,
-			{ report } as never,
+			{ report, reportAndGetCreated } as never,
 			{ pack } as never,
 			{ parse } as never,
 		);
-		return { service, getUser, isAdministrator, report, pack, parse };
+		return { service, getUser, isAdministrator, report, reportAndGetCreated, pack, parse };
 	}
 
 	const input = {
@@ -74,15 +75,16 @@ describe(MastodonReportService, () => {
 	});
 
 	test('rejects reports against administrators', async () => {
-		const { service, isAdministrator, report } = createService();
+		const { service, isAdministrator, report, reportAndGetCreated } = createService();
 		isAdministrator.mockResolvedValueOnce(true);
 
 		await expect(service.create(reporter as never, input)).rejects.toMatchObject({ statusCode: 422 });
 		expect(report).not.toHaveBeenCalled();
+		expect(reportAndGetCreated).not.toHaveBeenCalled();
 	});
 
 	test('returns the inserted report, creation time, normalized input, and packed target', async () => {
-		const { service, report, pack } = createService();
+		const { service, report, reportAndGetCreated, pack } = createService();
 		const result = await service.create(reporter as never, input);
 
 		expect(result).toEqual({
@@ -92,7 +94,8 @@ describe(MastodonReportService, () => {
 			input,
 		});
 		expect(pack).toHaveBeenCalledWith(target, reporter, { schema: 'UserDetailed' });
-		const persisted = report.mock.calls[0][0][0];
+		expect(report).not.toHaveBeenCalled();
+		const persisted = reportAndGetCreated.mock.calls[0][0][0];
 		expect(persisted).toMatchObject({
 			targetUserId: 'target-id',
 			targetUserHost: 'remote.example',
@@ -110,14 +113,14 @@ describe(MastodonReportService, () => {
 	});
 
 	test('normalizes an omitted comment and truncates without splitting a surrogate pair', async () => {
-		const { service, report } = createService();
+		const { service, reportAndGetCreated } = createService();
 		await service.create(reporter as never, { ...input, comment: undefined } as never);
-		const emptyComment = report.mock.calls[0][0][0].comment as string;
+		const emptyComment = reportAndGetCreated.mock.calls[0][0][0].comment as string;
 		expect(emptyComment).toMatch(/^\n\n--- Mastodon API report context ---/u);
 
-		report.mockClear();
+		reportAndGetCreated.mockClear();
 		await service.create(reporter as never, { ...input, comment: '😀'.repeat(2000) });
-		const bounded = report.mock.calls[0][0][0].comment as string;
+		const bounded = reportAndGetCreated.mock.calls[0][0][0].comment as string;
 		expect(bounded.length).toBeLessThanOrEqual(2048);
 		const comment = bounded.split('\n\n--- Mastodon API report context ---', 1)[0];
 		const lastCodeUnit = comment.charCodeAt(comment.length - 1);

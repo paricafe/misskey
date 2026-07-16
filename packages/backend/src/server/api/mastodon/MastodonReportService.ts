@@ -57,7 +57,7 @@ export class MastodonReportService {
 			...rawInput,
 			comment: rawInput.comment ?? '',
 		};
-		const reports = await this.abuseReportService.report([{
+		const reports = await this.abuseReportService.reportAndGetCreated([{
 			targetUserId: targetUser.id,
 			targetUserHost: targetUser.host,
 			reporterId: reporter.id,
