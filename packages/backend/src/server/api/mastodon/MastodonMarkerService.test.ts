@@ -21,6 +21,7 @@ describe(MastodonMarkerService, () => {
 			updatedAt: Date;
 			expiresAt: null;
 		}>();
+		let lockTail = Promise.resolve();
 		const stateService = {
 			get: vi.fn(async (userId: string, kind: string, key: string) => {
 				const row = rows.get(key);
@@ -60,6 +61,24 @@ describe(MastodonMarkerService, () => {
 				rows.set(input.key, row);
 				return row;
 			}),
+			withUserKindLock: vi.fn(async (_userId: string, _kind: string, callback: (service: typeof stateService) => Promise<unknown>) => {
+				const previous = lockTail;
+				let release!: () => void;
+				lockTail = new Promise<void>(resolve => {
+					release = resolve;
+				});
+				await previous;
+				const snapshot = new Map([...rows.entries()].map(([key, row]) => [key, { ...row }]));
+				try {
+					return await callback(stateService);
+				} catch (error) {
+					rows.clear();
+					for (const [key, row] of snapshot) rows.set(key, row);
+					throw error;
+				} finally {
+					release();
+				}
+			}),
 		};
 		return { service: new MastodonMarkerService(stateService as never), stateService, rows };
 	}
@@ -98,19 +117,47 @@ describe(MastodonMarkerService, () => {
 		});
 	});
 
-	test('allows only one of two concurrent initial marker writes to create version one', async () => {
+	test('rolls back every timeline when one compare-and-set conflicts', async () => {
 		const { service, rows } = createService();
+		await service.update('u1', {
+			home: { last_read_id: '10' },
+			notifications: { last_read_id: '20' },
+		});
+
+		await expect(service.update('u1', {
+			home: { last_read_id: '11', version: 1 },
+			notifications: { last_read_id: '21', version: 0 },
+		})).rejects.toMatchObject({ statusCode: 409, code: 'conflict' });
+
+		expect(rows.get('home')).toMatchObject({ value: { lastReadId: '10' }, version: 1 });
+		expect(rows.get('notifications')).toMatchObject({ value: { lastReadId: '20' }, version: 1 });
+	});
+
+	test('validates every timeline before starting any marker write', async () => {
+		const { service, rows, stateService } = createService();
+
+		await expect(service.update('u1', {
+			home: { last_read_id: '10' },
+			notifications: { last_read_id: '' },
+		})).rejects.toMatchObject({ statusCode: 422 });
+		await Promise.resolve();
+
+		expect(rows.size).toBe(0);
+		expect(stateService.createIfAbsent).not.toHaveBeenCalled();
+		expect(stateService.compareAndSet).not.toHaveBeenCalled();
+	});
+
+	test('serializes concurrent no-version updates without surfacing a compatibility conflict', async () => {
+		const { service, rows, stateService } = createService();
 
 		const results = await Promise.allSettled([
 			service.update('u1', { home: { last_read_id: '10' } }),
 			service.update('u1', { home: { last_read_id: '20' } }),
 		]);
 
-		expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(1);
-		expect(results.filter(result => result.status === 'rejected')).toMatchObject([{
-			reason: { statusCode: 409, code: 'conflict' },
-		}]);
-		expect(rows.get('home')).toMatchObject({ version: 1 });
+		expect(results.every(result => result.status === 'fulfilled')).toBe(true);
+		expect(rows.get('home')).toMatchObject({ value: { lastReadId: '20' }, version: 2 });
+		expect(stateService.withUserKindLock).toHaveBeenCalledTimes(2);
 	});
 
 	test('rejects unsupported timelines and malformed last-read ids', async () => {

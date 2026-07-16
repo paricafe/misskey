@@ -43,7 +43,7 @@ export class MastodonMarkerService {
 		if (keys.some(key => !MASTODON_MARKER_TIMELINES.includes(key as MastodonMarkerTimeline))) {
 			this.invalid(`Markers support only ${MASTODON_MARKER_TIMELINES.join(', ')}`);
 		}
-		const updated = await Promise.all(keys.map(async key => {
+		const updates = keys.map(key => {
 			const timeline = key as MastodonMarkerTimeline;
 			const input = this.dictionary(body[timeline], timeline);
 			const lastReadId = input.last_read_id;
@@ -52,28 +52,36 @@ export class MastodonMarkerService {
 			if (suppliedVersion != null && (!Number.isInteger(suppliedVersion) || suppliedVersion < 0)) {
 				this.invalid(`${timeline}[version] must be a non-negative integer`);
 			}
-			const current = await this.mastodonApiStateService.get(userId, MARKER_KIND, timeline);
-			let row: MiMastodonUserState;
-			if (current == null) {
-				if (suppliedVersion != null && suppliedVersion !== 0) this.conflict();
-				row = await this.mastodonApiStateService.createIfAbsent({
-					userId,
-					kind: MARKER_KIND,
-					key: timeline,
-					value: { lastReadId },
-				});
-			} else {
-				row = await this.mastodonApiStateService.compareAndSet({
-					userId,
-					kind: MARKER_KIND,
-					key: timeline,
-					expectedVersion: suppliedVersion ?? current.version,
-					value: { lastReadId },
-				});
+			return { timeline, lastReadId, suppliedVersion };
+		});
+		if (updates.length === 0) return {};
+
+		return await this.mastodonApiStateService.withUserKindLock(userId, MARKER_KIND, async stateService => {
+			const updated: [MastodonMarkerTimeline, MastodonMarker][] = [];
+			for (const { timeline, lastReadId, suppliedVersion } of updates) {
+				const current = await stateService.get(userId, MARKER_KIND, timeline);
+				let row: MiMastodonUserState;
+				if (current == null) {
+					if (suppliedVersion != null && suppliedVersion !== 0) this.conflict();
+					row = await stateService.createIfAbsent({
+						userId,
+						kind: MARKER_KIND,
+						key: timeline,
+						value: { lastReadId },
+					});
+				} else {
+					row = await stateService.compareAndSet({
+						userId,
+						kind: MARKER_KIND,
+						key: timeline,
+						expectedVersion: suppliedVersion ?? current.version,
+						value: { lastReadId },
+					});
+				}
+				updated.push([timeline, this.marker(row)]);
 			}
-			return [timeline, this.marker(row)] as const;
-		}));
-		return Object.fromEntries(updated);
+			return Object.fromEntries(updated);
+		});
 	}
 
 	private timelines(value: unknown): MastodonMarkerTimeline[] {
