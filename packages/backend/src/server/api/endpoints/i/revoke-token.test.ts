@@ -10,6 +10,7 @@ import RevokeTokenEndpoint from './revoke-token.js';
 const me = { id: 'user-id' } as never;
 
 function createEndpoint(options: {
+	enableMastodonApi?: boolean;
 	mastodonDeleteAffected?: number;
 	mastodonToken?: { id: string } | null;
 } = {}) {
@@ -25,7 +26,7 @@ function createEndpoint(options: {
 	const endpoint = new RevokeTokenEndpoint(
 		accessTokensRepository as never,
 		mastodonTokensRepository as never,
-		{ host: 'misskey.test' } as never,
+		{ host: 'misskey.test', enableMastodonApi: options.enableMastodonApi ?? true } as never,
 		redis as never,
 	);
 
@@ -89,6 +90,28 @@ describe('api:i/revoke-token', () => {
 		expect(mastodonTokensRepository.delete).not.toHaveBeenCalledWith(expect.objectContaining({
 			userId: null,
 		}));
+		expect(redis.publish).not.toHaveBeenCalled();
+	});
+
+	test('revokes only native tokens by ID when Mastodon API is disabled', async () => {
+		const { endpoint, accessTokensRepository, mastodonTokensRepository, redis } = createEndpoint({ enableMastodonApi: false });
+
+		await endpoint.exec({ tokenId: 'nativetokenid1234' }, me, null);
+
+		expect(accessTokensRepository.delete).toHaveBeenCalledWith({ id: 'nativetokenid1234', userId: me.id });
+		expect(mastodonTokensRepository.delete).not.toHaveBeenCalled();
+		expect(mastodonTokensRepository.findOneBy).not.toHaveBeenCalled();
+		expect(redis.publish).not.toHaveBeenCalled();
+	});
+
+	test('revokes only native tokens by value when Mastodon API is disabled', async () => {
+		const { endpoint, accessTokensRepository, mastodonTokensRepository, redis } = createEndpoint({ enableMastodonApi: false });
+
+		await endpoint.exec({ token: 'native-token' }, me, null);
+
+		expect(accessTokensRepository.delete).toHaveBeenCalledWith({ token: 'native-token', userId: me.id });
+		expect(mastodonTokensRepository.delete).not.toHaveBeenCalled();
+		expect(mastodonTokensRepository.findOneBy).not.toHaveBeenCalled();
 		expect(redis.publish).not.toHaveBeenCalled();
 	});
 });

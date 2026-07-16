@@ -54,10 +54,12 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 		super(meta, paramDef, async (ps, me) => {
 			if ('tokenId' in ps) {
 				await this.accessTokensRepository.delete({ id: ps.tokenId, userId: me.id });
+				if (!this.config.enableMastodonApi) return;
 				const result = await this.mastodonOAuthTokensRepository.delete({ id: ps.tokenId, userId: me.id });
 				if (result.affected) await this.publishMastodonTokenRevoked(ps.tokenId);
 			} else if (ps.token) {
 				await this.accessTokensRepository.delete({ token: ps.token, userId: me.id });
+				if (!this.config.enableMastodonApi) return;
 				const mastodonToken = await this.mastodonOAuthTokensRepository.findOneBy({
 					tokenHash: digestCredential(ps.token),
 					userId: me.id,

@@ -55,6 +55,7 @@ function createMastodonToken(overrides: Record<string, unknown> = {}) {
 }
 
 function createEndpoint(options: {
+	enableMastodonApi?: boolean;
 	nativeTokens?: ReturnType<typeof createNativeToken>[];
 	mastodonTokens?: ReturnType<typeof createMastodonToken>[];
 	createdAtByNativeId?: Record<string, string>;
@@ -83,6 +84,7 @@ function createEndpoint(options: {
 		})),
 	};
 	const endpoint = new AppsEndpoint(
+		{ enableMastodonApi: options.enableMastodonApi ?? true } as never,
 		accessTokensRepository as never,
 		mastodonTokensRepository as never,
 		idService as never,
@@ -148,6 +150,21 @@ describe('api:i/apps', () => {
 			iconUrl: 'https://example.com/icon.png',
 			description: 'Native app description',
 		});
+	});
+
+	test('returns only native tokens without reading Mastodon storage when disabled', async () => {
+		const nativeToken = createNativeToken();
+		const { endpoint, mastodonTokensRepository } = createEndpoint({
+			enableMastodonApi: false,
+			nativeTokens: [nativeToken],
+			mastodonTokens: [createMastodonToken()],
+		});
+
+		const result = await endpoint.exec({}, me, null);
+
+		expect(result).toHaveLength(1);
+		expect(result[0].id).toBe(nativeToken.id);
+		expect(mastodonTokensRepository.find).not.toHaveBeenCalled();
 	});
 
 	test.each([

@@ -9,6 +9,7 @@ import type { AccessTokensRepository, MastodonOAuthTokensRepository } from '@/mo
 import { DI } from '@/di-symbols.js';
 import { IdService } from '@/core/IdService.js';
 import { MastodonScopeService } from '@/server/api/mastodon/MastodonScopeService.js';
+import type { Config } from '@/config.js';
 
 export const meta = {
 	requireCredential: true,
@@ -71,6 +72,9 @@ export const paramDef = {
 @Injectable()
 export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-disable-line import/no-default-export
 	constructor(
+		@Inject(DI.config)
+		private config: Config,
+
 		@Inject(DI.accessTokensRepository)
 		private accessTokensRepository: AccessTokensRepository,
 
@@ -93,13 +97,13 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				default: query.orderBy('token.id', 'ASC'); break;
 			}
 
-			const [tokens, mastodonTokens] = await Promise.all([
-				query.getMany(),
-				this.mastodonOAuthTokensRepository.find({
+			const tokens = await query.getMany();
+			const mastodonTokens = this.config.enableMastodonApi
+				? await this.mastodonOAuthTokensRepository.find({
 					where: { userId: me.id },
 					relations: { client: true },
-				}),
-			]);
+				})
+				: [];
 
 			const nativeItems = await Promise.all(tokens.map(token => ({
 				id: token.id,
