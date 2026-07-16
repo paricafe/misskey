@@ -3,7 +3,8 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { describe, expect, test } from 'vitest';
+import { parse as mfmParse } from 'mfm-js';
+import { describe, expect, test, vi } from 'vitest';
 import { MastodonEntityService } from './MastodonEntityService.js';
 
 const user = {
@@ -189,6 +190,50 @@ describe(MastodonEntityService, () => {
 			rule_ids: ['rule-1'],
 			collection_ids: ['collection-1'],
 			target_account: expect.objectContaining({ id: 'user-id', username: 'alice' }),
+		});
+	});
+
+	test('converts a Misskey announcement to Mastodon without concatenating unescaped HTML', () => {
+		const toHtml = vi.fn().mockReturnValue('<p>safe announcement</p>');
+		const announcementService = new MastodonEntityService(
+			{ url: 'https://misskey.example/' } as never,
+			{ toHtml } as never,
+		);
+
+		const announcement = announcementService.announcement({
+			id: 'announcement-id',
+			createdAt: '2026-07-15T01:02:03.000Z',
+			updatedAt: '2026-07-16T04:05:06.000Z',
+			title: 'Notice <script>',
+			text: 'Body **bold**',
+			isRead: true,
+		} as never);
+
+		expect(toHtml).toHaveBeenCalledWith(mfmParse('Notice <script>\n\nBody **bold**'));
+		expect(announcement).toEqual({
+			id: 'announcement-id',
+			content: '<p>safe announcement</p>',
+			starts_at: null,
+			ends_at: null,
+			all_day: false,
+			published_at: '2026-07-15T01:02:03.000Z',
+			updated_at: '2026-07-16T04:05:06.000Z',
+			read: true,
+			mentions: [],
+			statuses: [],
+			tags: [],
+			emojis: [],
+			reactions: [],
+		});
+		expect(announcementService.announcement({
+			id: 'unread-announcement-id',
+			createdAt: '2026-07-15T01:02:03.000Z',
+			updatedAt: null,
+			title: 'Unread',
+			text: 'Announcement',
+		} as never)).toMatchObject({
+			updated_at: '2026-07-15T01:02:03.000Z',
+			read: false,
 		});
 	});
 

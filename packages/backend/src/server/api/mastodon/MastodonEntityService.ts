@@ -265,6 +265,24 @@ export class MastodonEntityService {
 		};
 	}
 
+	public announcement(announcement: Packed<'Announcement'>) {
+		return {
+			id: announcement.id,
+			content: this.render(`${announcement.title}\n\n${announcement.text}`),
+			starts_at: null,
+			ends_at: null,
+			all_day: false,
+			published_at: announcement.createdAt,
+			updated_at: announcement.updatedAt ?? announcement.createdAt,
+			read: announcement.isRead ?? false,
+			mentions: [],
+			statuses: [],
+			tags: [],
+			emojis: [],
+			reactions: [],
+		};
+	}
+
 	public tag(name: string) {
 		return {
 			name,

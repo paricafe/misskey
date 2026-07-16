@@ -71,6 +71,7 @@ describe(MastodonApiServerService, () => {
 		const noteFavoritesRepository = { findBy: vi.fn().mockResolvedValue([]) };
 		const userNotePiningsRepository = { findBy: vi.fn().mockResolvedValue([]) };
 		const linkHeader = vi.fn().mockReturnValue('<next>; rel="next"');
+		const toMisskey = vi.fn().mockReturnValue({ limit: 20 });
 		const offsetLinkHeader = vi.fn((_requestUrl: string, offset: number, limit: number, hasMore: boolean) => {
 			const links = [
 				...(hasMore ? [`<next:${offset + limit}>; rel="next"`] : []),
@@ -140,6 +141,7 @@ describe(MastodonApiServerService, () => {
 					poll: value.poll ?? null,
 				})),
 				poll: vi.fn((noteId, poll) => ({ id: noteId, votes_count: poll.choices.reduce((total: number, choice: { votes: number }) => total + choice.votes, 0) })),
+				announcement: vi.fn(value => ({ id: value.id, content: value.text, read: value.isRead ?? false })),
 				report: vi.fn((report, _createdAt, _targetUser, input) => ({
 					id: report.id,
 					category: input.category,
@@ -158,7 +160,7 @@ describe(MastodonApiServerService, () => {
 				}),
 			} as never,
 			{
-				toMisskey: vi.fn().mockReturnValue({ limit: 20 }),
+				toMisskey,
 				linkHeader,
 				offsetLinkHeader,
 			} as never,
@@ -184,10 +186,88 @@ describe(MastodonApiServerService, () => {
 			noteFavoritesRepository,
 			userNotePiningsRepository,
 			linkHeader,
+			toMisskey,
 			offsetLinkHeader,
 			createReport,
 		};
 	}
+
+	test('lists announcements for user tokens with bounded Mastodon pagination', async () => {
+		const { fastify, authenticate, assert, nativeInvoke, toMisskey } = createServer();
+		toMisskey.mockReturnValueOnce({ limit: 37, untilId: 'older' });
+		nativeInvoke.mockImplementation(async name => name === 'announcements' ? [{
+			id: 'announcement-id',
+			createdAt: '2026-07-15T01:02:03.000Z',
+			updatedAt: null,
+			title: 'Notice',
+			text: 'Body',
+			isRead: true,
+		}] : []);
+
+		const response = await fastify.inject({
+			method: 'GET',
+			url: '/api/v1/announcements?limit=37&max_id=older',
+			headers: { authorization: 'Bearer user-token' },
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(response.json()).toEqual([{ id: 'announcement-id', content: 'Body', read: true }]);
+		expect(toMisskey).toHaveBeenCalledWith(expect.objectContaining({ limit: '37', max_id: 'older' }), 100);
+		expect(nativeInvoke).toHaveBeenCalledWith('announcements', {
+			limit: 37,
+			untilId: 'older',
+			isActive: true,
+		}, expect.any(Object), expect.any(Object));
+		expect(authenticate).toHaveBeenCalledWith('user-token');
+		expect(assert).not.toHaveBeenCalled();
+	});
+
+	test('requires a user token for announcements even though the route has no named scope', async () => {
+		const { fastify, authenticate } = createServer();
+		const missing = await fastify.inject({ method: 'GET', url: '/api/v1/announcements' });
+
+		authenticate.mockResolvedValueOnce({
+			kind: 'application',
+			user: null,
+			token: { id: 'application-token', scopes: ['read'] },
+		});
+		const application = await fastify.inject({
+			method: 'GET',
+			url: '/api/v1/announcements',
+			headers: { authorization: 'Bearer application-token' },
+		});
+
+		expect(missing.statusCode).toBe(401);
+		expect(application.statusCode).toBe(401);
+	});
+
+	test('dismisses announcements through the native read endpoint', async () => {
+		const { fastify, assert, nativeInvoke } = createServer();
+		const response = await fastify.inject({
+			method: 'POST',
+			url: '/api/v1/announcements/announcement-id/dismiss',
+			headers: { authorization: 'Bearer user-token' },
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(response.json()).toEqual({});
+		expect(assert).toHaveBeenCalledWith(['read'], 'write:accounts');
+		expect(nativeInvoke).toHaveBeenCalledWith('i/read-announcement', {
+			announcementId: 'announcement-id',
+		}, expect.any(Object), expect.any(Object));
+	});
+
+	test.each(['PUT', 'DELETE'] as const)('authenticates announcement reaction %s before returning 422', async method => {
+		const { fastify, assert } = createServer();
+		const response = await fastify.inject({
+			method,
+			url: '/api/v1/announcements/announcement-id/reactions/wave',
+			headers: { authorization: 'Bearer user-token' },
+		});
+
+		expect(response.statusCode).toBe(422);
+		expect(assert).toHaveBeenCalledWith(['read'], 'write:accounts');
+	});
 
 	test('registers every documented Mastodon 4.6.3 Fastify route exactly once', async () => {
 		const { fastify } = createServer();

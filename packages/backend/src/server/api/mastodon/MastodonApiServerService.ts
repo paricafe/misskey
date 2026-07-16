@@ -243,6 +243,7 @@ export class MastodonApiServerService {
 		this.registerNotifications(fastify);
 		this.registerSearch(fastify);
 		this.registerLists(fastify);
+		this.registerAnnouncements(fastify);
 		this.registerReports(fastify);
 		this.registerCompatibilityRoutes(fastify);
 
@@ -712,6 +713,20 @@ export class MastodonApiServerService {
 				forward: this.boolean(body.forward),
 			});
 			return this.mastodonEntityService.report(result.report, result.createdAt, result.targetUser, result.input);
+		}));
+	}
+
+	private registerAnnouncements(fastify: FastifyInstance): void {
+		fastify.get('/api/v1/announcements', (request, reply) => this.withAuth(request as MastodonRequest, undefined, async auth => {
+			const announcements = await this.invoke('announcements', {
+				...this.mastodonPaginationService.toMisskey(request.query as Dictionary, 100),
+				isActive: true,
+			}, auth, request as MastodonRequest) as Packed<'Announcement'>[];
+			return this.page(request, reply, announcements, announcements.map(announcement => this.mastodonEntityService.announcement(announcement)));
+		}));
+		fastify.post<{ Params: { id: string } }>('/api/v1/announcements/:id/dismiss', request => this.withAuth(request as MastodonRequest, 'write:accounts', async auth => {
+			await this.invoke('i/read-announcement', { announcementId: request.params.id }, auth, request as MastodonRequest);
+			return {};
 		}));
 	}
 
