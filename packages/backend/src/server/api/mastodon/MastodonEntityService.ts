@@ -505,7 +505,8 @@ export class MastodonEntityService {
 	}
 
 	private notificationType(type: Packed<'Notification'>['type']): string | null {
-		if (['mention', 'reply', 'quote'].includes(type)) return 'mention';
+		if (['mention', 'reply'].includes(type)) return 'mention';
+		if (type === 'quote') return 'quote';
 		if (type === 'note') return 'status';
 		if (type === 'renote' || type === 'renote:grouped') return 'reblog';
 		if (type === 'reaction' || type === 'reaction:grouped') return 'favourite';

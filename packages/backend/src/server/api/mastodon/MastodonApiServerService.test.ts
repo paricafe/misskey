@@ -13,6 +13,7 @@ import { MastodonApiServerService } from './MastodonApiServerService.js';
 import { MastodonFilterService } from './MastodonFilterService.js';
 import { MastodonMarkerService } from './MastodonMarkerService.js';
 import { MastodonNotificationService } from './MastodonNotificationService.js';
+import { MastodonPushSubscriptionService } from './MastodonPushSubscriptionService.js';
 import { MastodonScopeService } from './MastodonScopeService.js';
 import { MastodonUserFeatureService } from './MastodonUserFeatureService.js';
 
@@ -99,7 +100,7 @@ describe(MastodonApiServerService, () => {
 		const stateRows = new Map<string, {
 			id: string;
 			userId: string;
-			tokenId: null;
+			tokenId: string | null;
 			kind: string;
 			key: string;
 			value: unknown;
@@ -109,6 +110,7 @@ describe(MastodonApiServerService, () => {
 			expiresAt: Date | null;
 		}>();
 		const stateKey = (kind: string, key: string) => `${kind}:${key}`;
+		let pushStateSequence = 0;
 		let stateLockTail = Promise.resolve();
 		const mastodonApiStateService = {
 			list: vi.fn(async (userId: string, kind: string) => [...stateRows.values()].filter(row => row.userId === userId && row.kind === kind)),
@@ -121,14 +123,14 @@ describe(MastodonApiServerService, () => {
 				return row?.userId === userId ? [[key, row] as const] : [];
 			}))),
 			getById: vi.fn(async (id: string) => [...stateRows.values()].find(row => row.id === id) ?? null),
-			put: vi.fn(async (input: { userId: string; kind: string; key: string; value: unknown; expiresAt?: Date | null }) => {
+			put: vi.fn(async (input: { userId: string; tokenId?: string | null; kind: string; key: string; value: unknown; expiresAt?: Date | null }) => {
 				const mapKey = stateKey(input.kind, input.key);
 				const previous = stateRows.get(mapKey);
 				const now = new Date();
 				const row = {
 					id: previous?.id ?? `state-${mapKey}`,
 					userId: input.userId,
-					tokenId: null,
+					tokenId: input.tokenId ?? null,
 					kind: input.kind,
 					key: input.key,
 					value: input.value,
@@ -140,7 +142,7 @@ describe(MastodonApiServerService, () => {
 				stateRows.set(mapKey, row);
 				return row;
 			}),
-			createIfAbsent: vi.fn(async (input: { userId: string; kind: string; key: string; value: unknown; expiresAt?: Date | null }) => {
+			createIfAbsent: vi.fn(async (input: { userId: string; tokenId?: string | null; kind: string; key: string; value: unknown; expiresAt?: Date | null }) => {
 				const mapKey = stateKey(input.kind, input.key);
 				if (stateRows.has(mapKey)) {
 					throw Object.assign(new MastodonApiError(409, 'conflict', 'The compatibility state has changed'), { code: 'conflict' });
@@ -149,7 +151,7 @@ describe(MastodonApiServerService, () => {
 				const row = {
 					id: `state-${mapKey}`,
 					userId: input.userId,
-					tokenId: null,
+					tokenId: input.tokenId ?? null,
 					kind: input.kind,
 					key: input.key,
 					value: input.value,
@@ -161,11 +163,11 @@ describe(MastodonApiServerService, () => {
 				stateRows.set(mapKey, row);
 				return row;
 			}),
-			createWithId: vi.fn(async (input: { id: string; userId: string; kind: string; key: string; value: unknown; expiresAt?: Date | null }) => {
+			createWithId: vi.fn(async (input: { id: string; userId: string; tokenId?: string | null; kind: string; key: string; value: unknown; expiresAt?: Date | null }) => {
 				const mapKey = stateKey(input.kind, input.key);
 				if (stateRows.has(mapKey)) throw new MastodonApiError(409, 'conflict', 'The compatibility state has changed');
 				const now = new Date();
-				const row = { ...input, tokenId: null, version: 1, createdAt: now, updatedAt: now, expiresAt: input.expiresAt ?? null };
+				const row = { ...input, tokenId: input.tokenId ?? null, version: 1, createdAt: now, updatedAt: now, expiresAt: input.expiresAt ?? null };
 				stateRows.set(mapKey, row);
 				return row;
 			}),
@@ -199,6 +201,11 @@ describe(MastodonApiServerService, () => {
 			}),
 			withUserKindLocks: vi.fn(async (_locks: unknown[], callback: (service: unknown) => Promise<unknown>) => await callback(mastodonApiStateService)),
 		};
+		const mastodonPushSubscriptionService = new MastodonPushSubscriptionService({
+			enableServiceWorker: true,
+			swPublicKey: 'BFoYnP6n4Huwsti9ptCZtqxxQTT5KpSdGfB8loT2pXzzZYNhOJ4lzcAmndO7ad8LFftUdmUXIZ3Zg-5JSZiu4f0',
+			swPrivateKey: 'nCqedreHEKZ54ZtuMX-1ZPkyK1H7e7itEemL_afgvUE',
+		} as never, mastodonApiStateService as never, { gen: vi.fn(() => `push-state-${++pushStateSequence}`) } as never);
 		const mastodonFilterService = new MastodonFilterService(mastodonApiStateService as never);
 		const mastodonMarkerService = new MastodonMarkerService(mastodonApiStateService as never);
 		const profiles = new Map([['user-id', { userId: 'user-id', mutedInstances: [] as string[] }]]);
@@ -457,6 +464,7 @@ describe(MastodonApiServerService, () => {
 			mastodonNotificationService,
 			{ get: getScheduledStatus } as never,
 			{ create: createReport } as never,
+			mastodonPushSubscriptionService,
 			mastodonUserFeatureService,
 			redis as never,
 		);
@@ -1301,6 +1309,19 @@ describe(MastodonApiServerService, () => {
 		}
 	});
 
+	test('declares the complete user push-subscription lifecycle as implemented with push scope', () => {
+		const contract = (method: string) => MASTODON_4_6_USER_ROUTES.find(route => route.method === method && route.path === '/api/v1/push/subscription');
+
+		for (const method of ['POST', 'GET', 'PUT', 'DELETE']) {
+			expect(contract(method)).toMatchObject({
+				behavior: 'implemented',
+				auth: 'user',
+				scope: 'push',
+			});
+		}
+		expect(contract('POST')?.requiredBody).toBeUndefined();
+	});
+
 	test('declares exact stateful tag, endorsement, domain-block, and status-mute contracts', () => {
 		const contract = (method: string, path: string) => MASTODON_4_6_USER_ROUTES.find(route => route.method === method && route.path === path);
 		expect(contract('POST', '/api/v1/tags/:name/follow')).toMatchObject({ behavior: 'implemented', scope: 'write:follows', entity: 'Tag', introducedIn: '4.0.0' });
@@ -1589,6 +1610,39 @@ describe(MastodonApiServerService, () => {
 		expect(unauthenticated.statusCode).toBe(401);
 		expect(authenticated.statusCode).toBe(404);
 		expect(authenticated.json()).toEqual({ error: 'Record not found' });
+	});
+
+	test('serves the JSON and bracket-form push subscription lifecycle per bearer token', async () => {
+		const { fastify, assert } = createServer();
+		const headers = { authorization: 'Bearer user-token' };
+		const p256dh = 'BFoYnP6n4Huwsti9ptCZtqxxQTT5KpSdGfB8loT2pXzzZYNhOJ4lzcAmndO7ad8LFftUdmUXIZ3Zg-5JSZiu4f0';
+		const clientAuth = 'MLACbMpb8aYGL4nf4aiwCA';
+		const created = await fastify.inject({ method: 'POST', url: '/api/v1/push/subscription', headers, payload: {
+			subscription: { endpoint: 'https://push.example/json', keys: { p256dh, auth: clientAuth }, standard: true },
+			data: { policy: 'all', alerts: { mention: true } },
+		} });
+		expect(created.statusCode).toBe(200);
+		expect(created.json()).toMatchObject({ id: 'push-state-1', endpoint: 'https://push.example/json', standard: true });
+		expect(created.json()).not.toHaveProperty('policy');
+		expect((await fastify.inject({ method: 'GET', url: '/api/v1/push/subscription', headers })).json()).toEqual(created.json());
+
+		const updated = await fastify.inject({ method: 'PUT', url: '/api/v1/push/subscription', headers, payload: { data: { alerts: { poll: true } } } });
+		expect(updated.json()).toMatchObject({ id: 'push-state-1', endpoint: 'https://push.example/json', alerts: { mention: false, poll: true } });
+
+		const form = new URLSearchParams({
+			'subscription[endpoint]': 'https://push.example/form',
+			'subscription[keys][p256dh]': p256dh,
+			'subscription[keys][auth]': clientAuth,
+			'data[policy]': 'followed',
+			'data[alerts][quote]': 'true',
+		});
+		const replaced = await fastify.inject({ method: 'POST', url: '/api/v1/push/subscription', headers: { ...headers, 'content-type': 'application/x-www-form-urlencoded' }, payload: form.toString() });
+		expect(replaced.statusCode).toBe(200);
+		expect(replaced.json()).toMatchObject({ id: 'push-state-2', endpoint: 'https://push.example/form', alerts: { quote: true } });
+		expect(assert).toHaveBeenCalledWith(['read'], 'push');
+
+		expect((await fastify.inject({ method: 'DELETE', url: '/api/v1/push/subscription', headers })).json()).toEqual({});
+		expect((await fastify.inject({ method: 'GET', url: '/api/v1/push/subscription', headers })).statusCode).toBe(404);
 	});
 
 	test('persists filter writes only after authentication and scope checks', async () => {
@@ -2057,7 +2111,10 @@ describe(MastodonApiServerService, () => {
 		});
 
 		expect(response.statusCode).toBe(200);
-		expect(response.json()).toMatchObject({ client_id: 'client-id', client_secret: 'client-secret' });
+		expect(response.json()).toMatchObject({
+			client_id: 'client-id', client_secret: 'client-secret',
+			vapid_key: 'BFoYnP6n4Huwsti9ptCZtqxxQTT5KpSdGfB8loT2pXzzZYNhOJ4lzcAmndO7ad8LFftUdmUXIZ3Zg-5JSZiu4f0',
+		});
 		expect(registerApplication).toHaveBeenCalledWith(expect.objectContaining({ client_name: 'Elk' }));
 	});
 
@@ -2083,6 +2140,7 @@ describe(MastodonApiServerService, () => {
 		});
 
 		expect(response.statusCode).toBe(200);
+		expect(response.json()).toMatchObject({ vapid_key: 'BFoYnP6n4Huwsti9ptCZtqxxQTT5KpSdGfB8loT2pXzzZYNhOJ4lzcAmndO7ad8LFftUdmUXIZ3Zg-5JSZiu4f0' });
 		expect(getApplication).toHaveBeenCalledWith('client-id');
 		expect(assert).not.toHaveBeenCalled();
 	});
@@ -3381,6 +3439,7 @@ describe(MastodonApiServerService, () => {
 			configuration: {
 				accounts: { max_pinned_statuses: 5 },
 				urls: { streaming: 'wss://misskey.example/api/v1/streaming' },
+				vapid: { public_key: 'BFoYnP6n4Huwsti9ptCZtqxxQTT5KpSdGfB8loT2pXzzZYNhOJ4lzcAmndO7ad8LFftUdmUXIZ3Zg-5JSZiu4f0' },
 			},
 			rules: [{ id: '1', text: 'Be kind', hint: '' }],
 		});

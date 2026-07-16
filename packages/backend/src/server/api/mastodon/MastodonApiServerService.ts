@@ -32,6 +32,7 @@ import { MastodonMarkerService, type MastodonMarkerTimeline } from './MastodonMa
 import { MastodonOAuthService } from './MastodonOAuthService.js';
 import { MastodonNotificationService, type MastodonNotificationSource } from './MastodonNotificationService.js';
 import { MastodonPaginationService } from './MastodonPaginationService.js';
+import { MastodonPushSubscriptionService } from './MastodonPushSubscriptionService.js';
 import { MastodonReportService } from './MastodonReportService.js';
 import { MastodonScheduledStatusService } from './MastodonScheduledStatusService.js';
 import { MastodonScopeService } from './MastodonScopeService.js';
@@ -75,6 +76,7 @@ export class MastodonApiServerService {
 		private mastodonNotificationService: MastodonNotificationService,
 		private mastodonScheduledStatusService: MastodonScheduledStatusService,
 		private mastodonReportService: MastodonReportService,
+		private mastodonPushSubscriptionService: MastodonPushSubscriptionService,
 		private mastodonUserFeatureService: MastodonUserFeatureService,
 
 		@Inject(DI.redis)
@@ -107,7 +109,7 @@ export class MastodonApiServerService {
 
 		fastify.post<{ Body: Dictionary }>('/api/v1/apps', async request => {
 			await this.assertApplicationRegistrationRate(request.ip);
-			return await this.mastodonOAuthService.registerApplication(request.body as MastodonApplicationRegistration);
+			return { ...await this.mastodonOAuthService.registerApplication(request.body as MastodonApplicationRegistration), vapid_key: this.mastodonPushSubscriptionService.vapidPublicKey() };
 		});
 		fastify.get('/api/v1/instance', request => this.withOptionalToken(request as MastodonRequest, async () => this.instanceV1()));
 		fastify.get('/api/v2/instance', request => this.withOptionalToken(request as MastodonRequest, async () => this.instanceV2()));
@@ -228,7 +230,7 @@ export class MastodonApiServerService {
 			return this.mastodonEntityService.credentialAccount(user as Packed<'MeDetailed'>);
 		}));
 		fastify.get('/api/v1/apps/verify_credentials', request => this.withAnyToken(request as MastodonRequest, async auth => {
-			return await this.mastodonOAuthService.getApplication(auth.token.clientId);
+			return { ...await this.mastodonOAuthService.getApplication(auth.token.clientId), vapid_key: this.mastodonPushSubscriptionService.vapidPublicKey() };
 		}));
 		fastify.get('/api/v1/preferences', request => this.withAuth(request as MastodonRequest, 'read:accounts', async () => ({
 			'posting:default:visibility': 'public',
@@ -301,6 +303,7 @@ export class MastodonApiServerService {
 		this.registerTimelines(fastify);
 		this.registerStatuses(fastify);
 		this.registerNotifications(fastify);
+		this.registerPushSubscriptions(fastify);
 		this.registerSearch(fastify);
 		this.registerLists(fastify);
 		this.registerScheduledStatuses(fastify);
@@ -313,6 +316,21 @@ export class MastodonApiServerService {
 		this.registerCompatibilityRoutes(fastify);
 
 		done();
+	}
+
+	private registerPushSubscriptions(fastify: FastifyInstance): void {
+		fastify.post<{ Body: Dictionary }>('/api/v1/push/subscription', request => this.withAuth(request as MastodonRequest, 'push', async auth => {
+			return await this.mastodonPushSubscriptionService.create(auth, this.bearerToken(request as MastodonRequest)!, request.body ?? {});
+		}));
+		fastify.get('/api/v1/push/subscription', request => this.withAuth(request as MastodonRequest, 'push', async auth => {
+			return await this.mastodonPushSubscriptionService.get(auth);
+		}));
+		fastify.put<{ Body: Dictionary }>('/api/v1/push/subscription', request => this.withAuth(request as MastodonRequest, 'push', async auth => {
+			return await this.mastodonPushSubscriptionService.update(auth, request.body ?? {});
+		}));
+		fastify.delete('/api/v1/push/subscription', request => this.withAuth(request as MastodonRequest, 'push', async auth => {
+			return await this.mastodonPushSubscriptionService.delete(auth);
+		}));
 	}
 
 	private registerRelationshipActions(fastify: FastifyInstance): void {
@@ -2269,6 +2287,7 @@ export class MastodonApiServerService {
 			languages: this.meta.langs,
 			configuration: {
 				urls: { streaming: this.streamingUrl() },
+				vapid: { public_key: this.mastodonPushSubscriptionService.vapidPublicKey() },
 				accounts: { max_pinned_statuses: this.meta.policies.pinLimit ?? 5 },
 				statuses: { max_characters: MAX_NOTE_TEXT_LENGTH, max_media_attachments: 16, characters_reserved_per_url: 23 },
 				media_attachments: {
