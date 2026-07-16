@@ -37,6 +37,7 @@ import { MastodonScopeService } from './api/mastodon/MastodonScopeService.js';
 import { MastodonApiServerService } from './api/mastodon/MastodonApiServerService.js';
 import { MastodonEntityService } from './api/mastodon/MastodonEntityService.js';
 import { MastodonPaginationService } from './api/mastodon/MastodonPaginationService.js';
+import { MastodonReportService } from './api/mastodon/MastodonReportService.js';
 import { MastodonStreamingApiServerService } from './api/mastodon/MastodonStreamingApiServerService.js';
 
 import MainStreamConnection from '@/server/api/stream/Connection.js';
@@ -119,6 +120,7 @@ import { SigninWithPasskeyApiService } from './api/SigninWithPasskeyApiService.j
 		MastodonApiServerService,
 		MastodonEntityService,
 		MastodonPaginationService,
+		MastodonReportService,
 		MastodonStreamingApiServerService,
 	],
 	exports: [

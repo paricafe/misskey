@@ -79,6 +79,12 @@ describe(MastodonApiServerService, () => {
 			return links.length === 0 ? null : links.join(', ');
 		});
 		const mastodonNotificationService = new MastodonNotificationService(redis as never);
+		const createReport = vi.fn(async (_reporter: unknown, input: Record<string, unknown>) => ({
+			report: { id: 'report-id', resolved: false, forwarded: false },
+			createdAt: '2026-07-16T01:02:03.000Z',
+			targetUser: { id: input.accountId, username: 'reported' },
+			input,
+		}));
 		const service = new MastodonApiServerService(
 			{ url: 'https://misskey.example/', host: 'misskey.example', version: '2026.7.0', maxFileSize: 10_000_000 } as never,
 			{
@@ -134,6 +140,11 @@ describe(MastodonApiServerService, () => {
 					poll: value.poll ?? null,
 				})),
 				poll: vi.fn((noteId, poll) => ({ id: noteId, votes_count: poll.choices.reduce((total: number, choice: { votes: number }) => total + choice.votes, 0) })),
+				report: vi.fn((report, _createdAt, _targetUser, input) => ({
+					id: report.id,
+					category: input.category,
+					status_ids: input.statusIds,
+				})),
 				notification: vi.fn(value => value.user == null ? null : {
 					id: value.id,
 					type: value.type === 'reaction' || value.type === 'reaction:grouped'
@@ -152,6 +163,7 @@ describe(MastodonApiServerService, () => {
 				offsetLinkHeader,
 			} as never,
 			mastodonNotificationService,
+			{ create: createReport } as never,
 			redis as never,
 		);
 		const fastify = Fastify();
@@ -173,6 +185,7 @@ describe(MastodonApiServerService, () => {
 			userNotePiningsRepository,
 			linkHeader,
 			offsetLinkHeader,
+			createReport,
 		};
 	}
 
@@ -677,6 +690,73 @@ describe(MastodonApiServerService, () => {
 			avatarId: 'avatar-file',
 			bannerId: 'header-file',
 		}, expect.any(Object), expect.any(Object));
+	});
+
+	test('creates a persisted report after resolving every bracketed status ID', async () => {
+		const { fastify, nativeInvoke, createReport } = createServer();
+		nativeInvoke.mockImplementation(async (name, data) => name === 'notes/show'
+			? { id: data.noteId, userId: 'target-id' }
+			: []);
+		const body = new URLSearchParams();
+		body.set('account_id', 'target-id');
+		body.set('category', 'violation');
+		body.set('forward', 'true');
+		for (const id of ['status-1', 'status-2']) body.append('status_ids[]', id);
+		body.append('rule_ids[]', 'rule-1');
+		body.append('collection_ids[]', 'collection-1');
+		body.append('forward_to_domains[]', 'moderation.example');
+
+		const response = await fastify.inject({
+			method: 'POST',
+			url: '/api/v1/reports',
+			headers: {
+				authorization: 'Bearer user-token',
+				'content-type': 'application/x-www-form-urlencoded',
+			},
+			payload: body.toString(),
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(response.json()).toEqual({ id: 'report-id', category: 'violation', status_ids: ['status-1', 'status-2'] });
+		expect(nativeInvoke).toHaveBeenCalledWith('notes/show', { noteId: 'status-1' }, expect.any(Object), expect.any(Object));
+		expect(nativeInvoke).toHaveBeenCalledWith('notes/show', { noteId: 'status-2' }, expect.any(Object), expect.any(Object));
+		expect(createReport).toHaveBeenCalledWith(expect.objectContaining({ id: 'user-id' }), {
+			accountId: 'target-id',
+			comment: '',
+			category: 'violation',
+			statusIds: ['status-1', 'status-2'],
+			ruleIds: ['rule-1'],
+			collectionIds: ['collection-1'],
+			forwardToDomains: ['moderation.example'],
+			forward: true,
+		});
+	});
+
+	test('rejects a report status authored by another account', async () => {
+		const { fastify, nativeInvoke, createReport } = createServer();
+		nativeInvoke.mockResolvedValueOnce({ id: 'status-1', userId: 'different-user' });
+
+		const response = await fastify.inject({
+			method: 'POST',
+			url: '/api/v1/reports',
+			headers: { authorization: 'Bearer user-token' },
+			payload: { account_id: 'target-id', status_ids: ['status-1'] },
+		});
+
+		expect(response.statusCode).toBe(422);
+		expect(createReport).not.toHaveBeenCalled();
+	});
+
+	test('requires report account_id without invoking persistence', async () => {
+		const { fastify, createReport } = createServer();
+		const response = await fastify.inject({
+			method: 'POST',
+			url: '/api/v1/reports',
+			headers: { authorization: 'Bearer user-token' },
+		});
+
+		expect(response.statusCode).toBe(400);
+		expect(createReport).not.toHaveBeenCalled();
 	});
 
 	test('serves public routes anonymously when Authorization is absent', async () => {

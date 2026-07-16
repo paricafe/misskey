@@ -9,7 +9,9 @@ import { MfmService } from '@/core/MfmService.js';
 import type { Config } from '@/config.js';
 import { DI } from '@/di-symbols.js';
 import type { Packed } from '@/misc/json-schema.js';
+import type { MiAbuseUserReport } from '@/models/AbuseUserReport.js';
 import { extractMentions } from '@/misc/extract-mentions.js';
+import type { MastodonReportInput } from './MastodonReportService.js';
 
 type PackedUser = Packed<'UserLite'> & Partial<Packed<'UserDetailedNotMeOnly'>>;
 
@@ -244,6 +246,22 @@ export class MastodonEntityService {
 			title: list.name,
 			replies_policy: 'list',
 			exclusive: false,
+		};
+	}
+
+	public report(report: MiAbuseUserReport, createdAt: string, targetUser: PackedUser, input: MastodonReportInput) {
+		return {
+			id: report.id,
+			action_taken: report.resolved,
+			action_taken_at: null,
+			category: input.category,
+			comment: input.comment,
+			forwarded: report.forwarded,
+			created_at: createdAt,
+			status_ids: input.statusIds,
+			rule_ids: input.ruleIds,
+			collection_ids: input.collectionIds,
+			target_account: this.account(targetUser),
 		};
 	}
 

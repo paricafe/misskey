@@ -67,11 +67,12 @@ export class AbuseReportService {
 			reports.push(report);
 		}
 
-		return Promise.all([
+		await Promise.all([
 			this.abuseReportNotificationService.notifyAdminStream(reports),
 			this.abuseReportNotificationService.notifySystemWebhook(reports, 'abuseReport'),
 			this.abuseReportNotificationService.notifyMail(reports),
 		]);
+		return reports;
 	}
 
 	/**

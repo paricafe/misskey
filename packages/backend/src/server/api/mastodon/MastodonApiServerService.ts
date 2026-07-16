@@ -28,6 +28,7 @@ import { MastodonEntityService } from './MastodonEntityService.js';
 import { MastodonOAuthService } from './MastodonOAuthService.js';
 import { MastodonNotificationService } from './MastodonNotificationService.js';
 import { MastodonPaginationService } from './MastodonPaginationService.js';
+import { MastodonReportService } from './MastodonReportService.js';
 import { MastodonScopeService } from './MastodonScopeService.js';
 import { MastodonApiError, sendMastodonError } from './errors.js';
 import type { MastodonAuth, MastodonUserAuth } from './types.js';
@@ -62,6 +63,7 @@ export class MastodonApiServerService {
 		private mastodonEntityService: MastodonEntityService,
 		private mastodonPaginationService: MastodonPaginationService,
 		private mastodonNotificationService: MastodonNotificationService,
+		private mastodonReportService: MastodonReportService,
 
 		@Inject(DI.redis)
 		private redis: Redis.Redis,
@@ -241,6 +243,7 @@ export class MastodonApiServerService {
 		this.registerNotifications(fastify);
 		this.registerSearch(fastify);
 		this.registerLists(fastify);
+		this.registerReports(fastify);
 		this.registerCompatibilityRoutes(fastify);
 
 		done();
@@ -680,6 +683,36 @@ export class MastodonApiServerService {
 				return this.mastodonEntityService.profile(user as Packed<'MeDetailed'>);
 			}));
 		}
+	}
+
+	private registerReports(fastify: FastifyInstance): void {
+		fastify.post('/api/v1/reports', request => this.withAuth(request as MastodonRequest, 'write:reports', async auth => {
+			const body = (request.body as Dictionary | undefined) ?? {};
+			const accountId = this.string(body.account_id);
+			if (accountId == null || accountId === '') throw new MastodonApiError(400, 'invalid_request', 'account_id is required');
+			const category = this.string(body.category) ?? 'other';
+			if (category !== 'spam' && category !== 'violation' && category !== 'other') {
+				throw new MastodonApiError(422, 'unprocessable_entity', `Unsupported report category: ${category}`);
+			}
+			const statusIds = this.strings(body['status_ids[]'] ?? body.status_ids);
+			for (const statusId of statusIds) {
+				const note = await this.invoke('notes/show', { noteId: statusId }, auth, request as MastodonRequest) as Packed<'Note'>;
+				if (note.userId !== accountId) {
+					throw new MastodonApiError(422, 'unprocessable_entity', 'Every reported status must belong to the reported account');
+				}
+			}
+			const result = await this.mastodonReportService.create(auth.user, {
+				accountId,
+				comment: this.string(body.comment) ?? '',
+				category,
+				statusIds,
+				ruleIds: this.strings(body['rule_ids[]'] ?? body.rule_ids),
+				collectionIds: this.strings(body['collection_ids[]'] ?? body.collection_ids),
+				forwardToDomains: this.strings(body['forward_to_domains[]'] ?? body.forward_to_domains),
+				forward: this.boolean(body.forward),
+			});
+			return this.mastodonEntityService.report(result.report, result.createdAt, result.targetUser, result.input);
+		}));
 	}
 
 	private async updateProfile(request: MastodonRequest, response: 'profile' | 'credential-account'): Promise<Dictionary> {

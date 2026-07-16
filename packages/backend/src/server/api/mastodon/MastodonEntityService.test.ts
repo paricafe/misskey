@@ -161,6 +161,37 @@ describe(MastodonEntityService, () => {
 		});
 	});
 
+	test('converts the persisted abuse record to the Mastodon Report entity', () => {
+		const report = service.report({
+			id: 'report-id',
+			resolved: false,
+			forwarded: true,
+		} as never, '2026-07-16T01:02:03.000Z', user as never, {
+			accountId: 'user-id',
+			comment: 'Please review this account.',
+			category: 'violation',
+			statusIds: ['status-1'],
+			ruleIds: ['rule-1'],
+			collectionIds: ['collection-1'],
+			forwardToDomains: ['moderation.example'],
+			forward: true,
+		});
+
+		expect(report).toEqual({
+			id: 'report-id',
+			action_taken: false,
+			action_taken_at: null,
+			category: 'violation',
+			comment: 'Please review this account.',
+			forwarded: true,
+			created_at: '2026-07-16T01:02:03.000Z',
+			status_ids: ['status-1'],
+			rule_ids: ['rule-1'],
+			collection_ids: ['collection-1'],
+			target_account: expect.objectContaining({ id: 'user-id', username: 'alice' }),
+		});
+	});
+
 	test('converts a URL to a complete Mastodon trend link entity', () => {
 		expect(service.trendLink('https://example.com/article')).toEqual({
 			url: 'https://example.com/article',

@@ -283,7 +283,7 @@ export const MASTODON_4_6_USER_ROUTES: readonly MastodonContractRoute[] = [
 	unsupported('POST', '/api/v1/announcements/:id/dismiss', 'user', 'write:accounts', 'Object', '3.1.0'),
 	unsupported('PUT', '/api/v1/announcements/:announcement_id/reactions/:id', 'user', 'write:accounts', 'Object', '3.1.0'),
 	unsupported('DELETE', '/api/v1/announcements/:announcement_id/reactions/:id', 'user', 'write:accounts', 'Object', '3.1.0'),
-	unsupported('POST', '/api/v1/reports', 'user', 'write:reports', 'Report', '1.1.0', ['account_id']),
+	implemented('POST', '/api/v1/reports', 'user', 'write:reports', 'Report', '1.1.0'),
 	implemented('GET', '/api/v1/preferences', 'user', 'read:accounts', 'Preferences', '2.8.0'),
 	safeArray('GET', '/api/v1/donation_campaigns', 'user', undefined, 'DonationCampaign[]', '4.6.0'),
 	safeArray('GET', '/api/v1/annual_reports', 'user', undefined, 'AnnualReport[]', '4.6.0'),
