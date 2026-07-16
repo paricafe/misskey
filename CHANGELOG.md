@@ -17,6 +17,7 @@
 - Enhance: Improve Mastodon API compatibility for search, trends, suggestions, tags, and entity responses
 - Enhance: Expand Mastodon API compatibility for profiles, reports, announcements, scheduled statuses, status history, quotes, account relationships, and instance discovery
 - Fix: Prevent a duplicate Mastodon instance peers route from blocking server startup
+- Fix: Prevent `users/recommendation` from generating invalid SQL when filtering blocked users
 
 ## 2026.7.0
 
