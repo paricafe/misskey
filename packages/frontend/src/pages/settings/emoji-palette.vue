@@ -272,7 +272,7 @@ function delPalette(id: string) {
 	}
 }
 
-function getHTMLElement(ev: PointerEvent): HTMLElement {
+function getHTMLElement(ev: Event): HTMLElement {
 	const target = ev.currentTarget ?? ev.target;
 	return target as HTMLElement;
 }

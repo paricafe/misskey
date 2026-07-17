@@ -184,6 +184,9 @@ id: "aidx"
 #   ┌─────────────────────┐
 #───┘ Other configuration └─────────────────────────────────────
 
+# Enable the Mastodon-compatible API (default: true)
+#enableMastodonApi: true
+
 # Whether disable HSTS
 #disableHsts: true
 

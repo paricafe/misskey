@@ -18,12 +18,12 @@ export class MiMastodonOAuthToken {
 	public tokenHash: string;
 
 	@Index('IDX_mastodon_oauth_token_user_id')
-	@Column(id())
-	public userId: MiUser['id'];
+	@Column({ ...id(), nullable: true })
+	public userId: MiUser['id'] | null;
 
-	@ManyToOne(() => MiUser, { onDelete: 'CASCADE' })
+	@ManyToOne(() => MiUser, { nullable: true, onDelete: 'CASCADE' })
 	@JoinColumn({ name: 'userId', foreignKeyConstraintName: 'FK_mastodon_oauth_token_user_id' })
-	public user: MiUser;
+	public user: MiUser | null;
 
 	@Index('IDX_mastodon_oauth_token_client_id')
 	@Column(id())

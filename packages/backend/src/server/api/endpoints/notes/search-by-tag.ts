@@ -62,6 +62,7 @@ export const paramDef = {
 		{
 			type: 'object',
 			properties: {
+				localHostOnly: { type: 'boolean', default: false },
 				reply: { type: 'boolean', nullable: true, default: null },
 				renote: { type: 'boolean', nullable: true, default: null },
 				withFiles: {

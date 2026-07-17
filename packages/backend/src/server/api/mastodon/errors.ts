@@ -38,6 +38,14 @@ export function sendMastodonError(reply: FastifyReply, error: unknown): void {
 	if (mastodonError.statusCode === 401 && !mastodonError.oauth) {
 		reply.header('WWW-Authenticate', 'Bearer realm="Mastodon", error="invalid_token"');
 	}
+	if (error instanceof ApiError && mastodonError.statusCode === 429) {
+		const resetMs = typeof error.info === 'object' && error.info != null && 'resetMs' in error.info
+			? error.info.resetMs
+			: undefined;
+		if (typeof resetMs === 'number') {
+			reply.header('Retry-After', Math.max(0, Math.ceil((resetMs - Date.now()) / 1000)).toString(10));
+		}
+	}
 	reply.code(mastodonError.statusCode);
 	reply.send(mastodonError.oauth
 		? { error: mastodonError.error, error_description: mastodonError.description }

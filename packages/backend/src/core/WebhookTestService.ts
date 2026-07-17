@@ -72,6 +72,8 @@ function generateDummyUser(override?: Partial<MiUser>): MiUser {
 function generateDummyNote(override?: Partial<MiNote>): MiNote {
 	return {
 		id: 'dummy-note-1',
+		updatedAt: null,
+		history: null,
 		replyId: null,
 		reply: null,
 		renoteId: null,

@@ -36,13 +36,8 @@ SPDX-License-Identifier: AGPL-3.0-only
 					<MkFolder v-if="$i && $i.policies.canImportNotes" :defaultOpen="true">
 						<template #label>{{ i18n.ts.import }}</template>
 						<template #icon><i class="ti ti-upload"></i></template>
-						<MkRadios v-model="noteType" style="padding-bottom: 8px;" small>
+						<MkRadios v-model="noteType" :options="noteTypeOptions" style="padding-bottom: 8px;" small>
 							<template #label>Origin</template>
-							<option value="Misskey">Misskey/Firefish</option>
-							<option value="Mastodon">Mastodon/Pleroma/Akkoma</option>
-							<option value="Twitter">Twitter</option>
-							<option value="Instagram">Instagram</option>
-							<option value="Facebook">Facebook</option>
 						</MkRadios>
 						<MkButton primary :class="$style.button" inline @click="importNotes($event)"><i class="ti ti-upload"></i> {{ i18n.ts.import }}</MkButton>
 					</MkFolder>
@@ -201,7 +196,14 @@ import { prefer } from '@/preferences.js';
 
 const excludeMutingUsers = ref(false);
 const excludeInactiveUsers = ref(false);
-const noteType = ref(null);
+const noteTypeOptions = [
+	{ value: 'Misskey', label: 'Misskey/Firefish' },
+	{ value: 'Mastodon', label: 'Mastodon/Pleroma/Akkoma' },
+	{ value: 'Twitter', label: 'Twitter' },
+	{ value: 'Instagram', label: 'Instagram' },
+	{ value: 'Facebook', label: 'Facebook' },
+];
+const noteType = ref('Misskey');
 const withReplies = ref(prefer.s.defaultFollowWithReplies);
 
 const onExportSuccess = () => {
@@ -239,8 +241,11 @@ const exportData = () => {
 	});
 };
 
-const importNotes = async (ev) => {
-	const file = await selectFile(ev.currentTarget ?? ev.target);
+const importNotes = async (ev: PointerEvent) => {
+	const file = await selectFile({
+		anchorElement: ev.currentTarget ?? ev.target,
+		multiple: false,
+	});
 	misskeyApi('i/import-notes', {
 		fileId: file.id,
 		type: noteType.value,

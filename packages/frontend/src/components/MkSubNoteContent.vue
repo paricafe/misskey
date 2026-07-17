@@ -56,7 +56,11 @@ const router = useRouter();
 function noteClickToOpen(id: string) {
 	const selection = window.document.getSelection();
 	if (selection?.toString().length === 0) {
-		router.push(`/notes/${id}`);
+		router.push('/notes/:noteId/:initialTab?', {
+			params: {
+				noteId: id,
+			},
+		});
 	}
 }
 

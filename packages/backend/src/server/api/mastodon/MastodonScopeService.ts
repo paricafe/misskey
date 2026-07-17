@@ -7,6 +7,7 @@ import { Injectable } from '@nestjs/common';
 import { MastodonApiError } from './errors.js';
 
 const GRANULAR_SCOPES = [
+	'profile',
 	'read:accounts',
 	'read:blocks',
 	'read:bookmarks',
@@ -38,10 +39,22 @@ const SUPPORTED_SCOPES = new Set<string>([
 	'write',
 	'follow',
 	'push',
+	'read:collections',
+	'write:collections',
 	...GRANULAR_SCOPES,
 ]);
 
+const LEGACY_FOLLOW_SCOPES = new Set<string>([
+	'read:follows',
+	'write:follows',
+	'read:blocks',
+	'write:blocks',
+	'read:mutes',
+	'write:mutes',
+]);
+
 const MISSKEY_PERMISSIONS_BY_SCOPE: Readonly<Record<(typeof GRANULAR_SCOPES)[number], readonly string[]>> = {
+	profile: ['read:account'],
 	'read:accounts': ['read:account'],
 	'read:blocks': ['read:blocks'],
 	'read:bookmarks': ['read:favorites'],
@@ -96,7 +109,7 @@ export class MastodonScopeService {
 		if (tokenScopes.includes(requiredScope)) return true;
 		if (requiredScope.startsWith('read:') && tokenScopes.includes('read')) return true;
 		if (requiredScope.startsWith('write:') && tokenScopes.includes('write')) return true;
-		if ((requiredScope === 'read:follows' || requiredScope === 'write:follows') && tokenScopes.includes('follow')) return true;
+		if (LEGACY_FOLLOW_SCOPES.has(requiredScope) && tokenScopes.includes('follow')) return true;
 
 		return false;
 	}
@@ -104,6 +117,16 @@ export class MastodonScopeService {
 	public assert(tokenScopes: readonly string[], requiredScope: string): void {
 		if (!this.allows(tokenScopes, requiredScope)) {
 			throw new MastodonApiError(403, 'insufficient_scope', `Scope ${requiredScope} is required`);
+		}
+	}
+
+	public allowsAny(tokenScopes: readonly string[], requiredScopes: readonly string[]): boolean {
+		return requiredScopes.some(requiredScope => this.allows(tokenScopes, requiredScope));
+	}
+
+	public assertAny(tokenScopes: readonly string[], requiredScopes: readonly string[]): void {
+		if (!this.allowsAny(tokenScopes, requiredScopes)) {
+			throw new MastodonApiError(403, 'insufficient_scope', `One of these scopes is required: ${requiredScopes.join(', ')}`);
 		}
 	}
 
@@ -115,8 +138,7 @@ export class MastodonScopeService {
 			} else if (scope === 'write') {
 				for (const child of GRANULAR_SCOPES) if (child.startsWith('write:')) granular.add(child);
 			} else if (scope === 'follow') {
-				granular.add('read:follows');
-				granular.add('write:follows');
+				for (const child of LEGACY_FOLLOW_SCOPES) granular.add(child);
 			} else if (scope !== 'push') {
 				granular.add(scope);
 			}

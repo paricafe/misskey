@@ -4,9 +4,12 @@
  */
 
 import { Inject, Injectable } from '@nestjs/common';
+import * as Redis from 'ioredis';
 import { Endpoint } from '@/server/api/endpoint-base.js';
-import type { AccessTokensRepository } from '@/models/_.js';
+import type { AccessTokensRepository, MastodonOAuthTokensRepository } from '@/models/_.js';
 import { DI } from '@/di-symbols.js';
+import { digestCredential } from '@/server/api/mastodon/utils.js';
+import type { Config } from '@/config.js';
 
 export const meta = {
 	requireCredential: true,
@@ -38,27 +41,41 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 	constructor(
 		@Inject(DI.accessTokensRepository)
 		private accessTokensRepository: AccessTokensRepository,
+
+		@Inject(DI.mastodonOAuthTokensRepository)
+		private mastodonOAuthTokensRepository: MastodonOAuthTokensRepository,
+
+		@Inject(DI.config)
+		private config: Config,
+
+		@Inject(DI.redis)
+		private redis: Redis.Redis,
 	) {
 		super(meta, paramDef, async (ps, me) => {
 			if ('tokenId' in ps) {
-				const tokenExist = await this.accessTokensRepository.exists({ where: { id: ps.tokenId } });
-
-				if (tokenExist) {
-					await this.accessTokensRepository.delete({
-						id: ps.tokenId,
-						userId: me.id,
-					});
-				}
+				await this.accessTokensRepository.delete({ id: ps.tokenId, userId: me.id });
+				if (!this.config.enableMastodonApi) return;
+				const result = await this.mastodonOAuthTokensRepository.delete({ id: ps.tokenId, userId: me.id });
+				if (result.affected) await this.publishMastodonTokenRevoked(ps.tokenId);
 			} else if (ps.token) {
-				const tokenExist = await this.accessTokensRepository.exists({ where: { token: ps.token } });
+				await this.accessTokensRepository.delete({ token: ps.token, userId: me.id });
+				if (!this.config.enableMastodonApi) return;
+				const mastodonToken = await this.mastodonOAuthTokensRepository.findOneBy({
+					tokenHash: digestCredential(ps.token),
+					userId: me.id,
+				});
+				if (mastodonToken == null) return;
 
-				if (tokenExist) {
-					await this.accessTokensRepository.delete({
-						token: ps.token,
-						userId: me.id,
-					});
-				}
+				const result = await this.mastodonOAuthTokensRepository.delete({ id: mastodonToken.id, userId: me.id });
+				if (result.affected) await this.publishMastodonTokenRevoked(mastodonToken.id);
 			}
 		});
+	}
+
+	private async publishMastodonTokenRevoked(tokenId: string): Promise<void> {
+		await this.redis.publish(this.config.host, JSON.stringify({
+			channel: `mastodonTokenRevoked:${tokenId}`,
+			message: null,
+		}));
 	}
 }

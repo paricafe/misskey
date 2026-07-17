@@ -33,8 +33,7 @@ import { ClientServerService } from './web/ClientServerService.js';
 import { OpenApiServerService } from './api/openapi/OpenApiServerService.js';
 import { OAuth2ProviderService } from './oauth/OAuth2ProviderService.js';
 import { makeHstsHook } from './hsts.js';
-import { MastodonApiServerService } from './api/mastodon/MastodonApiServerService.js';
-import { MastodonStreamingApiServerService } from './api/mastodon/MastodonStreamingApiServerService.js';
+import { MastodonApiIntegrationService } from './api/mastodon/MastodonApiIntegrationService.js';
 import { registerHttpServerInstrumentation } from './http-server-instrumentation.js';
 
 const _dirname = fileURLToPath(new URL('.', import.meta.url));
@@ -73,8 +72,7 @@ export class ServerService implements OnApplicationShutdown {
 		private globalEventService: GlobalEventService,
 		private loggerService: LoggerService,
 		private oauth2ProviderService: OAuth2ProviderService,
-		private mastodonApiServerService: MastodonApiServerService,
-		private mastodonStreamingApiServerService: MastodonStreamingApiServerService,
+		private mastodonApiIntegrationService: MastodonApiIntegrationService,
 	) {
 		this.logger = this.loggerService.getLogger('server', 'gray');
 	}
@@ -164,7 +162,7 @@ export class ServerService implements OnApplicationShutdown {
 		fastify.register(this.oauth2ProviderService.createServer, { prefix: '/oauth' });
 		fastify.register(this.oauth2ProviderService.createTokenServer, { prefix: '/oauth/token' });
 		fastify.register(this.healthServerService.createServer, { prefix: '/healthz' });
-		fastify.register(this.mastodonApiServerService.createServer);
+		this.mastodonApiIntegrationService.register(fastify);
 
 		fastify.get<{ Params: { path: string }; Querystring: { static?: any; badge?: any; }; }>('/emoji/:path(.*)', async (request, reply) => {
 			const path = request.params.path;
@@ -257,7 +255,7 @@ export class ServerService implements OnApplicationShutdown {
 		fastify.register(this.clientServerService.createServer);
 
 		this.streamingApiServerService.attach(fastify.server);
-		this.mastodonStreamingApiServerService.attach(fastify.server);
+		this.mastodonApiIntegrationService.attach(fastify.server);
 
 		const handleListenError = (err: unknown): void => {
 			switch ((err as NodeJS.ErrnoException).code) {
@@ -302,7 +300,7 @@ export class ServerService implements OnApplicationShutdown {
 	@bindThis
 	public async dispose(): Promise<void> {
 		await this.streamingApiServerService.detach();
-		await this.mastodonStreamingApiServerService.detach();
+		await this.mastodonApiIntegrationService.detach();
 		// fastify@5 close() waits for upgraded WebSocket connections to drain.
 		// streamingApiServerService.attach() adds raw ws.Server upgrades that
 		// fastify does not track in its connection registry, so close() can hang

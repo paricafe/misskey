@@ -27,6 +27,15 @@ export class MastodonAuthenticateService {
 	) {}
 
 	@bindThis
+	public async isActiveUserToken(tokenId: string, userId: string): Promise<boolean> {
+		const [tokenExists, userExists] = await Promise.all([
+			this.mastodonOAuthTokensRepository.exists({ where: { id: tokenId, userId } }),
+			this.usersRepository.exists({ where: { id: userId, host: IsNull(), isDeleted: false, isSuspended: false } }),
+		]);
+		return tokenExists && userExists;
+	}
+
+	@bindThis
 	public async authenticate(rawToken: string | null | undefined): Promise<MastodonAuth> {
 		if (rawToken == null || rawToken === '') {
 			throw this.authenticationError();
@@ -38,9 +47,14 @@ export class MastodonAuthenticateService {
 		if (token == null) {
 			throw this.authenticationError();
 		}
+		const userId = token.userId;
+		if (userId == null) {
+			await this.mastodonOAuthTokensRepository.update(token.id, { lastUsedAt: new Date() });
+			return { kind: 'application', user: null, token };
+		}
 
-		const user = await this.cacheService.localUserByIdCache.fetch(token.userId, () => (
-			this.usersRepository.findOneByOrFail({ id: token.userId, host: IsNull() }) as Promise<MiLocalUser>
+		const user = await this.cacheService.localUserByIdCache.fetch(userId, () => (
+			this.usersRepository.findOneByOrFail({ id: userId, host: IsNull() }) as Promise<MiLocalUser>
 		)).catch(() => null);
 		if (user == null || user.isDeleted || user.isSuspended) {
 			throw this.authenticationError();
@@ -48,7 +62,7 @@ export class MastodonAuthenticateService {
 
 		await this.mastodonOAuthTokensRepository.update(token.id, { lastUsedAt: new Date() });
 
-		return { user, token };
+		return { kind: 'user', user, token };
 	}
 
 	private authenticationError(): MastodonApiError {

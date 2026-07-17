@@ -57,7 +57,7 @@ import MkInstanceTicker from '@/components/MkInstanceTicker.vue';
 import { DI } from '@/di.js';
 
 const isDetail = ref(false);
-const setDetail = (value) => {
+const setDetail = (value: boolean) => {
 	isDetail.value = value;
 };
 

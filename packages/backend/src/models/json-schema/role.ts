@@ -292,6 +292,10 @@ export const packedRolePoliciesSchema = {
 			type: 'integer',
 			optional: false, nullable: false,
 		},
+		canImportNotes: {
+			type: 'boolean',
+			optional: false, nullable: false,
+		},
 		canImportAntennas: {
 			type: 'boolean',
 			optional: false, nullable: false,

@@ -38,6 +38,7 @@ import {
 	MiInstance,
 	MiMastodonOAuthClient,
 	MiMastodonOAuthToken,
+	MiMastodonUserState,
 	MiMeta,
 	MiModerationLog,
 	MiMuting,
@@ -348,6 +349,12 @@ const $mastodonOAuthTokensRepository: Provider = {
 	inject: [DI.db],
 };
 
+const $mastodonUserStatesRepository: Provider = {
+	provide: DI.mastodonUserStatesRepository,
+	useFactory: (db: DataSource) => db.getRepository(MiMastodonUserState).extend(miRepository as MiRepository<MiMastodonUserState>),
+	inject: [DI.db],
+};
+
 const $signinsRepository: Provider = {
 	provide: DI.signinsRepository,
 	useFactory: (db: DataSource) => db.getRepository(MiSignin).extend(miRepository as MiRepository<MiSignin>),
@@ -604,6 +611,7 @@ const $reversiGamesRepository: Provider = {
 		$accessTokensRepository,
 		$mastodonOAuthClientsRepository,
 		$mastodonOAuthTokensRepository,
+		$mastodonUserStatesRepository,
 		$signinsRepository,
 		$pagesRepository,
 		$pageLikesRepository,
@@ -684,6 +692,7 @@ const $reversiGamesRepository: Provider = {
 		$accessTokensRepository,
 		$mastodonOAuthClientsRepository,
 		$mastodonOAuthTokensRepository,
+		$mastodonUserStatesRepository,
 		$signinsRepository,
 		$pagesRepository,
 		$pageLikesRepository,

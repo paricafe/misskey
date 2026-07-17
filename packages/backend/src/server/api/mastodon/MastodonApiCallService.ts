@@ -11,7 +11,7 @@ import { ApiCallService } from '@/server/api/ApiCallService.js';
 import endpoints, { type IEndpoint } from '@/server/api/endpoints.js';
 import { MastodonApiError } from './errors.js';
 import { MastodonScopeService } from './MastodonScopeService.js';
-import type { MastodonAuth } from './types.js';
+import type { MastodonUserAuth } from './types.js';
 
 type NativeEndpoint = IEndpoint & { exec: (...args: any[]) => Promise<unknown> };
 type NativeRequest = FastifyRequest<{ Body: Record<string, unknown> | undefined, Querystring: Record<string, unknown> }>;
@@ -29,7 +29,7 @@ export class MastodonApiCallService {
 	public async invoke(
 		name: string,
 		data: Record<string, unknown>,
-		auth: MastodonAuth,
+		auth: MastodonUserAuth,
 		request: NativeRequest,
 		file: { name: string; path: string } | null = null,
 	): Promise<unknown> {
@@ -50,6 +50,28 @@ export class MastodonApiCallService {
 			token,
 			data,
 			file,
+			request,
+		);
+	}
+
+	public async invokePublic(
+		name: string,
+		data: Record<string, unknown>,
+		auth: MastodonUserAuth | null,
+		request: NativeRequest,
+	): Promise<unknown> {
+		if (auth != null) return await this.invoke(name, data, auth, request);
+		const definition = this.endpointByName.get(name);
+		if (definition == null) {
+			throw new MastodonApiError(500, 'server_error', `Unknown native endpoint: ${name}`);
+		}
+		const endpoint = this.moduleRef.get<{ exec: NativeEndpoint['exec'] }>(`ep:${name}`, { strict: false });
+		return await this.apiCallService.invoke(
+			{ ...definition, exec: endpoint.exec },
+			null,
+			null,
+			data,
+			null,
 			request,
 		);
 	}

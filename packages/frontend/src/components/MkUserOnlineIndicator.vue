@@ -29,6 +29,7 @@ const text = computed(() => {
 		case 'online': return i18n.ts.online;
 		case 'active': return i18n.ts.active;
 		case 'offline': return i18n.ts.offline;
+		default: return null;
 	}
 });
 </script>

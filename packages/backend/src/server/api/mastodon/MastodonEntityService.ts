@@ -9,7 +9,9 @@ import { MfmService } from '@/core/MfmService.js';
 import type { Config } from '@/config.js';
 import { DI } from '@/di-symbols.js';
 import type { Packed } from '@/misc/json-schema.js';
+import type { MiAbuseUserReport } from '@/models/AbuseUserReport.js';
 import { extractMentions } from '@/misc/extract-mentions.js';
+import type { MastodonReportInput } from './MastodonReportService.js';
 
 type PackedUser = Packed<'UserLite'> & Partial<Packed<'UserDetailedNotMeOnly'>>;
 
@@ -29,6 +31,7 @@ export class MastodonEntityService {
 		const description = user.description ?? '';
 		const fields = user.fields ?? [];
 		const avatar = user.avatarUrl ?? new URL(`/avatar/@${encodeURIComponent(host == null ? user.username : `${user.username}@${host}`)}`, this.config.url).toString();
+		const header = user.bannerUrl ?? new URL('/static-assets/user-unknown.png', this.config.url).toString();
 
 		return {
 			id: user.id,
@@ -46,14 +49,24 @@ export class MastodonEntityService {
 			uri: user.uri ?? url,
 			avatar,
 			avatar_static: avatar,
-			header: user.bannerUrl ?? '',
-			header_static: user.bannerUrl ?? '',
+			avatar_description: '',
+			header,
+			header_static: header,
+			header_description: '',
 			followers_count: user.followersCount ?? 0,
 			following_count: user.followingCount ?? 0,
 			statuses_count: user.notesCount ?? 0,
 			last_status_at: null,
 			hide_collections: false,
 			noindex: true,
+			show_media: true,
+			show_media_replies: true,
+			show_featured: true,
+			feature_approval: {
+				automatic: [],
+				manual: [],
+				current_user: null,
+			},
 			emojis: this.emojis(user.emojis),
 			roles: [],
 			fields: fields.map(field => ({
@@ -61,6 +74,37 @@ export class MastodonEntityService {
 				value: this.render(field.value),
 				verified_at: user.verifiedLinks?.includes(field.value) ? user.createdAt ?? null : null,
 			})),
+		};
+	}
+
+	public profile(user: Packed<'MeDetailed'>) {
+		const note = user.description ?? '';
+		const fields = (user.fields ?? []).map(field => ({ name: field.name, value: field.value }));
+		const formattedFields = fields.map(field => ({ name: field.name, value: this.render(field.value) }));
+
+		return {
+			id: user.id,
+			display_name: user.name ?? user.username,
+			note,
+			fields,
+			formatted_note: this.render(note),
+			formatted_fields: formattedFields,
+			avatar: user.avatarUrl ?? null,
+			avatar_static: user.avatarUrl ?? null,
+			avatar_description: '',
+			header: user.bannerUrl ?? null,
+			header_static: user.bannerUrl ?? null,
+			header_description: '',
+			locked: user.isLocked ?? false,
+			bot: user.isBot ?? false,
+			hide_collections: false,
+			discoverable: user.isExplorable ?? false,
+			indexable: false,
+			show_media: true,
+			show_media_replies: true,
+			show_featured: true,
+			attribution_domains: [],
+			featured_tags: [],
 		};
 	}
 
@@ -74,12 +118,21 @@ export class MastodonEntityService {
 				note: user.description ?? '',
 				fields: (user.fields ?? []).map(field => ({ name: field.name, value: field.value })),
 				follow_requests_count: 0,
+				hide_collections: false,
+				discoverable: user.isExplorable ?? false,
+				indexable: false,
+				attribution_domains: [],
+				quote_policy: 'public',
 			},
 			role: null,
 		};
 	}
 
 	public status(note: Packed<'Note'>): Record<string, unknown> {
+		return this.statusEntity(note, false);
+	}
+
+	private statusEntity(note: Packed<'Note'>, shallow: boolean): Record<string, unknown> {
 		const localUrl = new URL(`/notes/${note.id}`, this.config.url).toString();
 		const url = note.url ?? note.uri ?? localUrl;
 		const files = note.files ?? [];
@@ -100,9 +153,13 @@ export class MastodonEntityService {
 			replies_count: note.repliesCount,
 			reblogs_count: note.renoteCount,
 			favourites_count: note.reactionCount,
+			quotes_count: 0,
 			content: this.render(note.text ?? ''),
-			reblog: isPureRenote ? this.status(note.renote!) : null,
-			quote: !isPureRenote && note.renote != null ? this.status(note.renote) : null,
+			reblog: !shallow && isPureRenote ? this.statusEntity(note.renote!, true) : null,
+			quote: !shallow && !isPureRenote && note.renote != null ? {
+				state: 'accepted',
+				quoted_status: this.statusEntity(note.renote, true),
+			} : null,
 			application: null,
 			account: this.account(note.user),
 			media_attachments: files.map(file => this.attachment(file)),
@@ -120,7 +177,82 @@ export class MastodonEntityService {
 			bookmarked: false,
 			pinned: false,
 			filtered: [],
+			tagged_collections: [],
+			quote_approval: {
+				automatic: ['public'],
+				manual: [],
+				current_user: null,
+			},
 		};
+	}
+
+	public statusEdits(note: Packed<'Note'>) {
+		const historical = [...(note.history ?? [])]
+			.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+			.map(revision => ({
+				account: this.account(note.user),
+				content: this.render(revision.text ?? ''),
+				spoiler_text: revision.cw ?? '',
+				sensitive: false,
+				created_at: revision.createdAt,
+				media_attachments: [],
+				emojis: [],
+			}));
+		const files = note.files ?? [];
+		const current = {
+			account: this.account(note.user),
+			content: this.render(note.text ?? ''),
+			spoiler_text: note.cw ?? '',
+			sensitive: files.some(file => file.isSensitive) || note.channel?.isSensitive === true,
+			created_at: note.updatedAt ?? note.createdAt,
+			media_attachments: files.map(file => this.attachment(file)),
+			emojis: this.emojis(note.emojis),
+			...(note.poll == null ? {} : { poll: this.poll(note.id, note.poll) }),
+			...(note.renote != null && !(note.text == null && files.length === 0 && note.poll == null && note.replyId == null) ? {
+				quote: {
+					state: 'accepted',
+					quoted_status: this.statusEntity(note.renote, true),
+				},
+			} : {}),
+		};
+		return [...historical, current];
+	}
+
+	public translation(result: { sourceLang: string; text: string }, targetLanguage: string) {
+		return {
+			detected_source_language: result.sourceLang,
+			language: targetLanguage,
+			provider: null,
+			spoiler_text: '',
+			content: this.render(result.text),
+			poll: null,
+			media_attachments: [],
+		};
+	}
+
+	public instanceActivity(
+		notesChart: { local: { inc: number[] } },
+		usersChart: { local: { inc: number[] } },
+		now = new Date(),
+	) {
+		const notes = notesChart.local.inc;
+		const users = usersChart.local.inc;
+		if (notes.length !== 84 || users.length !== 84 ||
+			notes.some(value => !Number.isFinite(value)) || users.some(value => !Number.isFinite(value))) {
+			return [];
+		}
+
+		const daySeconds = 24 * 60 * 60;
+		const newestDay = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) / 1000;
+		return Array.from({ length: 12 }, (_, index) => {
+			const offset = index * 7;
+			return {
+				week: (newestDay - (offset + 6) * daySeconds).toString(),
+				statuses: notes.slice(offset, offset + 7).reduce((sum, value) => sum + value, 0).toString(),
+				logins: '0',
+				registrations: users.slice(offset, offset + 7).reduce((sum, value) => sum + value, 0).toString(),
+			};
+		});
 	}
 
 	public attachment(file: Packed<'DriveFile'>) {
@@ -180,7 +312,7 @@ export class MastodonEntityService {
 		const status = 'note' in notification && notification.note != null
 			? this.status(notification.note)
 			: undefined;
-		if (['favourite', 'mention', 'reblog', 'poll'].includes(type) && status == null) return null;
+		if (['favourite', 'mention', 'reblog', 'poll', 'status'].includes(type) && status == null) return null;
 
 		return {
 			id: notification.id,
@@ -200,7 +332,120 @@ export class MastodonEntityService {
 		};
 	}
 
-	private poll(noteId: string, poll: NonNullable<Packed<'Note'>['poll']>) {
+	public report(report: MiAbuseUserReport, createdAt: string, targetUser: PackedUser, input: MastodonReportInput) {
+		return {
+			id: report.id,
+			action_taken: report.resolved,
+			action_taken_at: null,
+			category: input.category,
+			comment: input.comment,
+			forwarded: report.forwarded,
+			created_at: createdAt,
+			status_ids: input.statusIds,
+			rule_ids: input.ruleIds,
+			collection_ids: input.collectionIds,
+			target_account: this.account(targetUser),
+		};
+	}
+
+	public announcement(announcement: Packed<'Announcement'>) {
+		return {
+			id: announcement.id,
+			content: this.render(`${announcement.title}\n\n${announcement.text}`),
+			starts_at: null,
+			ends_at: null,
+			all_day: false,
+			published_at: announcement.createdAt,
+			updated_at: announcement.updatedAt ?? announcement.createdAt,
+			read: announcement.isRead ?? false,
+			mentions: [],
+			statuses: [],
+			tags: [],
+			emojis: [],
+			reactions: [],
+		};
+	}
+
+	public scheduledStatus(draft: Packed<'NoteDraft'>) {
+		if (!draft.isActuallyScheduled || draft.scheduledAt == null) {
+			throw new Error('Expected a scheduled Note draft with scheduledAt');
+		}
+		return {
+			id: draft.id,
+			scheduled_at: new Date(draft.scheduledAt).toISOString(),
+			params: {
+				text: draft.text,
+				media_ids: draft.fileIds,
+				sensitive: (draft.files ?? []).some(file => file.isSensitive),
+				spoiler_text: draft.cw ?? null,
+				visibility: this.visibility(draft.visibility),
+				in_reply_to_id: draft.replyId,
+				language: null,
+				application_id: null,
+				poll: draft.poll == null ? null : {
+					options: draft.poll.choices,
+					multiple: draft.poll.multiple,
+					expires_in: draft.poll.expiredAfter == null ? null : Math.ceil(draft.poll.expiredAfter / 1000),
+				},
+				idempotency: null,
+				with_rate_limit: false,
+				quoted_status_id: draft.renoteId,
+				quote_approval_policy: 'nobody',
+			},
+			media_attachments: (draft.files ?? []).map(file => this.attachment(file)),
+		};
+	}
+
+	public tag(name: string, state: { following?: boolean; featuring?: boolean } = {}) {
+		return {
+			id: name.normalize('NFKC').toLowerCase(),
+			name,
+			url: new URL(`/tags/${encodeURIComponent(name)}`, this.config.url).toString(),
+			history: [],
+			...(state.following == null ? {} : { following: state.following }),
+			...(state.featuring == null ? {} : { featuring: state.featuring }),
+		};
+	}
+
+	public featuredTag(
+		tag: { id: string; name: string },
+		accountUrl: string,
+		stats: { statusesCount: number; lastStatusAt: string | null },
+	) {
+		return {
+			id: tag.id,
+			name: tag.name,
+			url: `${accountUrl.replace(/\/+$/u, '')}/tagged/${encodeURIComponent(tag.name)}`,
+			statuses_count: stats.statusesCount.toString(),
+			last_status_at: stats.lastStatusAt,
+		};
+	}
+
+	public trendLink(url: string) {
+		return {
+			url,
+			title: url,
+			description: '',
+			language: '',
+			type: 'link',
+			authors: [],
+			author_name: '',
+			author_url: '',
+			provider_name: '',
+			provider_url: '',
+			html: '',
+			width: 0,
+			height: 0,
+			image: null,
+			image_description: '',
+			embed_url: '',
+			blurhash: null,
+			published_at: null,
+			history: [],
+		};
+	}
+
+	public poll(noteId: string, poll: NonNullable<Packed<'Note'>['poll']>) {
 		const votesCount = poll.choices.reduce((total, choice) => total + choice.votes, 0);
 		const ownVotes = poll.choices.flatMap((choice, index) => choice.isVoted ? [index] : []);
 
@@ -260,7 +505,9 @@ export class MastodonEntityService {
 	}
 
 	private notificationType(type: Packed<'Notification'>['type']): string | null {
-		if (['mention', 'reply', 'note', 'quote'].includes(type)) return 'mention';
+		if (['mention', 'reply'].includes(type)) return 'mention';
+		if (type === 'quote') return 'quote';
+		if (type === 'note') return 'status';
 		if (type === 'renote' || type === 'renote:grouped') return 'reblog';
 		if (type === 'reaction' || type === 'reaction:grouped') return 'favourite';
 		if (type === 'follow' || type === 'followRequestAccepted') return 'follow';

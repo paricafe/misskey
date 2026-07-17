@@ -8,6 +8,33 @@ import { digestCredential } from './utils.js';
 import { MastodonAuthenticateService } from './MastodonAuthenticateService.js';
 
 describe(MastodonAuthenticateService, () => {
+	test('requires both token ownership and an active local user', async () => {
+		const tokenExists = vi.fn().mockResolvedValue(true);
+		const userExists = vi.fn()
+			.mockResolvedValueOnce(true)
+			.mockResolvedValueOnce(false);
+		const service = new MastodonAuthenticateService(
+			{ exists: tokenExists } as never,
+			{ exists: userExists } as never,
+			{ localUserByIdCache: { fetch: vi.fn() } } as never,
+		);
+
+		await expect(service.isActiveUserToken('token-id', 'user-id')).resolves.toBe(true);
+		await expect(service.isActiveUserToken('token-id', 'suspended-user-id')).resolves.toBe(false);
+		expect(tokenExists).toHaveBeenNthCalledWith(1, { where: { id: 'token-id', userId: 'user-id' } });
+		expect(tokenExists).toHaveBeenNthCalledWith(2, { where: { id: 'token-id', userId: 'suspended-user-id' } });
+		expect(userExists).toHaveBeenNthCalledWith(1, { where: expect.objectContaining({
+			id: 'user-id',
+			isDeleted: false,
+			isSuspended: false,
+		}) });
+		expect(userExists).toHaveBeenNthCalledWith(2, { where: expect.objectContaining({
+			id: 'suspended-user-id',
+			isDeleted: false,
+			isSuspended: false,
+		}) });
+	});
+
 	test('looks up only the compatibility token digest', async () => {
 		const token = {
 			id: 'token-id',
@@ -26,10 +53,33 @@ describe(MastodonAuthenticateService, () => {
 			{ localUserByIdCache: { fetch } } as never,
 		);
 
-		await expect(service.authenticate('raw-token')).resolves.toEqual({ token, user });
+		await expect(service.authenticate('raw-token')).resolves.toEqual({ kind: 'user', token, user });
 		expect(findOneBy).toHaveBeenCalledWith({ tokenHash: digestCredential('raw-token') });
 		expect(fetch).toHaveBeenCalledWith('user-id', expect.any(Function));
 		expect(update).toHaveBeenCalledWith('token-id', { lastUsedAt: expect.any(Date) });
+	});
+
+	test('returns an application auth result without loading a user', async () => {
+		const token = {
+			id: 'app-token-id',
+			tokenHash: digestCredential('raw-token'),
+			userId: null,
+			clientId: 'client-id',
+			scopes: ['read'],
+		};
+		const fetch = vi.fn();
+		const service = new MastodonAuthenticateService(
+			{ findOneBy: vi.fn().mockResolvedValue(token), update: vi.fn() } as never,
+			{ findOneBy: vi.fn() } as never,
+			{ localUserByIdCache: { fetch } } as never,
+		);
+
+		await expect(service.authenticate('raw-token')).resolves.toEqual({
+			kind: 'application',
+			token,
+			user: null,
+		});
+		expect(fetch).not.toHaveBeenCalled();
 	});
 
 	test('rejects a missing or unknown token', async () => {

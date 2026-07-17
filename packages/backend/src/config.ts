@@ -10,6 +10,7 @@ import { type FastifyServerOptions } from 'fastify';
 import type * as Sentry from '@sentry/node';
 import type * as SentryVue from '@sentry/vue';
 import type { RedisOptions } from 'ioredis';
+import type { LogFormat, LogLevelSetting } from './logging/types.js';
 
 type RedisOptionsSource = Partial<RedisOptions> & {
 	host: string;
@@ -51,6 +52,7 @@ type Source = {
 	trustProxy?: FastifyServerOptions['trustProxy'];
 	chmodSocket?: string;
 	enableIpRateLimit?: boolean;
+	enableMastodonApi?: boolean;
 	disableHsts?: boolean;
 	hstsPreload?: boolean;
 	db: {
@@ -139,6 +141,9 @@ type Source = {
 	};
 
 	logging?: {
+		format?: LogFormat;
+		level?: LogLevelSetting;
+		domains?: Record<string, LogLevelSetting> | null;
 		sql?: {
 			disableQueryTruncation?: boolean,
 			enableQueryParamLogging?: boolean,
@@ -153,6 +158,7 @@ export type Config = {
 	trustProxy: NonNullable<FastifyServerOptions['trustProxy']>;
 	chmodSocket: string | undefined;
 	enableIpRateLimit: boolean;
+	enableMastodonApi: boolean;
 	disableHsts: boolean | undefined;
 	hstsPreload: boolean | undefined;
 	db: {
@@ -202,6 +208,9 @@ export type Config = {
 	deliverJobMaxAttempts: number | undefined;
 	inboxJobMaxAttempts: number | undefined;
 	logging?: {
+		format?: LogFormat;
+		level?: LogLevelSetting;
+		domains?: Record<string, LogLevelSetting> | null;
 		sql?: {
 			disableQueryTruncation?: boolean,
 			enableQueryParamLogging?: boolean,
@@ -325,6 +334,7 @@ export function loadConfig(): Config {
 		disableHsts: config.disableHsts,
 		hstsPreload: config.hstsPreload ?? false,
 		enableIpRateLimit: config.enableIpRateLimit ?? true,
+		enableMastodonApi: config.enableMastodonApi ?? true,
 		host,
 		hostname,
 		scheme,

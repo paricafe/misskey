@@ -38,15 +38,12 @@ SPDX-License-Identifier: AGPL-3.0-only
 						Testing feature, may cause slow loading.
 					</template>
 				</MkSelect>
-				<MkRadios v-if="defaultFont.availableTypes.length > 0" v-model="defaultFont.fontFaceType">
+				<MkRadios
+					v-if="defaultFont.availableTypes.length > 0"
+					v-model="defaultFont.fontFaceType"
+					:options="defaultFont.availableTypes.map(item => ({ value: item.id, label: item.name }))"
+				>
 					<template #label>{{ i18n.ts.appearance }}</template>
-					<option
-						v-for="item in defaultFont.availableTypes"
-						:key="item.id"
-						:value="item.id"
-					>
-						{{ item.name }}
-					</option>
 				</MkRadios>
 			</div>
 		</div>

@@ -13,6 +13,7 @@ import { getNoteSummary } from '@/misc/get-note-summary.js';
 import type { MiMeta, MiSwSubscription, SwSubscriptionsRepository } from '@/models/_.js';
 import { bindThis } from '@/decorators.js';
 import { RedisKVCache } from '@/misc/cache.js';
+import { MastodonPushNotificationService } from '@/core/MastodonPushNotificationService.js';
 
 // Defined also packages/sw/types.ts#L13
 type PushNotificationsTypes = {
@@ -62,6 +63,8 @@ export class PushNotificationService implements OnApplicationShutdown {
 
 		@Inject(DI.swSubscriptionsRepository)
 		private swSubscriptionsRepository: SwSubscriptionsRepository,
+
+		private mastodonPushNotificationService: MastodonPushNotificationService,
 	) {
 		this.subscriptionsCache = new RedisKVCache<MiSwSubscription[]>(this.redisClient, 'userSwSubscriptions', {
 			lifetime: 1000 * 60 * 60 * 1, // 1h
@@ -74,6 +77,9 @@ export class PushNotificationService implements OnApplicationShutdown {
 
 	@bindThis
 	public async pushNotification<T extends keyof PushNotificationsTypes>(userId: string, type: T, body: PushNotificationsTypes[T]) {
+		if (type === 'notification') {
+			void this.mastodonPushNotificationService.pushNotification(userId, body as Packed<'Notification'>).catch(() => undefined);
+		}
 		if (!this.meta.enableServiceWorker || this.meta.swPublicKey == null || this.meta.swPrivateKey == null) return;
 
 		// アプリケーションの連絡先と、サーバーサイドの鍵ペアの情報を登録

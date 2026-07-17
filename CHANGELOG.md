@@ -8,10 +8,21 @@
 - Fix: ノートの返信・Renote数と詳細画面の返信一覧がリアルタイムに更新されない問題を修正
 - Fix: 「ノートをクリックして詳細を表示」が有効なとき、メディアのクリックやCWの展開でもノート詳細が開く問題を修正
 - Fix: ノートを編集した直後に、表示中の内容が更新されない問題を修正
+- Fix: ノートインポートの形式選択が正しく動作しない問題を修正
 
 ### Server
 - Feat: Mastodon API compatible OAuth, REST, and streaming endpoints are now available for Mastodon clients
+- Enhance: Improve Mastodon API filters, markers, conversations, notifications, Web Push, and streaming compatibility
+- Enhance: Add stateful Mastodon compatibility for filters, markers, followed and featured tags, endorsements, collections, conversations, notification groups, notification policies and requests, Web Push subscriptions and delivery, domain blocks, and status and thread mutes
+- Enhance: Allow administrators to disable the Mastodon-compatible API with `enableMastodonApi: false`
+- Enhance: Improve Mastodon OAuth application-token support, access-token management, and core API compatibility
 - Fix: Renoteを削除した際に対象ノートのRenote数が減少しない問題を修正
+- Enhance: Improve Mastodon API compatibility for search, trends, suggestions, tags, and entity responses
+- Enhance: Expand Mastodon API compatibility for profiles, reports, announcements, scheduled statuses, status history, quotes, account relationships, and instance discovery
+- Fix: Prevent a duplicate Mastodon instance peers route from blocking server startup
+- Fix: Prevent `users/recommendation` from generating invalid SQL when filtering blocked users
+- Fix: 一部のAPIスキーマとmisskey-jsの型定義が実装と一致していない問題を修正
+- Fix: Mastodonクライアントから言語指定付きでノートを投稿・編集できない問題を修正
 
 ## 2026.7.0
 
@@ -44,6 +55,7 @@
   - Fix: 幅が狭い画面で動画の再生が困難な問題を修正
   - Fix: 一部の画像のみセンシティブなとき、ビューワー内で画像を切り替えるとセンシティブな画像がそのまま表示される問題を修正
   - Fix: 一部の画像をビューワーで読み込んだ際に正しく表示されない問題を修正
+- Enhance: タイムラインの読み込みパフォーマンスを改善
 - Fix: 「画像を新しいタブで開く」が機能しなくなっていた問題を修正
 - Fix: デバイスタイプをスマートフォンに固定している状態で画面幅が広いとき、画面左上のアイコンが表示されない問題を修正
 - Fix: チャットでIMEの変換を確定するEnterでメッセージが送信されてしまうことがある問題を修正
@@ -66,6 +78,9 @@
 - Enhance: Node.js 22.23.0以降、24.17.0以降、26.4.0以降をサポートするように
 - Enhance: Docker Image の Node.js を 26.4.0 に、Debian を trixie (v13) に更新
 - Enhance: URLプレビューの結果を内部でキャッシュするように
+- Enhance: API内部エラーのログに構造化属性と正規化したエラー情報を付与し、認証情報を自動的に秘匿するように（従来形式の表示は維持）
+- Enhance: ログ全体の既定levelとlogger domainごとの出力levelを設定できるように
+- Enhance: バックエンドのログを1行JSON形式で出力できるように
 - Fix: `/stats` API のレスポンス型が正しくない問題を修正
 - Fix: ハッシュタグに関連するデータを更新する際のエラーハンドリングを修正
 - Fix: Sentry 使用環境下にて、Misskey が発行した SQL クエリが span に含まれない問題を修正

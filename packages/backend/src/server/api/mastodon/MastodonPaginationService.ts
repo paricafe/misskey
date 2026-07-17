@@ -44,4 +44,22 @@ export class MastodonPaginationService {
 
 		return `<${next.toString()}>; rel="next", <${previous.toString()}>; rel="prev"`;
 	}
+
+	public offsetLinkHeader(requestUrl: string, offset: number, limit: number, hasMore: boolean): string | null {
+		const links: string[] = [];
+		const createLink = (targetOffset: number, relation: 'next' | 'prev'): string => {
+			const url = new URL(requestUrl);
+			if (targetOffset === 0) {
+				url.searchParams.delete('offset');
+			} else {
+				url.searchParams.set('offset', targetOffset.toString());
+			}
+			return `<${url.toString()}>; rel="${relation}"`;
+		};
+
+		if (hasMore) links.push(createLink(offset + limit, 'next'));
+		if (offset > 0) links.push(createLink(Math.max(0, offset - limit), 'prev'));
+
+		return links.length === 0 ? null : links.join(', ');
+	}
 }

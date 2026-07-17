@@ -56,6 +56,7 @@ export const DI = {
 	accessTokensRepository: Symbol('accessTokensRepository'),
 	mastodonOAuthClientsRepository: Symbol('mastodonOAuthClientsRepository'),
 	mastodonOAuthTokensRepository: Symbol('mastodonOAuthTokensRepository'),
+	mastodonUserStatesRepository: Symbol('mastodonUserStatesRepository'),
 	signinsRepository: Symbol('signinsRepository'),
 	pagesRepository: Symbol('pagesRepository'),
 	pageLikesRepository: Symbol('pageLikesRepository'),

@@ -30,13 +30,25 @@ import { UrlPreviewService } from './web/UrlPreviewService.js';
 import { ClientLoggerService } from './web/ClientLoggerService.js';
 import { OAuth2ProviderService } from './oauth/OAuth2ProviderService.js';
 import { MastodonApiCallService } from './api/mastodon/MastodonApiCallService.js';
+import { MastodonApiStateService } from './api/mastodon/MastodonApiStateService.js';
+import { MastodonCollectionService } from './api/mastodon/MastodonCollectionService.js';
+import { MastodonConversationService } from './api/mastodon/MastodonConversationService.js';
+import { MastodonFilterService } from './api/mastodon/MastodonFilterService.js';
+import { MastodonMarkerService } from './api/mastodon/MastodonMarkerService.js';
+import { MastodonUserFeatureService } from './api/mastodon/MastodonUserFeatureService.js';
 import { MastodonAuthenticateService } from './api/mastodon/MastodonAuthenticateService.js';
 import { MastodonOAuthService } from './api/mastodon/MastodonOAuthService.js';
+import { MastodonNotificationService } from './api/mastodon/MastodonNotificationService.js';
 import { MastodonScopeService } from './api/mastodon/MastodonScopeService.js';
 import { MastodonApiServerService } from './api/mastodon/MastodonApiServerService.js';
+import { MastodonApiIntegrationService } from './api/mastodon/MastodonApiIntegrationService.js';
 import { MastodonEntityService } from './api/mastodon/MastodonEntityService.js';
 import { MastodonPaginationService } from './api/mastodon/MastodonPaginationService.js';
+import { MastodonReportService } from './api/mastodon/MastodonReportService.js';
+import { MastodonPushSubscriptionService } from './api/mastodon/MastodonPushSubscriptionService.js';
+import { MastodonScheduledStatusService } from './api/mastodon/MastodonScheduledStatusService.js';
 import { MastodonStreamingApiServerService } from './api/mastodon/MastodonStreamingApiServerService.js';
+import { MastodonStreamingEventService } from './api/mastodon/MastodonStreamingEventService.js';
 
 import MainStreamConnection from '@/server/api/stream/Connection.js';
 import { MainChannel } from './api/stream/channels/main.js';
@@ -111,12 +123,24 @@ import { SigninWithPasskeyApiService } from './api/SigninWithPasskeyApiService.j
 		OpenApiServerService,
 		OAuth2ProviderService,
 		MastodonApiCallService,
+		MastodonApiStateService,
+		MastodonCollectionService,
+		MastodonConversationService,
+		MastodonFilterService,
+		MastodonMarkerService,
+		MastodonUserFeatureService,
 		MastodonAuthenticateService,
+		MastodonNotificationService,
 		MastodonOAuthService,
 		MastodonScopeService,
 		MastodonApiServerService,
+		MastodonApiIntegrationService,
 		MastodonEntityService,
 		MastodonPaginationService,
+		MastodonScheduledStatusService,
+		MastodonReportService,
+		MastodonPushSubscriptionService,
+		MastodonStreamingEventService,
 		MastodonStreamingApiServerService,
 	],
 	exports: [

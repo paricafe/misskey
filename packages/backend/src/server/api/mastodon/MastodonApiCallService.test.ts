@@ -18,6 +18,7 @@ describe(MastodonApiCallService, () => {
 			new MastodonScopeService(),
 		);
 		const auth = {
+			kind: 'user',
 			user: { id: 'user-id' },
 			token: { id: 'token-id', scopes: ['write:statuses'] },
 		};
@@ -30,6 +31,28 @@ describe(MastodonApiCallService, () => {
 			auth.user,
 			expect.objectContaining({ id: 'token-id', permission: ['write:drive', 'write:notes', 'write:votes'] }),
 			{ text: 'hello' },
+			null,
+			request,
+		);
+	});
+
+	test('invokes a public endpoint anonymously without a synthetic token', async () => {
+		const exec = vi.fn();
+		const moduleRef = { get: vi.fn().mockReturnValue({ exec }) };
+		const invoke = vi.fn().mockResolvedValue({ id: 'note-id' });
+		const service = new MastodonApiCallService(
+			moduleRef as never,
+			{ invoke } as never,
+			new MastodonScopeService(),
+		);
+		const request = { method: 'GET' };
+
+		await service.invokePublic('notes/show', { noteId: 'note-id' }, null, request as never);
+		expect(invoke).toHaveBeenCalledWith(
+			expect.objectContaining({ name: 'notes/show', exec }),
+			null,
+			null,
+			{ noteId: 'note-id' },
 			null,
 			request,
 		);

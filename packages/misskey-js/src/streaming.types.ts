@@ -319,6 +319,10 @@ export type NoteUpdatedEvent = { id: Note['id'] } & ({
 		cw: string | null;
 		text: string;
 		updatedAt: string;
+		tags?: string[];
+		emojis?: Record<string, string>;
+		fileIds?: string[];
+		files?: DriveFile[];
 	};
 } | {
 	type: 'repliesCountChanged';

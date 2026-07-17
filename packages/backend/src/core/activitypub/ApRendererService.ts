@@ -471,7 +471,7 @@ export class ApRendererService {
 		return {
 			id: `${this.config.url}/notes/${note.id}`,
 			type: 'Note',
-			updated: note.updatedAt ?? undefined,
+			updated: note.updatedAt?.toISOString(),
 			attributedTo,
 			summary: summary ?? undefined,
 			content: content ?? undefined,
