@@ -1,4 +1,4 @@
-/*
+﻿/*
  * SPDX-FileCopyrightText: syuilo and misskey-project
  * SPDX-License-Identifier: AGPL-3.0-only
  */
@@ -247,10 +247,10 @@ export const MASTODON_4_6_USER_ROUTES: readonly MastodonContractRoute[] = [
 	implemented('GET', '/api/v1/instance/peers', 'public', undefined, 'string[]'),
 	implemented('GET', '/api/v1/instance/rules', 'public', undefined, 'Rule[]', '3.4.0'),
 	safeArray('GET', '/api/v1/instance/domain_blocks', 'public', undefined, 'DomainBlock[]', '4.0.0'),
-	safeArray('GET', '/api/v1/instance/terms_of_service', 'public', undefined, 'TermsOfService[]', '4.4.0'),
+	implemented('GET', '/api/v1/instance/terms_of_service', 'public', undefined, 'TermsOfService[]', '4.4.0'),
 	notFound('GET', '/api/v1/instance/terms_of_service/:date', 'public', undefined, 'TermsOfService', '4.4.0'),
-	notFound('GET', '/api/v1/instance/privacy_policy', 'public', undefined, 'PrivacyPolicy', '4.4.0'),
-	notFound('GET', '/api/v1/instance/extended_description', 'public', undefined, 'ExtendedDescription', '4.4.0'),
+	implemented('GET', '/api/v1/instance/privacy_policy', 'public', undefined, 'PrivacyPolicy', '4.4.0'),
+	implemented('GET', '/api/v1/instance/extended_description', 'public', undefined, 'ExtendedDescription', '4.4.0'),
 	safeObject('GET', '/api/v1/instance/translation_languages', 'public', undefined, 'TranslationLanguages', '4.0.0'),
 	safeArray('GET', '/api/v1/instance/languages', 'public', undefined, 'Language[]', '4.4.0'),
 	implemented('GET', '/api/v1/instance/activity', 'public', undefined, 'InstanceActivity[]'),

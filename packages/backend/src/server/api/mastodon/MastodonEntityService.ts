@@ -10,6 +10,7 @@ import type { Config } from '@/config.js';
 import { DI } from '@/di-symbols.js';
 import type { Packed } from '@/misc/json-schema.js';
 import type { MiAbuseUserReport } from '@/models/AbuseUserReport.js';
+import type { NotesRepository } from '@/models/_.js';
 import { extractMentions } from '@/misc/extract-mentions.js';
 import type { MastodonReportInput } from './MastodonReportService.js';
 
@@ -21,7 +22,10 @@ export class MastodonEntityService {
 		@Inject(DI.config)
 		private config: Config,
 
-		private mfmService: MfmService,
+		@Inject(DI.notesRepository)
+	private notesRepository: NotesRepository,
+
+	private mfmService: MfmService,
 	) {}
 
 	public account(user: PackedUser) {
@@ -514,5 +518,22 @@ export class MastodonEntityService {
 		if (type === 'receiveFollowRequest') return 'follow_request';
 		if (type === 'pollEnded') return 'poll';
 		return null;
+	}
+	public async enrichLastStatusAt(accounts: Record<string, unknown>[]): Promise<void> {
+		const userIds = [...new Set(accounts.map(a => typeof a.id === 'string' ? a.id : '').filter(Boolean))];
+		if (userIds.length === 0) return;
+		const result = await this.notesRepository.createQueryBuilder('note')
+			.select('note.userId', 'userId')
+			.addSelect('MAX(note.createdAt)', 'lastStatusAt')
+			.where('note.userId IN (:...ids)', { ids: userIds })
+			.andWhere("note.visibility IN ('public', 'home')")
+			.andWhere('note.localOnly = FALSE')
+			.groupBy('note.userId')
+			.getRawMany<{ userId: string; lastStatusAt: string | null }>();
+		const map = new Map(result.map(r => [r.userId, r.lastStatusAt]));
+		for (const account of accounts) {
+			const id = typeof account.id === 'string' ? account.id : '';
+			account.last_status_at = map.get(id) ?? null;
+		}
 	}
 }
