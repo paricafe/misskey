@@ -1,4 +1,4 @@
-/*
+﻿/*
  * SPDX-FileCopyrightText: syuilo and misskey-project
  * SPDX-License-Identifier: AGPL-3.0-only
  */
@@ -3494,7 +3494,7 @@ describe(MastodonApiServerService, () => {
 
 		expect(v1.statusCode).toBe(200);
 		expect(v1.json()).toMatchObject({
-			version: '4.3.0 (compatible; Misskey 2026.7.0)',
+			version: '4.6.0 (compatible; Misskey 2026.7.0)',
 			thumbnail: 'https://misskey.example/favicon.ico',
 			rules: [{ id: '1', text: 'Be kind', hint: '' }],
 		});
@@ -3502,8 +3502,8 @@ describe(MastodonApiServerService, () => {
 		expect(v2.json()).toMatchObject({
 			domain: 'misskey.example',
 			title: 'Misskey Test',
-			version: '4.3.0 (compatible; Misskey 2026.7.0)',
-			api_versions: { mastodon: 1 },
+			version: '4.6.0 (compatible; Misskey 2026.7.0)',
+			api_versions: { mastodon: 11 },
 			thumbnail: { url: 'https://misskey.example/favicon.ico' },
 			configuration: {
 				accounts: { max_pinned_statuses: 5 },
@@ -4056,7 +4056,7 @@ describe(MastodonApiServerService, () => {
 			method: 'POST',
 			url: '/api/v1/domain_blocks',
 			headers: { authorization: 'Bearer user-token', 'content-type': 'application/json' },
-			payload: { domain: 'BÜCHER.Example' },
+			payload: { domain: 'B脺CHER.Example' },
 		});
 		const listed = await fastify.inject({ method: 'GET', url: '/api/v1/domain_blocks', headers: { authorization: 'Bearer user-token' } });
 		const afterCursor = await fastify.inject({ method: 'GET', url: '/api/v1/domain_blocks?since_id=zzzz', headers: { authorization: 'Bearer user-token' } });
