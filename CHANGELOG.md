@@ -9,6 +9,7 @@
 - Fix: 「ノートをクリックして詳細を表示」が有効なとき、メディアのクリックやCWの展開でもノート詳細が開く問題を修正
 - Fix: ノートを編集した直後に、表示中の内容が更新されない問題を修正
 - Fix: ノートインポートの形式選択が正しく動作しない問題を修正
+- Fix: CW付きノート内のセンシティブなメディアでぼかしが表示されない問題を修正
 
 ### Server
 - Feat: Mastodon API compatible OAuth, REST, and streaming endpoints are now available for Mastodon clients
