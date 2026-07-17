@@ -552,6 +552,40 @@ describe(MastodonApiServerService, () => {
 		expect(contract('POST', '/api/v1/conversations/:id/unread')).toMatchObject({ behavior: 'implemented', scope: 'write:conversations', entity: 'Conversation' });
 	});
 
+	test('does not leave high-impact stateful resources on compatibility fallbacks', () => {
+		const signatures = [
+			'GET /api/v2/filters',
+			'POST /api/v2/filters',
+			'GET /api/v2/filters/:id',
+			'PUT /api/v2/filters/:id',
+			'DELETE /api/v2/filters/:id',
+			'GET /api/v2/filters/:filter_id/keywords',
+			'POST /api/v2/filters/:filter_id/keywords',
+			'GET /api/v2/filters/keywords/:id',
+			'PUT /api/v2/filters/keywords/:id',
+			'DELETE /api/v2/filters/keywords/:id',
+			'GET /api/v2/filters/:filter_id/statuses',
+			'POST /api/v2/filters/:filter_id/statuses',
+			'GET /api/v2/filters/statuses/:id',
+			'DELETE /api/v2/filters/statuses/:id',
+			'GET /api/v1/markers',
+			'POST /api/v1/markers',
+			'GET /api/v1/conversations',
+			'DELETE /api/v1/conversations/:id',
+			'POST /api/v1/conversations/:id/read',
+			'POST /api/v1/conversations/:id/unread',
+			'POST /api/v1/push/subscription',
+			'GET /api/v1/push/subscription',
+			'PUT /api/v1/push/subscription',
+			'DELETE /api/v1/push/subscription',
+		];
+
+		for (const signature of signatures) {
+			const [method, path] = signature.split(' ');
+			expect(MASTODON_4_6_USER_ROUTES.find(route => route.method === method && route.path === path)).toMatchObject({ behavior: 'implemented' });
+		}
+	});
+
 	test('lists exact conversation entities with last-status cursors and bounded min_id pagination', async () => {
 		const { fastify, assert, linkHeader, mastodonConversationService } = createServer();
 		const response = await fastify.inject({

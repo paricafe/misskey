@@ -12,6 +12,7 @@
 
 ### Server
 - Feat: Mastodon API compatible OAuth, REST, and streaming endpoints are now available for Mastodon clients
+- Enhance: Improve Mastodon API filters, markers, conversations, notifications, Web Push, and streaming compatibility
 - Enhance: Add stateful Mastodon compatibility for filters, markers, followed and featured tags, endorsements, collections, conversations, notification groups, notification policies and requests, Web Push subscriptions and delivery, domain blocks, and status and thread mutes
 - Enhance: Allow administrators to disable the Mastodon-compatible API with `enableMastodonApi: false`
 - Enhance: Improve Mastodon OAuth application-token support, access-token management, and core API compatibility
