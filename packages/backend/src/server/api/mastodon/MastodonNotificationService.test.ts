@@ -50,7 +50,7 @@ describe(MastodonNotificationService, () => {
 			roleService,
 			usersRepository,
 			followingsRepository,
-			service: new MastodonNotificationService(redis as never, state as never, idService as never, roleService as never, usersRepository as never, followingsRepository as never),
+			service: new MastodonNotificationService(redis as never, state as never, idService as never, roleService as never, usersRepository as never, followingsRepository as never, { notificationsMerged: vi.fn() } as never),
 		};
 	}
 

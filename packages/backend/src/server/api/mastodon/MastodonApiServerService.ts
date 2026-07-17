@@ -36,6 +36,7 @@ import { MastodonPushSubscriptionService } from './MastodonPushSubscriptionServi
 import { MastodonReportService } from './MastodonReportService.js';
 import { MastodonScheduledStatusService } from './MastodonScheduledStatusService.js';
 import { MastodonScopeService } from './MastodonScopeService.js';
+import { MastodonStreamingApiServerService } from './MastodonStreamingApiServerService.js';
 import { MastodonUserFeatureService, type MastodonUserTagState } from './MastodonUserFeatureService.js';
 import { MastodonApiError, sendMastodonError } from './errors.js';
 import type { MastodonAuth, MastodonUserAuth } from './types.js';
@@ -81,6 +82,8 @@ export class MastodonApiServerService {
 
 		@Inject(DI.redis)
 		private redis: Redis.Redis,
+
+		private mastodonStreamingApiServerService: MastodonStreamingApiServerService,
 	) {}
 
 	@bindThis
@@ -314,8 +317,20 @@ export class MastodonApiServerService {
 		this.registerFiltersAndMarkers(fastify);
 		this.registerUserFeatures(fastify);
 		this.registerCompatibilityRoutes(fastify);
+		this.registerStreaming(fastify);
 
 		done();
+	}
+
+	private registerStreaming(fastify: FastifyInstance): void {
+		fastify.get('/api/v1/streaming/health', (_request, reply) => {
+			reply.header('Cache-Control', 'private, no-store');
+			reply.type('text/plain');
+			return 'OK';
+		});
+		const handle = (request: FastifyRequest, reply: FastifyReply) => this.mastodonStreamingApiServerService.handleSse(request, reply);
+		fastify.get('/api/v1/streaming', handle);
+		fastify.get('/api/v1/streaming/*', handle);
 	}
 
 	private registerPushSubscriptions(fastify: FastifyInstance): void {

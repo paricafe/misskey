@@ -21,6 +21,7 @@ import type {
 } from '@/models/_.js';
 import { MastodonApiError } from './errors.js';
 import { MastodonApiStateService } from './MastodonApiStateService.js';
+import { MastodonStreamingEventService } from './MastodonStreamingEventService.js';
 
 const FOLLOWED_TAG_KIND = 'followed_tag';
 const FEATURED_TAG_KIND = 'featured_tag';
@@ -59,6 +60,7 @@ export class MastodonUserFeatureService {
 		private idService: IdService,
 		private userEntityService: UserEntityService,
 		private globalEventService: GlobalEventService,
+		private mastodonStreamingEventService: MastodonStreamingEventService,
 	) {}
 
 	public async listFollowedTags(userId: MiUser['id']): Promise<MastodonUserTagState[]> {
@@ -68,7 +70,7 @@ export class MastodonUserFeatureService {
 
 	public async followTag(userId: MiUser['id'], rawName: string): Promise<MastodonUserTagState> {
 		const tag = this.normalizeTag(rawName);
-		return await this.mastodonApiStateService.withUserKindLock(userId, FOLLOWED_TAG_KIND, async stateService => {
+		const result = await this.mastodonApiStateService.withUserKindLock(userId, FOLLOWED_TAG_KIND, async stateService => {
 			const existing = await stateService.get(userId, FOLLOWED_TAG_KIND, tag.key);
 			if (existing != null) return this.tagState(existing);
 			const rows = await stateService.list(userId, FOLLOWED_TAG_KIND);
@@ -76,14 +78,18 @@ export class MastodonUserFeatureService {
 			const row = await stateService.put({ userId, kind: FOLLOWED_TAG_KIND, key: tag.key, value: { name: tag.name } });
 			return this.tagState(row);
 		});
+		this.mastodonStreamingEventService.followedTagChanged(userId, { action: 'follow', tag: result.name });
+		return result;
 	}
 
 	public async unfollowTag(userId: MiUser['id'], rawName: string): Promise<Record<string, never>> {
 		const tag = this.normalizeTag(rawName);
-		return await this.mastodonApiStateService.withUserKindLock(userId, FOLLOWED_TAG_KIND, async stateService => {
+		const result = await this.mastodonApiStateService.withUserKindLock(userId, FOLLOWED_TAG_KIND, async stateService => {
 			await stateService.delete(userId, FOLLOWED_TAG_KIND, tag.key);
 			return {};
 		});
+		this.mastodonStreamingEventService.followedTagChanged(userId, { action: 'unfollow', tag: tag.name });
+		return result;
 	}
 
 	public async listFeaturedTags(userId: MiUser['id']): Promise<MastodonUserTagState[]> {

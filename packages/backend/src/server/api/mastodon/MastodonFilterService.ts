@@ -9,6 +9,7 @@ import { Injectable } from '@nestjs/common';
 import type { MiUser } from '@/models/User.js';
 import { MastodonApiError } from './errors.js';
 import { MastodonApiStateService } from './MastodonApiStateService.js';
+import { MastodonStreamingEventService } from './MastodonStreamingEventService.js';
 
 export const MASTODON_FILTER_CONTEXTS = ['home', 'notifications', 'public', 'thread', 'account'] as const;
 export const MASTODON_FILTER_ACTIONS = ['warn', 'hide', 'blur'] as const;
@@ -65,6 +66,7 @@ const MAX_FILTER_STATE_BYTES = 256 * 1024;
 export class MastodonFilterService {
 	constructor(
 		private mastodonApiStateService: MastodonApiStateService,
+		private mastodonStreamingEventService: MastodonStreamingEventService,
 	) {}
 
 	public async listV2(userId: MiUser['id']): Promise<MastodonFilter[]> {
@@ -302,7 +304,9 @@ export class MastodonFilterService {
 	}
 
 	private async mutate<T>(userId: MiUser['id'], callback: (stateService: MastodonApiStateService) => Promise<T>): Promise<T> {
-		return await this.mastodonApiStateService.withUserKindLock(userId, FILTER_KIND, callback);
+		const result = await this.mastodonApiStateService.withUserKindLock(userId, FILTER_KIND, callback);
+		this.mastodonStreamingEventService.filtersChanged(userId);
+		return result;
 	}
 
 	private async snapshot(userId: MiUser['id'], stateService = this.mastodonApiStateService): Promise<MastodonFilter[]> {

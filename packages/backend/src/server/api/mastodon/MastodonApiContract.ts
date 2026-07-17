@@ -106,6 +106,7 @@ export const MASTODON_4_6_USER_ROUTES: readonly MastodonContractRoute[] = [
 	notFound('GET', '/api/oembed', 'public', undefined, 'OEmbed', '1.6.0', ['url']),
 	implemented('GET', '/api/v1/streaming', 'user', 'read:statuses', 'StreamingEvent', '1.0.0', 'websocket'),
 	implemented('GET', '/api/v1/streaming/:stream', 'user', 'read:statuses', 'StreamingEvent', '1.0.0', 'websocket'),
+	implemented('GET', '/api/v1/streaming/health', 'public', undefined, 'String', '3.0.0'),
 
 	// Statuses and timelines
 	implemented('GET', '/api/v1/statuses', 'token', 'read:statuses', 'Status[]', '4.6.0'),

@@ -28,7 +28,11 @@ export class MastodonAuthenticateService {
 
 	@bindThis
 	public async isActiveUserToken(tokenId: string, userId: string): Promise<boolean> {
-		return this.mastodonOAuthTokensRepository.exists({ where: { id: tokenId, userId } });
+		const [tokenExists, userExists] = await Promise.all([
+			this.mastodonOAuthTokensRepository.exists({ where: { id: tokenId, userId } }),
+			this.usersRepository.exists({ where: { id: userId, host: IsNull(), isDeleted: false, isSuspended: false } }),
+		]);
+		return tokenExists && userExists;
 	}
 
 	@bindThis

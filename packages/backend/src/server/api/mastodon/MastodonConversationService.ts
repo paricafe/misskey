@@ -114,6 +114,40 @@ export class MastodonConversationService {
 		return await this.pack(user, filtered);
 	}
 
+	public async upsertLive(user: MiLocalUser, noteId: MiNote['id']): Promise<MastodonConversation> {
+		const liveNote = await this.notesRepository.findOneBy({ id: noteId });
+		if (liveNote == null || !this.isDirectFor(liveNote, user.id)) this.notFound();
+		const group = this.groups([liveNote])[0];
+		if (group == null) this.notFound();
+		const projection = await this.withConversationLocks(user.id, async stateService => {
+			const [row, tombstone] = await Promise.all([
+				stateService.get(user.id, CONVERSATION_KIND, group.key),
+				stateService.get(user.id, DELETED_KIND, group.key),
+			]);
+			const current = this.stored(row);
+			if (current != null && current.groupKey === group.groupKey && current.lastStatusId > liveNote.id) {
+				const currentNote = await this.notesRepository.findOneBy({ id: current.lastStatusId });
+				if (currentNote != null && this.isDirectFor(currentNote, user.id)) {
+					return this.projection(row!.id, current, currentNote, user.id);
+				}
+			}
+			return await this.reconcile(stateService, user.id, group, row, tombstone, new Set());
+		});
+		if (projection == null) this.notFound();
+		const [conversation] = await this.pack(user, [projection]);
+		if (conversation == null) this.notFound();
+		return conversation;
+	}
+
+	public async refreshLive(user: MiLocalUser, conversationId: string): Promise<MastodonConversation | null> {
+		try {
+			return await this.mutate(user, conversationId, stored => stored);
+		} catch (error) {
+			if (error instanceof MastodonApiError && error.statusCode === 404) return null;
+			throw error;
+		}
+	}
+
 	public async read(user: MiLocalUser, conversationId: string): Promise<MastodonConversation> {
 		return await this.mutate(user, conversationId, stored => ({
 			...stored,

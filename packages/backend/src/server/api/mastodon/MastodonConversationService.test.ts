@@ -143,6 +143,39 @@ describe(MastodonConversationService, () => {
 		};
 	}
 
+	test('upserts one persisted live direct note into a stable complete conversation projection', async () => {
+		const direct = note('099', 'thread-live', 'alice', ['me']);
+		const { service, notesRepository, calls } = createService([direct]);
+
+		const first = await service.upsertLive({ id: 'me' } as never, direct.id);
+		const second = await service.upsertLive({ id: 'me' } as never, direct.id);
+
+		expect(first).toEqual({
+			id: expect.stringMatching(/^conversation-/u),
+			unread: true,
+			accounts: [{ id: 'alice', username: 'alice' }],
+			lastStatus: expect.objectContaining({ id: '099' }),
+		});
+		expect(second).toEqual(first);
+		expect(notesRepository.findOneBy).toHaveBeenCalledWith({ id: '099' });
+		expect(calls.take).toEqual([]);
+	});
+
+	test('refreshes a live conversation to its previous status after the latest direct note is deleted', async () => {
+		const latest = note('099', 'thread-live', 'alice', ['me']);
+		const previous = note('098', 'thread-live', 'alice', ['me']);
+		const { service, setNotes } = createService([latest, previous]);
+		const created = await service.upsertLive({ id: 'me' } as never, latest.id);
+		setNotes([previous]);
+
+		await expect(service.refreshLive({ id: 'me' } as never, created.id)).resolves.toEqual({
+			id: created.id,
+			unread: true,
+			accounts: [{ id: 'alice', username: 'alice' }],
+			lastStatus: expect.objectContaining({ id: previous.id }),
+		});
+	});
+
 	test('queries only direct notes for the author or recipient with cursor bounds and a hard 200-note cap', async () => {
 		const { service, calls, notesRepository } = createService();
 

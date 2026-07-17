@@ -8,20 +8,31 @@ import { digestCredential } from './utils.js';
 import { MastodonAuthenticateService } from './MastodonAuthenticateService.js';
 
 describe(MastodonAuthenticateService, () => {
-	test('checks active user-token ownership by token id and user id', async () => {
-		const exists = vi.fn()
+	test('requires both token ownership and an active local user', async () => {
+		const tokenExists = vi.fn().mockResolvedValue(true);
+		const userExists = vi.fn()
 			.mockResolvedValueOnce(true)
 			.mockResolvedValueOnce(false);
 		const service = new MastodonAuthenticateService(
-			{ exists } as never,
-			{ findOneBy: vi.fn() } as never,
+			{ exists: tokenExists } as never,
+			{ exists: userExists } as never,
 			{ localUserByIdCache: { fetch: vi.fn() } } as never,
 		);
 
 		await expect(service.isActiveUserToken('token-id', 'user-id')).resolves.toBe(true);
-		await expect(service.isActiveUserToken('token-id', 'other-user-id')).resolves.toBe(false);
-		expect(exists).toHaveBeenNthCalledWith(1, { where: { id: 'token-id', userId: 'user-id' } });
-		expect(exists).toHaveBeenNthCalledWith(2, { where: { id: 'token-id', userId: 'other-user-id' } });
+		await expect(service.isActiveUserToken('token-id', 'suspended-user-id')).resolves.toBe(false);
+		expect(tokenExists).toHaveBeenNthCalledWith(1, { where: { id: 'token-id', userId: 'user-id' } });
+		expect(tokenExists).toHaveBeenNthCalledWith(2, { where: { id: 'token-id', userId: 'suspended-user-id' } });
+		expect(userExists).toHaveBeenNthCalledWith(1, { where: expect.objectContaining({
+			id: 'user-id',
+			isDeleted: false,
+			isSuspended: false,
+		}) });
+		expect(userExists).toHaveBeenNthCalledWith(2, { where: expect.objectContaining({
+			id: 'suspended-user-id',
+			isDeleted: false,
+			isSuspended: false,
+		}) });
 	});
 
 	test('looks up only the compatibility token digest', async () => {

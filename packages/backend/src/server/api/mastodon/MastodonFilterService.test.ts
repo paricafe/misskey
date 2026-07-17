@@ -60,7 +60,7 @@ describe(MastodonFilterService, () => {
 				}
 			}),
 		};
-		return { service: new MastodonFilterService(stateService as never), stateService, rows };
+		return { service: new MastodonFilterService(stateService as never, { filtersChanged: vi.fn() } as never), stateService, rows };
 	}
 
 	test('projects v2 keywords as authoritative v1 filters and keeps v1 CRUD keyed by keyword id', async () => {

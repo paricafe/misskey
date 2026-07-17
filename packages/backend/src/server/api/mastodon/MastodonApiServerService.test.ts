@@ -206,7 +206,15 @@ describe(MastodonApiServerService, () => {
 			swPublicKey: 'BFoYnP6n4Huwsti9ptCZtqxxQTT5KpSdGfB8loT2pXzzZYNhOJ4lzcAmndO7ad8LFftUdmUXIZ3Zg-5JSZiu4f0',
 			swPrivateKey: 'nCqedreHEKZ54ZtuMX-1ZPkyK1H7e7itEemL_afgvUE',
 		} as never, mastodonApiStateService as never, { gen: vi.fn(() => `push-state-${++pushStateSequence}`) } as never);
-		const mastodonFilterService = new MastodonFilterService(mastodonApiStateService as never);
+		const mastodonStreamingEventService = {
+			filtersChanged: vi.fn(),
+			notificationsMerged: vi.fn(),
+			followedTagChanged: vi.fn(),
+		};
+		const mastodonStreamingApiServerService = {
+			handleSse: vi.fn((_request: unknown, reply: { send: (value: string) => unknown }) => reply.send('')),
+		};
+		const mastodonFilterService = new MastodonFilterService(mastodonApiStateService as never, mastodonStreamingEventService as never);
 		const mastodonMarkerService = new MastodonMarkerService(mastodonApiStateService as never);
 		const profiles = new Map([['user-id', { userId: 'user-id', mutedInstances: [] as string[] }]]);
 		const profileRepository = {
@@ -266,6 +274,7 @@ describe(MastodonApiServerService, () => {
 			{ getUserPolicies: vi.fn(async () => ({ canPublicNote: true })) } as never,
 			userFeatureUsersRepository as never,
 			userFeatureFollowingsRepository as never,
+			mastodonStreamingEventService as never,
 		);
 		const mastodonUserFeatureService = new MastodonUserFeatureService(
 			mastodonApiStateService as never,
@@ -277,6 +286,7 @@ describe(MastodonApiServerService, () => {
 			{ gen: () => `compatibility-${++compatibilityId}` } as never,
 			userFeatureUserEntityService as never,
 			userFeatureGlobalEventService as never,
+			mastodonStreamingEventService as never,
 		);
 		const collection = (overrides: Record<string, unknown> = {}) => ({
 			id: 'collection-id',
@@ -467,6 +477,7 @@ describe(MastodonApiServerService, () => {
 			mastodonPushSubscriptionService,
 			mastodonUserFeatureService,
 			redis as never,
+			mastodonStreamingApiServerService as never,
 		);
 		const fastify = Fastify();
 		registerBeforeMastodon?.(fastify);
@@ -497,6 +508,7 @@ describe(MastodonApiServerService, () => {
 			mastodonCollectionService,
 			mastodonConversationService,
 			mastodonFilterService,
+			mastodonStreamingApiServerService,
 			profiles,
 			noteThreadMutingsRepository,
 			mutedThreads,
@@ -507,6 +519,29 @@ describe(MastodonApiServerService, () => {
 			userFeatureGlobalEventService,
 		};
 	}
+
+	test('exposes the public streaming health response as exact no-store plain text', async () => {
+		const { fastify, authenticate } = createServer();
+		const response = await fastify.inject({ method: 'GET', url: '/api/v1/streaming/health' });
+
+		expect(response.statusCode).toBe(200);
+		expect(response.body).toBe('OK');
+		expect(response.headers['content-type']).toMatch(/^text\/plain(?:;|$)/u);
+		expect(response.headers['cache-control']).toBe('private, no-store');
+		expect(authenticate).not.toHaveBeenCalled();
+	});
+
+	test('delegates a streaming path to the SSE adapter', async () => {
+		const { fastify, mastodonStreamingApiServerService } = createServer();
+		const response = await fastify.inject({
+			method: 'GET',
+			url: '/api/v1/streaming/public/local?access_token=user-token',
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(mastodonStreamingApiServerService.handleSse).toHaveBeenCalledOnce();
+		expect(mastodonStreamingApiServerService.handleSse).toHaveBeenCalledWith(expect.objectContaining({ raw: expect.anything() }), expect.objectContaining({ raw: expect.anything() }));
+	});
 
 	test('declares all four conversation routes as implemented with the official scopes', () => {
 		const contract = (method: string, path: string) => MASTODON_4_6_USER_ROUTES.find(route => route.method === method && route.path === path);

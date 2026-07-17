@@ -48,6 +48,7 @@ import { MastodonReportService } from './api/mastodon/MastodonReportService.js';
 import { MastodonPushSubscriptionService } from './api/mastodon/MastodonPushSubscriptionService.js';
 import { MastodonScheduledStatusService } from './api/mastodon/MastodonScheduledStatusService.js';
 import { MastodonStreamingApiServerService } from './api/mastodon/MastodonStreamingApiServerService.js';
+import { MastodonStreamingEventService } from './api/mastodon/MastodonStreamingEventService.js';
 
 import MainStreamConnection from '@/server/api/stream/Connection.js';
 import { MainChannel } from './api/stream/channels/main.js';
@@ -139,6 +140,7 @@ import { SigninWithPasskeyApiService } from './api/SigninWithPasskeyApiService.j
 		MastodonScheduledStatusService,
 		MastodonReportService,
 		MastodonPushSubscriptionService,
+		MastodonStreamingEventService,
 		MastodonStreamingApiServerService,
 	],
 	exports: [

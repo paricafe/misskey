@@ -14,6 +14,7 @@ import type { MiMastodonUserState } from '@/models/MastodonUserState.js';
 import type { FollowingsRepository, UsersRepository } from '@/models/_.js';
 import { MastodonApiError } from './errors.js';
 import { MastodonApiStateService } from './MastodonApiStateService.js';
+import { MastodonStreamingEventService } from './MastodonStreamingEventService.js';
 import { digestCredential } from './utils.js';
 
 const DISMISSAL_TTL_SECONDS = 90 * 24 * 60 * 60;
@@ -138,6 +139,8 @@ export class MastodonNotificationService {
 
 		@Inject(DI.followingsRepository)
 		private followingsRepository: FollowingsRepository,
+
+		private mastodonStreamingEventService: MastodonStreamingEventService,
 	) {}
 
 	public toMisskeyTypes(types: readonly string[]): MiGroupedNotification['type'][] {
@@ -477,15 +480,17 @@ export class MastodonNotificationService {
 
 	public async acceptRequests(userId: string, requestIds: string[]): Promise<{ merged: true }> {
 		if (requestIds.length > 80) this.invalid('request IDs must contain at most 80 items');
-		return await this.mastodonApiStateService.withUserKindLock(userId, REQUEST_KIND, async stateService => {
+		const result = await this.mastodonApiStateService.withUserKindLock(userId, REQUEST_KIND, async stateService => {
 			for (const requestId of [...new Set(requestIds)]) {
 				const row = await this.ownedRequest(stateService, userId, requestId);
 				const stored = this.storedRequest(row);
 				if (stored == null) this.notFound('Notification request not found');
 				await stateService.put({ userId, kind: REQUEST_KIND, key: row.key, value: { ...stored, accepted: true } });
 			}
-			return { merged: true };
+			return { merged: true as const };
 		});
+		this.mastodonStreamingEventService.notificationsMerged(userId);
+		return result;
 	}
 
 	public async dismissRequest(userId: string, requestId: string): Promise<Record<string, never>> {

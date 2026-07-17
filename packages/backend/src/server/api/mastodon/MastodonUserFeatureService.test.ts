@@ -103,6 +103,7 @@ describe(MastodonUserFeatureService, () => {
 			{ gen: () => `id-${++id}` } as never,
 			userEntityService as never,
 			globalEventService as never,
+			{ followedTagChanged: vi.fn() } as never,
 		);
 		return {
 			service,
