@@ -1,4 +1,4 @@
-﻿/*
+/*
  * SPDX-FileCopyrightText: syuilo and misskey-project
  * SPDX-License-Identifier: AGPL-3.0-only
  */
@@ -722,7 +722,7 @@ export class MastodonApiServerService {
 		}));
 
 		const actions: Array<[string, string, string, Dictionary]> = [
-			['favourite', 'notes/reactions/create', 'write:favourites', { reaction: '鉂わ笍' }],
+			['favourite', 'notes/reactions/create', 'write:favourites', { reaction: '❤️' }],
 			['unfavourite', 'notes/reactions/delete', 'write:favourites', {}],
 			['bookmark', 'notes/favorites/create', 'write:bookmarks', {}],
 			['unbookmark', 'notes/favorites/delete', 'write:bookmarks', {}],
@@ -2339,8 +2339,8 @@ export class MastodonApiServerService {
 		return {
 			domain: this.config.host,
 			title: this.meta.name ?? this.config.host,
-			version: `4.6.0 (compatible; Misskey ${this.config.version})`,
-			api_versions: { mastodon: 11 },
+			version: `4.3.0 (compatible; Misskey ${this.config.version})`,
+			api_versions: { mastodon: 1 },
 			source_url: 'https://github.com/misskey-dev/misskey',
 			description: this.meta.description ?? '',
 			usage: { users: { active_month: activeMonth } },
