@@ -8,13 +8,13 @@ import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
 import * as Redis from 'ioredis';
 import { extract, parse as mfmParse } from 'mfm-js';
-import { In, IsNull, MoreThan } from 'typeorm';
+import { In } from 'typeorm';
 import { pipeline } from 'node:stream/promises';
 import * as fs from 'node:fs';
 import { MAX_NOTE_TEXT_LENGTH } from '@/const.js';
 import type { Config } from '@/config.js';
 import { DI } from '@/di-symbols.js';
-import type { MiMeta, NoteFavoritesRepository, NotesRepository, UserNotePiningsRepository, UsersRepository } from '@/models/_.js';
+import type { MiMeta, NoteFavoritesRepository, NotesRepository, UserNotePiningsRepository } from '@/models/_.js';
 import { createTemp } from '@/misc/create-temp.js';
 import type { Packed } from '@/misc/json-schema.js';
 import { extractMentions } from '@/misc/extract-mentions.js';
@@ -63,9 +63,6 @@ export class MastodonApiServerService {
 
 		@Inject(DI.userNotePiningsRepository)
 		private userNotePiningsRepository: UserNotePiningsRepository,
-
-		@Inject(DI.usersRepository)
-		private usersRepository: UsersRepository,
 
 		private mastodonOAuthService: MastodonOAuthService,
 		private mastodonAuthenticateService: MastodonAuthenticateService,
@@ -117,8 +114,8 @@ export class MastodonApiServerService {
 			await this.assertApplicationRegistrationRate(request.ip);
 			return { ...await this.mastodonOAuthService.registerApplication(request.body as MastodonApplicationRegistration), vapid_key: this.mastodonPushSubscriptionService.vapidPublicKey() };
 		});
-		fastify.get('/api/v1/instance', request => this.withOptionalToken(request as MastodonRequest, async () => this.instanceV1(request as MastodonRequest)));
-		fastify.get('/api/v2/instance', request => this.withOptionalToken(request as MastodonRequest, async () => this.instanceV2(request as MastodonRequest)));
+		fastify.get('/api/v1/instance', request => this.withOptionalToken(request as MastodonRequest, async () => this.instanceV1()));
+		fastify.get('/api/v2/instance', request => this.withOptionalToken(request as MastodonRequest, async () => this.instanceV2()));
 		fastify.get('/api/v1/instance/rules', request => this.withOptionalToken(request as MastodonRequest, async () => this.rules()));
 		fastify.get('/api/v1/directory', (request, reply) => this.withOptionalToken(request as MastodonRequest, async () => {
 			const query = request.query as Dictionary;
@@ -157,18 +154,6 @@ export class MastodonApiServerService {
 				notes as { local: { inc: number[] } },
 				users as { local: { inc: number[] } },
 			);
-		}));
-		fastify.get('/api/v1/instance/privacy_policy', request => this.withOptionalToken(request as MastodonRequest, async () => {
-			if (this.meta.privacyPolicyUrl == null) throw new MastodonApiError(404, 'not_found', 'Record not found');
-			return { updated_at: new Date(0).toISOString(), content: this.meta.privacyPolicyUrl };
-		}));
-		fastify.get('/api/v1/instance/extended_description', request => this.withOptionalToken(request as MastodonRequest, async () => {
-			if (this.meta.description == null || this.meta.description === '') throw new MastodonApiError(404, 'not_found', 'Record not found');
-			return { updated_at: new Date(0).toISOString(), content: this.meta.description };
-		}));
-		fastify.get('/api/v1/instance/terms_of_service', request => this.withOptionalToken(request as MastodonRequest, async () => {
-			if (this.meta.termsOfServiceUrl == null) return [];
-			return [{ updated_at: new Date(0).toISOString(), content: this.meta.termsOfServiceUrl }];
 		}));
 		fastify.get('/api/v1/custom_emojis', request => this.withOptionalToken(request as MastodonRequest, async () => {
 			const response = await this.invokePublic('emojis', {}, null, request as MastodonRequest) as {
@@ -1865,22 +1850,6 @@ export class MastodonApiServerService {
 			pinned: pinnedIds.has(note.id),
 			muted: mutedNoteIds.has(note.id),
 		}));
-		const quotesCount = await this.queryQuotesCount(rootNoteIds);
-		const allAccounts: Record<string, unknown>[] = [];
-		for (const st of statuses) {
-			const acct = this.dictionary(st.account);
-			if (acct != null) allAccounts.push(acct);
-			const reblog = this.dictionary(st.reblog);
-			if (reblog != null) {
-				const ra = this.dictionary(reblog.account);
-				if (ra != null) allAccounts.push(ra);
-			}
-		}
-		await this.mastodonEntityService.enrichLastStatusAt(allAccounts);
-		for (const st of statuses) {
-			const sid = this.string(st.id) ?? '';
-			st.quotes_count = quotesCount.get(sid) ?? 0;
-		}
 		const corpora = new Map(notes.map(note => [note.id, this.filterCorpus(note)]));
 		return await this.mastodonFilterService.apply(auth.user.id, context, statuses, { ...options, corpora });
 	}
@@ -2298,17 +2267,8 @@ export class MastodonApiServerService {
 		return source.slice(offset, offset + limit);
 	}
 
-	private async instanceV1(request: MastodonRequest): Promise<Dictionary> {
-		let notesCount = 0;
-		let usersCount = 0;
-		let instances = 0;
-		try {
-			const stats = await this.invokePublic('stats', {}, null, request) as { notesCount: number; usersCount: number; instances: number };
-			notesCount = stats.notesCount;
-			usersCount = stats.usersCount;
-			instances = stats.instances;
-		} catch { /* keep zero values on failure */ }
-		const v2 = await this.instanceV2(request);
+	private instanceV1(): Dictionary {
+		const v2 = this.instanceV2();
 		return {
 			uri: this.config.host,
 			title: v2.title,
@@ -2317,7 +2277,7 @@ export class MastodonApiServerService {
 			email: this.meta.maintainerEmail ?? '',
 			version: v2.version,
 			urls: { streaming_api: this.streamingUrl() },
-			stats: { user_count: usersCount, status_count: notesCount, domain_count: instances },
+			stats: { user_count: 0, status_count: 0, domain_count: 0 },
 			thumbnail: this.instanceImageUrl(),
 			languages: this.meta.langs,
 			registrations: !this.meta.disableRegistration,
@@ -2329,13 +2289,7 @@ export class MastodonApiServerService {
 		};
 	}
 
-	private async instanceV2(request: MastodonRequest): Promise<Dictionary> {
-		let activeMonth = 0;
-		try {
-			activeMonth = await this.usersRepository.count({
-				where: { host: IsNull(), lastActiveDate: MoreThan(new Date(Date.now() - 2592000000)) },
-			});
-		} catch { /* keep zero on failure */ }
+	private instanceV2(): Dictionary {
 		return {
 			domain: this.config.host,
 			title: this.meta.name ?? this.config.host,
@@ -2343,7 +2297,7 @@ export class MastodonApiServerService {
 			api_versions: { mastodon: 1 },
 			source_url: 'https://github.com/misskey-dev/misskey',
 			description: this.meta.description ?? '',
-			usage: { users: { active_month: activeMonth } },
+			usage: { users: { active_month: 0 } },
 			thumbnail: { url: this.instanceImageUrl() },
 			languages: this.meta.langs,
 			configuration: {
@@ -2418,17 +2372,5 @@ export class MastodonApiServerService {
 
 	private boolean(value: unknown): boolean {
 		return value === true || value === 1 || value === '1' || value === 'true' || value === 'on';
-	}
-
-	private async queryQuotesCount(noteIds: readonly string[]): Promise<Map<string, number>> {
-		if (noteIds.length === 0) return new Map();
-		const result = await this.notesRepository.createQueryBuilder('note')
-			.select('note.renoteId', 'renoteId')
-			.addSelect('COUNT(*)::int', 'count')
-			.where('note.renoteId IN (:...ids)', { ids: noteIds as string[] })
-			.andWhere("(note.text IS NOT NULL OR note.cw IS NOT NULL OR cardinality(note.\"fileIds\") > 0 OR note.\"hasPoll\" = TRUE OR note.\"replyId\" IS NOT NULL)")
-			.groupBy('note.renoteId')
-			.getRawMany<{ renoteId: string; count: number }>();
-		return new Map(result.map(row => [row.renoteId, row.count]));
 	}
 }
