@@ -477,7 +477,7 @@ export class ApNoteService {
 			const createFrom = options.sentFrom?.origin === new URL(uri).origin ? value : uri;
 			return await this.createNote(createFrom, undefined, options.resolver, true);
 		} finally {
-			unlock();
+			await unlock();
 		}
 	}
 

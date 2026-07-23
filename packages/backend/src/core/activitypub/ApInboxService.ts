@@ -368,7 +368,7 @@ export class ApInboxService {
 				uri,
 			});
 		} finally {
-			unlock();
+			await unlock();
 		}
 	}
 
@@ -464,7 +464,7 @@ export class ApInboxService {
 				throw err;
 			}
 		} finally {
-			unlock();
+			await unlock();
 		}
 	}
 
@@ -549,7 +549,7 @@ export class ApInboxService {
 			await this.noteDeleteService.delete(actor, note);
 			return 'ok: note deleted';
 		} finally {
-			unlock();
+			await unlock();
 		}
 	}
 

@@ -285,7 +285,7 @@ describe(ApNoteService, () => {
 		expect(noteUpdateService.update).not.toHaveBeenCalled();
 	});
 
-	test('serializes concurrent AP updates and re-reads committed state before resolving the second attachment', async () => {
+	test('retries a concurrent AP update within the acquisition budget and re-reads committed state before resolving its attachment', async () => {
 		const {
 			service,
 			noteUpdateService,
@@ -303,36 +303,23 @@ describe(ApNoteService, () => {
 		notesRepository.findOneBy.mockImplementation(async () => ({ ...currentNote }));
 
 		let lockOwner: string | null = null;
-		const lockWaiters: Array<{ identifier: string; resolve: (value: string) => void }> = [];
 		const redisClient = {
 			set: vi.fn(async (_key: string, identifier: string) => {
 				if (lockOwner == null) {
 					lockOwner = identifier;
 					return 'OK';
 				}
-				return await new Promise<string>(resolve => {
-					lockWaiters.push({ identifier, resolve });
-				});
+				return null;
 			}),
 			get: vi.fn(async () => lockOwner),
 			del: vi.fn(async () => {
 				lockOwner = null;
-				const waiter = lockWaiters.shift();
-				if (waiter != null) {
-					lockOwner = waiter.identifier;
-					waiter.resolve('OK');
-				}
 				return 1;
 			}),
 			eval: vi.fn(async (script: string, _keyCount: number, _key: string, identifier: string) => {
 				if (lockOwner !== identifier) return 0;
 				if (script.includes('del')) {
 					lockOwner = null;
-					const waiter = lockWaiters.shift();
-					if (waiter != null) {
-						lockOwner = waiter.identifier;
-						waiter.resolve('OK');
-					}
 				}
 				return 1;
 			}),
@@ -382,6 +369,62 @@ describe(ApNoteService, () => {
 		expect(noteUpdateService.update).toHaveBeenCalledOnce();
 		expect(noteUpdateService.prepareUpdate).toHaveBeenCalledOnce();
 		expect(apImageService.resolveImage).toHaveBeenCalledOnce();
+	});
+
+	test('does not resolve resolveNote before async lock release completes', async () => {
+		const {
+			service,
+			redisClient,
+		} = createService();
+		const existingNote = { id: 'existing-note' };
+		let finishRelease!: () => void;
+		const releaseMayFinish = new Promise<void>(resolve => {
+			finishRelease = resolve;
+		});
+		redisClient.eval.mockImplementationOnce(async () => {
+			await releaseMayFinish;
+			return 1;
+		});
+		Object.assign(service, {
+			utilityService: {
+				isFederationAllowedUri: vi.fn().mockReturnValue(true),
+			},
+			apDbResolverService: {
+				getNoteFromApId: vi.fn().mockResolvedValue(existingNote),
+			},
+		});
+
+		let resolved = false;
+		const resolving = service.resolveNote('https://remote.example/notes/existing').then(result => {
+			resolved = true;
+			return result;
+		});
+		await vi.waitFor(() => {
+			expect(redisClient.eval).toHaveBeenCalledOnce();
+		});
+
+		expect(resolved).toBe(false);
+		finishRelease();
+		await expect(resolving).resolves.toBe(existingNote);
+	});
+
+	test('surfaces an async resolveNote lock release failure', async () => {
+		const {
+			service,
+			redisClient,
+		} = createService();
+		const releaseError = new Error('release failed');
+		redisClient.eval.mockRejectedValueOnce(releaseError);
+		Object.assign(service, {
+			utilityService: {
+				isFederationAllowedUri: vi.fn().mockReturnValue(true),
+			},
+			apDbResolverService: {
+				getNoteFromApId: vi.fn().mockResolvedValue({ id: 'existing-note' }),
+			},
+		});
+
+		await expect(service.resolveNote('https://remote.example/notes/existing')).rejects.toBe(releaseError);
 	});
 
 	test('aborts before the Note transaction when the AP object lock is lost during attachment resolution', async () => {

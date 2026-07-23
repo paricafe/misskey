@@ -124,4 +124,17 @@ describe(acquireDistributedLock, () => {
 		});
 		await lock();
 	});
+
+	test('fails safely after exhausting all 50 acquisition retries', async () => {
+		const redis = {
+			set: vi.fn().mockResolvedValue(null),
+		};
+		const acquisition = acquireDistributedLock(redis as never, 'busy', 30_000, 50, 100);
+		const acquisitionExpectation = expect(acquisition).rejects.toThrow('Failed to acquire lock busy');
+
+		await vi.advanceTimersByTimeAsync(5_000);
+
+		await acquisitionExpectation;
+		expect(redis.set).toHaveBeenCalledTimes(50);
+	});
 });
