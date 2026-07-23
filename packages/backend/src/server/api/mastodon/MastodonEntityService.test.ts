@@ -475,13 +475,27 @@ describe(MastodonEntityService, () => {
 	});
 
 	test('converts stored Note revisions oldest-to-newest and includes the current revision', () => {
+		const quoted = {
+			...note,
+			id: 'quoted-note-id',
+			text: 'Quoted poll',
+			files: [],
+			renoteId: null,
+			renote: null,
+		};
 		const edits = service.statusEdits({
 			...note,
+			text: 'Current revision with quote',
+			renoteId: quoted.id,
+			renote: quoted,
 			history: [
 				{ createdAt: '2025-02-03T03:00:00.000Z', text: 'Second', cw: null },
 				{ createdAt: '2025-02-03T02:00:00.000Z', text: 'First', cw: 'Old CW' },
 			],
-		} as never);
+		} as never, new Map([
+			['note-id', 2],
+			['quoted-note-id', 0],
+		]));
 
 		expect(edits.map(edit => edit.created_at)).toEqual([
 			'2025-02-03T02:00:00.000Z',
@@ -502,8 +516,21 @@ describe(MastodonEntityService, () => {
 			spoiler_text: 'CW',
 			sensitive: true,
 			media_attachments: [expect.objectContaining({ id: 'file-id' })],
-			poll: expect.objectContaining({ id: 'note-id' }),
+			poll: expect.objectContaining({ id: 'note-id', voters_count: 2 }),
+			quote: {
+				state: 'accepted',
+				quoted_status: expect.objectContaining({
+					id: 'quoted-note-id',
+					poll: expect.objectContaining({ id: 'quoted-note-id', voters_count: 0 }),
+				}),
+			},
 		});
+
+		const singlePollEdits = service.statusEdits({
+			...note,
+			poll: { ...note.poll, multiple: false },
+		} as never, new Map([['note-id', 1]]));
+		expect(singlePollEdits.at(-1)).toMatchObject({ poll: { voters_count: null } });
 	});
 
 	test('converts native translation results to Mastodon Translation', () => {

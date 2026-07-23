@@ -448,7 +448,14 @@ describe(MastodonApiServerService, () => {
 					history: [],
 				})),
 				status: vi.fn((value, voterCounts) => serializeStatus(value, voterCounts)),
-				statusEdits: vi.fn(value => [...(value.history ?? []), { createdAt: value.updatedAt ?? value.createdAt }].map(edit => ({ created_at: edit.createdAt }))),
+				statusEdits: vi.fn((value, voterCounts) => [
+					...(value.history ?? []).map((edit: { createdAt: string }) => ({ created_at: edit.createdAt })),
+					{
+						created_at: value.updatedAt ?? value.createdAt,
+						...(value.poll == null ? {} : { poll: serializeStatus(value, voterCounts).poll }),
+						...(value.renote == null ? {} : { quote: serializeStatus(value, voterCounts).quote }),
+					},
+				]),
 				translation: vi.fn((value, language) => ({ detected_source_language: value.sourceLang, language, content: value.text })),
 				instanceActivity: vi.fn((notes, users) => notes.local.inc.length === 84 && users.local.inc.length === 84
 					? Array.from({ length: 12 }, (_, index) => ({ week: index.toString(), statuses: '7', logins: '0', registrations: '7' }))
@@ -1136,6 +1143,49 @@ describe(MastodonApiServerService, () => {
 		expect(authenticated.statusCode).toBe(200);
 		expect(authenticate).toHaveBeenCalledWith('user-token');
 		expect(assert).toHaveBeenCalledWith(['read'], 'read:statuses');
+	});
+
+	test('enriches current and quoted polls in status history with one recursive query', async () => {
+		const { fastify, nativeInvoke, notesRepository } = createServer();
+		const multiplePoll = {
+			expiresAt: null,
+			multiple: true,
+			choices: [
+				{ text: 'A', votes: 2, isVoted: false },
+				{ text: 'B', votes: 1, isVoted: false },
+			],
+		};
+		nativeInvoke.mockResolvedValue({
+			id: 'current-poll',
+			createdAt: '2025-01-01T00:00:00.000Z',
+			updatedAt: '2025-01-02T00:00:00.000Z',
+			text: 'Current with quote',
+			poll: multiplePoll,
+			history: [{ createdAt: '2025-01-01T00:00:00.000Z', text: 'old' }],
+			renote: {
+				id: 'quoted-poll',
+				text: 'Quoted',
+				poll: multiplePoll,
+			},
+		});
+		notesRepository.query.mockResolvedValue([{ noteId: 'current-poll', votersCount: '2' }]);
+
+		const response = await fastify.inject({ method: 'GET', url: '/api/v1/statuses/current-poll/history' });
+
+		expect(response.statusCode).toBe(200);
+		expect(response.json()).toMatchObject([
+			{ created_at: '2025-01-01T00:00:00.000Z' },
+			{
+				created_at: '2025-01-02T00:00:00.000Z',
+				poll: { voters_count: 2 },
+				quote: { quoted_status: { id: 'quoted-poll', poll: { voters_count: 0 } } },
+			},
+		]);
+		expect(response.json()[0]).not.toHaveProperty('poll');
+		expect(response.json()[0]).not.toHaveProperty('quote');
+		const countQueries = notesRepository.query.mock.calls.filter(([sql]) => (sql as string).includes('COUNT(DISTINCT vote."userId")'));
+		expect(countQueries).toHaveLength(1);
+		expect(countQueries[0]?.[1]).toEqual([['current-poll', 'quoted-poll']]);
 	});
 
 	test('translates statuses using lang and Accept-Language, and reports unavailable translation truthfully', async () => {

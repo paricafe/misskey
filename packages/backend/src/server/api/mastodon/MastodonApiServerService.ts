@@ -639,7 +639,8 @@ export class MastodonApiServerService {
 		}));
 		fastify.get<{ Params: { id: string } }>('/api/v1/statuses/:id/history', request => this.withOptionalScopedUser(request, 'read:statuses', async auth => {
 			const note = await this.invokePublic('notes/show', { noteId: request.params.id }, auth, request) as Packed<'Note'>;
-			return this.mastodonEntityService.statusEdits(note);
+			const voterCounts = await this.pollVoterCounts([note]);
+			return this.mastodonEntityService.statusEdits(note, voterCounts);
 		}));
 		fastify.post<{ Params: { id: string }; Body: Dictionary }>('/api/v1/statuses/:id/translate', request => this.withAuth(request, 'read:statuses', async auth => {
 			const query = request.query as Dictionary;

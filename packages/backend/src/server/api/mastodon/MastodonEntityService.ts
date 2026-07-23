@@ -233,7 +233,7 @@ export class MastodonEntityService {
 		};
 	}
 
-	public statusEdits(note: Packed<'Note'>) {
+	public statusEdits(note: Packed<'Note'>, voterCounts?: ReadonlyMap<string, number>) {
 		const historical = [...(note.history ?? [])]
 			.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
 			.map(revision => ({
@@ -254,11 +254,11 @@ export class MastodonEntityService {
 			created_at: note.updatedAt ?? note.createdAt,
 			media_attachments: files.map(file => this.attachment(file)),
 			emojis: this.emojis(note.emojis),
-			...(note.poll == null ? {} : { poll: this.poll(note.id, note.poll) }),
+			...(note.poll == null ? {} : { poll: this.poll(note.id, note.poll, voterCounts?.get(note.id)) }),
 			...(note.renote != null && !(note.text == null && files.length === 0 && note.poll == null && note.replyId == null) ? {
 				quote: {
 					state: 'accepted',
-					quoted_status: this.statusEntity(note.renote, true),
+					quoted_status: this.statusEntity(note.renote, true, voterCounts),
 				},
 			} : {}),
 		};
