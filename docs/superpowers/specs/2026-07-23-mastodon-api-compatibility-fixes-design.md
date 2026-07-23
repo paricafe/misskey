@@ -19,7 +19,7 @@ The implementation covers the issues confirmed in the second review:
 - Return a correct `voters_count` for Mastodon poll entities.
 - Keep duplicate textual mentions from misaligning account IDs and URLs.
 - Correct branch shipping blockers involving SPDX and non-source locale changes.
-- Preserve complete status-edit snapshots, subject to separate migration review.
+- Preserve complete status-edit snapshots in the existing JSONB history column.
 
 Changes outside this list are excluded unless they are required to keep an
 existing test or public API contract correct.
@@ -103,21 +103,20 @@ Media-only edits pass nullable text through a Mastodon-specific update path
 instead of coercing it to an empty string rejected by `notes/update`.
 
 Complete historical Mastodon `StatusEdit` entities require immutable revision
-snapshots containing text, content warning, media IDs and sensitivity, poll
-state, quote state, emojis, and revision time.
+snapshots containing text, content warning, media attachment data and
+sensitivity, poll state, quote state, emojis, and revision time.
 
-This snapshot storage requires a new migration. Before any migration file or
-entity change is created, the following will be presented separately for user
-review:
+The existing `note.history` column is JSONB, so its element shape can be
+extended with optional snapshot fields without a schema migration. Existing
+text/CW-only history remains readable through conservative fallbacks, while
+new revisions store the complete shape. The JSON schema and TypeScript types
+are extended together.
 
-- Proposed table and indexes.
-- Snapshot JSON/type shape and size bounds.
-- Backfill behavior for existing text/CW-only history.
-- Exact reversible `up()` and `down()` operations.
-
-Until that review is approved, implementation stops before the migration and
-status-history persistence changes. Existing merged migrations will not be
-edited.
+No migration is planned. If implementation evidence later shows that a schema
+change is unavoidable, work stops before creating a migration and the table,
+indexes, compatibility strategy, and reversible `up()`/`down()` operations
+are presented separately for user review. Existing merged migrations are
+never edited.
 
 ## Poll Entity Counts
 
@@ -161,8 +160,9 @@ Every behavior change follows a red-green cycle with focused tests:
 - Duplicate mention ordering.
 
 After focused tests pass, run the complete Mastodon backend unit set, backend
-lint/type checking, `git diff --check`, locale safety, SPDX validation, and
-the migration checker whenever the separately approved migration is added.
+lint/type checking, `git diff --check`, locale safety, and SPDX validation.
+The migration checker is required only if a separately approved migration is
+eventually added.
 
 ## Success Criteria
 
