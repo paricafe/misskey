@@ -50,6 +50,11 @@ function createService(originNoteOverrides: Record<string, unknown> = {}) {
 			lockOwner = null;
 			return 1;
 		}),
+		eval: vi.fn(async (script: string, _keyCount: number, _key: string, identifier: string) => {
+			if (lockOwner !== identifier) return 0;
+			if (script.includes('del')) lockOwner = null;
+			return 1;
+		}),
 	};
 	const notesRepository = {
 		findOneBy: vi.fn().mockResolvedValue(originNote),
@@ -319,6 +324,18 @@ describe(ApNoteService, () => {
 				}
 				return 1;
 			}),
+			eval: vi.fn(async (script: string, _keyCount: number, _key: string, identifier: string) => {
+				if (lockOwner !== identifier) return 0;
+				if (script.includes('del')) {
+					lockOwner = null;
+					const waiter = lockWaiters.shift();
+					if (waiter != null) {
+						lockOwner = waiter.identifier;
+						waiter.resolve('OK');
+					}
+				}
+				return 1;
+			}),
 		};
 		Object.assign(service, { redisClient });
 
@@ -365,5 +382,24 @@ describe(ApNoteService, () => {
 		expect(noteUpdateService.update).toHaveBeenCalledOnce();
 		expect(noteUpdateService.prepareUpdate).toHaveBeenCalledOnce();
 		expect(apImageService.resolveImage).toHaveBeenCalledOnce();
+	});
+
+	test('aborts before the Note transaction when the AP object lock is lost during attachment resolution', async () => {
+		const {
+			service,
+			noteUpdateService,
+			apImageService,
+			redisClient,
+		} = createService();
+		apImageService.resolveImage.mockResolvedValueOnce({ id: 'new-file' });
+		redisClient.eval.mockResolvedValueOnce(0);
+
+		await expect(service.updateNote({
+			...update,
+			attachment: [{ type: 'Document', url: 'https://remote.example/files/new.png' }],
+		} as never)).rejects.toThrow('Lost distributed lock');
+
+		expect(apImageService.resolveImage).toHaveBeenCalledOnce();
+		expect(noteUpdateService.update).not.toHaveBeenCalled();
 	});
 });

@@ -360,13 +360,19 @@ export class ApNoteService {
 
 		const unlock = await acquireApObjectLock(this.redisClient, uri);
 		try {
-			await this.updateNoteLocked(value, uri, resolver, silent);
+			await this.updateNoteLocked(value, uri, resolver, silent, unlock.assertOwned);
 		} finally {
 			await unlock();
 		}
 	}
 
-	private async updateNoteLocked(value: string | IObject, uri: string, resolver?: Resolver, silent = false): Promise<void> {
+	private async updateNoteLocked(
+		value: string | IObject,
+		uri: string,
+		resolver: Resolver | undefined,
+		silent: boolean,
+		assertLockOwned: () => Promise<void>,
+	): Promise<void> {
 		const originNote = await this.notesRepository.findOneBy({ uri });
 		if (originNote === null) throw new Error('note is not registered');
 
@@ -406,10 +412,10 @@ export class ApNoteService {
 
 		await this.noteUpdateService.prepareUpdate(actor, originNote);
 
-		// This may materialize remote input in the bounded remote Drive cache, so it
-		// must finish before NoteUpdateService opens its database transaction.
-		// A later rollback publishes nothing; ordinary remote-file cleanup and
-		// capacity eviction handle any cache entry that was not attached to the Note.
+		// This may register a remote input-cache artifact and its Drive cache events,
+		// so it must finish before NoteUpdateService opens its database transaction.
+		// A rare later rollback can leave that artifact unattached; non-link cache
+		// bytes are capacity-bounded, but isLink rows are not universally swept.
 		// 添付ファイル
 		let files: MiDriveFile[] | undefined;
 		if (Object.hasOwn(note, 'attachment')) {
@@ -428,6 +434,7 @@ export class ApNoteService {
 
 		const apEmojis = emojis.map(emoji => emoji.name);
 
+		await assertLockOwned();
 		await this.noteUpdateService.update(actor, originNote, {
 			files,
 			cw,
