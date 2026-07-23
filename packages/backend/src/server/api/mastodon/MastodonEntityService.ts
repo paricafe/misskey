@@ -128,11 +128,11 @@ export class MastodonEntityService {
 		};
 	}
 
-	public status(note: Packed<'Note'>): Record<string, unknown> {
-		return this.statusEntity(note, false);
+	public status(note: Packed<'Note'>, voterCounts?: ReadonlyMap<string, number>): Record<string, unknown> {
+		return this.statusEntity(note, false, voterCounts);
 	}
 
-	private statusEntity(note: Packed<'Note'>, shallow: boolean): Record<string, unknown> {
+	private statusEntity(note: Packed<'Note'>, shallow: boolean, voterCounts?: ReadonlyMap<string, number>): Record<string, unknown> {
 		const localUrl = new URL(`/notes/${note.id}`, this.config.url).toString();
 		const url = note.url ?? note.uri ?? localUrl;
 		const files = note.files ?? [];
@@ -155,10 +155,10 @@ export class MastodonEntityService {
 			favourites_count: note.reactionCount,
 			quotes_count: 0,
 			content: this.render(note.text ?? ''),
-			reblog: !shallow && isPureRenote ? this.statusEntity(note.renote!, true) : null,
+			reblog: !shallow && isPureRenote ? this.statusEntity(note.renote!, true, voterCounts) : null,
 			quote: !shallow && !isPureRenote && note.renote != null ? {
 				state: 'accepted',
-				quoted_status: this.statusEntity(note.renote, true),
+				quoted_status: this.statusEntity(note.renote, true, voterCounts),
 			} : null,
 			application: null,
 			account: this.account(note.user),
@@ -170,7 +170,7 @@ export class MastodonEntityService {
 			})),
 			emojis: this.emojis(note.emojis),
 			card: null,
-			poll: note.poll == null ? null : this.poll(note.id, note.poll),
+			poll: note.poll == null ? null : this.poll(note.id, note.poll, voterCounts?.get(note.id)),
 			favourited: note.myReaction != null,
 			reblogged: false,
 			muted: false,
@@ -445,7 +445,7 @@ export class MastodonEntityService {
 		};
 	}
 
-	public poll(noteId: string, poll: NonNullable<Packed<'Note'>['poll']>) {
+	public poll(noteId: string, poll: NonNullable<Packed<'Note'>['poll']>, votersCount?: number) {
 		const votesCount = poll.choices.reduce((total, choice) => total + choice.votes, 0);
 		const ownVotes = poll.choices.flatMap((choice, index) => choice.isVoted ? [index] : []);
 
@@ -455,7 +455,7 @@ export class MastodonEntityService {
 			expired: poll.expiresAt != null && new Date(poll.expiresAt).getTime() <= Date.now(),
 			multiple: poll.multiple,
 			votes_count: votesCount,
-			voters_count: votesCount,
+			voters_count: poll.multiple ? votersCount ?? null : null,
 			voted: ownVotes.length > 0,
 			own_votes: ownVotes,
 			options: poll.choices.map(choice => ({ title: choice.text, votes_count: choice.votes })),
@@ -474,7 +474,16 @@ export class MastodonEntityService {
 
 	private mentions(note: Packed<'Note'>) {
 		const ids = note.mentions ?? [];
-		const parsed = extractMentions(mfmParse(note.text ?? ''));
+		const localHost = this.config.host.toLowerCase();
+		const seen = new Set<string>();
+		const parsed = extractMentions(mfmParse(note.text ?? '')).filter(mention => {
+			const host = mention.host?.toLowerCase();
+			const normalizedHost = host == null || host === localHost ? localHost : host;
+			const key = `${mention.username.toLowerCase()}@${normalizedHost}`;
+			if (seen.has(key)) return false;
+			seen.add(key);
+			return true;
+		});
 		return ids.map((id, index) => {
 			const mention = parsed[index];
 			const username = mention?.username ?? id;

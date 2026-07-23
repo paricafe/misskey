@@ -66,7 +66,7 @@ const note = {
 
 describe(MastodonEntityService, () => {
 	const service = new MastodonEntityService(
-		{ url: 'https://misskey.example/' } as never,
+		{ url: 'https://misskey.example/', host: 'misskey.example' } as never,
 		{ toHtml: (nodes: unknown) => `<p>${String(nodes)}</p>` } as never,
 	);
 
@@ -347,6 +347,39 @@ describe(MastodonEntityService, () => {
 		}]);
 	});
 
+	test('keeps distinct mention IDs aligned after duplicate mentions', () => {
+		const status = service.status({
+			...note,
+			text: '@alice @alice @bob',
+			mentions: ['alice-id', 'bob-id'],
+		} as never);
+
+		expect(status.mentions).toEqual([
+			{
+				id: 'alice-id',
+				username: 'alice',
+				acct: 'alice',
+				url: 'https://misskey.example/@alice',
+			},
+			{
+				id: 'bob-id',
+				username: 'bob',
+				acct: 'bob',
+				url: 'https://misskey.example/@bob',
+			},
+		]);
+
+		const normalizedLocalStatus = service.status({
+			...note,
+			text: '@Alice @alice@MISSKEY.EXAMPLE @bob',
+			mentions: ['alice-id', 'bob-id'],
+		} as never);
+		expect(normalizedLocalStatus.mentions).toEqual([
+			expect.objectContaining({ id: 'alice-id', username: 'Alice' }),
+			expect.objectContaining({ id: 'bob-id', username: 'bob' }),
+		]);
+	});
+
 	test('converts a Misskey note, attachment, and poll to a Mastodon status', () => {
 		const status = service.status(note as never);
 
@@ -366,7 +399,7 @@ describe(MastodonEntityService, () => {
 		expect(status.media_attachments).toEqual([expect.objectContaining({
 			id: 'file-id', type: 'image', description: 'alt text', width: 800, height: 600,
 		})]);
-		expect(status.poll).toMatchObject({ votes_count: 3, voters_count: 3, multiple: true, voted: true });
+		expect(status.poll).toMatchObject({ votes_count: 3, voters_count: null, multiple: true, voted: true });
 		expect(status.tags).toEqual([expect.objectContaining({ name: 'fediverse' })]);
 		expect(status).toMatchObject({
 			quotes_count: 0,
@@ -468,7 +501,7 @@ describe(MastodonEntityService, () => {
 		expect(poll).toMatchObject({
 			id: 'note-id',
 			votes_count: 3,
-			voters_count: 3,
+			voters_count: null,
 			multiple: true,
 			voted: true,
 			own_votes: [0],
@@ -477,6 +510,20 @@ describe(MastodonEntityService, () => {
 				{ title: 'B', votes_count: 1 },
 			],
 		});
+	});
+
+	test('maps voters_count from poll cardinality rather than summed choices', () => {
+		const singlePoll = {
+			...note.poll,
+			multiple: false,
+		};
+		const multiplePoll = {
+			...note.poll,
+			multiple: true,
+		};
+
+		expect(service.poll('single', singlePoll as never).voters_count).toBeNull();
+		expect(service.poll('multiple', multiplePoll as never, 2).voters_count).toBe(2);
 	});
 
 	test('converts relation flags and supported notifications', () => {

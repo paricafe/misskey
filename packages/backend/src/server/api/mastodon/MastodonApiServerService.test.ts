@@ -368,14 +368,20 @@ describe(MastodonApiServerService, () => {
 			text?: string | null;
 			replyId?: string | null;
 		};
-		const serializeStatus = (value: TestNote) => {
+		const serializeStatus = (value: TestNote, voterCounts?: ReadonlyMap<string, number>): Record<string, unknown> => {
 			const files = value.files ?? [];
 			const isPureRenote = value.renote != null && value.text == null && files.length === 0 && value.poll == null && value.replyId == null;
-			const nestedStatus = value.renote == null ? null : { id: value.renote.id, muted: false };
+			const nestedStatus: Record<string, unknown> | null = value.renote == null ? null : serializeStatus(value.renote, voterCounts);
 			return {
 				id: value.id,
 				media_attachments: files,
-				poll: value.poll ?? null,
+				poll: value.poll == null ? null : {
+					...value.poll as object,
+					voters_count: (value.poll as { multiple?: boolean }).multiple
+						? voterCounts?.get(value.id) ?? null
+						: null,
+				},
+				muted: false,
 				...(nestedStatus == null ? {} : isPureRenote
 					? { reblog: nestedStatus }
 					: { quote: { quoted_status: nestedStatus } }),
@@ -441,13 +447,17 @@ describe(MastodonApiServerService, () => {
 					published_at: null,
 					history: [],
 				})),
-				status: vi.fn(serializeStatus),
+				status: vi.fn((value, voterCounts) => serializeStatus(value, voterCounts)),
 				statusEdits: vi.fn(value => [...(value.history ?? []), { createdAt: value.updatedAt ?? value.createdAt }].map(edit => ({ created_at: edit.createdAt }))),
 				translation: vi.fn((value, language) => ({ detected_source_language: value.sourceLang, language, content: value.text })),
 				instanceActivity: vi.fn((notes, users) => notes.local.inc.length === 84 && users.local.inc.length === 84
 					? Array.from({ length: 12 }, (_, index) => ({ week: index.toString(), statuses: '7', logins: '0', registrations: '7' }))
 					: []),
-				poll: vi.fn((noteId, poll) => ({ id: noteId, votes_count: poll.choices.reduce((total: number, choice: { votes: number }) => total + choice.votes, 0) })),
+				poll: vi.fn((noteId, poll, votersCount) => ({
+					id: noteId,
+					votes_count: poll.choices.reduce((total: number, choice: { votes: number }) => total + choice.votes, 0),
+					voters_count: poll.multiple ? votersCount ?? null : null,
+				})),
 				scheduledStatus: vi.fn(value => ({ id: value.id, scheduled_at: new Date(value.scheduledAt).toISOString() })),
 				announcement: vi.fn(value => ({ id: value.id, content: value.text, read: value.isRead ?? false })),
 				report: vi.fn((report, _createdAt, _targetUser, input) => ({
@@ -2886,6 +2896,81 @@ describe(MastodonApiServerService, () => {
 		expect(notesRepository.findBy).not.toHaveBeenCalled();
 		expect(noteFavoritesRepository.findBy).not.toHaveBeenCalled();
 		expect(userNotePiningsRepository.findBy).not.toHaveBeenCalled();
+	});
+
+	test('batches exact distinct voter counts for anonymous status collections and nested statuses', async () => {
+		const { fastify, nativeInvoke, notesRepository } = createServer();
+		const multiplePoll = {
+			expiresAt: null,
+			multiple: true,
+			choices: [
+				{ text: 'A', votes: 2, isVoted: false },
+				{ text: 'B', votes: 1, isVoted: false },
+			],
+		};
+		nativeInvoke.mockImplementation(async name => name === 'notes/global-timeline'
+			? [
+				{ id: 'multiple-note', text: 'multiple', files: [], poll: multiplePoll, replyId: null, renote: null },
+				{ id: 'zero-voter-note', text: 'zero', files: [], poll: multiplePoll, replyId: null, renote: null },
+				{ id: 'unavailable-note', text: 'unavailable', files: [], poll: multiplePoll, replyId: null, renote: null },
+				{ id: 'single-note', text: 'single', files: [], poll: { ...multiplePoll, multiple: false }, replyId: null, renote: null },
+				{
+					id: 'quote-note',
+					text: 'quote',
+					files: [],
+					poll: null,
+					replyId: null,
+					renote: { id: 'nested-multiple-note', text: 'nested', files: [], poll: multiplePoll, replyId: null, renote: null },
+				},
+			]
+			: []);
+		notesRepository.query.mockResolvedValue([
+			{ noteId: 'multiple-note', votersCount: '2' },
+			{ noteId: 'unavailable-note', votersCount: '' },
+			{ noteId: 'nested-multiple-note', votersCount: '1' },
+		]);
+
+		const response = await fastify.inject({ method: 'GET', url: '/api/v1/timelines/public' });
+
+		expect(response.statusCode).toBe(200);
+		expect(response.json()).toMatchObject([
+			{ id: 'multiple-note', poll: { voters_count: 2 } },
+			{ id: 'zero-voter-note', poll: { voters_count: 0 } },
+			{ id: 'unavailable-note', poll: { voters_count: null } },
+			{ id: 'single-note', poll: { voters_count: null } },
+			{ id: 'quote-note', quote: { quoted_status: { id: 'nested-multiple-note', poll: { voters_count: 1 } } } },
+		]);
+		expect(notesRepository.query).toHaveBeenCalledOnce();
+		expect(notesRepository.query).toHaveBeenCalledWith(
+			expect.stringContaining('COUNT(DISTINCT vote."userId")'),
+			[['multiple-note', 'zero-voter-note', 'unavailable-note', 'nested-multiple-note']],
+		);
+		expect(notesRepository.query.mock.calls[0]?.[0]).toContain('GROUP BY vote."noteId"');
+	});
+
+	test('enriches a multiple-choice poll retrieval with its exact voter count', async () => {
+		const { fastify, nativeInvoke, notesRepository } = createServer();
+		nativeInvoke.mockImplementation(async (name, data) => name === 'notes/show'
+			? {
+				id: data.noteId,
+				poll: {
+					expiresAt: null,
+					multiple: true,
+					choices: [
+						{ text: 'A', votes: 2, isVoted: false },
+						{ text: 'B', votes: 1, isVoted: false },
+					],
+				},
+			}
+			: []);
+		notesRepository.query.mockResolvedValue([{ noteId: 'multiple-poll', votersCount: '2' }]);
+
+		const response = await fastify.inject({ method: 'GET', url: '/api/v1/polls/multiple-poll' });
+
+		expect(response.statusCode).toBe(200);
+		expect(response.json()).toMatchObject({ id: 'multiple-poll', votes_count: 3, voters_count: 2 });
+		expect(notesRepository.query).toHaveBeenCalledOnce();
+		expect(notesRepository.query.mock.calls[0]?.[1]).toEqual([['multiple-poll']]);
 	});
 
 	test('uses a user token and viewer state on public routes', async () => {

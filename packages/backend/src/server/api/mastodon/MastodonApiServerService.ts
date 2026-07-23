@@ -779,7 +779,8 @@ export class MastodonApiServerService {
 		fastify.get<{ Params: { id: string } }>('/api/v1/polls/:id', request => this.withOptionalUser(request, 'read:statuses', async auth => {
 			const note = await this.invokePublic('notes/show', { noteId: request.params.id }, auth, request) as Packed<'Note'>;
 			if (note.poll == null) throw new MastodonApiError(404, 'not_found', 'Poll not found');
-			return this.mastodonEntityService.poll(note.id, note.poll);
+			const voterCounts = await this.pollVoterCounts([note]);
+			return this.mastodonEntityService.poll(note.id, note.poll, voterCounts.get(note.id));
 		}));
 		fastify.post<{ Params: { id: string }; Body: Dictionary }>('/api/v1/polls/:id/votes', request => this.withAuth(request, 'write:statuses', async auth => {
 			if (auth.user.movedToUri) {
@@ -793,7 +794,9 @@ export class MastodonApiServerService {
 			const choices = this.pollVoteChoices(request.body?.['choices[]'] ?? request.body?.choices);
 			await this.pollVoteService.vote(request.params.id, choices, auth.user);
 			const note = await this.invoke('notes/show', { noteId: request.params.id }, auth, request) as Packed<'Note'>;
-			return note.poll == null ? null : this.mastodonEntityService.poll(note.id, note.poll);
+			if (note.poll == null) return null;
+			const voterCounts = await this.pollVoterCounts([note]);
+			return this.mastodonEntityService.poll(note.id, note.poll, voterCounts.get(note.id));
 		}));
 		fastify.post('/api/v1/media', request => this.upload(request));
 		fastify.post('/api/v2/media', request => this.upload(request));
@@ -1895,10 +1898,15 @@ export class MastodonApiServerService {
 		options: MastodonFilterApplyOptions = {},
 	): Promise<Record<string, unknown>[]> {
 		if (notes.length === 0) return [];
-		if (auth == null) return notes.map(note => this.mastodonEntityService.status(note));
+		const voterCountsPromise = this.pollVoterCounts(notes);
+		if (auth == null) {
+			const voterCounts = await voterCountsPromise;
+			return notes.map(note => this.mastodonEntityService.status(note, voterCounts));
+		}
 		const rootNoteIds = [...new Set(notes.map(note => note.id))];
 		const noteIds = this.collectNoteIds(notes);
-		const [renotes, favorites, pinings, mutedNoteIds] = await Promise.all([
+		const [voterCounts, renotes, favorites, pinings, mutedNoteIds] = await Promise.all([
+			voterCountsPromise,
 			this.notesRepository.findBy({ userId: auth.user.id, renoteId: In(rootNoteIds) }),
 			this.noteFavoritesRepository.findBy({ userId: auth.user.id, noteId: In(rootNoteIds) }),
 			this.userNotePiningsRepository.findBy({ userId: auth.user.id, noteId: In(rootNoteIds) }),
@@ -1908,7 +1916,7 @@ export class MastodonApiServerService {
 		const bookmarkedIds = new Set(favorites.map(favorite => favorite.noteId));
 		const pinnedIds = new Set(pinings.map(pining => pining.noteId));
 		const statuses = notes.map(note => ({
-			...this.applyMutedState(this.mastodonEntityService.status(note), mutedNoteIds),
+			...this.applyMutedState(this.mastodonEntityService.status(note, voterCounts), mutedNoteIds),
 			reblogged: renotedIds.has(note.id),
 			bookmarked: bookmarkedIds.has(note.id),
 			pinned: pinnedIds.has(note.id),
@@ -1916,6 +1924,44 @@ export class MastodonApiServerService {
 		}));
 		const corpora = new Map(notes.map(note => [note.id, this.filterCorpus(note)]));
 		return await this.mastodonFilterService.apply(auth.user.id, context, statuses, { ...options, corpora });
+	}
+
+	private async pollVoterCounts(notes: Packed<'Note'>[]): Promise<ReadonlyMap<string, number>> {
+		const noteIds = new Set<string>();
+		const visited = new Set<string>();
+		const visit = (note: Packed<'Note'>): void => {
+			if (visited.has(note.id)) return;
+			visited.add(note.id);
+			if (note.poll?.multiple === true) noteIds.add(note.id);
+			if (note.renote != null) visit(note.renote);
+		};
+		for (const note of notes) visit(note);
+		if (noteIds.size === 0) return new Map();
+
+		const requestedIds = [...noteIds];
+		const rows = await this.notesRepository.query(`
+			SELECT
+				vote."noteId" AS "noteId",
+				COUNT(DISTINCT vote."userId") AS "votersCount"
+			FROM "poll_vote" vote
+			WHERE vote."noteId" = ANY($1::varchar[])
+			GROUP BY vote."noteId"
+		`, [requestedIds]) as Array<{ noteId: unknown; votersCount: unknown }>;
+		const counts = new Map(requestedIds.map(noteId => [noteId, 0]));
+		for (const row of rows) {
+			if (typeof row.noteId !== 'string' || !counts.has(row.noteId)) continue;
+			const votersCount = typeof row.votersCount === 'number'
+				? row.votersCount
+				: typeof row.votersCount === 'string' && /^[0-9]+$/u.test(row.votersCount)
+					? Number(row.votersCount)
+					: Number.NaN;
+			if (!Number.isSafeInteger(votersCount) || votersCount < 0) {
+				counts.delete(row.noteId);
+				continue;
+			}
+			counts.set(row.noteId, votersCount);
+		}
+		return counts;
 	}
 
 	private notificationOptions(query: Dictionary): {
