@@ -372,6 +372,9 @@ describe(MastodonApiServerService, () => {
 			const files = value.files ?? [];
 			const isPureRenote = value.renote != null && value.text == null && files.length === 0 && value.poll == null && value.replyId == null;
 			const nestedStatus: Record<string, unknown> | null = value.renote == null ? null : serializeStatus(value.renote, voterCounts);
+			const pollChoices = value.poll == null
+				? []
+				: (value.poll as { choices?: Array<{ isVoted?: boolean }> }).choices ?? [];
 			return {
 				id: value.id,
 				media_attachments: files,
@@ -380,6 +383,8 @@ describe(MastodonApiServerService, () => {
 					voters_count: (value.poll as { multiple?: boolean }).multiple
 						? voterCounts?.get(value.id) ?? null
 						: null,
+					voted: pollChoices.some(choice => choice.isVoted === true),
+					own_votes: pollChoices.flatMap((choice, index) => choice.isVoted === true ? [index] : []),
 				},
 				muted: false,
 				...(nestedStatus == null ? {} : isPureRenote
@@ -1241,6 +1246,99 @@ describe(MastodonApiServerService, () => {
 		});
 		const quoteLookups = nativeInvoke.mock.calls.filter(([name, data]) => name === 'notes/show' && data.noteId === 'private-quote');
 		expect(quoteLookups).toHaveLength(2);
+	});
+
+	test('removes requester-specific vote state from resolved historical quote polls', async () => {
+		const { fastify, nativeInvoke } = createServer();
+		const historicalNote = {
+			id: 'note-id',
+			createdAt: '2025-01-01T00:00:00.000Z',
+			updatedAt: '2025-01-02T00:00:00.000Z',
+			history: [{
+				createdAt: '2025-01-01T00:00:00.000Z',
+				text: 'old quote',
+				renoteId: 'quoted-poll',
+			}],
+		};
+		nativeInvoke.mockImplementation(async (name, data) => {
+			if (name !== 'notes/show') return [];
+			if (data.noteId === 'note-id') return historicalNote;
+			if (data.noteId === 'quoted-poll') {
+				return {
+					id: 'quoted-poll',
+					text: 'quoted poll',
+					poll: {
+						expiresAt: null,
+						multiple: true,
+						choices: [
+							{ text: 'A', votes: 2, isVoted: true },
+							{ text: 'B', votes: 1, isVoted: false },
+						],
+					},
+				};
+			}
+			return [];
+		});
+
+		const anonymous = await fastify.inject({ method: 'GET', url: '/api/v1/statuses/note-id/history' });
+		const authenticated = await fastify.inject({
+			method: 'GET',
+			url: '/api/v1/statuses/note-id/history',
+			headers: { authorization: 'Bearer user-token' },
+		});
+
+		for (const response of [anonymous, authenticated]) {
+			expect(response.statusCode).toBe(200);
+			expect(response.json()[0]).toMatchObject({
+				quote: {
+					quoted_status: {
+						poll: {
+							voted: false,
+							own_votes: [],
+						},
+					},
+				},
+			});
+		}
+	});
+
+	test('treats a visibility-hidden historical quote as unavailable without leaking metadata', async () => {
+		const { fastify, nativeInvoke } = createServer();
+		nativeInvoke.mockImplementation(async (name, data) => {
+			if (name !== 'notes/show') return [];
+			if (data.noteId === 'note-id') {
+				return {
+					id: 'note-id',
+					createdAt: '2025-01-01T00:00:00.000Z',
+					updatedAt: '2025-01-02T00:00:00.000Z',
+					history: [{
+						createdAt: '2025-01-01T00:00:00.000Z',
+						text: 'old quote',
+						renoteId: 'hidden-quote',
+					}],
+				};
+			}
+			if (data.noteId === 'hidden-quote') {
+				return {
+					id: 'hidden-quote',
+					isHidden: true,
+					text: 'hidden quote content',
+					tags: ['hidden-tag'],
+					emojis: { hidden_emoji: 'https://secret.example/hidden.webp' },
+				};
+			}
+			return [];
+		});
+
+		const response = await fastify.inject({ method: 'GET', url: '/api/v1/statuses/note-id/history' });
+
+		expect(response.statusCode).toBe(200);
+		expect(response.json()[0]).toMatchObject({ quote: null });
+		const body = JSON.stringify(response.json());
+		expect(body).not.toContain('hidden quote content');
+		expect(body).not.toContain('hidden-tag');
+		expect(body).not.toContain('hidden_emoji');
+		expect(body).not.toContain('secret.example');
 	});
 
 	test('translates statuses using lang and Accept-Language, and reports unavailable translation truthfully', async () => {
@@ -4185,6 +4283,47 @@ describe(MastodonApiServerService, () => {
 
 		expect(response.statusCode).toBe(200);
 		expect(nativeInvoke).toHaveBeenCalledWith('notes/update', expect.objectContaining({ fileIds: ['existing-file'], text: 'edited' }), expect.anything(), expect.anything());
+		expect(nativeInvoke).not.toHaveBeenCalledWith('drive/files/update', expect.anything(), expect.anything(), expect.anything());
+	});
+
+	test.each([
+		['a non-sensitive status without files', { fileIds: [], files: [] }, false, 200],
+		['a non-sensitive status without files', { fileIds: [], files: [] }, true, 422],
+		['a channel-sensitive status', { fileIds: [], files: [], channel: { isSensitive: true } }, true, 200],
+		['a channel-sensitive status', { fileIds: [], files: [], channel: { isSensitive: true } }, false, 422],
+		['a status with mixed-sensitivity files', {
+			fileIds: ['sensitive-file', 'plain-file'],
+			files: [
+				{ id: 'sensitive-file', isSensitive: true },
+				{ id: 'plain-file', isSensitive: false },
+			],
+		}, true, 200],
+		['a non-sensitive status with files', {
+			fileIds: ['plain-file'],
+			files: [{ id: 'plain-file', isSensitive: false }],
+		}, true, 422],
+	])('compares requested sensitivity with the rendered status-level value for %s', async (_label, current, requested, expectedStatus) => {
+		const { fastify, nativeInvoke } = createServer();
+		nativeInvoke.mockImplementation(async name => {
+			if (name === 'notes/show') return { id: 'note-id', text: 'old', ...current };
+			if (name === 'notes/update') return { updatedNote: { id: 'note-id' } };
+			return [];
+		});
+
+		const response = await fastify.inject({
+			method: 'PUT',
+			url: '/api/v1/statuses/note-id',
+			headers: { authorization: 'Bearer mastodon-token', 'content-type': 'application/json' },
+			payload: { status: 'edited', sensitive: requested },
+		});
+
+		expect(response.statusCode).toBe(expectedStatus);
+		if (expectedStatus === 200) {
+			expect(nativeInvoke).toHaveBeenCalledWith('notes/update', expect.anything(), expect.anything(), expect.anything());
+		} else {
+			expect(nativeInvoke).not.toHaveBeenCalledWith('notes/update', expect.anything(), expect.anything(), expect.anything());
+		}
+		expect(nativeInvoke).not.toHaveBeenCalledWith('drive/files/show', expect.anything(), expect.anything(), expect.anything());
 		expect(nativeInvoke).not.toHaveBeenCalledWith('drive/files/update', expect.anything(), expect.anything(), expect.anything());
 	});
 

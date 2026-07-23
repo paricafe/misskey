@@ -541,7 +541,7 @@ describe(MastodonEntityService, () => {
 				expiresAt: null,
 				multiple: true,
 				choices: [
-					{ text: 'Quoted A', votes: 3, isVoted: false },
+					{ text: 'Quoted A', votes: 3, isVoted: true },
 					{ text: 'Quoted B', votes: 1, isVoted: false },
 				],
 			},

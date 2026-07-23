@@ -389,6 +389,7 @@ export class ApNoteService {
 		}
 
 		const actor = await this.apPersonService.resolvePerson(getOneApId(note.attributedTo), resolver) as MiRemoteUser;
+		const preparedUpdate = await this.noteUpdateService.prepareUpdate(actor, originNote);
 
 		// 添付ファイル
 		let files: MiDriveFile[] | undefined;
@@ -415,7 +416,7 @@ export class ApNoteService {
 			apHashtags,
 			apEmojis,
 			updatedAt: new Date(note.updated),
-		}, silent);
+		}, silent, undefined, preparedUpdate);
 	}
 
 	/**

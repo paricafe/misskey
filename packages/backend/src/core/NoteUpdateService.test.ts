@@ -207,6 +207,23 @@ describe(NoteUpdateService, () => {
 		expect(noteEntityService.pack).toHaveBeenCalledTimes(1);
 	});
 
+	test('reuses a prepared bounded snapshot without packing the old revision twice', async () => {
+		const { service, notesRepository, noteEntityService } = createService();
+		const preparedUpdate = await service.prepareUpdate(user, note);
+
+		await service.update(user, note, {
+			text: 'New text',
+			cw: null,
+			files: [],
+			apHashtags: [],
+			apEmojis: [],
+			updatedAt: new Date('2025-02-01T00:00:00.000Z'),
+		}, true, undefined, preparedUpdate);
+
+		expect(noteEntityService.pack).toHaveBeenCalledTimes(1);
+		expect(notesRepository.update.mock.calls[0]?.[1].history).toEqual(preparedUpdate.history);
+	});
+
 	test('resolves local emoji URLs when the normal packed local Note omits emojis', async () => {
 		const { service, notesRepository, noteEntityService, customEmojiService } = createService();
 		noteEntityService.pack.mockResolvedValueOnce({

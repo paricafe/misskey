@@ -645,14 +645,16 @@ export class MastodonApiServerService {
 				const renoteId = revision.renoteId ?? legacyRenote?.id;
 				return renoteId == null ? [] : [renoteId];
 			}))];
-			const historicalRenotes = await this.invokePublicBatch(
+			const historicalRenotes = (await this.invokePublicBatch(
 				'notes/show',
 				'noteId',
 				historicalRenoteIds,
 				auth,
 				request,
 				MAX_NOTE_HISTORY_REVISIONS,
-			) as Packed<'Note'>[];
+			) as Packed<'Note'>[])
+				.filter(renote => renote.isHidden !== true)
+				.map(renote => this.sanitizeHistoricalQuote(renote));
 			const historicalRenotesById = new Map(historicalRenotes.map(renote => [renote.id, renote]));
 			const historicalPollNotes = historicalRenotes.map(renote => ({
 				...renote,
@@ -713,7 +715,7 @@ export class MastodonApiServerService {
 			const rawSensitive = request.body?.sensitive;
 			const isSensitive = rawSensitive == null ? null : this.profileBoolean(rawSensitive, 'sensitive');
 			if (isSensitive != null) {
-				await this.assertStatusUpdateMediaSensitivity(effectiveFileIds, isSensitive, current, auth, request);
+				this.assertStatusUpdateMediaSensitivity(isSensitive, current);
 			}
 			const result = await this.invoke('notes/update', {
 				noteId: request.params.id,
@@ -2181,26 +2183,34 @@ export class MastodonApiServerService {
 		}
 	}
 
-	private async assertStatusUpdateMediaSensitivity(
-		fileIds: string[],
+	private assertStatusUpdateMediaSensitivity(
 		isSensitive: boolean,
 		current: Packed<'Note'>,
-		auth: MastodonUserAuth,
-		request: MastodonRequest,
-	): Promise<void> {
-		const filesById = new Map((current.files ?? []).map(file => [file.id, file]));
-		const missingFileIds = fileIds.filter(fileId => !filesById.has(fileId));
-		const missingFiles = await Promise.all(missingFileIds.map(async fileId => {
-			return await this.invoke('drive/files/show', { fileId }, auth, request) as Packed<'DriveFile'>;
-		}));
-		for (const file of missingFiles) filesById.set(file.id, file);
-		if (fileIds.some(fileId => filesById.get(fileId)?.isSensitive !== isSensitive)) {
+	): void {
+		const currentSensitive = current.channel?.isSensitive === true ||
+			(current.files ?? []).some(file => file.isSensitive);
+		if (currentSensitive !== isSensitive) {
 			throw new MastodonApiError(
 				422,
 				'unprocessable_entity',
 				'Changing media sensitivity while editing a status is not supported atomically',
 			);
 		}
+	}
+
+	private sanitizeHistoricalQuote(note: Packed<'Note'>, depth = 1): Packed<'Note'> {
+		return {
+			...note,
+			poll: note.poll == null
+				? note.poll
+				: {
+					...note.poll,
+					choices: note.poll.choices.map(choice => ({ ...choice, isVoted: false })),
+				},
+			...(depth > 0 && note.renote != null
+				? { renote: this.sanitizeHistoricalQuote(note.renote, depth - 1) }
+				: {}),
+		};
 	}
 
 	private async assertApplicationRegistrationRate(ip: string): Promise<void> {

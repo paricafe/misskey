@@ -55,6 +55,13 @@ type PollSnapshot = {
 	votersCount?: number;
 };
 
+export type NoteUpdatePreparation = Readonly<{
+	noteId: MiNote['id'];
+	sourceHistory: MiNote['history'];
+	sourceUpdatedAt: MiNote['updatedAt'];
+	history: NonNullable<MiNote['history']>;
+}>;
+
 @Injectable()
 export class NoteUpdateService {
 	constructor(
@@ -102,7 +109,14 @@ export class NoteUpdateService {
 	 * @param note Note to update
 	 * @param data New note info
 	 */
-	async update(user: { id: MiUser['id']; uri: MiUser['uri']; host: MiUser['host']; isBot: MiUser['isBot']; }, note: MiNote, data: Option, quiet = false, updater?: MiUser): Promise<MiNote> {
+	async update(
+		user: { id: MiUser['id']; uri: MiUser['uri']; host: MiUser['host']; isBot: MiUser['isBot']; },
+		note: MiNote,
+		data: Option,
+		quiet = false,
+		updater?: MiUser,
+		preparation?: NoteUpdatePreparation,
+	): Promise<MiNote> {
 		if (!data.updatedAt) {
 			throw new Error('update time is required');
 		}
@@ -118,6 +132,16 @@ export class NoteUpdateService {
 			// Same history already exists, skip this
 			return note;
 		}
+
+		const preparedUpdate = preparation ?? await this.prepareUpdate(user, note);
+		if (
+			preparedUpdate.noteId !== note.id ||
+			preparedUpdate.sourceHistory !== note.history ||
+			preparedUpdate.sourceUpdatedAt !== note.updatedAt
+		) {
+			throw new Error('Prepared note update does not match the current note state');
+		}
+		const history = [...preparedUpdate.history];
 
 		// Parse tags & emojis
 		const meta = await this.metaService.fetch();
@@ -142,15 +166,6 @@ export class NoteUpdateService {
 		if (this.utilityService.isMediaSilencedHost(meta.mediaSilencedHosts, user.host)) emojis = [];
 
 		tags = tags.filter(tag => Array.from(tag).length <= 128).splice(0, 32);
-
-		const oldRevision = await this.snapshotRevision(user, note);
-		const history = [...(note.history || []), oldRevision];
-		if (
-			history.length > MAX_NOTE_HISTORY_REVISIONS ||
-			Buffer.byteLength(JSON.stringify(history), 'utf8') > MAX_NOTE_HISTORY_BYTES
-		) {
-			throw new IdentifiableError(NOTE_HISTORY_LIMIT_ERROR_ID, 'Note edit history limit exceeded.');
-		}
 
 		const newNote: MiNote = {
 			...note,
@@ -228,6 +243,27 @@ export class NoteUpdateService {
 		// }
 
 		return updatedNote;
+	}
+
+	async prepareUpdate(
+		user: { id: MiUser['id'] },
+		note: MiNote,
+	): Promise<NoteUpdatePreparation> {
+		const oldRevision = await this.snapshotRevision(user, note);
+		const history = [...(note.history || []), oldRevision];
+		if (
+			history.length > MAX_NOTE_HISTORY_REVISIONS ||
+			Buffer.byteLength(JSON.stringify(history), 'utf8') > MAX_NOTE_HISTORY_BYTES
+		) {
+			throw new IdentifiableError(NOTE_HISTORY_LIMIT_ERROR_ID, 'Note edit history limit exceeded.');
+		}
+
+		return {
+			noteId: note.id,
+			sourceHistory: note.history,
+			sourceUpdatedAt: note.updatedAt,
+			history,
+		};
 	}
 
 	private async snapshotRevision(

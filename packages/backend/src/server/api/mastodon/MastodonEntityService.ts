@@ -244,7 +244,12 @@ export class MastodonEntityService {
 				const files = revision.files ?? [];
 				const legacyRenote = (revision as typeof revision & { renote?: Packed<'Note'> | null }).renote;
 				const renoteId = revision.renoteId ?? legacyRenote?.id;
-				const renote = renoteId == null ? undefined : historicalRenotes.get(renoteId);
+				const resolvedRenote = renoteId == null ? undefined : historicalRenotes.get(renoteId);
+				const renote = resolvedRenote?.isHidden === true
+					? undefined
+					: resolvedRenote == null
+						? undefined
+						: this.sanitizeHistoricalQuote(resolvedRenote);
 				const poll = revision.poll == null
 					? undefined
 					: {
@@ -293,6 +298,21 @@ export class MastodonEntityService {
 			} : {}),
 		};
 		return [...historical, current];
+	}
+
+	private sanitizeHistoricalQuote(note: Packed<'Note'>, depth = 1): Packed<'Note'> {
+		return {
+			...note,
+			poll: note.poll == null
+				? note.poll
+				: {
+					...note.poll,
+					choices: note.poll.choices.map(choice => ({ ...choice, isVoted: false })),
+				},
+			...(depth > 0 && note.renote != null
+				? { renote: this.sanitizeHistoricalQuote(note.renote, depth - 1) }
+				: {}),
+		};
 	}
 
 	public translation(result: { sourceLang: string; text: string }, targetLanguage: string) {
