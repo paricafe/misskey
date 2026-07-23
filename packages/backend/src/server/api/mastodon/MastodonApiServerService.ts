@@ -1687,6 +1687,8 @@ export class MastodonApiServerService {
 			throw new MastodonApiError(400, 'invalid_request', 'scheduled_at must be an ISO 8601 date-time');
 		}
 		const scheduledAt = this.parseScheduledAt(body.scheduled_at, false);
+		const fileIds = this.strings(body['media_ids[]'] ?? body.media_ids);
+		const poll = this.parseStatusPoll(body, fileIds);
 		const idempotencyKey = this.string(request.headers['idempotency-key']);
 		const cacheKey = idempotencyKey == null || idempotencyKey === ''
 			? null
@@ -1702,8 +1704,6 @@ export class MastodonApiServerService {
 			const text = this.string(body.status) ?? null;
 			const visibility = this.string(body.visibility) ?? 'public';
 			const misskeyVisibility = this.toMisskeyVisibility(visibility);
-			const choices = this.strings(body['poll[options][]'] ?? (body.poll as Dictionary | undefined)?.options);
-			const fileIds = this.strings(body['media_ids[]'] ?? body.media_ids);
 			await this.updateMediaSensitivity(fileIds, body.sensitive, auth, request);
 			const replyId = this.string(body.in_reply_to_id) ?? null;
 			const renoteId = this.string(body.quoted_status_id) ?? null;
@@ -1718,11 +1718,7 @@ export class MastodonApiServerService {
 				replyId,
 				renoteId,
 				...(fileIds.length > 0 ? { fileIds } : {}),
-				...(choices.length >= 2 ? { poll: {
-					choices,
-					multiple: this.boolean(body['poll[multiple]'] ?? (body.poll as Dictionary | undefined)?.multiple),
-					expiredAfter: Math.max(1, Number(this.string(body['poll[expires_in]'] ?? (body.poll as Dictionary | undefined)?.expires_in) ?? 300)) * 1000,
-				} } : {}),
+				...(poll == null ? {} : { poll }),
 			};
 			if (scheduledAt != null) {
 				const result = await this.invoke('notes/drafts/create', {
@@ -1764,8 +1760,52 @@ export class MastodonApiServerService {
 		if (typeof rawValue !== 'string') throw new MastodonApiError(400, 'invalid_request', 'scheduled_at must be an ISO 8601 date-time');
 		const date = new Date(rawValue);
 		if (!Number.isFinite(date.getTime())) throw new MastodonApiError(400, 'invalid_request', 'scheduled_at must be an ISO 8601 date-time');
-		if (date.getTime() <= Date.now()) throw new MastodonApiError(422, 'unprocessable_entity', 'scheduled_at must be in the future');
+		if (date.getTime() < Date.now() + 300_000) throw new MastodonApiError(422, 'unprocessable_entity', 'scheduled_at must be at least five minutes in the future');
 		return date;
+	}
+
+	private parseStatusPoll(body: Dictionary, fileIds: string[]): { choices: string[]; multiple: boolean; expiredAfter: number } | undefined {
+		const nested = this.dictionary(body.poll);
+		const hasPoll = nested != null || Object.keys(body).some(key => key.startsWith('poll['));
+		if (!hasPoll) return undefined;
+		const rawChoices = body['poll[options][]'] ?? nested?.options;
+		const choices = this.strings(rawChoices);
+		const expiresRaw = body['poll[expires_in]'] ?? nested?.expires_in;
+		if (choices.length < 2 || this.hasEmptyPollOption(rawChoices)) {
+			throw new MastodonApiError(422, 'unprocessable_entity', 'A poll requires at least two non-empty options');
+		}
+		if (expiresRaw == null || expiresRaw === '') {
+			throw new MastodonApiError(422, 'unprocessable_entity', 'poll.expires_in is required');
+		}
+		if (fileIds.length > 0) {
+			throw new MastodonApiError(422, 'unprocessable_entity', 'A poll cannot be combined with media');
+		}
+		const expiresIn = Number(expiresRaw);
+		if (!Number.isInteger(expiresIn) || expiresIn < 1 || expiresIn > 2629746) {
+			throw new MastodonApiError(422, 'unprocessable_entity', 'poll.expires_in is invalid');
+		}
+		const hideTotals = this.pollBoolean(body['poll[hide_totals]'] ?? nested?.hide_totals, 'hide_totals');
+		if (hideTotals) {
+			throw new MastodonApiError(422, 'unprocessable_entity', 'Hidden poll totals are not supported');
+		}
+		return {
+			choices,
+			multiple: this.pollBoolean(body['poll[multiple]'] ?? nested?.multiple, 'multiple'),
+			expiredAfter: expiresIn * 1000,
+		};
+	}
+
+	private hasEmptyPollOption(value: unknown): boolean {
+		if (Array.isArray(value)) return value.some(option => this.hasEmptyPollOption(option));
+		const option = this.string(value);
+		return option == null || option.split(',').some(part => part.trim() === '');
+	}
+
+	private pollBoolean(value: unknown, name: string): boolean {
+		if (value == null) return false;
+		if (value === true || value === 1 || value === '1' || value === 'true' || value === 'on') return true;
+		if (value === false || value === 0 || value === '0' || value === 'false' || value === 'off') return false;
+		throw new MastodonApiError(422, 'unprocessable_entity', `poll.${name} is invalid`);
 	}
 
 	private async featuredTagEntities(

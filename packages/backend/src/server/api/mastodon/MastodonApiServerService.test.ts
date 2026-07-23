@@ -21,6 +21,8 @@ describe(MastodonApiServerService, () => {
 	const servers: ReturnType<typeof Fastify>[] = [];
 
 	afterEach(async () => {
+		vi.useRealTimers();
+		vi.restoreAllMocks();
 		await Promise.all(servers.splice(0).map(server => server.close()));
 	});
 
@@ -859,8 +861,6 @@ describe(MastodonApiServerService, () => {
 				in_reply_to_id: 'reply-id',
 				quoted_status_id: 'quote-id',
 				quote_approval_policy: 'public',
-				media_ids: ['file-id'],
-				sensitive: true,
 				poll: { options: ['A', 'B'], multiple: true, expires_in: 3600 },
 				language: 'en',
 				scheduled_at: '2099-01-02T03:04:05.000Z',
@@ -875,17 +875,82 @@ describe(MastodonApiServerService, () => {
 			visibility: 'home',
 			replyId: 'reply-id',
 			renoteId: 'quote-id',
-			fileIds: ['file-id'],
 			poll: { choices: ['A', 'B'], multiple: true, expiredAfter: 3600000 },
 			scheduledAt: Date.parse('2099-01-02T03:04:05.000Z'),
 			isActuallyScheduled: true,
 		}, expect.any(Object), expect.any(Object));
 		expect(nativeInvoke.mock.calls.find(([name]) => name === 'notes/drafts/create')?.[1]).not.toHaveProperty('language');
-		expect(nativeInvoke).toHaveBeenCalledWith('drive/files/update', {
-			fileId: 'file-id',
-			isSensitive: true,
-		}, expect.any(Object), expect.any(Object));
 		expect(nativeInvoke).not.toHaveBeenCalledWith('notes/create', expect.anything(), expect.anything(), expect.anything());
+	});
+
+	test.each([
+		{ status: 'x', poll: { options: ['only one'], expires_in: 300 } },
+		{ status: 'x', poll: { options: ['A', '', 'B'], expires_in: 300 } },
+		{ status: 'x', poll: { options: ['A', 'B'] } },
+		{ status: 'x', poll: { expires_in: 300 } },
+		{ status: 'x', media_ids: ['file'], poll: { options: ['A', 'B'], expires_in: 300 } },
+		{ status: 'x', poll: { options: ['A', 'B'], expires_in: 300, hide_totals: true } },
+		{ status: 'x', poll: { options: ['A', 'B'], expires_in: 'NaN' } },
+		{ status: 'x', poll: { options: ['A', 'B'], expires_in: 300, multiple: 'invalid' } },
+		{ status: 'x', poll: { options: ['A', 'B'], expires_in: 300, hide_totals: 'invalid' } },
+	])('rejects invalid poll parameters before status side effects', async payload => {
+		const { fastify, nativeInvoke } = createServer();
+		const response = await fastify.inject({
+			method: 'POST',
+			url: '/api/v1/statuses',
+			headers: { authorization: 'Bearer user-token' },
+			payload,
+		});
+
+		expect(response.statusCode).toBe(422);
+		for (const endpoint of ['notes/create', 'notes/drafts/create', 'drive/files/update']) {
+			expect(nativeInvoke.mock.calls.some(([name]) => name === endpoint)).toBe(false);
+		}
+	});
+
+	test('keeps nested JSON and form-encoded polls compatible', async () => {
+		const { fastify, nativeInvoke } = createServer();
+		const nestedJson = await fastify.inject({
+			method: 'POST',
+			url: '/api/v1/statuses',
+			headers: { authorization: 'Bearer user-token' },
+			payload: { status: 'nested', poll: { options: ['A', 'B'], expires_in: 300 } },
+		});
+		const formEncoded = await fastify.inject({
+			method: 'POST',
+			url: '/api/v1/statuses',
+			headers: { authorization: 'Bearer user-token', 'content-type': 'application/x-www-form-urlencoded' },
+			payload: 'status=form&poll%5Boptions%5D%5B%5D=A&poll%5Boptions%5D%5B%5D=B&poll%5Bexpires_in%5D=300',
+		});
+
+		expect([nestedJson.statusCode, formEncoded.statusCode]).toEqual([200, 200]);
+		expect(nativeInvoke).toHaveBeenCalledWith('notes/create', expect.objectContaining({
+			poll: { choices: ['A', 'B'], multiple: false, expiredAfter: 300000 },
+		}), expect.any(Object), expect.any(Object));
+	});
+
+	test('requires scheduled statuses to be at least five minutes in the future', async () => {
+		vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-01-01T00:00:00.000Z'));
+		const { fastify, nativeInvoke } = createServer();
+		nativeInvoke.mockImplementation(async (name, data) => name === 'notes/drafts/create'
+			? { createdDraft: { id: 'draft-id', isActuallyScheduled: true, scheduledAt: data.scheduledAt } }
+			: []);
+
+		const fourMinutes = await fastify.inject({
+			method: 'POST',
+			url: '/api/v1/statuses',
+			headers: { authorization: 'Bearer user-token' },
+			payload: { status: 'later', scheduled_at: '2026-01-01T00:04:00.000Z' },
+		});
+		const fiveMinutes = await fastify.inject({
+			method: 'POST',
+			url: '/api/v1/statuses',
+			headers: { authorization: 'Bearer user-token' },
+			payload: { status: 'later', scheduled_at: '2026-01-01T00:05:00.000Z' },
+		});
+
+		expect([fourMinutes.statusCode, fiveMinutes.statusCode]).toEqual([422, 200]);
+		expect(nativeInvoke.mock.calls.filter(([name]) => name === 'notes/drafts/create')).toHaveLength(1);
 	});
 
 	test('maps an immediate quote and rejects semantics that Misskey cannot enforce', async () => {
