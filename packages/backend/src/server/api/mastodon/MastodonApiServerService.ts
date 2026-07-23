@@ -2307,30 +2307,42 @@ export class MastodonApiServerService {
 
 	private async quotePage(noteId: string, request: MastodonRequest, auth: MastodonUserAuth | null): Promise<{ quotes: Packed<'Note'>[]; source: { id: string }[] }> {
 		const pagination = this.mastodonPaginationService.toMisskey(request.query as Dictionary, 40);
+		const newerTraversal = pagination.sinceId != null && pagination.untilId == null;
 		const quotes: Packed<'Note'>[] = [];
 		let untilId = pagination.untilId;
+		let sinceId = pagination.sinceId;
 		let lastSourceId: string | undefined;
 		let pagesScanned = 0;
 
 		while (pagesScanned < 10 && quotes.length < pagination.limit + 1) {
 			const renotes = await this.invokePublic('notes/renotes', {
 				noteId,
-				...pagination,
+				...(newerTraversal ? {} : pagination),
 				limit: 100,
-				...(untilId != null ? { untilId } : {}),
+				...(newerTraversal
+					? (sinceId != null ? { sinceId } : {})
+					: (untilId != null ? { untilId } : {})),
 			}, auth, request) as Packed<'Note'>[];
-			pagesScanned += 1;
 			if (renotes.length === 0) break;
 
+			pagesScanned += 1;
 			lastSourceId = renotes.at(-1)!.id;
-			untilId = lastSourceId;
+			if (newerTraversal) {
+				sinceId = lastSourceId;
+			} else {
+				untilId = lastSourceId;
+			}
 			quotes.push(...renotes.filter(note => note.renoteId != null && !this.isPurePackedRenote(note)));
 		}
 
-		const page = quotes.slice(0, pagination.limit);
+		const page = (newerTraversal ? [...quotes].reverse() : quotes).slice(0, pagination.limit);
 		const source = page.flatMap(note => note.id == null ? [] : [{ id: note.id }]);
-		if (pagesScanned === 10 && quotes.length < pagination.limit + 1 && lastSourceId != null && source.at(-1)?.id !== lastSourceId) {
-			source.push({ id: lastSourceId });
+		if (pagesScanned === 10 && quotes.length < pagination.limit + 1 && lastSourceId != null) {
+			if (newerTraversal) {
+				if (source[0]?.id !== lastSourceId) source.unshift({ id: lastSourceId });
+			} else if (source.at(-1)?.id !== lastSourceId) {
+				source.push({ id: lastSourceId });
+			}
 		}
 		return { quotes: page, source };
 	}

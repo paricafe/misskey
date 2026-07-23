@@ -1252,6 +1252,98 @@ describe(MastodonApiServerService, () => {
 		expect(linkHeader).toHaveBeenNthCalledWith(1, expect.any(String), [{ id: 'quote-newer' }]);
 	});
 
+	test('scans newer since_id pages past boosts and keeps Link cursors newest-first', async () => {
+		const { fastify, nativeInvoke, linkHeader, toMisskey } = createServer();
+		const pureBoosts = Array.from({ length: 100 }, (_, index) => ({
+			id: `boost-${index.toString().padStart(3, '0')}`,
+			renoteId: 'note-id',
+			text: null,
+			cw: null,
+			files: [],
+			poll: null,
+			replyId: null,
+		}));
+		const lastBoostId = pureBoosts.at(-1)!.id;
+		toMisskey.mockReturnValue({ limit: 1, sinceId: 'since-id' });
+		linkHeader.mockImplementation((_url, source) => `<max_id=${source.at(-1)?.id}>; rel="next", <since_id=${source[0]?.id}>; rel="prev"`);
+		nativeInvoke.mockImplementation(async (name, data) => {
+			if (name !== 'notes/renotes') return [];
+			if (data.sinceId === 'since-id') return pureBoosts;
+			if (data.sinceId === lastBoostId) return [{
+				id: 'quote-newer',
+				renoteId: 'note-id',
+				text: 'Newer quote',
+				cw: null,
+				files: [],
+				poll: null,
+				replyId: null,
+			}];
+			return [];
+		});
+
+		const response = await fastify.inject({ method: 'GET', url: '/api/v1/statuses/note-id/quotes?limit=1&since_id=since-id', headers: { authorization: 'Bearer user-token' } });
+
+		expect(response.json()).toEqual([expect.objectContaining({ id: 'quote-newer' })]);
+		expect(nativeInvoke).toHaveBeenNthCalledWith(2, 'notes/renotes', {
+			noteId: 'note-id',
+			limit: 100,
+			sinceId: lastBoostId,
+		}, expect.any(Object), expect.any(Object));
+		expect(response.headers.link).toBe('<max_id=quote-newer>; rel="next", <since_id=quote-newer>; rel="prev"');
+	});
+
+	test('keeps ordinary since_id lookahead newest-first without duplicating or skipping quotes', async () => {
+		const { fastify, nativeInvoke, linkHeader, toMisskey } = createServer();
+		toMisskey.mockImplementation((query: Record<string, unknown>) => ({
+			limit: 1,
+			...(typeof query.since_id === 'string' ? { sinceId: query.since_id } : {}),
+			...(typeof query.max_id === 'string' ? { untilId: query.max_id } : {}),
+		}));
+		nativeInvoke.mockImplementation(async (name, data) => {
+			if (name !== 'notes/renotes') return [];
+			if (data.sinceId === 'since-id') return [
+				{ id: 'quote-older', renoteId: 'note-id', text: 'Older', cw: null, files: [], poll: null, replyId: null },
+				{ id: 'quote-newer', renoteId: 'note-id', text: 'Newer', cw: null, files: [], poll: null, replyId: null },
+			];
+			return data.untilId === 'quote-newer'
+				? [{ id: 'quote-older', renoteId: 'note-id', text: 'Older', cw: null, files: [], poll: null, replyId: null }]
+				: [];
+		});
+
+		const first = await fastify.inject({ method: 'GET', url: '/api/v1/statuses/note-id/quotes?limit=1&since_id=since-id', headers: { authorization: 'Bearer user-token' } });
+		const second = await fastify.inject({ method: 'GET', url: '/api/v1/statuses/note-id/quotes?limit=1&max_id=quote-newer', headers: { authorization: 'Bearer user-token' } });
+
+		expect(first.json()).toEqual([expect.objectContaining({ id: 'quote-newer' })]);
+		expect(second.json()).toEqual([expect.objectContaining({ id: 'quote-older' })]);
+		expect(linkHeader).toHaveBeenNthCalledWith(1, expect.any(String), [{ id: 'quote-newer' }]);
+	});
+
+	test('does not create a safety-bound cursor when the tenth native quote page is empty', async () => {
+		const { fastify, nativeInvoke, linkHeader, toMisskey } = createServer();
+		const pages = [
+			...Array.from({ length: 9 }, (_, index) => [{
+				id: `boost-page-${index + 1}`,
+				renoteId: 'note-id',
+				text: null,
+				cw: null,
+				files: [],
+				poll: null,
+				replyId: null,
+			}]),
+			[],
+		];
+		toMisskey.mockReturnValue({ limit: 1 });
+		linkHeader.mockReturnValue(null);
+		nativeInvoke.mockImplementation(async name => name === 'notes/renotes' ? pages.shift() ?? [] : []);
+
+		const response = await fastify.inject({ method: 'GET', url: '/api/v1/statuses/note-id/quotes?limit=1', headers: { authorization: 'Bearer user-token' } });
+
+		expect(response.json()).toEqual([]);
+		expect(nativeInvoke.mock.calls.filter(([name]) => name === 'notes/renotes')).toHaveLength(10);
+		expect(linkHeader).toHaveBeenCalledWith(expect.any(String), []);
+		expect(response.headers.link).toBeUndefined();
+	});
+
 	test.each([
 		['POST', '/api/v1/statuses/status-id/quotes/quote-id/revoke'],
 		['PUT', '/api/v1/statuses/status-id/interaction_policy'],
