@@ -1132,10 +1132,10 @@ describe(MastodonApiServerService, () => {
 			user: null,
 			token: { id: 'app-token', scopes: ['read'] },
 		});
-		nativeInvoke.mockImplementation(async name => name === 'notes/renotes' ? [
+		nativeInvoke.mockImplementationOnce(async name => name === 'notes/renotes' ? [
 			{ id: 'boost-id', renoteId: 'note-id', text: null, cw: null, files: [], poll: null, replyId: null },
 			{ id: 'quote-id', renoteId: 'note-id', text: 'My quote', cw: null, files: [], poll: null, replyId: null },
-		] : []);
+		] : []).mockResolvedValue([]);
 
 		const response = await fastify.inject({
 			method: 'GET',
@@ -1146,8 +1146,110 @@ describe(MastodonApiServerService, () => {
 		expect(response.statusCode).toBe(200);
 		expect(response.json()).toEqual([expect.objectContaining({ id: 'quote-id' })]);
 		expect(assert).toHaveBeenCalledWith(['read'], 'read:statuses');
-		expect(nativeInvoke).toHaveBeenCalledWith('notes/renotes', expect.objectContaining({ noteId: 'note-id', limit: 20 }), null, expect.any(Object));
-		expect(linkHeader).toHaveBeenCalledWith(expect.any(String), [expect.objectContaining({ id: 'quote-id' })]);
+		expect(nativeInvoke).toHaveBeenCalledWith('notes/renotes', expect.objectContaining({ noteId: 'note-id', limit: 100 }), null, expect.any(Object));
+		expect(linkHeader).toHaveBeenCalledWith(expect.any(String), [{ id: 'quote-id' }]);
+	});
+
+	test('scans past pure boost pages to return older quotes without using boost cursors', async () => {
+		const { fastify, nativeInvoke, linkHeader, toMisskey } = createServer();
+		const pureBoosts = Array.from({ length: 20 }, (_, index) => ({
+			id: `boost-${index.toString().padStart(2, '0')}`,
+			renoteId: 'note-id',
+			text: null,
+			cw: null,
+			files: [],
+			poll: null,
+			replyId: null,
+		}));
+		const lastBoostId = pureBoosts.at(-1)!.id;
+		toMisskey.mockReturnValue({ limit: 1 });
+		nativeInvoke.mockImplementation(async (name, data) => {
+			if (name !== 'notes/renotes') return [];
+			if (data.untilId == null) return pureBoosts;
+			if (data.untilId === lastBoostId) return [{
+				id: 'quote-id',
+				renoteId: 'note-id',
+				text: 'My quote',
+				cw: null,
+				files: [],
+				poll: null,
+				replyId: null,
+			}];
+			return [];
+		});
+
+		const response = await fastify.inject({
+			method: 'GET',
+			url: '/api/v1/statuses/note-id/quotes?limit=1',
+			headers: { authorization: 'Bearer user-token' },
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(response.json()).toEqual([expect.objectContaining({ id: 'quote-id' })]);
+		expect(nativeInvoke).toHaveBeenNthCalledWith(2, 'notes/renotes', {
+			noteId: 'note-id',
+			limit: 100,
+			untilId: lastBoostId,
+		}, expect.any(Object), expect.any(Object));
+		expect(linkHeader).toHaveBeenCalledWith(expect.any(String), [{ id: 'quote-id' }]);
+	});
+
+	test('uses the last consumed boost as the quote continuation cursor at the safety bound', async () => {
+		const { fastify, nativeInvoke, linkHeader, toMisskey } = createServer();
+		const pages = [
+			[{ id: 'quote-id', renoteId: 'note-id', text: 'My quote', cw: null, files: [], poll: null, replyId: null }],
+			...Array.from({ length: 9 }, (_, index) => [{
+				id: `boost-page-${index + 2}`,
+				renoteId: 'note-id',
+				text: null,
+				cw: null,
+				files: [],
+				poll: null,
+				replyId: null,
+			}]),
+		];
+		toMisskey.mockReturnValue({ limit: 1 });
+		nativeInvoke.mockImplementation(async name => name === 'notes/renotes' ? pages.shift() ?? [] : []);
+
+		const response = await fastify.inject({
+			method: 'GET',
+			url: '/api/v1/statuses/note-id/quotes?limit=1',
+			headers: { authorization: 'Bearer user-token' },
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(response.json()).toEqual([expect.objectContaining({ id: 'quote-id' })]);
+		expect(nativeInvoke.mock.calls.filter(([name]) => name === 'notes/renotes')).toHaveLength(10);
+		expect(linkHeader).toHaveBeenCalledWith(expect.any(String), [
+			{ id: 'quote-id' },
+			{ id: 'boost-page-10' },
+		]);
+	});
+
+	test('uses a returned quote cursor for ordinary quote pages without skipping prefetched quotes', async () => {
+		const { fastify, nativeInvoke, linkHeader, toMisskey } = createServer();
+		toMisskey.mockImplementation((query: Record<string, unknown>) => ({
+			limit: Math.min(40, Number(query.limit)),
+			...(typeof query.max_id === 'string' ? { untilId: query.max_id } : {}),
+		}));
+		nativeInvoke.mockImplementation(async (name, data) => {
+			if (name !== 'notes/renotes') return [];
+			if (data.untilId == null) return [
+				{ id: 'quote-newer', renoteId: 'note-id', text: 'Newer', cw: null, files: [], poll: null, replyId: null },
+				{ id: 'quote-older', renoteId: 'note-id', text: 'Older', cw: null, files: [], poll: null, replyId: null },
+			];
+			return data.untilId === 'quote-newer'
+				? [{ id: 'quote-older', renoteId: 'note-id', text: 'Older', cw: null, files: [], poll: null, replyId: null }]
+				: [];
+		});
+
+		const first = await fastify.inject({ method: 'GET', url: '/api/v1/statuses/note-id/quotes?limit=1', headers: { authorization: 'Bearer user-token' } });
+		const second = await fastify.inject({ method: 'GET', url: '/api/v1/statuses/note-id/quotes?limit=1&max_id=quote-newer', headers: { authorization: 'Bearer user-token' } });
+
+		expect(first.json()).toEqual([expect.objectContaining({ id: 'quote-newer' })]);
+		expect(second.json()).toEqual([expect.objectContaining({ id: 'quote-older' })]);
+		expect(toMisskey).toHaveBeenCalledWith(expect.objectContaining({ limit: '1' }), 40);
+		expect(linkHeader).toHaveBeenNthCalledWith(1, expect.any(String), [{ id: 'quote-newer' }]);
 	});
 
 	test.each([

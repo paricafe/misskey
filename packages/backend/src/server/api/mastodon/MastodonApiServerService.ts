@@ -668,12 +668,8 @@ export class MastodonApiServerService {
 		}));
 		fastify.get<{ Params: { id: string } }>('/api/v1/statuses/:id/quotes', (request, reply) => this.withToken(request, 'read:statuses', async tokenAuth => {
 			const auth = tokenAuth.kind === 'user' ? tokenAuth : null;
-			const renotes = await this.invokePublic('notes/renotes', {
-				noteId: request.params.id,
-				...this.mastodonPaginationService.toMisskey(request.query as Dictionary, 100),
-			}, auth, request) as Packed<'Note'>[];
-			const quotes = renotes.filter(note => note.renoteId != null && !this.isPurePackedRenote(note));
-			return this.page(request, reply, quotes, await this.statusesWithState(quotes, auth, 'thread'));
+			const { quotes, source } = await this.quotePage(request.params.id, request, auth);
+			return this.page(request, reply, source, await this.statusesWithState(quotes, auth, 'thread'));
 		}));
 		fastify.get<{ Params: { id: string } }>('/api/v1/statuses/:id/reblogged_by', (request, reply) => this.withOptionalUser(request, 'read:statuses', async auth => {
 			const renotes = await this.invokePublic('notes/renotes', { noteId: request.params.id, ...this.mastodonPaginationService.toMisskey(request.query as Dictionary, 80) }, auth, request) as Packed<'Note'>[];
@@ -2307,6 +2303,36 @@ export class MastodonApiServerService {
 		const link = this.mastodonPaginationService.linkHeader(new URL(request.url, this.config.url).toString(), source);
 		if (link != null) reply.header('Link', link);
 		return converted;
+	}
+
+	private async quotePage(noteId: string, request: MastodonRequest, auth: MastodonUserAuth | null): Promise<{ quotes: Packed<'Note'>[]; source: { id: string }[] }> {
+		const pagination = this.mastodonPaginationService.toMisskey(request.query as Dictionary, 40);
+		const quotes: Packed<'Note'>[] = [];
+		let untilId = pagination.untilId;
+		let lastSourceId: string | undefined;
+		let pagesScanned = 0;
+
+		while (pagesScanned < 10 && quotes.length < pagination.limit + 1) {
+			const renotes = await this.invokePublic('notes/renotes', {
+				noteId,
+				...pagination,
+				limit: 100,
+				...(untilId != null ? { untilId } : {}),
+			}, auth, request) as Packed<'Note'>[];
+			pagesScanned += 1;
+			if (renotes.length === 0) break;
+
+			lastSourceId = renotes.at(-1)!.id;
+			untilId = lastSourceId;
+			quotes.push(...renotes.filter(note => note.renoteId != null && !this.isPurePackedRenote(note)));
+		}
+
+		const page = quotes.slice(0, pagination.limit);
+		const source = page.flatMap(note => note.id == null ? [] : [{ id: note.id }]);
+		if (pagesScanned === 10 && quotes.length < pagination.limit + 1 && lastSourceId != null && source.at(-1)?.id !== lastSourceId) {
+			source.push({ id: lastSourceId });
+		}
+		return { quotes: page, source };
 	}
 
 	private offsetPagination(query: Dictionary, defaultLimit: number, maximumLimit: number): { limit: number; offset: number; readLimit: number } {
