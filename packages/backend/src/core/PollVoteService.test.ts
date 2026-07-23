@@ -20,6 +20,7 @@ function createService(options: {
 	remote?: boolean;
 	hasPoll?: boolean;
 	noteMissing?: boolean;
+	advisoryLockWait?: () => Promise<void>;
 } = {}) {
 	const me = { id: 'voter-id' };
 	const note = {
@@ -55,6 +56,7 @@ function createService(options: {
 		query: vi.fn(async (sql: string, parameters: unknown[]) => {
 			if (sql.includes('pg_advisory_xact_lock')) {
 				order.push('lock');
+				await options.advisoryLockWait?.();
 				return [];
 			}
 
@@ -262,6 +264,87 @@ describe(PollVoteService, () => {
 		await expect(service.vote(note.id, [0], me as never)).rejects.toMatchObject({ code: 'ALREADY_EXPIRED' });
 
 		expect(pollVotesRepository.insert).not.toHaveBeenCalled();
+	});
+
+	test('rejects a poll that expires while waiting for the advisory lock', async () => {
+		vi.useFakeTimers();
+		try {
+			const beforeExpiry = new Date('2026-07-23T00:00:00.000Z');
+			const afterExpiry = new Date('2026-07-23T00:00:02.000Z');
+			vi.setSystemTime(beforeExpiry);
+
+			let releaseLock!: () => void;
+			const lockGate = new Promise<void>(resolve => {
+				releaseLock = resolve;
+			});
+			let signalLockStarted!: () => void;
+			const lockStarted = new Promise<void>(resolve => {
+				signalLockStarted = resolve;
+			});
+			const {
+				service,
+				note,
+				me,
+				pollsRepository,
+				pollVotesRepository,
+			} = createService({
+				expiresAt: new Date('2026-07-23T00:00:01.000Z'),
+				advisoryLockWait: async () => {
+					signalLockStarted();
+					await lockGate;
+				},
+			});
+
+			const voting = service.vote(note.id, [0], me as never);
+			await lockStarted;
+			vi.setSystemTime(afterExpiry);
+			releaseLock();
+
+			await expect(voting).rejects.toMatchObject({ code: 'ALREADY_EXPIRED' });
+			expect(pollVotesRepository.insert).not.toHaveBeenCalled();
+			expect(pollsRepository.query.mock.calls.filter(([sql]) => sql.includes('UPDATE poll'))).toHaveLength(0);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	test('generates vote IDs using the time after the advisory lock is acquired', async () => {
+		vi.useFakeTimers();
+		try {
+			vi.setSystemTime(new Date('2026-07-23T00:00:00.000Z'));
+
+			let releaseLock!: () => void;
+			const lockGate = new Promise<void>(resolve => {
+				releaseLock = resolve;
+			});
+			let signalLockStarted!: () => void;
+			const lockStarted = new Promise<void>(resolve => {
+				signalLockStarted = resolve;
+			});
+			const {
+				service,
+				note,
+				me,
+				idService,
+			} = createService({
+				expiresAt: new Date('2026-07-23T00:01:00.000Z'),
+				advisoryLockWait: async () => {
+					signalLockStarted();
+					await lockGate;
+				},
+			});
+
+			const voting = service.vote(note.id, [0], me as never);
+			await lockStarted;
+			const afterLock = new Date('2026-07-23T00:00:02.000Z');
+			vi.setSystemTime(afterLock);
+			releaseLock();
+			await voting;
+
+			expect(idService.gen).toHaveBeenCalledWith(afterLock.getTime());
+		} finally {
+			vi.useRealTimers();
+		}
 	});
 
 	test('rejects a voter blocked by the poll author before starting a transaction', async () => {

@@ -80,7 +80,6 @@ export class PollVoteService {
 
 	@bindThis
 	public async vote(noteId: MiNote['id'], choices: number[], me: MiLocalUser): Promise<void> {
-		const createdAt = new Date();
 		const uniqueChoices = [...new Set(choices)];
 		const note = await this.notesRepository.findOneBy({ id: noteId });
 
@@ -109,6 +108,7 @@ export class PollVoteService {
 			);
 
 			const poll = await pollsRepository.findOneByOrFail({ noteId: note.id });
+			const createdAt = new Date();
 			const existingVotes = await pollVotesRepository.findBy({
 				noteId: note.id,
 				userId: me.id,
