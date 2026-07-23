@@ -465,7 +465,7 @@ describe(MastodonApiServerService, () => {
 					category: input.category,
 					status_ids: input.statusIds,
 				})),
-				notification: vi.fn(value => value.user == null ? null : {
+				notification: vi.fn((value, voterCounts) => value.user == null ? null : {
 					id: value.id,
 					type: value.type === 'reaction' || value.type === 'reaction:grouped'
 						? 'favourite'
@@ -475,7 +475,7 @@ describe(MastodonApiServerService, () => {
 								? 'status'
 								: value.type ?? 'mention',
 					account: { id: value.user.id },
-					...(value.note == null ? {} : { status: { ...serializeStatus(value.note), content: value.renderedContent ?? '' } }),
+					...(value.note == null ? {} : { status: { ...serializeStatus(value.note, voterCounts), content: value.renderedContent ?? '' } }),
 				}),
 			} as never,
 			{
@@ -631,6 +631,41 @@ describe(MastodonApiServerService, () => {
 		);
 		expect(response.headers.link).toBe('<next>; rel="next"');
 		expect(assert).toHaveBeenCalledWith(['read'], 'read:statuses');
+	});
+
+	test('batches multiple-poll voter counts across a conversation page', async () => {
+		const { fastify, mastodonConversationService, notesRepository } = createServer();
+		const multiplePoll = {
+			expiresAt: null,
+			multiple: true,
+			choices: [
+				{ text: 'A', votes: 2, isVoted: false },
+				{ text: 'B', votes: 1, isVoted: false },
+			],
+		};
+		mastodonConversationService.list.mockResolvedValueOnce([
+			{ id: 'conversation-new', unread: true, accounts: [{ id: 'alice' }], lastStatus: { id: 'poll-new', poll: multiplePoll } },
+			{ id: 'conversation-old', unread: false, accounts: [{ id: 'bob' }], lastStatus: { id: 'poll-old', poll: multiplePoll } },
+		] as never);
+		notesRepository.query.mockResolvedValue([
+			{ noteId: 'poll-new', votersCount: '2' },
+			{ noteId: 'poll-old', votersCount: '1' },
+		]);
+
+		const response = await fastify.inject({
+			method: 'GET',
+			url: '/api/v1/conversations',
+			headers: { authorization: 'Bearer user-token' },
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(response.json()).toMatchObject([
+			{ id: 'conversation-new', unread: true, accounts: [{ id: 'alice' }], last_status: { id: 'poll-new', poll: { voters_count: 2 } } },
+			{ id: 'conversation-old', unread: false, accounts: [{ id: 'bob' }], last_status: { id: 'poll-old', poll: { voters_count: 1 } } },
+		]);
+		const countQueries = notesRepository.query.mock.calls.filter(([sql]) => (sql as string).includes('COUNT(DISTINCT vote."userId")'));
+		expect(countQueries).toHaveLength(1);
+		expect(countQueries[0]?.[1]).toEqual([['poll-new', 'poll-old']]);
 	});
 
 	test('uses a default conversation limit of 20', async () => {
@@ -2160,6 +2195,40 @@ describe(MastodonApiServerService, () => {
 			markAsRead: false,
 			includeTypes: ['mention', 'reply', 'quote', 'reaction'],
 		}, expect.any(Object), expect.any(Object));
+	});
+
+	test('batches exact voter counts across a REST notification page', async () => {
+		const { fastify, nativeInvoke, notesRepository } = createServer();
+		const multiplePoll = {
+			expiresAt: null,
+			multiple: true,
+			choices: [
+				{ text: 'A', votes: 2, isVoted: false },
+				{ text: 'B', votes: 1, isVoted: false },
+			],
+		};
+		nativeInvoke.mockImplementation(async name => name === 'i/notifications'
+			? [
+				{ id: 'notification-new', type: 'note', user: { id: 'actor-a' }, note: { id: 'poll-new', poll: multiplePoll } },
+				{ id: 'notification-old', type: 'note', user: { id: 'actor-b' }, note: { id: 'poll-old', poll: multiplePoll } },
+			]
+			: []);
+		notesRepository.query.mockResolvedValue([{ noteId: 'poll-new', votersCount: '2' }]);
+
+		const response = await fastify.inject({
+			method: 'GET',
+			url: '/api/v1/notifications',
+			headers: { authorization: 'Bearer user-token' },
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(response.json()).toMatchObject([
+			{ id: 'notification-old', status: { id: 'poll-old', poll: { voters_count: 0 } } },
+			{ id: 'notification-new', status: { id: 'poll-new', poll: { voters_count: 2 } } },
+		]);
+		const countQueries = notesRepository.query.mock.calls.filter(([sql]) => (sql as string).includes('COUNT(DISTINCT vote."userId")'));
+		expect(countQueries).toHaveLength(1);
+		expect(countQueries[0]?.[1]).toEqual([['poll-new', 'poll-old']]);
 	});
 
 	test('keeps v1 notification group_key on server grouping when grouped_types is empty', async () => {

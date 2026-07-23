@@ -10,6 +10,7 @@ import { MastodonStreamSession, type MastodonStreamOutput } from './MastodonStre
 function createSession(options: {
 	filter?: (statuses: Record<string, unknown>[]) => Promise<Record<string, unknown>[]>;
 	notifications?: (sources: unknown[]) => Promise<unknown[]>;
+	voterCounts?: (notes: Array<{ id: string }>) => Promise<ReadonlyMap<string, number>>;
 	followedTags?: string[];
 	conversation?: (noteId: string) => Promise<Record<string, unknown>>;
 	refreshConversation?: (conversationId: string) => Promise<Record<string, unknown> | null>;
@@ -26,18 +27,20 @@ function createSession(options: {
 	};
 	const outputs: MastodonStreamOutput[] = [];
 	const close = vi.fn();
-	const status = vi.fn((value: { id: string; text?: string | null; cw?: string | null }) => ({
+	const status = vi.fn((value: { id: string; text?: string | null; cw?: string | null; poll?: { multiple?: boolean } | null }, voterCounts?: ReadonlyMap<string, number>) => ({
 		id: value.id,
 		...(value.text == null ? {} : { text: value.text }),
 		...(value.cw == null ? {} : { cw: value.cw }),
+		...(value.poll == null ? {} : { poll: { voters_count: value.poll.multiple ? voterCounts?.get(value.id) ?? null : null } }),
 	}));
-	const notification = vi.fn((value: { id: string; note?: { id: string } }) => ({
+	const notification = vi.fn((value: { id: string; note?: { id: string; poll?: { multiple?: boolean } | null } }, voterCounts?: ReadonlyMap<string, number>) => ({
 		id: value.id,
 		type: 'mention',
 		created_at: '2026-07-17T00:00:00.000Z',
 		account: { id: 'actor' },
-		...(value.note == null ? {} : { status: { id: value.note.id } }),
+		...(value.note == null ? {} : { status: status(value.note, voterCounts) }),
 	}));
+	const pollVoterCounts = vi.fn(async (notes: Array<{ id: string }>) => options.voterCounts?.(notes) ?? new Map());
 	const announcement = vi.fn((value: { id: string; text: string }) => ({ id: value.id, content: value.text }));
 	const filterApply = vi.fn(async (_userId, _context, statuses: Record<string, unknown>[], _options?: unknown) => options.filter?.(statuses) ?? statuses);
 	const upsertLive = vi.fn(async (_user, noteId: string) => options.conversation?.(noteId) ?? ({
@@ -60,7 +63,7 @@ function createSession(options: {
 			assertAny: vi.fn(),
 			allows: vi.fn((_scopes, scope) => options.allows?.(scope) ?? true),
 		} as never,
-		mastodonEntityService: { status, notification, announcement } as never,
+		mastodonEntityService: { status, notification, announcement, pollVoterCounts } as never,
 		mastodonFilterService: { apply: filterApply } as never,
 		mastodonNotificationService: {
 			list: vi.fn(async (_userId, sources) => options.notifications?.(sources) ?? sources),
@@ -79,6 +82,8 @@ function createSession(options: {
 		outputs,
 		close,
 		status,
+		notification,
+		pollVoterCounts,
 		announcement,
 		filterApply,
 		upsertLive,
@@ -138,6 +143,46 @@ describe(MastodonStreamSession, () => {
 			payload: { id: 'warned', text: 'spoiler', filtered: [{ filter: { filter_action: 'warn' } }] },
 			stream: 'public',
 		}]));
+	});
+
+	test('enriches live updates and notifications once per event', async () => {
+		const { session, outputs, pollVoterCounts, frame } = createSession({
+			voterCounts: async notes => new Map(notes.map(value => [value.id, value.id === 'poll-update' ? 2 : 0])),
+		});
+		await session.start();
+		await session.subscribe({ stream: 'public' });
+		await session.subscribe({ stream: 'user:notification' });
+		const multiplePoll = {
+			multiple: true,
+			choices: [
+				{ text: 'A', votes: 2, isVoted: false },
+				{ text: 'B', votes: 1, isVoted: false },
+			],
+		};
+
+		frame({ type: 'channel', body: { id: 'mastodon-0', type: 'note', body: { ...note('poll-update'), poll: multiplePoll } } });
+		frame({
+			type: 'channel',
+			body: {
+				id: 'mastodon-1',
+				type: 'notification',
+				body: { id: 'poll-notification', note: { ...note('poll-zero'), poll: multiplePoll } },
+			},
+		});
+
+		await vi.waitFor(() => expect(outputs).toEqual([
+			{ event: 'update', payload: { id: 'poll-update', poll: { voters_count: 2 } }, stream: 'public' },
+			expect.objectContaining({
+				event: 'notification',
+				payload: expect.objectContaining({ id: 'poll-notification', status: { id: 'poll-zero', poll: { voters_count: 0 } } }),
+				stream: 'user:notification',
+			}),
+		]));
+		expect(pollVoterCounts).toHaveBeenCalledTimes(2);
+		expect(pollVoterCounts.mock.calls.map(([notes]) => notes.map(value => value.id))).toEqual([
+			['poll-update'],
+			['poll-zero'],
+		]);
 	});
 
 	test.each([

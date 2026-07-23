@@ -28,7 +28,7 @@ import { MASTODON_4_6_USER_ROUTES, type MastodonContractRoute } from './Mastodon
 import { MastodonAuthenticateService } from './MastodonAuthenticateService.js';
 import { MASTODON_COLLECTION_WINDOW_LIMIT, MastodonCollectionService, type MastodonCollectionPage } from './MastodonCollectionService.js';
 import { MastodonConversationService, type MastodonConversation } from './MastodonConversationService.js';
-import { MastodonEntityService } from './MastodonEntityService.js';
+import { MastodonEntityService, resolvePollVoterCounts } from './MastodonEntityService.js';
 import { MastodonFilterService, type MastodonFilterApplyOptions, type MastodonFilterContext } from './MastodonFilterService.js';
 import { MastodonMarkerService, type MastodonMarkerTimeline } from './MastodonMarkerService.js';
 import { MastodonOAuthService } from './MastodonOAuthService.js';
@@ -1348,7 +1348,13 @@ export class MastodonApiServerService {
 				minId: this.string(query.min_id),
 				sinceId: this.string(query.since_id),
 			});
-			const entities = await Promise.all(conversations.map(conversation => this.conversation(conversation, auth)));
+			const statuses = await this.statusesWithState(
+				conversations.map(conversation => conversation.lastStatus),
+				auth,
+				'thread',
+				{ preserveHidden: true },
+			);
+			const entities = conversations.map((conversation, index) => this.conversationEntity(conversation, statuses[index]!));
 			return this.page(request, reply, conversations.map(conversation => ({ id: conversation.lastStatus.id })), entities);
 		}));
 
@@ -1365,11 +1371,16 @@ export class MastodonApiServerService {
 	}
 
 	private async conversation(conversation: MastodonConversation, auth: MastodonUserAuth): Promise<Dictionary> {
+		const lastStatus = await this.statusWithState(conversation.lastStatus, auth, 'thread');
+		return this.conversationEntity(conversation, lastStatus);
+	}
+
+	private conversationEntity(conversation: MastodonConversation, lastStatus: Record<string, unknown>): Dictionary {
 		return {
 			id: conversation.id,
 			unread: conversation.unread,
 			accounts: conversation.accounts,
-			last_status: await this.statusWithState(conversation.lastStatus, auth, 'thread'),
+			last_status: lastStatus,
 		};
 	}
 
@@ -1927,41 +1938,7 @@ export class MastodonApiServerService {
 	}
 
 	private async pollVoterCounts(notes: Packed<'Note'>[]): Promise<ReadonlyMap<string, number>> {
-		const noteIds = new Set<string>();
-		const visited = new Set<string>();
-		const visit = (note: Packed<'Note'>): void => {
-			if (visited.has(note.id)) return;
-			visited.add(note.id);
-			if (note.poll?.multiple === true) noteIds.add(note.id);
-			if (note.renote != null) visit(note.renote);
-		};
-		for (const note of notes) visit(note);
-		if (noteIds.size === 0) return new Map();
-
-		const requestedIds = [...noteIds];
-		const rows = await this.notesRepository.query(`
-			SELECT
-				vote."noteId" AS "noteId",
-				COUNT(DISTINCT vote."userId") AS "votersCount"
-			FROM "poll_vote" vote
-			WHERE vote."noteId" = ANY($1::varchar[])
-			GROUP BY vote."noteId"
-		`, [requestedIds]) as Array<{ noteId: unknown; votersCount: unknown }>;
-		const counts = new Map(requestedIds.map(noteId => [noteId, 0]));
-		for (const row of rows) {
-			if (typeof row.noteId !== 'string' || !counts.has(row.noteId)) continue;
-			const votersCount = typeof row.votersCount === 'number'
-				? row.votersCount
-				: typeof row.votersCount === 'string' && /^[0-9]+$/u.test(row.votersCount)
-					? Number(row.votersCount)
-					: Number.NaN;
-			if (!Number.isSafeInteger(votersCount) || votersCount < 0) {
-				counts.delete(row.noteId);
-				continue;
-			}
-			counts.set(row.noteId, votersCount);
-		}
-		return counts;
+		return await resolvePollVoterCounts(this.notesRepository, notes);
 	}
 
 	private notificationOptions(query: Dictionary): {
@@ -1995,8 +1972,9 @@ export class MastodonApiServerService {
 		params: Dictionary,
 	): Promise<{ sources: MastodonNotificationSource[]; page: { id: string }[] }> {
 		const notifications = await this.invoke('i/notifications', params, auth, request) as Packed<'Notification'>[];
+		const voterCounts = await this.pollVoterCounts(notifications.flatMap(notification => notification.note == null ? [] : [notification.note]));
 		const converted = notifications
-			.map(notification => this.mastodonEntityService.notification(notification))
+			.map(notification => this.mastodonEntityService.notification(notification, voterCounts))
 			.filter(value => value != null) as Dictionary[];
 		const filtered = await this.notificationFilters(auth.user.id, converted, notifications);
 		const entitiesById = new Map(filtered.flatMap(entity => {

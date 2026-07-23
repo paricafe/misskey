@@ -394,6 +394,7 @@ export class MastodonStreamSession {
 	}
 
 	private async handleNote(channel: NativeChannel, note: Packed<'Note'>): Promise<void> {
+		const voterCounts = await this.#entityService.pollVoterCounts([note]);
 		for (const subscription of channel.targets.values()) {
 			const stream = subscription.stream;
 			if (stream === 'user:notification') continue;
@@ -404,23 +405,32 @@ export class MastodonStreamSession {
 			if (stream.endsWith(':media') && (note.files?.length ?? 0) === 0) continue;
 			if (this.wasDelivered(stream, note.id)) continue;
 			if (stream === 'direct') {
-				await this.emitConversation(note, stream);
+				await this.emitConversation(note, stream, voterCounts);
 				continue;
 			}
-			const status = await this.filteredStatus(note, this.filterContext(stream));
+			const status = await this.filteredStatus(note, this.filterContext(stream), voterCounts);
 			if (status == null) continue;
 			this.remember(stream, note);
 			this.#send({ event: 'update', payload: status, stream });
 		}
 	}
 
-	private async emitConversation(note: Packed<'Note'>, stream: MastodonStreamName): Promise<void> {
+	private async emitConversation(
+		note: Packed<'Note'>,
+		stream: MastodonStreamName,
+		voterCounts: ReadonlyMap<string, number>,
+	): Promise<void> {
 		const conversation = await this.#conversationService.upsertLive(this.#auth.user, note.id);
-		await this.emitPackedConversation(conversation, stream);
+		await this.emitPackedConversation(conversation, stream, conversation.lastStatus.id === note.id ? voterCounts : undefined);
 	}
 
-	private async emitPackedConversation(conversation: MastodonConversation, stream: MastodonStreamName): Promise<void> {
-		const lastStatus = await this.filteredStatus(conversation.lastStatus, 'home');
+	private async emitPackedConversation(
+		conversation: MastodonConversation,
+		stream: MastodonStreamName,
+		voterCounts?: ReadonlyMap<string, number>,
+	): Promise<void> {
+		const resolvedVoterCounts = voterCounts ?? await this.#entityService.pollVoterCounts([conversation.lastStatus]);
+		const lastStatus = await this.filteredStatus(conversation.lastStatus, 'home', resolvedVoterCounts);
 		if (lastStatus == null) return;
 		this.remember(stream, conversation.lastStatus, conversation.id);
 		this.#send({
@@ -437,7 +447,8 @@ export class MastodonStreamSession {
 
 	private async handleNotification(channel: NativeChannel, native: Packed<'Notification'>): Promise<void> {
 		if (!this.#scopeService.allows(this.#auth.token.scopes, 'read:notifications')) return;
-		const entity = this.#entityService.notification(native);
+		const voterCounts = await this.#entityService.pollVoterCounts(native.note == null ? [] : [native.note]);
+		const entity = this.#entityService.notification(native, voterCounts);
 		if (entity == null) return;
 		const source: MastodonNotificationSource = { native: native as MastodonNotificationSource['native'], entity: entity as MastodonNotificationSource['entity'] };
 		const [visible] = await this.#notificationService.list(this.#auth.user.id, [source], { includeFiltered: false });
@@ -456,8 +467,12 @@ export class MastodonStreamSession {
 		}
 	}
 
-	private async filteredStatus(note: Packed<'Note'>, context: MastodonFilterContext): Promise<Record<string, unknown> | null> {
-		const status = this.#entityService.status(note) as Record<string, unknown>;
+	private async filteredStatus(
+		note: Packed<'Note'>,
+		context: MastodonFilterContext,
+		voterCounts: ReadonlyMap<string, number>,
+	): Promise<Record<string, unknown> | null> {
+		const status = this.#entityService.status(note, voterCounts) as Record<string, unknown>;
 		const [filtered] = await this.#filterService.apply(this.#auth.user.id, context, [status], {
 			corpora: new Map([[note.id, this.filterCorpus(note)]]),
 		});
@@ -518,12 +533,13 @@ export class MastodonStreamSession {
 		const changes = outer?.body ?? event.body as Partial<Packed<'Note'>> | undefined;
 		const updated = { ...delivered.note, ...(changes ?? {}) } as Packed<'Note'>;
 		delivered.note = updated;
+		const voterCounts = await this.#entityService.pollVoterCounts([updated]);
 		for (const stream of streams) {
 			if (stream === 'direct') {
-				await this.emitConversation(updated, stream);
+				await this.emitConversation(updated, stream, voterCounts);
 				continue;
 			}
-			const status = await this.filteredStatus(updated, this.filterContext(stream));
+			const status = await this.filteredStatus(updated, this.filterContext(stream), voterCounts);
 			if (status == null) continue;
 			this.#send({ event: 'status.update', payload: status, stream });
 		}

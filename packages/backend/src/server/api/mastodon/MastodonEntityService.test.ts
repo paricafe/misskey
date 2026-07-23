@@ -68,6 +68,7 @@ describe(MastodonEntityService, () => {
 	const service = new MastodonEntityService(
 		{ url: 'https://misskey.example/', host: 'misskey.example' } as never,
 		{ toHtml: (nodes: unknown) => `<p>${String(nodes)}</p>` } as never,
+		{ query: vi.fn() } as never,
 	);
 
 	test('converts a Misskey user to a Mastodon account', () => {
@@ -215,6 +216,7 @@ describe(MastodonEntityService, () => {
 		const announcementService = new MastodonEntityService(
 			{ url: 'https://misskey.example/' } as never,
 			{ toHtml } as never,
+			{ query: vi.fn() } as never,
 		);
 
 		const announcement = announcementService.announcement({
@@ -376,6 +378,29 @@ describe(MastodonEntityService, () => {
 		} as never);
 		expect(normalizedLocalStatus.mentions).toEqual([
 			expect.objectContaining({ id: 'alice-id', username: 'Alice' }),
+			expect.objectContaining({ id: 'bob-id', username: 'bob' }),
+		]);
+
+		const remoteAuthorStatus = service.status({
+			...note,
+			user: { ...note.user, host: 'remote.example' },
+			text: '@Alice @alice@REMOTE.EXAMPLE @alice@misskey.example @bob',
+			mentions: ['remote-alice-id', 'local-alice-id', 'bob-id'],
+		} as never);
+		expect(remoteAuthorStatus.mentions).toEqual([
+			expect.objectContaining({ id: 'remote-alice-id', username: 'Alice', acct: 'Alice' }),
+			expect.objectContaining({ id: 'local-alice-id', username: 'alice', acct: 'alice@misskey.example' }),
+			expect.objectContaining({ id: 'bob-id', username: 'bob', acct: 'bob' }),
+		]);
+
+		const normalizedRemoteHostStatus = service.status({
+			...note,
+			user: { ...note.user, host: '例え.テスト' },
+			text: '@Alice @alice@XN--R8JZ45G.XN--ZCKZAH @bob',
+			mentions: ['remote-alice-id', 'bob-id'],
+		} as never);
+		expect(normalizedRemoteHostStatus.mentions).toEqual([
+			expect.objectContaining({ id: 'remote-alice-id', username: 'Alice' }),
 			expect.objectContaining({ id: 'bob-id', username: 'bob' }),
 		]);
 	});
