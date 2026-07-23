@@ -10,7 +10,7 @@ import { type FastifyServerOptions } from 'fastify';
 import type * as Sentry from '@sentry/node';
 import type * as SentryVue from '@sentry/vue';
 import type { RedisOptions } from 'ioredis';
-import type { LogFormat, LogLevelSetting } from './logging/types.js';
+import type { AccessLogConfiguration, LogFormat, LogLevelSetting } from './logging/types.js';
 
 type RedisOptionsSource = Partial<RedisOptions> & {
 	host: string;
@@ -144,6 +144,7 @@ type Source = {
 		format?: LogFormat;
 		level?: LogLevelSetting;
 		domains?: Record<string, LogLevelSetting> | null;
+		access?: AccessLogConfiguration;
 		sql?: {
 			disableQueryTruncation?: boolean,
 			enableQueryParamLogging?: boolean,
@@ -211,6 +212,7 @@ export type Config = {
 		format?: LogFormat;
 		level?: LogLevelSetting;
 		domains?: Record<string, LogLevelSetting> | null;
+		access?: AccessLogConfiguration;
 		sql?: {
 			disableQueryTruncation?: boolean,
 			enableQueryParamLogging?: boolean,
