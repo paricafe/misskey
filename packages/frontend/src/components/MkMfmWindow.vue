@@ -380,18 +380,18 @@ SPDX-License-Identifier: AGPL-3.0-only
         </MkStickyContainer>
     </MkWindow>
     </template>
-    
+
     <script lang="ts" setup>
     import { ref } from 'vue';
     import MkInfo from './MkInfo.vue';
     import MkWindow from '@/components/MkWindow.vue';
     import MkTextarea from '@/components/MkTextarea.vue';
     import { i18n } from '@/i18n.js';
-    
+
     const emit = defineEmits<{
         (ev: 'closed'): void;
     }>();
-    
+
     const preview_mention = ref('@example');
     const preview_hashtag = ref('#test');
     const preview_link = ref(`[${i18n.ts._mfm.dummy}](https://pari.cafe)`);
@@ -463,17 +463,17 @@ SPDX-License-Identifier: AGPL-3.0-only
     const preview_italic = ref('<i>italic</i> *italic2*');
     const preview_border = ref(
         `$[border a default border]
-    
+
     $[border.width=2 a thick border]
-    
+
     $[border.style=double,width=5 a double border]
-    
+
     $[border.color=0f0 a green border]
-    
+
     $[border.radius=10 a rounded border]`,
     );
     </script>
-    
+
     <style lang="scss" scoped>
     .mfm-cheat-sheet {
         > .section {
@@ -488,14 +488,14 @@ SPDX-License-Identifier: AGPL-3.0-only
                 backdrop-filter: var(--blur, blur(10px));
                 background-color: var(--X16);
             }
-    
+
             > .content {
                 > p {
                     margin: 0;
                     padding: 16px;
                     padding-top: 0;
                 }
-    
+
                 > .preview {
                     border-top: solid 0.5px var(--divider);
                     padding: 16px;

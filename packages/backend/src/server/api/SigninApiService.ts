@@ -224,7 +224,7 @@ export class SigninApiService {
 			}
 
 			if (same) {
-		  	        if (!this.meta.approvalRequiredForSignup && !user.approved) this.usersRepository.update(user.id, { approved: true });
+				if (!this.meta.approvalRequiredForSignup && !user.approved) this.usersRepository.update(user.id, { approved: true });
 				return this.signinService.signin(request, reply, user);
 			} else {
 				return await fail(403, {
