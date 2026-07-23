@@ -62,6 +62,9 @@ describe(MastodonApiServerService, () => {
 			return [];
 		});
 		const publicInvoke = vi.fn((name: string, data: Record<string, unknown>, viewer: unknown, request: unknown) => nativeInvoke(name, data, viewer, request));
+		const pollVoteService = {
+			vote: vi.fn().mockResolvedValue(undefined),
+		};
 		const registerApplication = vi.fn().mockResolvedValue({ client_id: 'client-id', client_secret: 'client-secret' });
 		const getApplication = vi.fn().mockResolvedValue({ id: 'client-id', name: 'Elk' });
 		const redis = {
@@ -393,6 +396,7 @@ describe(MastodonApiServerService, () => {
 			notesRepository as never,
 			noteFavoritesRepository as never,
 			userNotePiningsRepository as never,
+			pollVoteService as never,
 			{ registerApplication, getApplication } as never,
 			{ authenticate } as never,
 			{ assert, assertAny } as never,
@@ -494,6 +498,7 @@ describe(MastodonApiServerService, () => {
 			assertAny,
 			nativeInvoke,
 			publicInvoke,
+			pollVoteService,
 			registerApplication,
 			getApplication,
 			redis,
@@ -3251,6 +3256,39 @@ describe(MastodonApiServerService, () => {
 		expect(response.json()).toMatchObject({ id: 'note-with-poll', votes_count: 2 });
 		expect(authenticate).not.toHaveBeenCalled();
 		expect(publicInvoke).toHaveBeenCalledWith('notes/show', { noteId: 'note-with-poll' }, null, expect.any(Object));
+	});
+
+	test('submits the complete poll choice list to one atomic vote operation', async () => {
+		const { fastify, nativeInvoke, pollVoteService } = createServer();
+		const response = await fastify.inject({
+			method: 'POST',
+			url: '/api/v1/polls/note-with-poll/votes',
+			headers: { authorization: 'Bearer user-token' },
+			payload: { 'choices[]': ['0', '0', '1'] },
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(pollVoteService.vote).toHaveBeenCalledOnce();
+		expect(pollVoteService.vote).toHaveBeenCalledWith('note-with-poll', [0, 0, 1], { id: 'user-id' });
+		expect(nativeInvoke).not.toHaveBeenCalledWith('notes/polls/vote', expect.anything(), expect.anything(), expect.anything());
+	});
+
+	test.each([
+		['non-numeric', ['0', 'not-a-choice']],
+		['non-integer', ['0', '1.5']],
+		['negative', ['0', '-1']],
+	] as const)('rejects a %s poll choice instead of applying the valid subset', async (_label, choices) => {
+		const { fastify, nativeInvoke, pollVoteService } = createServer();
+		const response = await fastify.inject({
+			method: 'POST',
+			url: '/api/v1/polls/note-with-poll/votes',
+			headers: { authorization: 'Bearer user-token' },
+			payload: { 'choices[]': choices },
+		});
+
+		expect(response.statusCode).toBe(400);
+		expect(pollVoteService.vote).not.toHaveBeenCalled();
+		expect(nativeInvoke).not.toHaveBeenCalledWith('notes/polls/vote', expect.anything(), expect.anything(), expect.anything());
 	});
 
 	test('deletes media with a user token', async () => {

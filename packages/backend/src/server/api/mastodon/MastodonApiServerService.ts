@@ -20,6 +20,7 @@ import type { Packed } from '@/misc/json-schema.js';
 import { extractMentions } from '@/misc/extract-mentions.js';
 import { bindThis } from '@/decorators.js';
 import { ApiError } from '@/server/api/error.js';
+import { PollVoteService } from '@/core/PollVoteService.js';
 import type { FastifyInstance, FastifyPluginOptions, FastifyReply, FastifyRequest } from 'fastify';
 import { MastodonApiCallService } from './MastodonApiCallService.js';
 import { MastodonApiStateService } from './MastodonApiStateService.js';
@@ -65,6 +66,7 @@ export class MastodonApiServerService {
 		@Inject(DI.userNotePiningsRepository)
 		private userNotePiningsRepository: UserNotePiningsRepository,
 
+		private pollVoteService: PollVoteService,
 		private mastodonOAuthService: MastodonOAuthService,
 		private mastodonAuthenticateService: MastodonAuthenticateService,
 		private mastodonScopeService: MastodonScopeService,
@@ -785,12 +787,12 @@ export class MastodonApiServerService {
 		}));
 		fastify.post<{ Params: { id: string }; Body: Dictionary }>('/api/v1/polls/:id/votes', request => this.withAuth(request, 'write:statuses', async auth => {
 			const choices = this.strings(request.body?.['choices[]'] ?? request.body?.choices)
-				.map(choice => Number(choice))
-				.filter(choice => Number.isInteger(choice) && choice >= 0);
+				.map(choice => Number(choice));
 			if (choices.length === 0) throw new MastodonApiError(400, 'invalid_request', 'At least one poll choice is required');
-			for (const choice of new Set(choices)) {
-				await this.invoke('notes/polls/vote', { noteId: request.params.id, choice }, auth, request);
+			if (choices.some(choice => !Number.isInteger(choice) || choice < 0)) {
+				throw new MastodonApiError(400, 'invalid_request', 'Poll choices must be non-negative integers');
 			}
+			await this.pollVoteService.vote(request.params.id, choices, auth.user);
 			const note = await this.invoke('notes/show', { noteId: request.params.id }, auth, request) as Packed<'Note'>;
 			return note.poll == null ? null : this.mastodonEntityService.poll(note.id, note.poll);
 		}));
