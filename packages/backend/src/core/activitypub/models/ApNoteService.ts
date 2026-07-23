@@ -368,6 +368,8 @@ export class ApNoteService {
 		if (!note.updated) {
 			throw new Error('note.updated field is required');
 		}
+		const updatedAt = new Date(note.updated);
+		if (this.noteUpdateService.isUpdateAlreadyApplied(originNote, updatedAt)) return;
 
 		// Fetch note author
 		if (!note.attributedTo) {
@@ -415,7 +417,7 @@ export class ApNoteService {
 			text,
 			apHashtags,
 			apEmojis,
-			updatedAt: new Date(note.updated),
+			updatedAt,
 		}, silent, undefined, preparedUpdate);
 	}
 

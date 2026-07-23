@@ -224,6 +224,20 @@ describe(NoteUpdateService, () => {
 		expect(notesRepository.update.mock.calls[0]?.[1].history).toEqual(preparedUpdate.history);
 	});
 
+	test('recognizes an already-applied revision timestamp without preparing history', () => {
+		const { service, noteEntityService } = createService();
+		const updatedAt = new Date('2025-02-01T00:00:00.000Z');
+
+		expect(service.isUpdateAlreadyApplied({
+			...note,
+			history: [{
+				createdAt: updatedAt.toISOString(),
+				text: 'already stored',
+			}],
+		} as never, updatedAt)).toBe(true);
+		expect(noteEntityService.pack).not.toHaveBeenCalled();
+	});
+
 	test('resolves local emoji URLs when the normal packed local Note omits emojis', async () => {
 		const { service, notesRepository, noteEntityService, customEmojiService } = createService();
 		noteEntityService.pack.mockResolvedValueOnce({

@@ -15,10 +15,19 @@ import { ApNoteService } from './ApNoteService.js';
 function createService(originNoteOverrides: Record<string, unknown> = {}) {
 	const preparedUpdate = { noteId: 'origin-note', history: [] };
 	const noteUpdateService = {
+		isUpdateAlreadyApplied: vi.fn((note: { history?: Array<{ createdAt: string }> | null }, updatedAt: Date) =>
+			note.history?.some(revision => revision.createdAt === updatedAt.toISOString()) ?? false),
 		prepareUpdate: vi.fn().mockResolvedValue(preparedUpdate),
 		update: vi.fn().mockResolvedValue(undefined),
 	};
 	const apImageService = { resolveImage: vi.fn() };
+	const apPersonService = {
+		resolvePerson: vi.fn().mockResolvedValue({
+			id: 'remote-user',
+			host: 'remote.example',
+		}),
+	};
+	const extractEmojis = vi.fn().mockResolvedValue([]);
 	const originNote = {
 		id: 'origin-note',
 		uri: 'https://remote.example/notes/1',
@@ -34,21 +43,24 @@ function createService(originNoteOverrides: Record<string, unknown> = {}) {
 		apMfmService: {
 			htmlToMfm: vi.fn().mockReturnValue('edited text'),
 		},
-		apPersonService: {
-			resolvePerson: vi.fn().mockResolvedValue({
-				id: 'remote-user',
-				host: 'remote.example',
-			}),
-		},
+		apPersonService,
 		apImageService,
 		noteUpdateService,
 		logger: { info: vi.fn() },
 	});
 	Object.defineProperty(service, 'extractEmojis', {
-		value: vi.fn().mockResolvedValue([]),
+		value: extractEmojis,
 	});
 
-	return { service, noteUpdateService, apImageService, originNote, preparedUpdate };
+	return {
+		service,
+		noteUpdateService,
+		apImageService,
+		apPersonService,
+		extractEmojis,
+		originNote,
+		preparedUpdate,
+	};
 }
 
 const update = {
@@ -110,6 +122,39 @@ describe(ApNoteService, () => {
 
 		expect(noteUpdateService.prepareUpdate).toHaveBeenCalledOnce();
 		expect(apImageService.resolveImage).not.toHaveBeenCalled();
+		expect(noteUpdateService.update).not.toHaveBeenCalled();
+	});
+
+	test('treats an already-seen update as a no-op before a full-history preflight or attachment resolution', async () => {
+		const history = Array.from({ length: MAX_NOTE_HISTORY_REVISIONS }, (_, index) => ({
+			createdAt: index === 0 ? update.updated : new Date(index).toISOString(),
+			text: `revision-${index}`,
+		}));
+		const {
+			service,
+			noteUpdateService,
+			apImageService,
+			apPersonService,
+			extractEmojis,
+			originNote,
+		} = createService({ history });
+		noteUpdateService.prepareUpdate.mockRejectedValueOnce(
+			new IdentifiableError(NOTE_HISTORY_LIMIT_ERROR_ID, 'Note edit history limit exceeded.'),
+		);
+
+		await expect(service.updateNote({
+			...update,
+			attachment: [{ type: 'Document', url: 'https://remote.example/files/new.png' }],
+		} as never)).resolves.toBeUndefined();
+
+		expect(noteUpdateService.isUpdateAlreadyApplied).toHaveBeenCalledWith(
+			originNote,
+			new Date(update.updated),
+		);
+		expect(apPersonService.resolvePerson).not.toHaveBeenCalled();
+		expect(noteUpdateService.prepareUpdate).not.toHaveBeenCalled();
+		expect(apImageService.resolveImage).not.toHaveBeenCalled();
+		expect(extractEmojis).not.toHaveBeenCalled();
 		expect(noteUpdateService.update).not.toHaveBeenCalled();
 	});
 });

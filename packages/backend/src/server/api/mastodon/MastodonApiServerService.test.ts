@@ -4327,6 +4327,75 @@ describe(MastodonApiServerService, () => {
 		expect(nativeInvoke).not.toHaveBeenCalledWith('drive/files/update', expect.anything(), expect.anything(), expect.anything());
 	});
 
+	test.each([
+		['sensitive old media with non-sensitive replacement and sensitive=true', true, false, true, 422],
+		['non-sensitive old media with sensitive replacement and sensitive=false', false, true, false, 422],
+		['sensitive old media with non-sensitive replacement and sensitive=false', true, false, false, 200],
+		['non-sensitive old media with sensitive replacement and sensitive=true', false, true, true, 200],
+	])('validates %s against the effective replacement media', async (
+		_label,
+		oldIsSensitive,
+		newIsSensitive,
+		requested,
+		expectedStatus,
+	) => {
+		const { fastify, nativeInvoke } = createServer();
+		nativeInvoke.mockImplementation(async (name, data) => {
+			if (name === 'notes/show') {
+				return {
+					id: 'note-id',
+					text: 'old',
+					fileIds: ['old-file'],
+					files: [{ id: 'old-file', isSensitive: oldIsSensitive }],
+				};
+			}
+			if (name === 'drive/files/show') {
+				return {
+					id: data.fileId,
+					isSensitive: newIsSensitive,
+				};
+			}
+			if (name === 'notes/update') return { updatedNote: { id: 'note-id' } };
+			return [];
+		});
+
+		const response = await fastify.inject({
+			method: 'PUT',
+			url: '/api/v1/statuses/note-id',
+			headers: { authorization: 'Bearer mastodon-token', 'content-type': 'application/json' },
+			payload: {
+				status: 'edited',
+				media_ids: ['replacement-file'],
+				sensitive: requested,
+			},
+		});
+
+		expect(response.statusCode).toBe(expectedStatus);
+		expect(nativeInvoke).toHaveBeenCalledWith(
+			'drive/files/show',
+			{ fileId: 'replacement-file' },
+			expect.anything(),
+			expect.anything(),
+		);
+		if (expectedStatus === 422) {
+			expect(response.json()).toEqual({
+				error: 'Changing media sensitivity while editing a status is not supported atomically',
+			});
+			expect(nativeInvoke.mock.calls.map(([name]) => name)).toEqual([
+				'notes/show',
+				'drive/files/show',
+			]);
+		} else {
+			expect(nativeInvoke).toHaveBeenCalledWith(
+				'notes/update',
+				expect.objectContaining({ fileIds: ['replacement-file'] }),
+				expect.anything(),
+				expect.anything(),
+			);
+		}
+		expect(nativeInvoke).not.toHaveBeenCalledWith('drive/files/update', expect.anything(), expect.anything(), expect.anything());
+	});
+
 	test('passes null text through for a media-only edit that omits status', async () => {
 		const { fastify, nativeInvoke } = createServer();
 		nativeInvoke.mockImplementation(async name => {

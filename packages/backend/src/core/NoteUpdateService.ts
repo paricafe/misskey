@@ -128,7 +128,7 @@ export class NoteUpdateService {
 			throw new Error('Note must have text or files');
 		}
 
-		if (note.history && note.history.findIndex(h => h.createdAt === data.updatedAt?.toISOString()) !== -1) {
+		if (this.isUpdateAlreadyApplied(note, data.updatedAt)) {
 			// Same history already exists, skip this
 			return note;
 		}
@@ -243,6 +243,13 @@ export class NoteUpdateService {
 		// }
 
 		return updatedNote;
+	}
+
+	isUpdateAlreadyApplied(
+		note: Pick<MiNote, 'history'>,
+		updatedAt: Date,
+	): boolean {
+		return note.history?.some(revision => revision.createdAt === updatedAt.toISOString()) ?? false;
 	}
 
 	async prepareUpdate(

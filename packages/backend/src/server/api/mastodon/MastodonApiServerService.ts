@@ -715,7 +715,7 @@ export class MastodonApiServerService {
 			const rawSensitive = request.body?.sensitive;
 			const isSensitive = rawSensitive == null ? null : this.profileBoolean(rawSensitive, 'sensitive');
 			if (isSensitive != null) {
-				this.assertStatusUpdateMediaSensitivity(isSensitive, current);
+				await this.assertStatusUpdateMediaSensitivity(effectiveFileIds, isSensitive, current, auth, request);
 			}
 			const result = await this.invoke('notes/update', {
 				noteId: request.params.id,
@@ -2183,13 +2183,22 @@ export class MastodonApiServerService {
 		}
 	}
 
-	private assertStatusUpdateMediaSensitivity(
+	private async assertStatusUpdateMediaSensitivity(
+		fileIds: string[],
 		isSensitive: boolean,
 		current: Packed<'Note'>,
-	): void {
-		const currentSensitive = current.channel?.isSensitive === true ||
-			(current.files ?? []).some(file => file.isSensitive);
-		if (currentSensitive !== isSensitive) {
+		auth: MastodonUserAuth,
+		request: MastodonRequest,
+	): Promise<void> {
+		const currentFilesById = new Map((current.files ?? []).map(file => [file.id, file]));
+		const effectiveFiles = await Promise.all(fileIds.map(async fileId => {
+			const currentFile = currentFilesById.get(fileId);
+			if (currentFile != null) return currentFile;
+			return await this.invoke('drive/files/show', { fileId }, auth, request) as Packed<'DriveFile'>;
+		}));
+		const effectiveSensitive = current.channel?.isSensitive === true ||
+			effectiveFiles.some(file => file.isSensitive);
+		if (effectiveSensitive !== isSensitive) {
 			throw new MastodonApiError(
 				422,
 				'unprocessable_entity',
