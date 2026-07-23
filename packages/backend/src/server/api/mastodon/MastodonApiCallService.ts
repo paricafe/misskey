@@ -30,7 +30,7 @@ export class MastodonApiCallService {
 		name: string,
 		data: Record<string, unknown>,
 		auth: MastodonUserAuth,
-		request: NativeRequest,
+		request: FastifyRequest,
 		file: { name: string; path: string } | null = null,
 	): Promise<unknown> {
 		const definition = this.endpointByName.get(name);
@@ -44,13 +44,14 @@ export class MastodonApiCallService {
 			permission: this.mastodonScopeService.toMisskeyPermissions(auth.token.scopes),
 		} as MiAccessToken;
 
+		// This adapter invocation consumes only the common Fastify request context; payload data is passed separately.
 		return await this.apiCallService.invoke(
 			{ ...definition, exec: endpoint.exec },
 			auth.user,
 			token,
 			data,
 			file,
-			request,
+			request as NativeRequest,
 		);
 	}
 
@@ -58,7 +59,7 @@ export class MastodonApiCallService {
 		name: string,
 		data: Record<string, unknown>,
 		auth: MastodonUserAuth | null,
-		request: NativeRequest,
+		request: FastifyRequest,
 	): Promise<unknown> {
 		if (auth != null) return await this.invoke(name, data, auth, request);
 		const definition = this.endpointByName.get(name);
@@ -66,13 +67,14 @@ export class MastodonApiCallService {
 			throw new MastodonApiError(500, 'server_error', `Unknown native endpoint: ${name}`);
 		}
 		const endpoint = this.moduleRef.get<{ exec: NativeEndpoint['exec'] }>(`ep:${name}`, { strict: false });
+		// This adapter invocation consumes only the common Fastify request context; payload data is passed separately.
 		return await this.apiCallService.invoke(
 			{ ...definition, exec: endpoint.exec },
 			null,
 			null,
 			data,
 			null,
-			request,
+			request as NativeRequest,
 		);
 	}
 }
