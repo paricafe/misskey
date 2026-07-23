@@ -4396,6 +4396,31 @@ describe(MastodonApiServerService, () => {
 		expect(nativeInvoke).not.toHaveBeenCalledWith('drive/files/update', expect.anything(), expect.anything(), expect.anything());
 	});
 
+	test.each([
+		['more than 16 media IDs', Array.from({ length: 17 }, (_, index) => `file${index}`)],
+		['duplicate media IDs', ['duplicatefile', 'duplicatefile']],
+	])('rejects %s before resolving sensitive media', async (_label, mediaIds) => {
+		const { fastify, nativeInvoke } = createServer();
+
+		const response = await fastify.inject({
+			method: 'PUT',
+			url: '/api/v1/statuses/note-id',
+			headers: { authorization: 'Bearer mastodon-token', 'content-type': 'application/json' },
+			payload: {
+				status: 'edited',
+				media_ids: mediaIds,
+				sensitive: true,
+			},
+		});
+
+		expect(response.statusCode).toBe(400);
+		expect(response.json()).toEqual({ error: 'Invalid param.' });
+		expect(nativeInvoke).not.toHaveBeenCalledWith('drive/files/show', expect.anything(), expect.anything(), expect.anything());
+		expect(nativeInvoke).not.toHaveBeenCalledWith('drive/files/update', expect.anything(), expect.anything(), expect.anything());
+		expect(nativeInvoke).not.toHaveBeenCalledWith('notes/update', expect.anything(), expect.anything(), expect.anything());
+		expect(nativeInvoke).not.toHaveBeenCalled();
+	});
+
 	test('passes null text through for a media-only edit that omits status', async () => {
 		const { fastify, nativeInvoke } = createServer();
 		nativeInvoke.mockImplementation(async name => {

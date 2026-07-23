@@ -11,7 +11,7 @@ import { extract, parse as mfmParse } from 'mfm-js';
 import { In } from 'typeorm';
 import { pipeline } from 'node:stream/promises';
 import * as fs from 'node:fs';
-import { MAX_NOTE_TEXT_LENGTH } from '@/const.js';
+import { MAX_NOTE_FILES, MAX_NOTE_TEXT_LENGTH } from '@/const.js';
 import type { Config } from '@/config.js';
 import { DI } from '@/di-symbols.js';
 import type { MiMeta, NoteFavoritesRepository, NotesRepository, UserNotePiningsRepository } from '@/models/_.js';
@@ -708,10 +708,12 @@ export class MastodonApiServerService {
 		}));
 		fastify.put<{ Params: { id: string }; Body: Dictionary }>('/api/v1/statuses/:id', request => this.withAuth(request, 'write:statuses', async auth => {
 			this.validateStatusUpdateSemantics(request.body ?? {});
-			const fileIds = this.strings(request.body?.['media_ids[]'] ?? request.body?.media_ids);
-			const current = await this.invoke('notes/show', { noteId: request.params.id }, auth, request) as Packed<'Note'>;
 			const hasMediaIds = Object.hasOwn(request.body ?? {}, 'media_ids') || Object.hasOwn(request.body ?? {}, 'media_ids[]');
+			const fileIds = this.strings(request.body?.['media_ids[]'] ?? request.body?.media_ids);
+			if (hasMediaIds) this.validateStatusUpdateFileIds(fileIds);
+			const current = await this.invoke('notes/show', { noteId: request.params.id }, auth, request) as Packed<'Note'>;
 			const effectiveFileIds = hasMediaIds ? fileIds : current.fileIds ?? [];
+			if (!hasMediaIds) this.validateStatusUpdateFileIds(effectiveFileIds);
 			const rawSensitive = request.body?.sensitive;
 			const isSensitive = rawSensitive == null ? null : this.profileBoolean(rawSensitive, 'sensitive');
 			if (isSensitive != null) {
@@ -849,6 +851,12 @@ export class MastodonApiServerService {
 		const quoteApprovalPolicy = this.string(body.quote_approval_policy);
 		if (quoteApprovalPolicy != null && quoteApprovalPolicy !== '' && quoteApprovalPolicy !== 'public') {
 			throw new MastodonApiError(422, 'unprocessable_entity', `Unsupported quote approval policy: ${quoteApprovalPolicy}`);
+		}
+	}
+
+	private validateStatusUpdateFileIds(fileIds: readonly string[]): void {
+		if (fileIds.length > MAX_NOTE_FILES || new Set(fileIds).size !== fileIds.length) {
+			throw new MastodonApiError(400, 'invalid_request', 'Invalid param.');
 		}
 	}
 

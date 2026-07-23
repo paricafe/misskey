@@ -9,7 +9,7 @@ import type { DriveFilesRepository, MiDriveFile, UsersRepository } from '@/model
 import { Endpoint } from '@/server/api/endpoint-base.js';
 import { DI } from '@/di-symbols.js';
 import { GetterService } from '@/server/api/GetterService.js';
-import { MAX_NOTE_TEXT_LENGTH } from '@/const.js';
+import { MAX_NOTE_FILES, MAX_NOTE_TEXT_LENGTH } from '@/const.js';
 import { ApiError } from '@/server/api/error.js';
 import { NoteEntityService } from '@/core/entities/NoteEntityService.js';
 import { NOTE_HISTORY_LIMIT_ERROR_ID, NoteUpdateService } from '@/core/NoteUpdateService.js';
@@ -78,14 +78,14 @@ export const paramDef = {
 			type: 'array',
 			uniqueItems: true,
 			minItems: 0,
-			maxItems: 16,
+			maxItems: MAX_NOTE_FILES,
 			items: { type: 'string', format: 'misskey:id' },
 		},
 		mediaIds: {
 			type: 'array',
 			uniqueItems: true,
 			minItems: 0,
-			maxItems: 16,
+			maxItems: MAX_NOTE_FILES,
 			items: { type: 'string', format: 'misskey:id' },
 		},
 		cw: { type: 'string', nullable: true, maxLength: 100 },
