@@ -48,8 +48,7 @@ export class MiNote {
 		emojiUrls?: Record<string, string>,
 		poll?: Packed<'Note'>['poll'],
 		pollVotersCount?: number,
-		renote?: Packed<'Note'> | null,
-		renotePollVotersCount?: number,
+		renoteId?: MiNote['id'] | null,
 	}[] | null;
 
 	@Index()

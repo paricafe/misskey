@@ -122,14 +122,10 @@ export const packedNoteSchema = {
 						type: 'number',
 						optional: true, nullable: false,
 					},
-					renote: {
-						type: 'object',
+					renoteId: {
+						type: 'string',
 						optional: true, nullable: true,
-						ref: 'Note',
-					},
-					renotePollVotersCount: {
-						type: 'number',
-						optional: true, nullable: false,
+						format: 'id',
 					},
 				},
 			},

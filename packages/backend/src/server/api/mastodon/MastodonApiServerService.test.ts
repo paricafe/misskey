@@ -448,8 +448,15 @@ describe(MastodonApiServerService, () => {
 					history: [],
 				})),
 				status: vi.fn((value, voterCounts) => serializeStatus(value, voterCounts)),
-				statusEdits: vi.fn((value, voterCounts) => [
-					...(value.history ?? []).map((edit: { createdAt: string }) => ({ created_at: edit.createdAt })),
+				statusEdits: vi.fn((value, voterCounts, historicalRenotes: ReadonlyMap<string, TestNote> = new Map()) => [
+					...(value.history ?? []).map((edit: { createdAt: string; renoteId?: string }) => ({
+						created_at: edit.createdAt,
+						...(edit.renoteId == null ? {} : {
+							quote: historicalRenotes.has(edit.renoteId)
+								? { state: 'accepted', quoted_status: serializeStatus(historicalRenotes.get(edit.renoteId)!, voterCounts) }
+								: null,
+						}),
+					})),
 					{
 						created_at: value.updatedAt ?? value.createdAt,
 						...(value.poll == null ? {} : { poll: serializeStatus(value, voterCounts).poll }),
@@ -1186,6 +1193,54 @@ describe(MastodonApiServerService, () => {
 		const countQueries = notesRepository.query.mock.calls.filter(([sql]) => (sql as string).includes('COUNT(DISTINCT vote."userId")'));
 		expect(countQueries).toHaveLength(1);
 		expect(countQueries[0]?.[1]).toEqual([['current-poll', 'quoted-poll']]);
+	});
+
+	test('resolves historical quotes through requester visibility without exposing stored quote content', async () => {
+		const { fastify, nativeInvoke } = createServer();
+		const historicalNote = {
+			id: 'note-id',
+			createdAt: '2025-01-01T00:00:00.000Z',
+			updatedAt: '2025-01-02T00:00:00.000Z',
+			history: [{
+				createdAt: '2025-01-01T00:00:00.000Z',
+				text: 'old',
+				renoteId: 'private-quote',
+				renote: { id: 'private-quote', text: 'stored secret' },
+			}],
+		};
+		nativeInvoke.mockImplementation(async (name, data, viewer) => {
+			if (name !== 'notes/show') return [];
+			if (data.noteId === 'note-id') return historicalNote;
+			if (data.noteId === 'private-quote' && viewer != null) {
+				return { id: 'private-quote', text: 'visible to authenticated requester' };
+			}
+			throw new ApiError({
+				message: 'No such note.',
+				code: 'NO_SUCH_NOTE',
+				id: 'not-found',
+				httpStatusCode: 404,
+			});
+		});
+
+		const anonymous = await fastify.inject({ method: 'GET', url: '/api/v1/statuses/note-id/history' });
+		const authenticated = await fastify.inject({
+			method: 'GET',
+			url: '/api/v1/statuses/note-id/history',
+			headers: { authorization: 'Bearer user-token' },
+		});
+
+		expect(anonymous.statusCode).toBe(200);
+		expect(anonymous.json()[0]).toMatchObject({ quote: null });
+		expect(JSON.stringify(anonymous.json())).not.toContain('stored secret');
+		expect(authenticated.statusCode).toBe(200);
+		expect(authenticated.json()[0]).toMatchObject({
+			quote: {
+				state: 'accepted',
+				quoted_status: { id: 'private-quote' },
+			},
+		});
+		const quoteLookups = nativeInvoke.mock.calls.filter(([name, data]) => name === 'notes/show' && data.noteId === 'private-quote');
+		expect(quoteLookups).toHaveLength(2);
 	});
 
 	test('translates statuses using lang and Accept-Language, and reports unavailable translation truthfully', async () => {
@@ -4077,10 +4132,17 @@ describe(MastodonApiServerService, () => {
 		expect(nativeInvoke).toHaveBeenCalledWith('notes/create', expect.objectContaining({ visibility: 'followers', fileIds: ['file-id'] }), expect.anything(), expect.anything());
 	});
 
-	test('preserves attachments on text-only edits and clears their sensitivity when requested', async () => {
+	test('rejects a media sensitivity change before updating the Note', async () => {
 		const { fastify, nativeInvoke } = createServer();
 		nativeInvoke.mockImplementation(async name => {
-			if (name === 'notes/show') return { id: 'note-id', text: 'old', fileIds: ['existing-file'] };
+			if (name === 'notes/show') {
+				return {
+					id: 'note-id',
+					text: 'old',
+					fileIds: ['existing-file'],
+					files: [{ id: 'existing-file', isSensitive: true }],
+				};
+			}
 			if (name === 'notes/update') return { updatedNote: { id: 'note-id' } };
 			return [];
 		});
@@ -4091,12 +4153,39 @@ describe(MastodonApiServerService, () => {
 			payload: { status: 'edited', sensitive: false },
 		});
 
+		expect(response.statusCode).toBe(422);
+		expect(response.json()).toEqual({
+			error: 'Changing media sensitivity while editing a status is not supported atomically',
+		});
+		expect(nativeInvoke).not.toHaveBeenCalledWith('notes/update', expect.anything(), expect.anything(), expect.anything());
+		expect(nativeInvoke).not.toHaveBeenCalledWith('drive/files/update', expect.anything(), expect.anything(), expect.anything());
+	});
+
+	test('preserves attachments and accepts explicit sensitivity when every file already matches', async () => {
+		const { fastify, nativeInvoke } = createServer();
+		nativeInvoke.mockImplementation(async name => {
+			if (name === 'notes/show') {
+				return {
+					id: 'note-id',
+					text: 'old',
+					fileIds: ['existing-file'],
+					files: [{ id: 'existing-file', isSensitive: false }],
+				};
+			}
+			if (name === 'notes/update') return { updatedNote: { id: 'note-id' } };
+			return [];
+		});
+
+		const response = await fastify.inject({
+			method: 'PUT',
+			url: '/api/v1/statuses/note-id',
+			headers: { authorization: 'Bearer mastodon-token', 'content-type': 'application/json' },
+			payload: { status: 'edited', sensitive: false },
+		});
+
 		expect(response.statusCode).toBe(200);
 		expect(nativeInvoke).toHaveBeenCalledWith('notes/update', expect.objectContaining({ fileIds: ['existing-file'], text: 'edited' }), expect.anything(), expect.anything());
-		expect(nativeInvoke).toHaveBeenCalledWith('drive/files/update', { fileId: 'existing-file', isSensitive: false }, expect.anything(), expect.anything());
-		const noteUpdateOrder = nativeInvoke.mock.invocationCallOrder[nativeInvoke.mock.calls.findIndex(([name]) => name === 'notes/update')];
-		const sensitivityOrder = nativeInvoke.mock.invocationCallOrder[nativeInvoke.mock.calls.findIndex(([name]) => name === 'drive/files/update')];
-		expect(noteUpdateOrder).toBeLessThan(sensitivityOrder);
+		expect(nativeInvoke).not.toHaveBeenCalledWith('drive/files/update', expect.anything(), expect.anything(), expect.anything());
 	});
 
 	test('passes null text through for a media-only edit that omits status', async () => {
@@ -4138,7 +4227,7 @@ describe(MastodonApiServerService, () => {
 
 		expect(response.statusCode).toBe(200);
 		const update = nativeInvoke.mock.calls.find(([name]) => name === 'notes/update')?.[1];
-		expect(update).not.toHaveProperty('fileIds');
+		expect(update).toMatchObject({ fileIds: [] });
 	});
 
 	test('rejects an invalid sensitive value instead of clearing media sensitivity', async () => {
@@ -4157,6 +4246,33 @@ describe(MastodonApiServerService, () => {
 		expect(response.statusCode).toBe(400);
 		expect(nativeInvoke).not.toHaveBeenCalledWith('drive/files/update', expect.anything(), expect.anything(), expect.anything());
 		expect(nativeInvoke).not.toHaveBeenCalledWith('notes/update', expect.anything(), expect.anything(), expect.anything());
+	});
+
+	test('preserves the native history-limit error as a stable Mastodon 422', async () => {
+		const { fastify, nativeInvoke } = createServer();
+		nativeInvoke.mockImplementation(async name => {
+			if (name === 'notes/show') return { id: 'note-id', text: 'old', fileIds: [] };
+			if (name === 'notes/update') {
+				throw new ApiError({
+					message: 'Note edit history limit exceeded.',
+					code: 'NOTE_HISTORY_LIMIT_EXCEEDED',
+					id: 'history-limit',
+					kind: 'client',
+					httpStatusCode: 422,
+				});
+			}
+			return [];
+		});
+
+		const response = await fastify.inject({
+			method: 'PUT',
+			url: '/api/v1/statuses/note-id',
+			headers: { authorization: 'Bearer mastodon-token', 'content-type': 'application/json' },
+			payload: { status: 'edited' },
+		});
+
+		expect(response.statusCode).toBe(422);
+		expect(response.json()).toEqual({ error: 'Note edit history limit exceeded.' });
 	});
 
 	test('treats an already-favourited status as a successful idempotent mutation', async () => {

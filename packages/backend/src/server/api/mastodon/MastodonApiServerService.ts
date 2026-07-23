@@ -21,6 +21,7 @@ import { extractMentions } from '@/misc/extract-mentions.js';
 import { bindThis } from '@/decorators.js';
 import { ApiError } from '@/server/api/error.js';
 import { PollVoteService } from '@/core/PollVoteService.js';
+import { MAX_NOTE_HISTORY_REVISIONS } from '@/core/NoteUpdateService.js';
 import type { FastifyInstance, FastifyPluginOptions, FastifyReply, FastifyRequest } from 'fastify';
 import { MastodonApiCallService } from './MastodonApiCallService.js';
 import { MastodonApiStateService } from './MastodonApiStateService.js';
@@ -639,8 +640,27 @@ export class MastodonApiServerService {
 		}));
 		fastify.get<{ Params: { id: string } }>('/api/v1/statuses/:id/history', request => this.withOptionalScopedUser(request, 'read:statuses', async auth => {
 			const note = await this.invokePublic('notes/show', { noteId: request.params.id }, auth, request) as Packed<'Note'>;
-			const voterCounts = await this.pollVoterCounts([note]);
-			return this.mastodonEntityService.statusEdits(note, voterCounts);
+			const historicalRenoteIds = [...new Set((note.history ?? []).flatMap(revision => {
+				const legacyRenote = (revision as typeof revision & { renote?: Packed<'Note'> | null }).renote;
+				const renoteId = revision.renoteId ?? legacyRenote?.id;
+				return renoteId == null ? [] : [renoteId];
+			}))];
+			const historicalRenotes = await this.invokePublicBatch(
+				'notes/show',
+				'noteId',
+				historicalRenoteIds,
+				auth,
+				request,
+				MAX_NOTE_HISTORY_REVISIONS,
+			) as Packed<'Note'>[];
+			const historicalRenotesById = new Map(historicalRenotes.map(renote => [renote.id, renote]));
+			const historicalPollNotes = historicalRenotes.map(renote => ({
+				...renote,
+				renoteId: null,
+				renote: null,
+			}));
+			const voterCounts = await this.pollVoterCounts([note, ...historicalPollNotes]);
+			return this.mastodonEntityService.statusEdits(note, voterCounts, historicalRenotesById);
 		}));
 		fastify.post<{ Params: { id: string }; Body: Dictionary }>('/api/v1/statuses/:id/translate', request => this.withAuth(request, 'read:statuses', async auth => {
 			const query = request.query as Dictionary;
@@ -691,18 +711,17 @@ export class MastodonApiServerService {
 			const hasMediaIds = Object.hasOwn(request.body ?? {}, 'media_ids') || Object.hasOwn(request.body ?? {}, 'media_ids[]');
 			const effectiveFileIds = hasMediaIds ? fileIds : current.fileIds ?? [];
 			const rawSensitive = request.body?.sensitive;
-			if (rawSensitive != null) this.profileBoolean(rawSensitive, 'sensitive');
+			const isSensitive = rawSensitive == null ? null : this.profileBoolean(rawSensitive, 'sensitive');
+			if (isSensitive != null) {
+				await this.assertStatusUpdateMediaSensitivity(effectiveFileIds, isSensitive, current, auth, request);
+			}
 			const result = await this.invoke('notes/update', {
 				noteId: request.params.id,
 				text: this.string(request.body?.status) ?? current.text ?? null,
 				cw: Object.hasOwn(request.body ?? {}, 'spoiler_text') ? this.string(request.body?.spoiler_text) || null : current.cw ?? null,
-				...(effectiveFileIds.length > 0 ? { fileIds: effectiveFileIds } : {}),
+				...(hasMediaIds || effectiveFileIds.length > 0 ? { fileIds: effectiveFileIds } : {}),
 			}, auth, request) as { updatedNote: Packed<'Note'> };
-			await this.updateMediaSensitivity(effectiveFileIds, rawSensitive, auth, request);
-			const updatedNote = rawSensitive == null
-				? result.updatedNote
-				: await this.invoke('notes/show', { noteId: request.params.id }, auth, request) as Packed<'Note'>;
-			return await this.statusWithState(updatedNote, auth, 'thread');
+			return await this.statusWithState(result.updatedNote, auth, 'thread');
 		}));
 		fastify.delete<{ Params: { id: string } }>('/api/v1/statuses/:id', request => this.withAuth(request, 'write:statuses', async auth => {
 			const note = await this.invoke('notes/show', { noteId: request.params.id }, auth, request) as Packed<'Note'>;
@@ -2162,6 +2181,28 @@ export class MastodonApiServerService {
 		}
 	}
 
+	private async assertStatusUpdateMediaSensitivity(
+		fileIds: string[],
+		isSensitive: boolean,
+		current: Packed<'Note'>,
+		auth: MastodonUserAuth,
+		request: MastodonRequest,
+	): Promise<void> {
+		const filesById = new Map((current.files ?? []).map(file => [file.id, file]));
+		const missingFileIds = fileIds.filter(fileId => !filesById.has(fileId));
+		const missingFiles = await Promise.all(missingFileIds.map(async fileId => {
+			return await this.invoke('drive/files/show', { fileId }, auth, request) as Packed<'DriveFile'>;
+		}));
+		for (const file of missingFiles) filesById.set(file.id, file);
+		if (fileIds.some(fileId => filesById.get(fileId)?.isSensitive !== isSensitive)) {
+			throw new MastodonApiError(
+				422,
+				'unprocessable_entity',
+				'Changing media sensitivity while editing a status is not supported atomically',
+			);
+		}
+	}
+
 	private async assertApplicationRegistrationRate(ip: string): Promise<void> {
 		const key = `mastodon-api:app-registration:${digestCredential(ip)}`;
 		const count = await this.redis.incr(key);
@@ -2295,8 +2336,9 @@ export class MastodonApiServerService {
 		rawIds: unknown,
 		auth: MastodonUserAuth | null,
 		request: MastodonRequest,
+		limit = 40,
 	): Promise<unknown[]> {
-		const requestedIds = this.strings(rawIds).slice(0, 40);
+		const requestedIds = this.strings(rawIds).slice(0, limit);
 		const uniqueIds = [...new Set(requestedIds)];
 		const entries = await Promise.all(uniqueIds.map(async id => {
 			try {

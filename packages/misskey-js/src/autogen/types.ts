@@ -4524,8 +4524,8 @@ export type components = {
                     }[];
                 } | null;
                 pollVotersCount?: number;
-                renote?: components['schemas']['Note'] | null;
-                renotePollVotersCount?: number;
+                /** Format: id */
+                renoteId?: string | null;
             }[] | null;
             /** Format: date-time */
             deletedAt?: string | null;

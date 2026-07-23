@@ -35,6 +35,11 @@ import { UtilityService } from "@/core/UtilityService.js";
 import { CustomEmojiService } from "@/core/CustomEmojiService.js";
 import { DriveFileEntityService } from "@/core/entities/DriveFileEntityService.js";
 import { awaitAll } from "@/misc/prelude/await-all.js";
+import { IdentifiableError } from '@/misc/identifiable-error.js';
+
+export const MAX_NOTE_HISTORY_REVISIONS = 100;
+export const MAX_NOTE_HISTORY_BYTES = 1024 * 1024;
+export const NOTE_HISTORY_LIMIT_ERROR_ID = '8a2c5b6f-8e2b-4f1d-a5d9-f2b96c5b0d34';
 
 type Option = {
 	updatedAt?: Date | null;
@@ -102,7 +107,10 @@ export class NoteUpdateService {
 			throw new Error('update time is required');
 		}
 
-		if ((data.text == null || data.text.length === 0) && (data.files?.length ?? 0) === 0) {
+		const fileIds = data.files === undefined
+			? [...note.fileIds]
+			: data.files?.map(file => file.id) ?? [];
+		if ((data.text == null || data.text.length === 0) && fileIds.length === 0) {
 			throw new Error('Note must have text or files');
 		}
 
@@ -136,6 +144,13 @@ export class NoteUpdateService {
 		tags = tags.filter(tag => Array.from(tag).length <= 128).splice(0, 32);
 
 		const oldRevision = await this.snapshotRevision(user, note);
+		const history = [...(note.history || []), oldRevision];
+		if (
+			history.length > MAX_NOTE_HISTORY_REVISIONS ||
+			Buffer.byteLength(JSON.stringify(history), 'utf8') > MAX_NOTE_HISTORY_BYTES
+		) {
+			throw new IdentifiableError(NOTE_HISTORY_LIMIT_ERROR_ID, 'Note edit history limit exceeded.');
+		}
 
 		const newNote: MiNote = {
 			...note,
@@ -146,7 +161,7 @@ export class NoteUpdateService {
 			updatedAt: data.updatedAt,
 			tags,
 			emojis,
-			fileIds: data.files ? data.files.map(file => file.id) : [],
+			fileIds,
 		};
 
 		if (!quiet) {
@@ -172,7 +187,6 @@ export class NoteUpdateService {
 		}
 
 		// Check if is latest or previous version
-		const history = [...(note.history || []), oldRevision];
 		let updatedNote: MiNote;
 		if (note.updatedAt && note.updatedAt >= data.updatedAt) {
 			// Previous version, just update history
@@ -220,18 +234,20 @@ export class NoteUpdateService {
 		user: { id: MiUser['id'] },
 		note: MiNote,
 	): Promise<NonNullable<MiNote['history']>[number]> {
-		const [packed, pollSnapshot, renoteSnapshot] = await Promise.all([
+		const [packed, pollSnapshot] = await Promise.all([
 			this.noteEntityService.pack(note, user, {
 				detail: false,
 				skipHide: true,
 			}),
-			this.snapshotPoll(note, user.id),
-			this.snapshotRenote(note.renoteId, user),
+			this.snapshotPoll(note),
 		]);
 		const files = (packed.files ?? []).map(file => ({
 			...file,
 			properties: { ...file.properties },
 		}));
+		const emojiUrls = packed.emojis == null && note.userHost == null
+			? this.snapshotLocalEmojiUrls(note.emojis, await this.customEmojiService.localEmojisCache.fetch())
+			: { ...(packed.emojis ?? {}) };
 
 		return {
 			createdAt: (note.updatedAt || this.idService.parse(note.id).date).toISOString(),
@@ -241,23 +257,28 @@ export class NoteUpdateService {
 			files,
 			sensitive: files.some(file => file.isSensitive) || packed.channel?.isSensitive === true,
 			emojis: [...note.emojis],
-			emojiUrls: { ...(packed.emojis ?? {}) },
+			emojiUrls,
 			...(pollSnapshot.poll == null ? {} : { poll: pollSnapshot.poll }),
 			...(pollSnapshot.votersCount == null ? {} : { pollVotersCount: pollSnapshot.votersCount }),
-			renote: renoteSnapshot.renote,
-			...(renoteSnapshot.votersCount == null ? {} : { renotePollVotersCount: renoteSnapshot.votersCount }),
+			renoteId: note.renoteId,
 		};
 	}
 
-	private async snapshotPoll(note: Pick<MiNote, 'id' | 'hasPoll'>, userId: MiUser['id']): Promise<PollSnapshot> {
+	private snapshotLocalEmojiUrls(
+		names: readonly string[],
+		localEmojis: ReadonlyMap<string, { publicUrl: string; originalUrl: string }>,
+	): Record<string, string> {
+		return Object.fromEntries(names.flatMap(name => {
+			const emoji = localEmojis.get(name);
+			const url = emoji?.publicUrl || emoji?.originalUrl;
+			return url == null ? [] : [[name, url]];
+		}));
+	}
+
+	private async snapshotPoll(note: Pick<MiNote, 'id' | 'hasPoll'>): Promise<PollSnapshot> {
 		if (!note.hasPoll) return {};
 
 		const poll = await this.pollsRepository.findOneByOrFail({ noteId: note.id });
-		const votes = await this.pollVotesRepository.findBy({
-			noteId: note.id,
-			userId,
-		});
-		const votedChoices = new Set(votes.map(vote => vote.choice));
 		const snapshot: PollSnapshot = {
 			poll: {
 				multiple: poll.multiple,
@@ -265,7 +286,7 @@ export class NoteUpdateService {
 				choices: poll.choices.map((text, index) => ({
 					text,
 					votes: poll.votes[index] ?? 0,
-					isVoted: votedChoices.has(index),
+					isVoted: false,
 				})),
 			},
 		};
@@ -282,45 +303,6 @@ export class NoteUpdateService {
 		}
 
 		return snapshot;
-	}
-
-	private async snapshotRenote(
-		renoteId: MiNote['renoteId'],
-		user: { id: MiUser['id'] },
-	): Promise<{ renote: Packed<'Note'> | null; votersCount?: number }> {
-		if (renoteId == null) return { renote: null };
-
-		const note = await this.notesRepository.findOneBy({ id: renoteId });
-		if (note == null) return { renote: null };
-
-		const [packed, pollSnapshot] = await Promise.all([
-			this.noteEntityService.pack(note, user, {
-				detail: false,
-				skipHide: true,
-			}),
-			this.snapshotPoll(note, user.id),
-		]);
-		const bounded = {
-			...packed,
-			files: (packed.files ?? []).map(file => ({
-				...file,
-				properties: { ...file.properties },
-			})),
-			emojis: { ...(packed.emojis ?? {}) },
-			reactions: {},
-			reactionEmojis: {},
-			...(pollSnapshot.poll == null ? {} : { poll: pollSnapshot.poll }),
-		};
-		delete bounded.history;
-		delete bounded.reply;
-		delete bounded.renote;
-		delete bounded.visibleUserIds;
-		delete bounded.reactionAndUserPairCache;
-
-		return {
-			renote: bounded,
-			...(pollSnapshot.votersCount == null ? {} : { votersCount: pollSnapshot.votersCount }),
-		};
 	}
 
 	@bindThis

@@ -12,7 +12,8 @@ import { GetterService } from '@/server/api/GetterService.js';
 import { MAX_NOTE_TEXT_LENGTH } from '@/const.js';
 import { ApiError } from '@/server/api/error.js';
 import { NoteEntityService } from '@/core/entities/NoteEntityService.js';
-import { NoteUpdateService } from '@/core/NoteUpdateService.js';
+import { NOTE_HISTORY_LIMIT_ERROR_ID, NoteUpdateService } from '@/core/NoteUpdateService.js';
+import { IdentifiableError } from '@/misc/identifiable-error.js';
 
 export const meta = {
 	tags: ['notes'],
@@ -52,6 +53,14 @@ export const meta = {
 			code: 'NO_SUCH_FILE',
 			id: 'b6992544-63e7-67f0-fa7f-32444b1b5306',
 		},
+
+		historyLimitExceeded: {
+			message: 'Note edit history limit exceeded.',
+			code: 'NOTE_HISTORY_LIMIT_EXCEEDED',
+			id: NOTE_HISTORY_LIMIT_ERROR_ID,
+			kind: 'client',
+			httpStatusCode: 422,
+		},
 	},
 } as const;
 
@@ -68,14 +77,14 @@ export const paramDef = {
 		fileIds: {
 			type: 'array',
 			uniqueItems: true,
-			minItems: 1,
+			minItems: 0,
 			maxItems: 16,
 			items: { type: 'string', format: 'misskey:id' },
 		},
 		mediaIds: {
 			type: 'array',
 			uniqueItems: true,
-			minItems: 1,
+			minItems: 0,
 			maxItems: 16,
 			items: { type: 'string', format: 'misskey:id' },
 		},
@@ -108,24 +117,27 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				throw new ApiError(meta.errors.noSuchNote);
 			}
 
-			let files: MiDriveFile[] = [];
+			let files: MiDriveFile[] | undefined;
 			const fileIds = ps.fileIds ?? ps.mediaIds ?? null;
 			if (fileIds != null) {
-				files = await this.driveFilesRepository.createQueryBuilder('file')
-					.where('file.userId = :userId AND file.id IN (:...fileIds)', {
-						userId: me.id,
-						fileIds,
-					})
-					.orderBy('array_position(ARRAY[:...fileIds], "id"::text)')
-					.setParameters({ fileIds })
-					.getMany();
+				files = fileIds.length === 0
+					? []
+					: await this.driveFilesRepository.createQueryBuilder('file')
+						.where('file.userId = :userId AND file.id IN (:...fileIds)', {
+							userId: me.id,
+							fileIds,
+						})
+						.orderBy('array_position(ARRAY[:...fileIds], "id"::text)')
+						.setParameters({ fileIds })
+						.getMany();
 
 				if (files.length !== fileIds.length) {
 					throw new ApiError(meta.errors.noSuchFile);
 				}
 			}
 
-			if (ps.text == null && files.length === 0) {
+			const finalFileIds = fileIds ?? note.fileIds;
+			if (ps.text == null && finalFileIds.length === 0) {
 				throw new ApiError({
 					message: 'Invalid param.',
 					code: 'INVALID_PARAM',
@@ -136,7 +148,12 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				});
 			}
 
-			if (note.text === ps.text && note.cw === ps.cw && note.fileIds === fileIds) {
+			if (
+				note.text === ps.text &&
+				note.cw === ps.cw &&
+				note.fileIds.length === finalFileIds.length &&
+				note.fileIds.every((fileId, index) => fileId === finalFileIds[index])
+			) {
 				// The same as old note, nothing to do
 				return {
 					updatedNote: await this.noteEntityService.pack(note, me),
@@ -148,7 +165,12 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				cw: ps.cw,
 				updatedAt: new Date(),
 				files,
-			}, false, me);
+			}, false, me).catch(error => {
+				if (error instanceof IdentifiableError && error.id === NOTE_HISTORY_LIMIT_ERROR_ID) {
+					throw new ApiError(meta.errors.historyLimitExceeded);
+				}
+				throw error;
+			});
 
 			return {
 				updatedNote: await this.noteEntityService.pack(updatedNote, me),

@@ -233,15 +233,29 @@ export class MastodonEntityService {
 		};
 	}
 
-	public statusEdits(note: Packed<'Note'>, voterCounts?: ReadonlyMap<string, number>) {
+	public statusEdits(
+		note: Packed<'Note'>,
+		voterCounts?: ReadonlyMap<string, number>,
+		historicalRenotes: ReadonlyMap<string, Packed<'Note'>> = new Map(),
+	) {
 		const historical = [...(note.history ?? [])]
 			.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
 			.map(revision => {
 				const files = revision.files ?? [];
-				const isPureRenote = revision.renote != null && revision.text == null && files.length === 0 && revision.poll == null;
-				const renoteVoterCounts = revision.renote == null || revision.renotePollVotersCount == null
+				const legacyRenote = (revision as typeof revision & { renote?: Packed<'Note'> | null }).renote;
+				const renoteId = revision.renoteId ?? legacyRenote?.id;
+				const renote = renoteId == null ? undefined : historicalRenotes.get(renoteId);
+				const poll = revision.poll == null
 					? undefined
-					: new Map([[revision.renote.id, revision.renotePollVotersCount]]);
+					: {
+						...revision.poll,
+						choices: revision.poll.choices.map(choice => ({ ...choice, isVoted: false })),
+					};
+				const hasQuote = renoteId != null && (
+					revision.text != null ||
+					files.length > 0 ||
+					poll != null
+				);
 				return {
 					account: this.account(note.user),
 					content: this.render(revision.text ?? ''),
@@ -250,13 +264,13 @@ export class MastodonEntityService {
 					created_at: revision.createdAt,
 					media_attachments: files.map(file => this.attachment(file)),
 					emojis: this.emojis(revision.emojiUrls),
-					...(revision.poll == null ? {} : {
-						poll: this.poll(note.id, revision.poll, revision.pollVotersCount),
+					...(poll == null ? {} : {
+						poll: this.poll(note.id, poll, revision.pollVotersCount),
 					}),
-					...(revision.renote != null && !isPureRenote ? {
-						quote: {
+					...(hasQuote ? {
+						quote: renote == null ? null : {
 							state: 'accepted',
-							quoted_status: this.statusEntity(revision.renote, true, renoteVoterCounts),
+							quoted_status: this.statusEntity(renote, true, voterCounts),
 						},
 					} : {}),
 				};

@@ -513,26 +513,39 @@ describe(MastodonEntityService, () => {
 						],
 					},
 					pollVotersCount: 5,
+					renoteId: 'old-quoted-note-id',
 					renote: {
 						...quoted,
 						id: 'old-quoted-note-id',
-						text: 'Historical quote',
+						text: 'Legacy embedded quote must not be used',
 						poll: {
 							expiresAt: null,
 							multiple: true,
 							choices: [
-								{ text: 'Quoted A', votes: 3, isVoted: false },
-								{ text: 'Quoted B', votes: 1, isVoted: false },
+								{ text: 'Leaked A', votes: 30, isVoted: true },
+								{ text: 'Leaked B', votes: 10, isVoted: false },
 							],
 						},
 					},
-					renotePollVotersCount: 3,
 				},
 			],
 		} as never, new Map([
 			['note-id', 2],
 			['quoted-note-id', 0],
-		]));
+			['old-quoted-note-id', 3],
+		]), new Map([['old-quoted-note-id', {
+			...quoted,
+			id: 'old-quoted-note-id',
+			text: 'Visibility-checked historical quote',
+			poll: {
+				expiresAt: null,
+				multiple: true,
+				choices: [
+					{ text: 'Quoted A', votes: 3, isVoted: false },
+					{ text: 'Quoted B', votes: 1, isVoted: false },
+				],
+			},
+		} as never]]));
 
 		expect(edits.map(edit => edit.created_at)).toEqual([
 			'2025-02-03T02:00:00.000Z',
@@ -556,18 +569,25 @@ describe(MastodonEntityService, () => {
 				id: 'note-id',
 				votes_count: 6,
 				voters_count: 5,
+				voted: false,
+				own_votes: [],
 			}),
 			quote: {
 				state: 'accepted',
 				quoted_status: expect.objectContaining({
 					id: 'old-quoted-note-id',
+					quote: null,
+					reblog: null,
 					poll: expect.objectContaining({
 						votes_count: 4,
 						voters_count: 3,
+						voted: false,
+						own_votes: [],
 					}),
 				}),
 			},
 		});
+		expect(JSON.stringify(edits[0])).not.toContain('Leaked A');
 		expect(edits[1]).toMatchObject({
 			content: expect.any(String),
 			spoiler_text: '',
@@ -596,6 +616,25 @@ describe(MastodonEntityService, () => {
 			poll: { ...note.poll, multiple: false },
 		} as never, new Map([['note-id', 1]]));
 		expect(singlePollEdits.at(-1)).toMatchObject({ poll: { voters_count: null } });
+	});
+
+	test('returns a null historical quote when its reference is unavailable', () => {
+		const edits = service.statusEdits({
+			...note,
+			history: [{
+				createdAt: '2025-02-03T02:00:00.000Z',
+				text: 'Quote was here',
+				renoteId: 'hidden-quote',
+				renote: {
+					...note,
+					id: 'hidden-quote',
+					text: 'Stored hidden content',
+				},
+			}],
+		} as never, undefined, new Map());
+
+		expect(edits[0]).toMatchObject({ quote: null });
+		expect(JSON.stringify(edits[0])).not.toContain('Stored hidden content');
 	});
 
 	test('converts native translation results to Mastodon Translation', () => {

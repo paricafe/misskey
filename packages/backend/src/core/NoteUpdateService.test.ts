@@ -4,7 +4,13 @@
  */
 
 import { describe, expect, test, vi } from 'vitest';
-import { NoteUpdateService } from './NoteUpdateService.js';
+import type { MiNote } from '@/models/Note.js';
+import {
+	MAX_NOTE_HISTORY_BYTES,
+	MAX_NOTE_HISTORY_REVISIONS,
+	NOTE_HISTORY_LIMIT_ERROR_ID,
+	NoteUpdateService,
+} from './NoteUpdateService.js';
 
 const oldFile = {
 	id: 'old-file',
@@ -23,13 +29,6 @@ const oldFile = {
 	folder: null,
 	userId: null,
 	user: null,
-};
-
-const quotedFile = {
-	...oldFile,
-	id: 'quoted-file',
-	name: 'quoted.png',
-	url: 'https://cdn.example/quoted.png',
 };
 
 function createService() {
@@ -76,8 +75,8 @@ function createService() {
 				replyId: null,
 				renoteId: 'nested-quote',
 				visibility: 'public',
-				files: [quotedFile],
-				fileIds: ['quoted-file'],
+				files: [],
+				fileIds: [],
 				emojis: {},
 				reactions: {},
 				reactionEmojis: {},
@@ -89,6 +88,16 @@ function createService() {
 				reply: { id: 'nested-reply' },
 			}),
 	};
+	const customEmojiService = {
+		populateEmojis: vi.fn().mockResolvedValue({ party: 'https://cdn.example/party.webp' }),
+		localEmojisCache: {
+			fetch: vi.fn().mockResolvedValue(new Map([
+				['party', { name: 'party', publicUrl: 'https://cdn.example/local-party.webp', originalUrl: 'https://origin.example/local-party.png' }],
+			])),
+		},
+	};
+	const globalEventService = { publishNoteStream: vi.fn() };
+	const searchService = { indexNote: vi.fn() };
 	const service = new NoteUpdateService(
 		{} as never,
 		{} as never,
@@ -96,20 +105,18 @@ function createService() {
 		{} as never,
 		pollsRepository as never,
 		pollVotesRepository as never,
-		{
-			populateEmojis: vi.fn().mockResolvedValue({ party: 'https://cdn.example/party.webp' }),
-		} as never,
+		customEmojiService as never,
 		{} as never,
 		{ isLocalUser: vi.fn().mockReturnValue(false) } as never,
 		noteEntityService as never,
-		{ publishNoteStream: vi.fn() } as never,
+		globalEventService as never,
 		{} as never,
 		{} as never,
 		{} as never,
 		{} as never,
 		{} as never,
 		{ fetch: vi.fn().mockResolvedValue({ mediaSilencedHosts: [] }) } as never,
-		{ indexNote: vi.fn() } as never,
+		searchService as never,
 		{} as never,
 		{} as never,
 		{} as never,
@@ -119,7 +126,16 @@ function createService() {
 		} as never,
 		{ isMediaSilencedHost: vi.fn().mockReturnValue(false) } as never,
 	);
-	return { service, notesRepository, pollsRepository, pollVotesRepository, noteEntityService };
+	return {
+		service,
+		notesRepository,
+		pollsRepository,
+		pollVotesRepository,
+		noteEntityService,
+		customEmojiService,
+		globalEventService,
+		searchService,
+	};
 }
 
 const note = {
@@ -141,7 +157,7 @@ const note = {
 	tags: [],
 	reactions: {},
 	reactionAndUserPairCache: [],
-} as never;
+} as unknown as MiNote;
 
 const user = {
 	id: 'user-id',
@@ -152,7 +168,7 @@ const user = {
 
 describe(NoteUpdateService, () => {
 	test('stores a complete immutable bounded snapshot before replacing note state', async () => {
-		const { service, notesRepository, noteEntityService } = createService();
+		const { service, notesRepository, noteEntityService, pollVotesRepository } = createService();
 
 		await service.update(user, note, {
 			text: 'New text',
@@ -178,28 +194,55 @@ describe(NoteUpdateService, () => {
 				multiple: true,
 				choices: [
 					{ text: 'old A', votes: 3, isVoted: false },
-					{ text: 'old B', votes: 2, isVoted: true },
+					{ text: 'old B', votes: 2, isVoted: false },
 				],
 			},
 			pollVotersCount: 4,
-			renote: expect.objectContaining({
-				id: 'quoted-note',
-				files: [quotedFile],
-				poll: expect.objectContaining({
-					multiple: true,
-					choices: [
-						{ text: 'quoted A', votes: 4, isVoted: false },
-						{ text: 'quoted B', votes: 1, isVoted: false },
-					],
-				}),
-			}),
-			renotePollVotersCount: 4,
+			renoteId: 'quoted-note',
 		});
-		expect(persisted.history[0].renote).not.toHaveProperty('history');
-		expect(persisted.history[0].renote).not.toHaveProperty('reply');
-		expect(persisted.history[0].renote).not.toHaveProperty('renote');
+		expect(persisted.history[0]).not.toHaveProperty('renote');
+		expect(persisted.history[0]).not.toHaveProperty('renotePollVotersCount');
+		expect(pollVotesRepository.findBy).not.toHaveBeenCalled();
 		expect(noteEntityService.pack).toHaveBeenCalledWith(expect.objectContaining({ id: 'note-id' }), user, expect.objectContaining({ detail: false }));
-		expect(noteEntityService.pack).toHaveBeenCalledWith(expect.objectContaining({ id: 'quoted-note' }), user, expect.objectContaining({ detail: false }));
+		expect(noteEntityService.pack).toHaveBeenCalledTimes(1);
+	});
+
+	test('resolves local emoji URLs when the normal packed local Note omits emojis', async () => {
+		const { service, notesRepository, noteEntityService, customEmojiService } = createService();
+		noteEntityService.pack.mockResolvedValueOnce({
+			files: [oldFile],
+			channel: { isSensitive: false },
+		} as never);
+
+		await service.update(user, note, {
+			text: 'New text',
+			cw: null,
+			files: [],
+			apHashtags: [],
+			apEmojis: [],
+			updatedAt: new Date('2025-02-01T00:00:00.000Z'),
+		}, true);
+
+		expect(notesRepository.update.mock.calls[0]?.[1].history[0].emojiUrls).toEqual({
+			party: 'https://cdn.example/local-party.webp',
+		});
+		expect(customEmojiService.localEmojisCache.fetch).toHaveBeenCalledOnce();
+	});
+
+	test('preserves existing attachments when files are omitted from a partial update', async () => {
+		const { service, notesRepository } = createService();
+
+		await service.update(user, note, {
+			text: 'New text',
+			cw: null,
+			apHashtags: [],
+			apEmojis: [],
+			updatedAt: new Date('2025-02-01T00:00:00.000Z'),
+		}, true);
+
+		expect(notesRepository.update).toHaveBeenCalledWith({ id: 'note-id' }, expect.objectContaining({
+			fileIds: ['old-file'],
+		}));
 	});
 
 	test('rejects a final state with neither text nor files', async () => {
@@ -213,5 +256,90 @@ describe(NoteUpdateService, () => {
 		}, true)).rejects.toThrow('Note must have text or files');
 
 		expect(notesRepository.update).not.toHaveBeenCalled();
+	});
+
+	test('allows the history revision count boundary', async () => {
+		const { service, notesRepository } = createService();
+		const history = Array.from({ length: MAX_NOTE_HISTORY_REVISIONS - 1 }, (_, index) => ({
+			createdAt: new Date(index).toISOString(),
+			text: `revision-${index}`,
+		}));
+
+		await service.update(user, { ...note, history } as never, {
+			text: 'New text',
+			cw: null,
+			files: [],
+			apHashtags: [],
+			apEmojis: [],
+			updatedAt: new Date('2025-02-01T00:00:00.000Z'),
+		}, true);
+
+		expect(notesRepository.update.mock.calls[0]?.[1].history).toHaveLength(MAX_NOTE_HISTORY_REVISIONS);
+	});
+
+	test('rejects before mutation when the history revision count would exceed the limit', async () => {
+		const { service, notesRepository, globalEventService, searchService } = createService();
+		const history = Array.from({ length: MAX_NOTE_HISTORY_REVISIONS }, (_, index) => ({
+			createdAt: new Date(index).toISOString(),
+			text: `revision-${index}`,
+		}));
+
+		await expect(service.update(user, { ...note, history } as never, {
+			text: 'New text',
+			cw: null,
+			files: [],
+			apHashtags: [],
+			apEmojis: [],
+			updatedAt: new Date('2025-02-01T00:00:00.000Z'),
+		}, false)).rejects.toMatchObject({
+			id: NOTE_HISTORY_LIMIT_ERROR_ID,
+		});
+
+		expect(notesRepository.update).not.toHaveBeenCalled();
+		expect(globalEventService.publishNoteStream).not.toHaveBeenCalled();
+		expect(searchService.indexNote).not.toHaveBeenCalled();
+	});
+
+	test('allows a history payload below the byte boundary', async () => {
+		const { service, notesRepository } = createService();
+		const history = [{
+			createdAt: '2024-01-01T00:00:00.000Z',
+			text: 'x'.repeat(MAX_NOTE_HISTORY_BYTES - 2048),
+		}];
+
+		await service.update(user, { ...note, history } as never, {
+			text: 'New text',
+			cw: null,
+			files: [],
+			apHashtags: [],
+			apEmojis: [],
+			updatedAt: new Date('2025-02-01T00:00:00.000Z'),
+		}, true);
+
+		const persistedHistory = notesRepository.update.mock.calls[0]?.[1].history;
+		expect(Buffer.byteLength(JSON.stringify(persistedHistory), 'utf8')).toBeLessThanOrEqual(MAX_NOTE_HISTORY_BYTES);
+	});
+
+	test('rejects before mutation when the history payload exceeds the byte boundary', async () => {
+		const { service, notesRepository, globalEventService, searchService } = createService();
+		const history = [{
+			createdAt: '2024-01-01T00:00:00.000Z',
+			text: 'x'.repeat(MAX_NOTE_HISTORY_BYTES),
+		}];
+
+		await expect(service.update(user, { ...note, history } as never, {
+			text: 'New text',
+			cw: null,
+			files: [],
+			apHashtags: [],
+			apEmojis: [],
+			updatedAt: new Date('2025-02-01T00:00:00.000Z'),
+		}, false)).rejects.toMatchObject({
+			id: NOTE_HISTORY_LIMIT_ERROR_ID,
+		});
+
+		expect(notesRepository.update).not.toHaveBeenCalled();
+		expect(globalEventService.publishNoteStream).not.toHaveBeenCalled();
+		expect(searchService.indexNote).not.toHaveBeenCalled();
 	});
 });
