@@ -200,37 +200,49 @@ describe(PollVoteService, () => {
 		expect(persisted().votes).toHaveLength(0);
 	});
 
-	test('inserts every requested choice for a multiple-choice poll', async () => {
+	test('inserts every requested choice in request order for a multiple-choice poll', async () => {
 		const { service, note, me, pollsRepository, pollVotesRepository, persisted } = createService();
 
-		await service.vote(note.id, [0, 1], me as never);
+		await service.vote(note.id, [2, 0], me as never);
 
 		expect(pollVotesRepository.insert).toHaveBeenCalledWith([
+			expect.objectContaining({ choice: 2 }),
 			expect.objectContaining({ choice: 0 }),
-			expect.objectContaining({ choice: 1 }),
 		]);
+		expect(pollsRepository.query).toHaveBeenCalledWith(
+			expect.stringContaining('votes[$1]'),
+			[3, note.id],
+		);
 		expect(pollsRepository.query).toHaveBeenCalledWith(
 			expect.stringContaining('votes[$1]'),
 			[1, note.id],
 		);
-		expect(pollsRepository.query).toHaveBeenCalledWith(
-			expect.stringContaining('votes[$1]'),
-			[2, note.id],
-		);
-		expect(persisted().votes.map(vote => vote.choice)).toEqual([0, 1]);
-		expect(persisted().poll.votes).toEqual([1, 1, 0]);
+		expect(persisted().votes.map(vote => vote.choice)).toEqual([2, 0]);
+		expect(persisted().poll.votes).toEqual([1, 0, 1]);
 	});
 
-	test('deduplicates repeated choices before inserting or publishing', async () => {
-		const { service, note, me, pollVotesRepository, globalEventService, persisted } = createService();
+	test('rejects duplicate choices without writes or side effects', async () => {
+		const {
+			service,
+			note,
+			me,
+			pollsRepository,
+			pollVotesRepository,
+			globalEventService,
+			queueService,
+			pollService,
+			persisted,
+		} = createService();
 
-		await service.vote(note.id, [1, 1, 1], me as never);
+		await expect(service.vote(note.id, [0, 0], me as never)).rejects.toMatchObject({ code: 'INVALID_CHOICE' });
 
-		expect(pollVotesRepository.insert).toHaveBeenCalledWith([
-			expect.objectContaining({ choice: 1 }),
-		]);
-		expect(globalEventService.publishNoteStream).toHaveBeenCalledTimes(1);
-		expect(persisted().votes.map(vote => vote.choice)).toEqual([1]);
+		expect(pollVotesRepository.insert).not.toHaveBeenCalled();
+		expect(pollsRepository.query.mock.calls.filter(([sql]) => sql.includes('UPDATE poll'))).toHaveLength(0);
+		expect(globalEventService.publishNoteStream).not.toHaveBeenCalled();
+		expect(queueService.deliver).not.toHaveBeenCalled();
+		expect(pollService.deliverQuestionUpdate).not.toHaveBeenCalled();
+		expect(persisted().votes).toHaveLength(0);
+		expect(persisted().poll.votes).toEqual([0, 0, 0]);
 	});
 
 	test('rejects the complete request when one requested choice was already voted', async () => {
@@ -266,11 +278,11 @@ describe(PollVoteService, () => {
 		expect(pollVotesRepository.insert).not.toHaveBeenCalled();
 	});
 
-	test('rejects a poll that expires while waiting for the advisory lock', async () => {
+	test('rejects a poll at the exact expiry boundary after acquiring the advisory lock', async () => {
 		vi.useFakeTimers();
 		try {
 			const beforeExpiry = new Date('2026-07-23T00:00:00.000Z');
-			const afterExpiry = new Date('2026-07-23T00:00:02.000Z');
+			const atExpiry = new Date('2026-07-23T00:00:01.000Z');
 			vi.setSystemTime(beforeExpiry);
 
 			let releaseLock!: () => void;
@@ -287,8 +299,12 @@ describe(PollVoteService, () => {
 				me,
 				pollsRepository,
 				pollVotesRepository,
+				globalEventService,
+				queueService,
+				pollService,
+				persisted,
 			} = createService({
-				expiresAt: new Date('2026-07-23T00:00:01.000Z'),
+				expiresAt: atExpiry,
 				advisoryLockWait: async () => {
 					signalLockStarted();
 					await lockGate;
@@ -297,12 +313,17 @@ describe(PollVoteService, () => {
 
 			const voting = service.vote(note.id, [0], me as never);
 			await lockStarted;
-			vi.setSystemTime(afterExpiry);
+			vi.setSystemTime(atExpiry);
 			releaseLock();
 
 			await expect(voting).rejects.toMatchObject({ code: 'ALREADY_EXPIRED' });
 			expect(pollVotesRepository.insert).not.toHaveBeenCalled();
 			expect(pollsRepository.query.mock.calls.filter(([sql]) => sql.includes('UPDATE poll'))).toHaveLength(0);
+			expect(globalEventService.publishNoteStream).not.toHaveBeenCalled();
+			expect(queueService.deliver).not.toHaveBeenCalled();
+			expect(pollService.deliverQuestionUpdate).not.toHaveBeenCalled();
+			expect(persisted().votes).toHaveLength(0);
+			expect(persisted().poll.votes).toEqual([0, 0, 0]);
 		} finally {
 			vi.useRealTimers();
 		}

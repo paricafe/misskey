@@ -114,12 +114,13 @@ export class PollVoteService {
 				userId: me.id,
 			});
 
-			if (poll.expiresAt && poll.expiresAt < createdAt) {
+			if (poll.expiresAt && poll.expiresAt <= createdAt) {
 				throw new ApiError(pollVoteErrors.alreadyExpired);
 			}
 
 			if (
 				uniqueChoices.length === 0 ||
+				uniqueChoices.length !== choices.length ||
 				(!poll.multiple && uniqueChoices.length > 1) ||
 				uniqueChoices.some(choice => poll.choices[choice] == null)
 			) {
