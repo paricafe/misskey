@@ -476,6 +476,7 @@ describe(MastodonApiServerService, () => {
 			{ create: createReport } as never,
 			mastodonPushSubscriptionService,
 			mastodonUserFeatureService,
+			mastodonApiStateService as never,
 			redis as never,
 			mastodonStreamingApiServerService as never,
 		);
@@ -3546,6 +3547,66 @@ describe(MastodonApiServerService, () => {
 
 		expect(response.statusCode).toBe(200);
 		expect(response.json()).toMatchObject({ id: 'note-id', favourited: false });
+	});
+
+	test('preserves private boost visibility and reuses an existing pure renote', async () => {
+		const { fastify, nativeInvoke, notesRepository } = createServer();
+		let renoteLookupCount = 0;
+		notesRepository.findBy.mockImplementation(async ({ renoteId }: { renoteId: unknown }) => {
+			if (renoteId !== 'target') return [];
+			renoteLookupCount += 1;
+			return renoteLookupCount === 1
+				? []
+				: [
+					{ id: 'quote-id', text: 'My quote', cw: null, fileIds: [], hasPoll: false, replyId: null, renoteId: 'target' },
+					{ id: 'created-renote-id', text: null, cw: null, fileIds: [], hasPoll: false, replyId: null, renoteId: 'target' },
+				];
+		});
+		nativeInvoke.mockImplementation(async (name, data) => {
+			if (name === 'notes/create') return { createdNote: { id: 'created-renote-id' } };
+			if (name === 'notes/show') return { id: data.noteId };
+			return [];
+		});
+		const headers = { authorization: 'Bearer mastodon-token', 'content-type': 'application/json' };
+
+		const first = await fastify.inject({
+			method: 'POST',
+			url: '/api/v1/statuses/target/reblog',
+			headers,
+			payload: { visibility: 'private' },
+		});
+		const second = await fastify.inject({
+			method: 'POST',
+			url: '/api/v1/statuses/target/reblog',
+			headers,
+			payload: { visibility: 'private' },
+		});
+
+		expect(first.statusCode).toBe(200);
+		expect(second.statusCode).toBe(200);
+		expect(nativeInvoke).toHaveBeenCalledWith('notes/create', {
+			renoteId: 'target',
+			visibility: 'followers',
+		}, expect.any(Object), expect.any(Object));
+		expect(nativeInvoke.mock.calls.filter(([name]) => name === 'notes/create')).toHaveLength(1);
+		expect(nativeInvoke).toHaveBeenCalledWith('notes/show', { noteId: 'created-renote-id' }, expect.any(Object), expect.any(Object));
+		expect(nativeInvoke).not.toHaveBeenCalledWith('notes/show', { noteId: 'quote-id' }, expect.any(Object), expect.any(Object));
+	});
+
+	test.each([
+		['bookmark', 'ALREADY_FAVORITED', true],
+		['unbookmark', 'NOT_FAVORITED', false],
+	] as const)('normalizes repeated %s', async (action, code, bookmarked) => {
+		const { fastify, nativeInvoke } = createServer();
+		nativeInvoke.mockRejectedValueOnce(Object.assign(new ApiError({} as never), { code }));
+		const response = await fastify.inject({
+			method: 'POST',
+			url: `/api/v1/statuses/target/${action}`,
+			headers: { authorization: 'Bearer mastodon-token' },
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(response.json()).toMatchObject({ bookmarked });
 	});
 
 	test('orders thread ancestors from root to immediate parent', async () => {

@@ -22,6 +22,7 @@ import { bindThis } from '@/decorators.js';
 import { ApiError } from '@/server/api/error.js';
 import type { FastifyInstance, FastifyPluginOptions, FastifyReply, FastifyRequest } from 'fastify';
 import { MastodonApiCallService } from './MastodonApiCallService.js';
+import { MastodonApiStateService } from './MastodonApiStateService.js';
 import { MASTODON_4_6_USER_ROUTES, type MastodonContractRoute } from './MastodonApiContract.js';
 import { MastodonAuthenticateService } from './MastodonAuthenticateService.js';
 import { MASTODON_COLLECTION_WINDOW_LIMIT, MastodonCollectionService, type MastodonCollectionPage } from './MastodonCollectionService.js';
@@ -79,6 +80,7 @@ export class MastodonApiServerService {
 		private mastodonReportService: MastodonReportService,
 		private mastodonPushSubscriptionService: MastodonPushSubscriptionService,
 		private mastodonUserFeatureService: MastodonUserFeatureService,
+		private mastodonApiStateService: MastodonApiStateService,
 
 		@Inject(DI.redis)
 		private redis: Redis.Redis,
@@ -716,11 +718,13 @@ export class MastodonApiServerService {
 				try {
 					await this.invoke(endpoint, { noteId: request.params.id, ...extra }, auth, request);
 				} catch (error) {
-					const isIdempotentReactionError = error instanceof ApiError && (
+					const isIdempotentActionError = error instanceof ApiError && (
 						(action === 'favourite' && error.code === 'ALREADY_REACTED') ||
-						(action === 'unfavourite' && error.code === 'NOT_REACTED')
+						(action === 'unfavourite' && error.code === 'NOT_REACTED') ||
+						(action === 'bookmark' && error.code === 'ALREADY_FAVORITED') ||
+						(action === 'unbookmark' && error.code === 'NOT_FAVORITED')
 					);
-					if (!isIdempotentReactionError) throw error;
+					if (!isIdempotentActionError) throw error;
 				}
 				const note = await this.invoke('notes/show', { noteId: request.params.id }, auth, request);
 				const status = await this.statusWithState(note as Packed<'Note'>, auth, 'thread');
@@ -743,9 +747,21 @@ export class MastodonApiServerService {
 				return { ...await this.statusWithState(note, auth, 'thread'), muted: action === 'mute' };
 			}));
 		}
-		fastify.post<{ Params: { id: string } }>('/api/v1/statuses/:id/reblog', request => this.withAuth(request, 'write:statuses', async auth => {
-			const result = await this.invoke('notes/create', { renoteId: request.params.id }, auth, request) as { createdNote: Packed<'Note'> };
-			return { ...await this.statusWithState(result.createdNote, auth, 'thread'), reblogged: true };
+		fastify.post<{ Params: { id: string }; Body: Dictionary }>('/api/v1/statuses/:id/reblog', request => this.withAuth(request, 'write:statuses', async auth => {
+			const visibility = this.toMisskeyVisibility(this.string(request.body?.visibility) ?? 'public');
+			return await this.mastodonApiStateService.withUserKindLock(auth.user.id, `status_reblog:${request.params.id}`, async () => {
+				const existing = (await this.notesRepository.findBy({
+					userId: auth.user.id,
+					renoteId: request.params.id,
+				})).find(note => this.isPureRenote(note));
+				const note = existing == null
+					? (await this.invoke('notes/create', {
+						renoteId: request.params.id,
+						visibility,
+					}, auth, request) as { createdNote: Packed<'Note'> }).createdNote
+					: await this.invoke('notes/show', { noteId: existing.id }, auth, request) as Packed<'Note'>;
+				return { ...await this.statusWithState(note, auth, 'thread'), reblogged: true };
+			});
 		}));
 		fastify.post<{ Params: { id: string } }>('/api/v1/statuses/:id/unreblog', request => this.withAuth(request, 'write:statuses', async auth => {
 			const renotes = await this.notesRepository.findBy({ userId: auth.user.id, renoteId: request.params.id });
