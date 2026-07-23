@@ -228,7 +228,7 @@ export class MastodonApiServerService {
 			return this.mastodonEntityService.tag(hashtag.tag);
 		}));
 
-		fastify.get('/api/v1/accounts/verify_credentials', request => this.withAuth(request, 'read:accounts', async auth => {
+		fastify.get('/api/v1/accounts/verify_credentials', request => this.withAuth(request, ['profile', 'read:accounts'], async auth => {
 			const user = await this.invoke('i', {}, auth, request);
 			return this.mastodonEntityService.credentialAccount(user as Packed<'MeDetailed'>);
 		}));
@@ -243,8 +243,7 @@ export class MastodonApiServerService {
 			'reading:expand:spoilers': false,
 		} as Dictionary)));
 		this.registerProfile(fastify);
-		fastify.get('/api/v1/accounts', request => this.withToken(request, 'read:accounts', async tokenAuth => {
-			const auth = tokenAuth.kind === 'user' ? tokenAuth : null;
+		fastify.get('/api/v1/accounts', request => this.withOptionalUser(request, 'read:accounts', async auth => {
 			const users = await this.invokePublicBatch(
 				'users/show',
 				'userId',
@@ -604,8 +603,7 @@ export class MastodonApiServerService {
 	}
 
 	private registerStatuses(fastify: FastifyInstance): void {
-		fastify.get('/api/v1/statuses', request => this.withToken(request, 'read:statuses', async tokenAuth => {
-			const auth = tokenAuth.kind === 'user' ? tokenAuth : null;
+		fastify.get('/api/v1/statuses', request => this.withOptionalUser(request, 'read:statuses', async auth => {
 			const notes = await this.invokePublicBatch(
 				'notes/show',
 				'noteId',
@@ -673,13 +671,14 @@ export class MastodonApiServerService {
 			const quotes = renotes.filter(note => note.renoteId != null && !this.isPurePackedRenote(note));
 			return this.page(request, reply, quotes, await this.statusesWithState(quotes, auth, 'thread'));
 		}));
-		fastify.get<{ Params: { id: string } }>('/api/v1/statuses/:id/reblogged_by', request => this.withOptionalUser(request, 'read:statuses', async auth => {
-			const renotes = await this.invokePublic('notes/renotes', { noteId: request.params.id, ...this.mastodonPaginationService.toMisskey(request.query as Dictionary, 100) }, auth, request) as Packed<'Note'>[];
-			return renotes.map(note => this.mastodonEntityService.account(note.user));
+		fastify.get<{ Params: { id: string } }>('/api/v1/statuses/:id/reblogged_by', (request, reply) => this.withOptionalUser(request, 'read:statuses', async auth => {
+			const renotes = await this.invokePublic('notes/renotes', { noteId: request.params.id, ...this.mastodonPaginationService.toMisskey(request.query as Dictionary, 80) }, auth, request) as Packed<'Note'>[];
+			const reblogs = renotes.filter(note => this.isPurePackedRenote(note));
+			return this.page(request, reply, renotes, reblogs.map(note => this.mastodonEntityService.account(note.user)));
 		}));
-		fastify.get<{ Params: { id: string } }>('/api/v1/statuses/:id/favourited_by', request => this.withOptionalUser(request, 'read:statuses', async auth => {
-			const reactions = await this.invokePublic('notes/reactions', { noteId: request.params.id, ...this.mastodonPaginationService.toMisskey(request.query as Dictionary, 100) }, auth, request) as Array<{ user: Packed<'UserLite'> }>;
-			return reactions.map(reaction => this.mastodonEntityService.account(reaction.user));
+		fastify.get<{ Params: { id: string } }>('/api/v1/statuses/:id/favourited_by', (request, reply) => this.withOptionalUser(request, 'read:statuses', async auth => {
+			const reactions = await this.invokePublic('notes/reactions', { noteId: request.params.id, ...this.mastodonPaginationService.toMisskey(request.query as Dictionary, 80) }, auth, request) as Array<{ id: string; user: Packed<'UserLite'> }>;
+			return this.page(request, reply, reactions, reactions.map(reaction => this.mastodonEntityService.account(reaction.user)));
 		}));
 		fastify.post<{ Body: Dictionary }>('/api/v1/statuses', request => this.withAuth(request, 'write:statuses', async auth => {
 			return await this.createStatus(request, auth);
@@ -714,7 +713,15 @@ export class MastodonApiServerService {
 		];
 		for (const [action, endpoint, scope, extra] of actions) {
 			fastify.post<{ Params: { id: string } }>(`/api/v1/statuses/:id/${action}`, request => this.withAuth(request, scope, async auth => {
-				await this.invoke(endpoint, { noteId: request.params.id, ...extra }, auth, request);
+				try {
+					await this.invoke(endpoint, { noteId: request.params.id, ...extra }, auth, request);
+				} catch (error) {
+					const isIdempotentReactionError = error instanceof ApiError && (
+						(action === 'favourite' && error.code === 'ALREADY_REACTED') ||
+						(action === 'unfavourite' && error.code === 'NOT_REACTED')
+					);
+					if (!isIdempotentReactionError) throw error;
+				}
 				const note = await this.invoke('notes/show', { noteId: request.params.id }, auth, request);
 				const status = await this.statusWithState(note as Packed<'Note'>, auth, 'thread');
 				if (action === 'favourite' || action === 'unfavourite') status.favourited = action === 'favourite';
@@ -2060,9 +2067,10 @@ export class MastodonApiServerService {
 	}
 
 	private async updateMediaSensitivity(fileIds: string[], rawSensitive: unknown, auth: MastodonUserAuth, request: MastodonRequest): Promise<void> {
-		if (rawSensitive == null || !this.boolean(rawSensitive)) return;
+		if (rawSensitive == null) return;
+		const isSensitive = this.profileBoolean(rawSensitive, 'sensitive');
 		for (const fileId of fileIds) {
-			await this.invoke('drive/files/update', { fileId, isSensitive: true }, auth, request);
+			await this.invoke('drive/files/update', { fileId, isSensitive }, auth, request);
 		}
 	}
 
@@ -2280,7 +2288,7 @@ export class MastodonApiServerService {
 			thumbnail: this.instanceImageUrl(),
 			languages: this.meta.langs,
 			registrations: !this.meta.disableRegistration,
-			approval_required: false,
+			approval_required: this.meta.approvalRequiredForSignup,
 			invites_enabled: false,
 			configuration: v2.configuration,
 			contact_account: null,
@@ -2311,7 +2319,7 @@ export class MastodonApiServerService {
 				},
 				polls: { max_options: 10, max_characters_per_option: 50, min_expiration: 300, max_expiration: 2629746 },
 			},
-			registrations: { enabled: !this.meta.disableRegistration, approval_required: false, message: null },
+			registrations: { enabled: !this.meta.disableRegistration, approval_required: this.meta.approvalRequiredForSignup, message: null },
 			contact: { email: this.meta.maintainerEmail ?? '', account: null },
 			rules: this.rules(),
 		};

@@ -43,4 +43,24 @@ describe('API', () => {
 		const res2 = await cli.request('users/show', { userIds: ['xxxxxxxx'] });
 		expectType<Misskey.entities.UserDetailed[]>(res2);
 	});
+
+	test('signup approval types', async () => {
+		const request: Misskey.entities.SignupRequest = {
+			username: 'alice',
+			password: 'password',
+			reason: 'I would like to join.',
+		};
+		expectType<string | undefined>(request.reason);
+
+		const cli = new Misskey.api.APIClient({
+			origin: 'https://misskey.test',
+		});
+		const response = await cli.request('signup-pending', { code: 'code' });
+		if (response.pendingApproval) {
+			expectType<true>(response.pendingApproval);
+		} else {
+			expectType<true>(response.finished);
+			expectType<string>(response.i);
+		}
+	});
 });
