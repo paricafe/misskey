@@ -232,7 +232,7 @@ describe(PollVoteService, () => {
 			queueService,
 			pollService,
 			persisted,
-		} = createService();
+		} = createService({ remote: true });
 
 		await expect(service.vote(note.id, [0, 0], me as never)).rejects.toMatchObject({ code: 'INVALID_CHOICE' });
 
@@ -304,6 +304,7 @@ describe(PollVoteService, () => {
 				pollService,
 				persisted,
 			} = createService({
+				remote: true,
 				expiresAt: atExpiry,
 				advisoryLockWait: async () => {
 					signalLockStarted();
