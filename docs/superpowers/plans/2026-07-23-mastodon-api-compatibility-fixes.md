@@ -327,11 +327,12 @@ Run the test by name. Expected: current route returns `[]` and calls
 
 Parse Mastodon limit with maximum 40. Fetch native pages of at most 100,
 carrying `untilId`, until `limit + 1` quotes are collected, native exhaustion
-is reached, or ten native pages have been scanned. If the safety bound is
-reached while more source rows exist, retain a continuation cursor so the
-client can resume rather than treating the collection as exhausted.
-
-Generate response and `Link` data from quote IDs, not pure boosts.
+is reached, or ten native pages have been scanned. Treat Mastodon cursor
+parameters as opaque: when the safety bound is reached, generate the next
+`Link` from the last consumed underlying renote-stream ID even if that row is
+a pure boost. Response entities remain quote-only. This resumes the native
+stream without skipping an older quote, duplicating a returned quote, or
+requiring server-side cursor state.
 
 - [ ] **Step 4: Verify GREEN**
 

@@ -93,9 +93,11 @@ The quote endpoint will scan native renote pages using native IDs as cursors,
 discard pure boosts, and continue until it has collected the requested number
 of quotes plus one look-ahead item or has exhausted the source.
 
-The scan is bounded per request to prevent unbounded database work. Link
-headers are generated from quote IDs, and a page containing only boosts does
-not incorrectly signal end-of-results while older quotes remain.
+The scan is bounded per request to prevent unbounded database work. Mastodon
+cursor parameters are opaque, so Link headers use the underlying renote-stream
+ID at the scan boundary even when that row is a pure boost. Response entities
+remain quote-only. This lets a boost-only scan window continue without
+skipping older quotes or requiring server-side cursor state.
 
 ## Status Editing and History
 
