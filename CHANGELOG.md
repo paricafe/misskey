@@ -26,6 +26,7 @@
 - Fix: Preserve media-only Mastodon edits and complete historical status revision data
 - Fix: 一部のAPIスキーマとmisskey-jsの型定義が実装と一致していない問題を修正
 - Fix: Mastodonクライアントから言語指定付きでノートを投稿・編集できない問題を修正
+- Fix: Mastodon互換APIのステータス操作、投票、引用ページネーション、編集履歴の互換性を改善
 
 ## 2026.7.0
 
