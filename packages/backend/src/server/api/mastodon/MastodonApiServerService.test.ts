@@ -4094,6 +4094,31 @@ describe(MastodonApiServerService, () => {
 		expect(response.statusCode).toBe(200);
 		expect(nativeInvoke).toHaveBeenCalledWith('notes/update', expect.objectContaining({ fileIds: ['existing-file'], text: 'edited' }), expect.anything(), expect.anything());
 		expect(nativeInvoke).toHaveBeenCalledWith('drive/files/update', { fileId: 'existing-file', isSensitive: false }, expect.anything(), expect.anything());
+		const noteUpdateOrder = nativeInvoke.mock.invocationCallOrder[nativeInvoke.mock.calls.findIndex(([name]) => name === 'notes/update')];
+		const sensitivityOrder = nativeInvoke.mock.invocationCallOrder[nativeInvoke.mock.calls.findIndex(([name]) => name === 'drive/files/update')];
+		expect(noteUpdateOrder).toBeLessThan(sensitivityOrder);
+	});
+
+	test('passes null text through for a media-only edit that omits status', async () => {
+		const { fastify, nativeInvoke } = createServer();
+		nativeInvoke.mockImplementation(async name => {
+			if (name === 'notes/show') return { id: 'note-id', text: null, fileIds: ['old-file'] };
+			if (name === 'notes/update') return { updatedNote: { id: 'note-id' } };
+			return [];
+		});
+
+		const response = await fastify.inject({
+			method: 'PUT',
+			url: '/api/v1/statuses/note-id',
+			headers: { authorization: 'Bearer mastodon-token', 'content-type': 'application/json' },
+			payload: { media_ids: ['new-file'] },
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(nativeInvoke).toHaveBeenCalledWith('notes/update', expect.objectContaining({
+			fileIds: ['new-file'],
+			text: null,
+		}), expect.anything(), expect.anything());
 	});
 
 	test('clears attachments when an edit explicitly sends an empty media_ids list', async () => {

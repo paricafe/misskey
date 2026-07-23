@@ -23,6 +23,7 @@
 - Fix: Prevent a duplicate Mastodon instance peers route from blocking server startup
 - Fix: Prevent `users/recommendation` from generating invalid SQL when filtering blocked users
 - Fix: Improve Mastodon API authentication, status mutation, instance metadata, and pagination compatibility
+- Fix: Preserve media-only Mastodon edits and complete historical status revision data
 - Fix: 一部のAPIスキーマとmisskey-jsの型定義が実装と一致していない問題を修正
 - Fix: Mastodonクライアントから言語指定付きでノートを投稿・編集できない問題を修正
 

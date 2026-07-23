@@ -690,14 +690,19 @@ export class MastodonApiServerService {
 			const current = await this.invoke('notes/show', { noteId: request.params.id }, auth, request) as Packed<'Note'>;
 			const hasMediaIds = Object.hasOwn(request.body ?? {}, 'media_ids') || Object.hasOwn(request.body ?? {}, 'media_ids[]');
 			const effectiveFileIds = hasMediaIds ? fileIds : current.fileIds ?? [];
-			await this.updateMediaSensitivity(effectiveFileIds, request.body?.sensitive, auth, request);
+			const rawSensitive = request.body?.sensitive;
+			if (rawSensitive != null) this.profileBoolean(rawSensitive, 'sensitive');
 			const result = await this.invoke('notes/update', {
 				noteId: request.params.id,
-				text: this.string(request.body?.status) ?? current.text ?? '',
+				text: this.string(request.body?.status) ?? current.text ?? null,
 				cw: Object.hasOwn(request.body ?? {}, 'spoiler_text') ? this.string(request.body?.spoiler_text) || null : current.cw ?? null,
 				...(effectiveFileIds.length > 0 ? { fileIds: effectiveFileIds } : {}),
 			}, auth, request) as { updatedNote: Packed<'Note'> };
-			return await this.statusWithState(result.updatedNote, auth, 'thread');
+			await this.updateMediaSensitivity(effectiveFileIds, rawSensitive, auth, request);
+			const updatedNote = rawSensitive == null
+				? result.updatedNote
+				: await this.invoke('notes/show', { noteId: request.params.id }, auth, request) as Packed<'Note'>;
+			return await this.statusWithState(updatedNote, auth, 'thread');
 		}));
 		fastify.delete<{ Params: { id: string } }>('/api/v1/statuses/:id', request => this.withAuth(request, 'write:statuses', async auth => {
 			const note = await this.invoke('notes/show', { noteId: request.params.id }, auth, request) as Packed<'Note'>;

@@ -63,7 +63,7 @@ export const paramDef = {
 			type: 'string',
 			minLength: 1,
 			maxLength: MAX_NOTE_TEXT_LENGTH,
-			nullable: false,
+			nullable: true,
 		},
 		fileIds: {
 			type: 'array',
@@ -123,6 +123,17 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				if (files.length !== fileIds.length) {
 					throw new ApiError(meta.errors.noSuchFile);
 				}
+			}
+
+			if (ps.text == null && files.length === 0) {
+				throw new ApiError({
+					message: 'Invalid param.',
+					code: 'INVALID_PARAM',
+					id: '3d81ceae-475f-4600-b2a8-2bc116157532',
+				}, {
+					param: '#/properties/text/type',
+					reason: 'must be string',
+				});
 			}
 
 			if (note.text === ps.text && note.cw === ps.cw && note.fileIds === fileIds) {

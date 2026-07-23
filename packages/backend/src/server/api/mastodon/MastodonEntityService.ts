@@ -236,15 +236,31 @@ export class MastodonEntityService {
 	public statusEdits(note: Packed<'Note'>, voterCounts?: ReadonlyMap<string, number>) {
 		const historical = [...(note.history ?? [])]
 			.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
-			.map(revision => ({
-				account: this.account(note.user),
-				content: this.render(revision.text ?? ''),
-				spoiler_text: revision.cw ?? '',
-				sensitive: false,
-				created_at: revision.createdAt,
-				media_attachments: [],
-				emojis: [],
-			}));
+			.map(revision => {
+				const files = revision.files ?? [];
+				const isPureRenote = revision.renote != null && revision.text == null && files.length === 0 && revision.poll == null;
+				const renoteVoterCounts = revision.renote == null || revision.renotePollVotersCount == null
+					? undefined
+					: new Map([[revision.renote.id, revision.renotePollVotersCount]]);
+				return {
+					account: this.account(note.user),
+					content: this.render(revision.text ?? ''),
+					spoiler_text: revision.cw ?? '',
+					sensitive: revision.sensitive ?? files.some(file => file.isSensitive),
+					created_at: revision.createdAt,
+					media_attachments: files.map(file => this.attachment(file)),
+					emojis: this.emojis(revision.emojiUrls),
+					...(revision.poll == null ? {} : {
+						poll: this.poll(note.id, revision.poll, revision.pollVotersCount),
+					}),
+					...(revision.renote != null && !isPureRenote ? {
+						quote: {
+							state: 'accepted',
+							quoted_status: this.statusEntity(revision.renote, true, renoteVoterCounts),
+						},
+					} : {}),
+				};
+			});
 		const files = note.files ?? [];
 		const current = {
 			account: this.account(note.user),

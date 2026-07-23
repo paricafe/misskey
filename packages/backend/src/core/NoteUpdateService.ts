@@ -7,11 +7,12 @@ import { Injectable, Inject } from '@nestjs/common';
 import * as mfm from 'mfm-js';
 import type { MiUser, MiLocalUser, MiRemoteUser } from '@/models/User.js';
 import type { MiNote } from '@/models/Note.js';
-import type { InstancesRepository, MiDriveFile, NotesRepository, UsersRepository } from '@/models/_.js';
+import type { InstancesRepository, MiDriveFile, NotesRepository, PollsRepository, PollVotesRepository, UsersRepository } from '@/models/_.js';
 import { RelayService } from '@/core/RelayService.js';
 import { FederatedInstanceService } from '@/core/FederatedInstanceService.js';
 import { DI } from '@/di-symbols.js';
 import type { Config } from '@/config.js';
+import type { Packed } from '@/misc/json-schema.js';
 import NotesChart from '@/core/chart/charts/notes.js';
 import PerUserNotesChart from '@/core/chart/charts/per-user-notes.js';
 import InstanceChart from '@/core/chart/charts/instance.js';
@@ -44,6 +45,11 @@ type Option = {
 	apEmojis?: string[] | null;
 };
 
+type PollSnapshot = {
+	poll?: NonNullable<Packed<'Note'>['poll']>;
+	votersCount?: number;
+};
+
 @Injectable()
 export class NoteUpdateService {
 	constructor(
@@ -58,6 +64,12 @@ export class NoteUpdateService {
 
 		@Inject(DI.instancesRepository)
 		private instancesRepository: InstancesRepository,
+
+		@Inject(DI.pollsRepository)
+		private pollsRepository: PollsRepository,
+
+		@Inject(DI.pollVotesRepository)
+		private pollVotesRepository: PollVotesRepository,
 
 		private customEmojiService: CustomEmojiService,
 		private driveFileEntityService: DriveFileEntityService,
@@ -90,6 +102,10 @@ export class NoteUpdateService {
 			throw new Error('update time is required');
 		}
 
+		if ((data.text == null || data.text.length === 0) && (data.files?.length ?? 0) === 0) {
+			throw new Error('Note must have text or files');
+		}
+
 		if (note.history && note.history.findIndex(h => h.createdAt === data.updatedAt?.toISOString()) !== -1) {
 			// Same history already exists, skip this
 			return note;
@@ -118,6 +134,8 @@ export class NoteUpdateService {
 		if (this.utilityService.isMediaSilencedHost(meta.mediaSilencedHosts, user.host)) emojis = [];
 
 		tags = tags.filter(tag => Array.from(tag).length <= 128).splice(0, 32);
+
+		const oldRevision = await this.snapshotRevision(user, note);
 
 		const newNote: MiNote = {
 			...note,
@@ -154,11 +172,7 @@ export class NoteUpdateService {
 		}
 
 		// Check if is latest or previous version
-		const history = [...(note.history || []), {
-			createdAt: (note.updatedAt || this.idService.parse(note.id).date).toISOString(),
-			cw: note.cw,
-			text: note.text,
-		}];
+		const history = [...(note.history || []), oldRevision];
 		let updatedNote: MiNote;
 		if (note.updatedAt && note.updatedAt >= data.updatedAt) {
 			// Previous version, just update history
@@ -200,6 +214,113 @@ export class NoteUpdateService {
 		// }
 
 		return updatedNote;
+	}
+
+	private async snapshotRevision(
+		user: { id: MiUser['id'] },
+		note: MiNote,
+	): Promise<NonNullable<MiNote['history']>[number]> {
+		const [packed, pollSnapshot, renoteSnapshot] = await Promise.all([
+			this.noteEntityService.pack(note, user, {
+				detail: false,
+				skipHide: true,
+			}),
+			this.snapshotPoll(note, user.id),
+			this.snapshotRenote(note.renoteId, user),
+		]);
+		const files = (packed.files ?? []).map(file => ({
+			...file,
+			properties: { ...file.properties },
+		}));
+
+		return {
+			createdAt: (note.updatedAt || this.idService.parse(note.id).date).toISOString(),
+			cw: note.cw,
+			text: note.text,
+			fileIds: [...note.fileIds],
+			files,
+			sensitive: files.some(file => file.isSensitive) || packed.channel?.isSensitive === true,
+			emojis: [...note.emojis],
+			emojiUrls: { ...(packed.emojis ?? {}) },
+			...(pollSnapshot.poll == null ? {} : { poll: pollSnapshot.poll }),
+			...(pollSnapshot.votersCount == null ? {} : { pollVotersCount: pollSnapshot.votersCount }),
+			renote: renoteSnapshot.renote,
+			...(renoteSnapshot.votersCount == null ? {} : { renotePollVotersCount: renoteSnapshot.votersCount }),
+		};
+	}
+
+	private async snapshotPoll(note: Pick<MiNote, 'id' | 'hasPoll'>, userId: MiUser['id']): Promise<PollSnapshot> {
+		if (!note.hasPoll) return {};
+
+		const poll = await this.pollsRepository.findOneByOrFail({ noteId: note.id });
+		const votes = await this.pollVotesRepository.findBy({
+			noteId: note.id,
+			userId,
+		});
+		const votedChoices = new Set(votes.map(vote => vote.choice));
+		const snapshot: PollSnapshot = {
+			poll: {
+				multiple: poll.multiple,
+				expiresAt: poll.expiresAt?.toISOString() ?? null,
+				choices: poll.choices.map((text, index) => ({
+					text,
+					votes: poll.votes[index] ?? 0,
+					isVoted: votedChoices.has(index),
+				})),
+			},
+		};
+
+		if (poll.multiple) {
+			const row = await this.pollVotesRepository.createQueryBuilder('vote')
+				.select('COUNT(DISTINCT vote."userId")', 'count')
+				.where('vote."noteId" = :noteId', { noteId: note.id })
+				.getRawOne<{ count: number | string }>();
+			const votersCount = Number(row?.count ?? 0);
+			if (Number.isSafeInteger(votersCount) && votersCount >= 0) {
+				snapshot.votersCount = votersCount;
+			}
+		}
+
+		return snapshot;
+	}
+
+	private async snapshotRenote(
+		renoteId: MiNote['renoteId'],
+		user: { id: MiUser['id'] },
+	): Promise<{ renote: Packed<'Note'> | null; votersCount?: number }> {
+		if (renoteId == null) return { renote: null };
+
+		const note = await this.notesRepository.findOneBy({ id: renoteId });
+		if (note == null) return { renote: null };
+
+		const [packed, pollSnapshot] = await Promise.all([
+			this.noteEntityService.pack(note, user, {
+				detail: false,
+				skipHide: true,
+			}),
+			this.snapshotPoll(note, user.id),
+		]);
+		const bounded = {
+			...packed,
+			files: (packed.files ?? []).map(file => ({
+				...file,
+				properties: { ...file.properties },
+			})),
+			emojis: { ...(packed.emojis ?? {}) },
+			reactions: {},
+			reactionEmojis: {},
+			...(pollSnapshot.poll == null ? {} : { poll: pollSnapshot.poll }),
+		};
+		delete bounded.history;
+		delete bounded.reply;
+		delete bounded.renote;
+		delete bounded.visibleUserIds;
+		delete bounded.reactionAndUserPairCache;
+
+		return {
+			renote: bounded,
+			...(pollSnapshot.votersCount == null ? {} : { votersCount: pollSnapshot.votersCount }),
+		};
 	}
 
 	@bindThis

@@ -490,7 +490,44 @@ describe(MastodonEntityService, () => {
 			renote: quoted,
 			history: [
 				{ createdAt: '2025-02-03T03:00:00.000Z', text: 'Second', cw: null },
-				{ createdAt: '2025-02-03T02:00:00.000Z', text: 'First', cw: 'Old CW' },
+				{
+					createdAt: '2025-02-03T02:00:00.000Z',
+					text: 'First',
+					cw: 'Old CW',
+					fileIds: ['old-file-id'],
+					files: [{
+						...note.files[0],
+						id: 'old-file-id',
+						url: 'https://cdn.example/old-image.png',
+						isSensitive: false,
+					}],
+					sensitive: false,
+					emojis: ['old_party'],
+					emojiUrls: { old_party: 'https://cdn.example/old-party.webp' },
+					poll: {
+						expiresAt: null,
+						multiple: true,
+						choices: [
+							{ text: 'Old A', votes: 4, isVoted: false },
+							{ text: 'Old B', votes: 2, isVoted: true },
+						],
+					},
+					pollVotersCount: 5,
+					renote: {
+						...quoted,
+						id: 'old-quoted-note-id',
+						text: 'Historical quote',
+						poll: {
+							expiresAt: null,
+							multiple: true,
+							choices: [
+								{ text: 'Quoted A', votes: 3, isVoted: false },
+								{ text: 'Quoted B', votes: 1, isVoted: false },
+							],
+						},
+					},
+					renotePollVotersCount: 3,
+				},
 			],
 		} as never, new Map([
 			['note-id', 2],
@@ -507,11 +544,39 @@ describe(MastodonEntityService, () => {
 			content: expect.any(String),
 			spoiler_text: 'Old CW',
 			sensitive: false,
+			media_attachments: [expect.objectContaining({
+				id: 'old-file-id',
+				url: 'https://cdn.example/old-image.png',
+			})],
+			emojis: [expect.objectContaining({
+				shortcode: 'old_party',
+				url: 'https://cdn.example/old-party.webp',
+			})],
+			poll: expect.objectContaining({
+				id: 'note-id',
+				votes_count: 6,
+				voters_count: 5,
+			}),
+			quote: {
+				state: 'accepted',
+				quoted_status: expect.objectContaining({
+					id: 'old-quoted-note-id',
+					poll: expect.objectContaining({
+						votes_count: 4,
+						voters_count: 3,
+					}),
+				}),
+			},
+		});
+		expect(edits[1]).toMatchObject({
+			content: expect.any(String),
+			spoiler_text: '',
+			sensitive: false,
 			media_attachments: [],
 			emojis: [],
 		});
-		expect(edits[0]).not.toHaveProperty('poll');
-		expect(edits[0]).not.toHaveProperty('quote');
+		expect(edits[1]).not.toHaveProperty('poll');
+		expect(edits[1]).not.toHaveProperty('quote');
 		expect(edits.at(-1)).toMatchObject({
 			spoiler_text: 'CW',
 			sensitive: true,
