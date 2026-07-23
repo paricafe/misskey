@@ -1408,8 +1408,8 @@ describe(MastodonApiServerService, () => {
 	test('declares public batch lookups and profile-compatible credential verification', () => {
 		const contract = (path: string) => MASTODON_4_6_USER_ROUTES.find(route => route.method === 'GET' && route.path === path);
 
-		expect(contract('/api/v1/accounts')).toMatchObject({ auth: 'public', scope: 'read:accounts' });
-		expect(contract('/api/v1/statuses')).toMatchObject({ auth: 'public', scope: 'read:statuses' });
+		expect(contract('/api/v1/accounts')).toMatchObject({ auth: 'public', scope: 'read:accounts', introducedIn: '4.3.0' });
+		expect(contract('/api/v1/statuses')).toMatchObject({ auth: 'public', scope: 'read:statuses', introducedIn: '4.3.0' });
 		expect(contract('/api/v1/accounts/verify_credentials')).toMatchObject({ auth: 'user', scope: ['profile', 'read:accounts'] });
 	});
 
@@ -3659,6 +3659,7 @@ describe(MastodonApiServerService, () => {
 
 		expect(v1.json().approval_required).toBe(true);
 		expect(v2.json().registrations.approval_required).toBe(true);
+		expect(v2.json().registrations.reason_required).toBe(true);
 	});
 
 	test('uses the instance icon as the discovery image when no banner is configured', async () => {

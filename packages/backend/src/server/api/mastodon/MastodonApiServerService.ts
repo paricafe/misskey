@@ -2319,7 +2319,12 @@ export class MastodonApiServerService {
 				},
 				polls: { max_options: 10, max_characters_per_option: 50, min_expiration: 300, max_expiration: 2629746 },
 			},
-			registrations: { enabled: !this.meta.disableRegistration, approval_required: this.meta.approvalRequiredForSignup, message: null },
+			registrations: {
+				enabled: !this.meta.disableRegistration,
+				approval_required: this.meta.approvalRequiredForSignup,
+				reason_required: this.meta.approvalRequiredForSignup,
+				message: null,
+			},
 			contact: { email: this.meta.maintainerEmail ?? '', account: null },
 			rules: this.rules(),
 		};
