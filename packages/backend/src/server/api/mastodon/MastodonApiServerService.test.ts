@@ -908,25 +908,73 @@ describe(MastodonApiServerService, () => {
 		}
 	});
 
-	test('keeps nested JSON and form-encoded polls compatible', async () => {
+	test.each([
+		{
+			name: 'nested JSON',
+			headers: {},
+			payload: { status: 'nested', poll: { options: ['Cats, dogs', 'Birds'], expires_in: 300 } },
+		},
+		{
+			name: 'form-encoded input',
+			headers: { 'content-type': 'application/x-www-form-urlencoded' },
+			payload: 'status=form&poll%5Boptions%5D%5B%5D=Cats%2C%20dogs&poll%5Boptions%5D%5B%5D=Birds&poll%5Bexpires_in%5D=300',
+		},
+	])('preserves commas in $name poll options', async ({ headers, payload }) => {
 		const { fastify, nativeInvoke } = createServer();
-		const nestedJson = await fastify.inject({
+		const response = await fastify.inject({
+			method: 'POST',
+			url: '/api/v1/statuses',
+			headers: { authorization: 'Bearer user-token', ...headers },
+			payload,
+		});
+
+		expect(response.statusCode).toBe(200);
+		const createCalls = nativeInvoke.mock.calls.filter(([name]) => name === 'notes/create');
+		expect(createCalls).toHaveLength(1);
+		expect(createCalls[0]?.[1]).toMatchObject({
+			poll: { choices: ['Cats, dogs', 'Birds'], multiple: false, expiredAfter: 300000 },
+		});
+	});
+
+	test.each([
+		{
+			name: 'nested JSON',
+			headers: {},
+			payload: { status: 'nested', poll: { options: ['Cats, dogs'], expires_in: 300 } },
+		},
+		{
+			name: 'form-encoded input',
+			headers: { 'content-type': 'application/x-www-form-urlencoded' },
+			payload: 'status=form&poll%5Boptions%5D%5B%5D=Cats%2C%20dogs&poll%5Bexpires_in%5D=300',
+		},
+	])('rejects a single comma-containing $name poll option', async ({ headers, payload }) => {
+		const { fastify, nativeInvoke } = createServer();
+		const response = await fastify.inject({
+			method: 'POST',
+			url: '/api/v1/statuses',
+			headers: { authorization: 'Bearer user-token', ...headers },
+			payload,
+		});
+
+		expect(response.statusCode).toBe(422);
+		expect(nativeInvoke.mock.calls.some(([name]) => name === 'notes/create')).toBe(false);
+	});
+
+	test.each([
+		{ options: 'Cats, dogs' },
+		{ options: ['Cats', ['dogs']] },
+		{ options: ['Cats', 2] },
+	])('rejects malformed poll option representations', async poll => {
+		const { fastify, nativeInvoke } = createServer();
+		const response = await fastify.inject({
 			method: 'POST',
 			url: '/api/v1/statuses',
 			headers: { authorization: 'Bearer user-token' },
-			payload: { status: 'nested', poll: { options: ['A', 'B'], expires_in: 300 } },
-		});
-		const formEncoded = await fastify.inject({
-			method: 'POST',
-			url: '/api/v1/statuses',
-			headers: { authorization: 'Bearer user-token', 'content-type': 'application/x-www-form-urlencoded' },
-			payload: 'status=form&poll%5Boptions%5D%5B%5D=A&poll%5Boptions%5D%5B%5D=B&poll%5Bexpires_in%5D=300',
+			payload: { status: 'invalid', poll: { ...poll, expires_in: 300 } },
 		});
 
-		expect([nestedJson.statusCode, formEncoded.statusCode]).toEqual([200, 200]);
-		expect(nativeInvoke).toHaveBeenCalledWith('notes/create', expect.objectContaining({
-			poll: { choices: ['A', 'B'], multiple: false, expiredAfter: 300000 },
-		}), expect.any(Object), expect.any(Object));
+		expect(response.statusCode).toBe(422);
+		expect(nativeInvoke.mock.calls.some(([name]) => name === 'notes/create')).toBe(false);
 	});
 
 	test('requires scheduled statuses to be at least five minutes in the future', async () => {

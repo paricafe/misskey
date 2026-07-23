@@ -1769,9 +1769,9 @@ export class MastodonApiServerService {
 		const hasPoll = nested != null || Object.keys(body).some(key => key.startsWith('poll['));
 		if (!hasPoll) return undefined;
 		const rawChoices = body['poll[options][]'] ?? nested?.options;
-		const choices = this.strings(rawChoices);
+		const choices = this.pollOptions(rawChoices);
 		const expiresRaw = body['poll[expires_in]'] ?? nested?.expires_in;
-		if (choices.length < 2 || this.hasEmptyPollOption(rawChoices)) {
+		if (choices.length < 2 || choices.some(choice => choice.trim() === '')) {
 			throw new MastodonApiError(422, 'unprocessable_entity', 'A poll requires at least two non-empty options');
 		}
 		if (expiresRaw == null || expiresRaw === '') {
@@ -1795,10 +1795,11 @@ export class MastodonApiServerService {
 		};
 	}
 
-	private hasEmptyPollOption(value: unknown): boolean {
-		if (Array.isArray(value)) return value.some(option => this.hasEmptyPollOption(option));
-		const option = this.string(value);
-		return option == null || option.split(',').some(part => part.trim() === '');
+	private pollOptions(value: unknown): string[] {
+		if (!Array.isArray(value) || value.some(option => typeof option !== 'string')) {
+			throw new MastodonApiError(422, 'unprocessable_entity', 'poll.options must be an array of strings');
+		}
+		return value;
 	}
 
 	private pollBoolean(value: unknown, name: string): boolean {
