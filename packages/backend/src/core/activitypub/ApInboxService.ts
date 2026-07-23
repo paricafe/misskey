@@ -791,6 +791,12 @@ export class ApInboxService {
 			this.logger.error(`Resolution failed: ${e}`);
 			throw e;
 		});
+		if (
+			(getApType(object) === 'Question' || isPost(object)) &&
+			(object.attributedTo == null || actor.uri !== getOneApId(object.attributedTo))
+		) {
+			return 'skip: actor does not match object author';
+		}
 
 		if (isActor(object)) {
 			await this.apPersonService.updatePerson(actor.uri, resolver, object);
@@ -799,9 +805,6 @@ export class ApInboxService {
 			await this.apQuestionService.updateQuestion(object, actor, resolver).catch(err => console.error(err));
 			return 'ok: Question updated';
 		} else if (isPost(object)) {
-			if (object.attributedTo == null || actor.uri !== getOneApId(object.attributedTo)) {
-				return 'skip: actor does not match object author';
-			}
 			await this.apNoteService.updateNote(object, resolver);
 			return 'ok: Post updated';
 		} else {

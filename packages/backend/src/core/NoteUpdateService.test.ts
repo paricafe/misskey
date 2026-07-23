@@ -111,6 +111,20 @@ function createService(lockedNote: MiNote = note) {
 	const driveFileEntityService = {
 		packManyByIds: vi.fn().mockResolvedValue([]),
 	};
+	const userEntityService = {
+		isLocalUser: vi.fn().mockReturnValue(false),
+	};
+	const relayService = {
+		deliverToRelays: vi.fn(),
+	};
+	const apRendererService = {
+		renderNote: vi.fn(),
+		renderUpdateNote: vi.fn(),
+		addContext: vi.fn(),
+	};
+	const apDeliverManagerService = {
+		createDeliverManager: vi.fn(),
+	};
 	const service = new NoteUpdateService(
 		{} as never,
 		{} as never,
@@ -120,14 +134,14 @@ function createService(lockedNote: MiNote = note) {
 		pollVotesRepository as never,
 		customEmojiService as never,
 		driveFileEntityService as never,
-		{ isLocalUser: vi.fn().mockReturnValue(false) } as never,
+		userEntityService as never,
 		noteEntityService as never,
 		globalEventService as never,
+		relayService as never,
 		{} as never,
 		{} as never,
-		{} as never,
-		{} as never,
-		{} as never,
+		apRendererService as never,
+		apDeliverManagerService as never,
 		{ fetch: vi.fn().mockResolvedValue({ mediaSilencedHosts: [] }) } as never,
 		searchService as never,
 		{} as never,
@@ -149,6 +163,10 @@ function createService(lockedNote: MiNote = note) {
 		globalEventService,
 		searchService,
 		lockedNotesRepository,
+		userEntityService,
+		relayService,
+		apRendererService,
+		apDeliverManagerService,
 	};
 }
 
@@ -501,10 +519,24 @@ describe(NoteUpdateService, () => {
 	});
 
 	test('emits no external side effects when persistence fails', async () => {
-		const { service, notesRepository, globalEventService, searchService } = createService();
+		const nonLocalOnlyNote = {
+			...note,
+			localOnly: false,
+		} as MiNote;
+		const {
+			service,
+			notesRepository,
+			globalEventService,
+			searchService,
+			userEntityService,
+			relayService,
+			apRendererService,
+			apDeliverManagerService,
+		} = createService(nonLocalOnlyNote);
+		userEntityService.isLocalUser.mockReturnValue(true);
 		notesRepository.update.mockRejectedValueOnce(new Error('database write failed'));
 
-		await expect(service.update(user, note, {
+		await expect(service.update(user, nonLocalOnlyNote, {
 			text: 'New text',
 			cw: null,
 			files: [],
@@ -515,6 +547,9 @@ describe(NoteUpdateService, () => {
 
 		expect(globalEventService.publishNoteStream).not.toHaveBeenCalled();
 		expect(searchService.indexNote).not.toHaveBeenCalled();
+		expect(apRendererService.renderNote).not.toHaveBeenCalled();
+		expect(apDeliverManagerService.createDeliverManager).not.toHaveBeenCalled();
+		expect(relayService.deliverToRelays).not.toHaveBeenCalled();
 	});
 
 	test('serializes concurrent edits and builds both history revisions from the locked committed note', async () => {

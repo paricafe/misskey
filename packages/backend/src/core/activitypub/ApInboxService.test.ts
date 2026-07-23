@@ -89,4 +89,44 @@ describe(ApInboxService, () => {
 		expect(result).toBe('ok: Post updated');
 		expect(apNoteService.updateNote).toHaveBeenCalledWith(object, expect.anything());
 	});
+
+	test('rejects a Question update whose attributed author differs from the signed activity actor', async () => {
+		const apQuestionService = {
+			updateQuestion: vi.fn().mockResolvedValue(undefined),
+		};
+		const service = Object.create(ApInboxService.prototype) as ApInboxService;
+		Object.assign(service, {
+			apResolverService: {
+				createResolver: vi.fn().mockResolvedValue({
+					resolve: vi.fn().mockResolvedValue({
+						id: 'https://remote.example/notes/poll',
+						type: 'Question',
+						attributedTo: 'https://remote.example/users/bob',
+						updated: '2025-02-01T00:00:00.000Z',
+					}),
+				}),
+			},
+			apQuestionService,
+			logger: {
+				debug: vi.fn(),
+				error: vi.fn(),
+			},
+		});
+
+		const result = await (service as unknown as {
+			update: (
+				actor: { uri: string },
+				activity: { actor: string; object: string },
+			) => Promise<string>;
+		}).update(
+			{ uri: 'https://remote.example/users/alice' },
+			{
+				actor: 'https://remote.example/users/alice',
+				object: 'https://remote.example/notes/poll',
+			},
+		);
+
+		expect(result).toBe('skip: actor does not match object author');
+		expect(apQuestionService.updateQuestion).not.toHaveBeenCalled();
+	});
 });

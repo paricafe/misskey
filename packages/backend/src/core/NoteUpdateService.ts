@@ -143,6 +143,8 @@ export class NoteUpdateService {
 		if (this.utilityService.isMediaSilencedHost(meta.mediaSilencedHosts, user.host)) emojis = [];
 		tags = tags.filter(tag => Array.from(tag).length <= 128).splice(0, 32);
 
+		// Keep this transaction DB-local. ActivityPub actor, attachment, and emoji
+		// resolution must be completed by the caller before entering it.
 		const result = await this.notesRepository.manager.transaction(async transactionalEntityManager => {
 			const transactionalNotesRepository = transactionalEntityManager.getRepository(MiNote);
 			const lockedRow = await transactionalNotesRepository.findOne({

@@ -38,12 +38,27 @@ function createService(originNoteOverrides: Record<string, unknown> = {}) {
 		fileIds: ['existing-file'],
 		...originNoteOverrides,
 	};
+	let lockOwner: string | null = null;
+	const redisClient = {
+		set: vi.fn(async (_key: string, identifier: string) => {
+			if (lockOwner != null) return null;
+			lockOwner = identifier;
+			return 'OK';
+		}),
+		get: vi.fn(async () => lockOwner),
+		del: vi.fn(async () => {
+			lockOwner = null;
+			return 1;
+		}),
+	};
+	const notesRepository = {
+		findOneBy: vi.fn().mockResolvedValue(originNote),
+	};
 	const service = Object.create(ApNoteService.prototype) as ApNoteService;
 	Object.assign(service, {
 		config: { url: 'https://local.example' },
-		notesRepository: {
-			findOneBy: vi.fn().mockResolvedValue(originNote),
-		},
+		redisClient,
+		notesRepository,
 		apMfmService: {
 			htmlToMfm: vi.fn().mockReturnValue('edited text'),
 		},
@@ -64,6 +79,8 @@ function createService(originNoteOverrides: Record<string, unknown> = {}) {
 		extractEmojis,
 		originNote,
 		preparedUpdate,
+		redisClient,
+		notesRepository,
 	};
 }
 
@@ -261,5 +278,92 @@ describe(ApNoteService, () => {
 		expect(apImageService.resolveImage).not.toHaveBeenCalled();
 		expect(extractEmojis).not.toHaveBeenCalled();
 		expect(noteUpdateService.update).not.toHaveBeenCalled();
+	});
+
+	test('serializes concurrent AP updates and re-reads committed state before resolving the second attachment', async () => {
+		const {
+			service,
+			noteUpdateService,
+			apImageService,
+			notesRepository,
+		} = createService({ history: [] });
+		let currentNote = {
+			id: 'origin-note',
+			uri: 'https://remote.example/notes/1',
+			userId: 'remote-user',
+			fileIds: ['existing-file'],
+			updatedAt: null as Date | null,
+			history: [] as Array<{ createdAt: string; text: string }>,
+		};
+		notesRepository.findOneBy.mockImplementation(async () => ({ ...currentNote }));
+
+		let lockOwner: string | null = null;
+		const lockWaiters: Array<{ identifier: string; resolve: (value: string) => void }> = [];
+		const redisClient = {
+			set: vi.fn(async (_key: string, identifier: string) => {
+				if (lockOwner == null) {
+					lockOwner = identifier;
+					return 'OK';
+				}
+				return await new Promise<string>(resolve => {
+					lockWaiters.push({ identifier, resolve });
+				});
+			}),
+			get: vi.fn(async () => lockOwner),
+			del: vi.fn(async () => {
+				lockOwner = null;
+				const waiter = lockWaiters.shift();
+				if (waiter != null) {
+					lockOwner = waiter.identifier;
+					waiter.resolve('OK');
+				}
+				return 1;
+			}),
+		};
+		Object.assign(service, { redisClient });
+
+		let releaseFirstAttachment!: () => void;
+		const firstAttachmentMayFinish = new Promise<void>(resolve => {
+			releaseFirstAttachment = resolve;
+		});
+		apImageService.resolveImage.mockImplementationOnce(async () => {
+			await firstAttachmentMayFinish;
+			return { id: 'new-file' };
+		});
+		noteUpdateService.update.mockImplementationOnce(async (_actor, lockedNote, data) => {
+			currentNote = {
+				...currentNote,
+				...lockedNote,
+				updatedAt: data.updatedAt,
+				history: [{
+					createdAt: '2025-01-01T00:00:00.000Z',
+					text: 'Old text',
+				}],
+			};
+		});
+		const concurrentUpdate = {
+			...update,
+			attachment: [{ type: 'Document', url: 'https://remote.example/files/new.png' }],
+		};
+
+		const first = service.updateNote(concurrentUpdate as never);
+		await vi.waitFor(() => {
+			expect(apImageService.resolveImage).toHaveBeenCalledOnce();
+		});
+
+		const second = service.updateNote(concurrentUpdate as never);
+		await vi.waitFor(() => {
+			expect(redisClient.set).toHaveBeenCalledTimes(2);
+		});
+		expect(notesRepository.findOneBy).toHaveBeenCalledOnce();
+		expect(noteUpdateService.update).not.toHaveBeenCalled();
+
+		releaseFirstAttachment();
+		await Promise.all([first, second]);
+
+		expect(notesRepository.findOneBy).toHaveBeenCalledTimes(2);
+		expect(noteUpdateService.update).toHaveBeenCalledOnce();
+		expect(noteUpdateService.prepareUpdate).toHaveBeenCalledOnce();
+		expect(apImageService.resolveImage).toHaveBeenCalledOnce();
 	});
 });
