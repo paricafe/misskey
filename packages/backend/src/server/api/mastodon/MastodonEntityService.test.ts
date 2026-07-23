@@ -64,6 +64,19 @@ const note = {
 	myReaction: '👍',
 };
 
+function renoteTarget(id: string) {
+	return {
+		...note,
+		id,
+		text: 'Renoted note',
+		cw: null,
+		files: [],
+		poll: null,
+		renoteId: null,
+		renote: null,
+	};
+}
+
 describe(MastodonEntityService, () => {
 	const service = new MastodonEntityService(
 		{ url: 'https://misskey.example/', host: 'misskey.example' } as never,
@@ -472,6 +485,95 @@ describe(MastodonEntityService, () => {
 				reblog: null,
 			}),
 		});
+	});
+
+	test('maps a CW-only renote as a quote in the current status', () => {
+		const quoted = renoteTarget('cw-quote-target-id');
+		const status = service.status({
+			...note,
+			id: 'cw-only-quote-id',
+			text: null,
+			cw: 'Content warning',
+			files: [],
+			poll: null,
+			replyId: null,
+			renoteId: quoted.id,
+			renote: quoted,
+		} as never);
+
+		expect(status.reblog).toBeNull();
+		expect(status.quote).toEqual({
+			state: 'accepted',
+			quoted_status: expect.objectContaining({ id: quoted.id }),
+		});
+	});
+
+	test('retains a CW-only quote in the current status edit', () => {
+		const quoted = renoteTarget('current-edit-quote-target-id');
+		const edits = service.statusEdits({
+			...note,
+			text: null,
+			cw: 'Content warning',
+			files: [],
+			poll: null,
+			replyId: null,
+			renoteId: quoted.id,
+			renote: quoted,
+			history: [],
+		} as never);
+
+		expect(edits).toHaveLength(1);
+		expect(edits[0]).toMatchObject({
+			quote: {
+				state: 'accepted',
+				quoted_status: { id: quoted.id },
+			},
+		});
+	});
+
+	test('retains and resolves a CW-only quote in a historical status edit', () => {
+		const quoted = renoteTarget('historical-cw-quote-target-id');
+		const edits = service.statusEdits({
+			...note,
+			text: 'Current revision',
+			cw: null,
+			files: [],
+			poll: null,
+			renoteId: quoted.id,
+			renote: quoted,
+			history: [{
+				createdAt: '2025-02-03T02:00:00.000Z',
+				text: null,
+				cw: 'Historical content warning',
+				renoteId: quoted.id,
+			}],
+		} as never, undefined, new Map([[quoted.id, quoted as never]]));
+
+		expect(edits[0]).toMatchObject({
+			spoiler_text: 'Historical content warning',
+			quote: {
+				state: 'accepted',
+				quoted_status: { id: quoted.id },
+			},
+		});
+	});
+
+	test('keeps a true pure renote as a reblog', () => {
+		const renoted = renoteTarget('pure-renote-target-id');
+		const status = service.status({
+			...note,
+			id: 'pure-renote-id',
+			text: null,
+			cw: null,
+			files: [],
+			poll: null,
+			replyId: null,
+			renoteId: renoted.id,
+			renote: renoted,
+		} as never);
+
+		expect(status.quote).toBeNull();
+		expect(status.reblog).toEqual(expect.objectContaining({ id: renoted.id }));
 	});
 
 	test('converts stored Note revisions oldest-to-newest and includes the current revision', () => {

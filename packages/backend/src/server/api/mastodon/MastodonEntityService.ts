@@ -17,6 +17,20 @@ import type { MastodonReportInput } from './MastodonReportService.js';
 
 type PackedUser = Packed<'UserLite'> & Partial<Packed<'UserDetailedNotMeOnly'>>;
 
+function isPureRenote(note: {
+	text?: string | null;
+	cw?: string | null;
+	files?: readonly unknown[];
+	poll?: unknown | null;
+	replyId?: string | null;
+}): boolean {
+	return note.text == null &&
+		note.cw == null &&
+		(note.files?.length ?? 0) === 0 &&
+		note.poll == null &&
+		note.replyId == null;
+}
+
 export async function resolvePollVoterCounts(notesRepository: NotesRepository, notes: Packed<'Note'>[]): Promise<ReadonlyMap<string, number>> {
 	const noteIds = new Set<string>();
 	const visited = new Set<string>();
@@ -183,7 +197,7 @@ export class MastodonEntityService {
 		const localUrl = new URL(`/notes/${note.id}`, this.config.url).toString();
 		const url = note.url ?? note.uri ?? localUrl;
 		const files = note.files ?? [];
-		const isPureRenote = note.renote != null && note.text == null && files.length === 0 && note.poll == null && note.replyId == null;
+		const isPure = note.renote != null && isPureRenote(note);
 
 		return {
 			id: note.id,
@@ -202,8 +216,8 @@ export class MastodonEntityService {
 			favourites_count: note.reactionCount,
 			quotes_count: 0,
 			content: this.render(note.text ?? ''),
-			reblog: !shallow && isPureRenote ? this.statusEntity(note.renote!, true, voterCounts) : null,
-			quote: !shallow && !isPureRenote && note.renote != null ? {
+			reblog: !shallow && isPure ? this.statusEntity(note.renote!, true, voterCounts) : null,
+			quote: !shallow && !isPure && note.renote != null ? {
 				state: 'accepted',
 				quoted_status: this.statusEntity(note.renote, true, voterCounts),
 			} : null,
@@ -256,11 +270,10 @@ export class MastodonEntityService {
 						...revision.poll,
 						choices: revision.poll.choices.map(choice => ({ ...choice, isVoted: false })),
 					};
-				const hasQuote = renoteId != null && (
-					revision.text != null ||
-					files.length > 0 ||
-					poll != null
-				);
+				const hasQuote = renoteId != null && !isPureRenote({
+					...revision,
+					replyId: note.replyId,
+				});
 				return {
 					account: this.account(note.user),
 					content: this.render(revision.text ?? ''),
@@ -290,7 +303,7 @@ export class MastodonEntityService {
 			media_attachments: files.map(file => this.attachment(file)),
 			emojis: this.emojis(note.emojis),
 			...(note.poll == null ? {} : { poll: this.poll(note.id, note.poll, voterCounts?.get(note.id)) }),
-			...(note.renote != null && !(note.text == null && files.length === 0 && note.poll == null && note.replyId == null) ? {
+			...(note.renote != null && !isPureRenote(note) ? {
 				quote: {
 					state: 'accepted',
 					quoted_status: this.statusEntity(note.renote, true, voterCounts),
