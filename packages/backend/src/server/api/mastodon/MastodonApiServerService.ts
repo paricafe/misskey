@@ -2306,6 +2306,7 @@ export class MastodonApiServerService {
 	}
 
 	private async quotePage(noteId: string, request: MastodonRequest, auth: MastodonUserAuth | null): Promise<{ quotes: Packed<'Note'>[]; source: { id: string }[] }> {
+		const nativeBatchLimit = 100;
 		const pagination = this.mastodonPaginationService.toMisskey(request.query as Dictionary, 40);
 		const newerTraversal = pagination.sinceId != null && pagination.untilId == null;
 		const quotes: Packed<'Note'>[] = [];
@@ -2313,12 +2314,13 @@ export class MastodonApiServerService {
 		let sinceId = pagination.sinceId;
 		let lastSourceId: string | undefined;
 		let pagesScanned = 0;
+		let nativeExhausted = false;
 
-		while (pagesScanned < 10 && quotes.length < pagination.limit + 1) {
+		while (!nativeExhausted && pagesScanned < 10 && quotes.length < pagination.limit + 1) {
 			const renotes = await this.invokePublic('notes/renotes', {
 				noteId,
 				...(newerTraversal ? {} : pagination),
-				limit: 100,
+				limit: nativeBatchLimit,
 				...(newerTraversal
 					? (sinceId != null ? { sinceId } : {})
 					: (untilId != null ? { untilId } : {})),
@@ -2333,11 +2335,12 @@ export class MastodonApiServerService {
 				untilId = lastSourceId;
 			}
 			quotes.push(...renotes.filter(note => note.renoteId != null && !this.isPurePackedRenote(note)));
+			nativeExhausted = renotes.length < nativeBatchLimit;
 		}
 
 		const page = (newerTraversal ? [...quotes].reverse() : quotes).slice(0, pagination.limit);
 		const source = page.flatMap(note => note.id == null ? [] : [{ id: note.id }]);
-		if (pagesScanned === 10 && quotes.length < pagination.limit + 1 && lastSourceId != null) {
+		if (!nativeExhausted && pagesScanned === 10 && quotes.length < pagination.limit + 1 && lastSourceId != null) {
 			if (newerTraversal) {
 				if (source[0]?.id !== lastSourceId) source.unshift({ id: lastSourceId });
 			} else if (source.at(-1)?.id !== lastSourceId) {

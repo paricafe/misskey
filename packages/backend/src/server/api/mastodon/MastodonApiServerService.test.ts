@@ -1152,7 +1152,7 @@ describe(MastodonApiServerService, () => {
 
 	test('scans past pure boost pages to return older quotes without using boost cursors', async () => {
 		const { fastify, nativeInvoke, linkHeader, toMisskey } = createServer();
-		const pureBoosts = Array.from({ length: 20 }, (_, index) => ({
+		const pureBoosts = Array.from({ length: 100 }, (_, index) => ({
 			id: `boost-${index.toString().padStart(2, '0')}`,
 			renoteId: 'note-id',
 			text: null,
@@ -1197,16 +1197,27 @@ describe(MastodonApiServerService, () => {
 	test('uses the last consumed boost as the quote continuation cursor at the safety bound', async () => {
 		const { fastify, nativeInvoke, linkHeader, toMisskey } = createServer();
 		const pages = [
-			[{ id: 'quote-id', renoteId: 'note-id', text: 'My quote', cw: null, files: [], poll: null, replyId: null }],
-			...Array.from({ length: 9 }, (_, index) => [{
-				id: `boost-page-${index + 2}`,
+			[
+				{ id: 'quote-id', renoteId: 'note-id', text: 'My quote', cw: null, files: [], poll: null, replyId: null },
+				...Array.from({ length: 99 }, (_, index) => ({
+					id: `boost-page-1-${index}`,
+					renoteId: 'note-id',
+					text: null,
+					cw: null,
+					files: [],
+					poll: null,
+					replyId: null,
+				})),
+			],
+			...Array.from({ length: 9 }, (_, page) => Array.from({ length: 100 }, (_, index) => ({
+				id: `boost-page-${page + 2}-${index}`,
 				renoteId: 'note-id',
 				text: null,
 				cw: null,
 				files: [],
 				poll: null,
 				replyId: null,
-			}]),
+			}))),
 		];
 		toMisskey.mockReturnValue({ limit: 1 });
 		nativeInvoke.mockImplementation(async name => name === 'notes/renotes' ? pages.shift() ?? [] : []);
@@ -1222,7 +1233,7 @@ describe(MastodonApiServerService, () => {
 		expect(nativeInvoke.mock.calls.filter(([name]) => name === 'notes/renotes')).toHaveLength(10);
 		expect(linkHeader).toHaveBeenCalledWith(expect.any(String), [
 			{ id: 'quote-id' },
-			{ id: 'boost-page-10' },
+			{ id: 'boost-page-10-99' },
 		]);
 	});
 
@@ -1321,16 +1332,42 @@ describe(MastodonApiServerService, () => {
 	test('does not create a safety-bound cursor when the tenth native quote page is empty', async () => {
 		const { fastify, nativeInvoke, linkHeader, toMisskey } = createServer();
 		const pages = [
-			...Array.from({ length: 9 }, (_, index) => [{
-				id: `boost-page-${index + 1}`,
+			...Array.from({ length: 9 }, (_, page) => Array.from({ length: 100 }, (_, index) => ({
+				id: `boost-page-${page + 1}-${index}`,
 				renoteId: 'note-id',
 				text: null,
 				cw: null,
 				files: [],
 				poll: null,
 				replyId: null,
-			}]),
+			}))),
 			[],
+		];
+		toMisskey.mockReturnValue({ limit: 1 });
+		linkHeader.mockReturnValue(null);
+		nativeInvoke.mockImplementation(async name => name === 'notes/renotes' ? pages.shift() ?? [] : []);
+
+		const response = await fastify.inject({ method: 'GET', url: '/api/v1/statuses/note-id/quotes?limit=1', headers: { authorization: 'Bearer user-token' } });
+
+		expect(response.json()).toEqual([]);
+		expect(nativeInvoke.mock.calls.filter(([name]) => name === 'notes/renotes')).toHaveLength(10);
+		expect(linkHeader).toHaveBeenCalledWith(expect.any(String), []);
+		expect(response.headers.link).toBeUndefined();
+	});
+
+	test('does not create a safety-bound cursor when the tenth native quote page is short', async () => {
+		const { fastify, nativeInvoke, linkHeader, toMisskey } = createServer();
+		const pages = [
+			...Array.from({ length: 9 }, (_, page) => Array.from({ length: 100 }, (_, index) => ({
+				id: `boost-${page}-${index}`,
+				renoteId: 'note-id',
+				text: null,
+				cw: null,
+				files: [],
+				poll: null,
+				replyId: null,
+			}))),
+			[{ id: 'final-boost', renoteId: 'note-id', text: null, cw: null, files: [], poll: null, replyId: null }],
 		];
 		toMisskey.mockReturnValue({ limit: 1 });
 		linkHeader.mockReturnValue(null);
