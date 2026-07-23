@@ -9,15 +9,17 @@ import {
 	MAX_NOTE_HISTORY_BYTES,
 	MAX_NOTE_HISTORY_REVISIONS,
 	NOTE_HISTORY_LIMIT_ERROR_ID,
+	NoteUpdateService,
 } from '@/core/NoteUpdateService.js';
 import { ApNoteService } from './ApNoteService.js';
 
 function createService(originNoteOverrides: Record<string, unknown> = {}) {
 	const preparedUpdate = { noteId: 'origin-note', history: [] };
 	const noteUpdateService = {
-		isUpdateAlreadyApplied: vi.fn((note: { updatedAt?: Date | null; history?: Array<{ createdAt: string }> | null }, updatedAt: Date) =>
-			note.updatedAt?.getTime() === updatedAt.getTime() ||
-			(note.history?.some(revision => revision.createdAt === updatedAt.toISOString()) ?? false)),
+		isUpdateAlreadyApplied: vi.fn((
+			note: { updatedAt?: Date | null; history?: Array<{ createdAt: string }> | null },
+			updatedAt: Date,
+		) => NoteUpdateService.prototype.isUpdateAlreadyApplied(note as never, updatedAt)),
 		prepareUpdate: vi.fn().mockResolvedValue(preparedUpdate),
 		update: vi.fn().mockResolvedValue(undefined),
 	};
@@ -32,6 +34,7 @@ function createService(originNoteOverrides: Record<string, unknown> = {}) {
 	const originNote = {
 		id: 'origin-note',
 		uri: 'https://remote.example/notes/1',
+		userId: 'remote-user',
 		fileIds: ['existing-file'],
 		...originNoteOverrides,
 	};
@@ -73,8 +76,27 @@ const update = {
 };
 
 describe(ApNoteService, () => {
+	test('rejects an ActivityPub update whose resolved author does not own the cached note before preparing or resolving content', async () => {
+		const {
+			service,
+			noteUpdateService,
+			apImageService,
+			extractEmojis,
+		} = createService({ userId: 'different-remote-user' });
+
+		await expect(service.updateNote({
+			...update,
+			attachment: [{ type: 'Document', url: 'https://remote.example/files/new.png' }],
+		} as never)).rejects.toThrow('note author does not match');
+
+		expect(noteUpdateService.prepareUpdate).not.toHaveBeenCalled();
+		expect(apImageService.resolveImage).not.toHaveBeenCalled();
+		expect(extractEmojis).not.toHaveBeenCalled();
+		expect(noteUpdateService.update).not.toHaveBeenCalled();
+	});
+
 	test('preserves attachments when an ActivityPub update omits attachment', async () => {
-		const { service, noteUpdateService, apImageService, originNote, preparedUpdate } = createService();
+		const { service, noteUpdateService, apImageService, originNote } = createService();
 
 		await service.updateNote(update as never);
 
@@ -82,7 +104,7 @@ describe(ApNoteService, () => {
 		expect(option.files).toBeUndefined();
 		expect(apImageService.resolveImage).not.toHaveBeenCalled();
 		expect(noteUpdateService.prepareUpdate).toHaveBeenCalledWith(expect.objectContaining({ id: 'remote-user' }), originNote);
-		expect(noteUpdateService.update.mock.calls[0]?.[5]).toBe(preparedUpdate);
+		expect(noteUpdateService.update.mock.calls[0]).toHaveLength(4);
 	});
 
 	test('removes attachments when an ActivityPub update explicitly sends an empty attachment array', async () => {
@@ -152,7 +174,7 @@ describe(ApNoteService, () => {
 			originNote,
 			new Date(update.updated),
 		);
-		expect(apPersonService.resolvePerson).not.toHaveBeenCalled();
+		expect(apPersonService.resolvePerson).toHaveBeenCalledOnce();
 		expect(noteUpdateService.prepareUpdate).not.toHaveBeenCalled();
 		expect(apImageService.resolveImage).not.toHaveBeenCalled();
 		expect(extractEmojis).not.toHaveBeenCalled();
@@ -183,7 +205,58 @@ describe(ApNoteService, () => {
 			attachment: [{ type: 'Document', url: 'https://remote.example/files/new.png' }],
 		} as never)).resolves.toBeUndefined();
 
-		expect(apPersonService.resolvePerson).not.toHaveBeenCalled();
+		expect(apPersonService.resolvePerson).toHaveBeenCalledOnce();
+		expect(noteUpdateService.prepareUpdate).not.toHaveBeenCalled();
+		expect(apImageService.resolveImage).not.toHaveBeenCalled();
+		expect(extractEmojis).not.toHaveBeenCalled();
+		expect(noteUpdateService.update).not.toHaveBeenCalled();
+	});
+
+	test('treats a stale update absent from history as a repeatable no-op before resolving any side effects', async () => {
+		const {
+			service,
+			noteUpdateService,
+			apImageService,
+			apPersonService,
+			extractEmojis,
+		} = createService({
+			updatedAt: new Date('2025-03-01T00:00:00.000Z'),
+			history: [],
+		});
+		const staleUpdate = {
+			...update,
+			updated: '2025-01-01T00:00:00.000Z',
+			attachment: [{ type: 'Document', url: 'https://remote.example/files/new.png' }],
+		};
+
+		await expect(service.updateNote(staleUpdate as never)).resolves.toBeUndefined();
+		await expect(service.updateNote(staleUpdate as never)).resolves.toBeUndefined();
+
+		expect(noteUpdateService.isUpdateAlreadyApplied).toHaveBeenCalledTimes(2);
+		expect(apPersonService.resolvePerson).toHaveBeenCalledTimes(2);
+		expect(noteUpdateService.prepareUpdate).not.toHaveBeenCalled();
+		expect(apImageService.resolveImage).not.toHaveBeenCalled();
+		expect(extractEmojis).not.toHaveBeenCalled();
+		expect(noteUpdateService.update).not.toHaveBeenCalled();
+	});
+
+	test('rejects a stale update whose resolved author does not own the cached note', async () => {
+		const {
+			service,
+			noteUpdateService,
+			apImageService,
+			extractEmojis,
+		} = createService({
+			userId: 'different-remote-user',
+			updatedAt: new Date('2025-03-01T00:00:00.000Z'),
+		});
+
+		await expect(service.updateNote({
+			...update,
+			updated: '2025-01-01T00:00:00.000Z',
+			attachment: [{ type: 'Document', url: 'https://remote.example/files/new.png' }],
+		} as never)).rejects.toThrow('note author does not match');
+
 		expect(noteUpdateService.prepareUpdate).not.toHaveBeenCalled();
 		expect(apImageService.resolveImage).not.toHaveBeenCalled();
 		expect(extractEmojis).not.toHaveBeenCalled();

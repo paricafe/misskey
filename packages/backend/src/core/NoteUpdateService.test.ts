@@ -31,7 +31,7 @@ const oldFile = {
 	user: null,
 };
 
-function createService() {
+function createService(lockedNote: MiNote = note) {
 	const notesRepository = {
 		update: vi.fn().mockResolvedValue(undefined),
 		findOneBy: vi.fn().mockResolvedValue({
@@ -39,6 +39,16 @@ function createService() {
 			hasPoll: true,
 		}),
 	};
+	const lockedNotesRepository = {
+		findOne: vi.fn().mockResolvedValue(lockedNote),
+		update: notesRepository.update,
+	};
+	Object.assign(notesRepository, {
+		manager: {
+			transaction: vi.fn(async (callback: (manager: { getRepository: () => typeof lockedNotesRepository }) => Promise<unknown>) =>
+				callback({ getRepository: () => lockedNotesRepository })),
+		},
+	});
 	const pollsRepository = {
 		findOneByOrFail: vi.fn(async ({ noteId }: { noteId: string }) => ({
 			noteId,
@@ -98,6 +108,9 @@ function createService() {
 	};
 	const globalEventService = { publishNoteStream: vi.fn() };
 	const searchService = { indexNote: vi.fn() };
+	const driveFileEntityService = {
+		packManyByIds: vi.fn().mockResolvedValue([]),
+	};
 	const service = new NoteUpdateService(
 		{} as never,
 		{} as never,
@@ -106,7 +119,7 @@ function createService() {
 		pollsRepository as never,
 		pollVotesRepository as never,
 		customEmojiService as never,
-		{} as never,
+		driveFileEntityService as never,
 		{ isLocalUser: vi.fn().mockReturnValue(false) } as never,
 		noteEntityService as never,
 		globalEventService as never,
@@ -135,6 +148,7 @@ function createService() {
 		customEmojiService,
 		globalEventService,
 		searchService,
+		lockedNotesRepository,
 	};
 }
 
@@ -207,7 +221,7 @@ describe(NoteUpdateService, () => {
 		expect(noteEntityService.pack).toHaveBeenCalledTimes(1);
 	});
 
-	test('reuses a prepared bounded snapshot without packing the old revision twice', async () => {
+	test('rebuilds a preflight snapshot from the locked note before persistence', async () => {
 		const { service, notesRepository, noteEntityService } = createService();
 		const preparedUpdate = await service.prepareUpdate(user, note);
 
@@ -218,9 +232,9 @@ describe(NoteUpdateService, () => {
 			apHashtags: [],
 			apEmojis: [],
 			updatedAt: new Date('2025-02-01T00:00:00.000Z'),
-		}, true, undefined, preparedUpdate);
+		}, true);
 
-		expect(noteEntityService.pack).toHaveBeenCalledTimes(1);
+		expect(noteEntityService.pack).toHaveBeenCalledTimes(2);
 		expect(notesRepository.update.mock.calls[0]?.[1].history).toEqual(preparedUpdate.history);
 	});
 
@@ -248,6 +262,102 @@ describe(NoteUpdateService, () => {
 			history: [],
 		} as never, updatedAt)).toBe(true);
 		expect(noteEntityService.pack).not.toHaveBeenCalled();
+	});
+
+	test('recognizes an older note timestamp as stale even when it is absent from history', () => {
+		const { service, noteEntityService } = createService();
+
+		expect(service.isUpdateAlreadyApplied({
+			...note,
+			updatedAt: new Date('2025-02-01T00:00:00.000Z'),
+			history: [],
+		} as never, new Date('2025-01-01T00:00:00.000Z'))).toBe(true);
+		expect(noteEntityService.pack).not.toHaveBeenCalled();
+	});
+
+	test('rejects an update by a user who does not own the note before preparing or mutating it', async () => {
+		const { service, notesRepository, noteEntityService, globalEventService, searchService } = createService();
+
+		await expect(service.update({
+			id: 'different-user',
+			uri: null,
+			host: null,
+			isBot: false,
+		} as never, note, {
+			text: 'New text',
+			cw: null,
+			files: [],
+			apHashtags: [],
+			apEmojis: [],
+			updatedAt: new Date('2025-02-01T00:00:00.000Z'),
+		}, false)).rejects.toThrow('note author does not match');
+
+		expect(noteEntityService.pack).not.toHaveBeenCalled();
+		expect(notesRepository.update).not.toHaveBeenCalled();
+		expect(globalEventService.publishNoteStream).not.toHaveBeenCalled();
+		expect(searchService.indexNote).not.toHaveBeenCalled();
+	});
+
+	test('rejects when the locked note owner changed before preparing or mutating it', async () => {
+		const lockedNote = {
+			...note,
+			userId: 'different-user',
+		} as MiNote;
+		const {
+			service,
+			notesRepository,
+			noteEntityService,
+			globalEventService,
+			searchService,
+		} = createService(lockedNote);
+
+		await expect(service.update(user, note, {
+			text: 'New text',
+			cw: null,
+			files: [],
+			apHashtags: [],
+			apEmojis: [],
+			updatedAt: new Date('2025-02-01T00:00:00.000Z'),
+		}, false)).rejects.toThrow('note author does not match');
+
+		expect(noteEntityService.pack).not.toHaveBeenCalled();
+		expect(notesRepository.update).not.toHaveBeenCalled();
+		expect(globalEventService.publishNoteStream).not.toHaveBeenCalled();
+		expect(searchService.indexNote).not.toHaveBeenCalled();
+	});
+
+	test('treats an update that became stale before the lock as a no-op', async () => {
+		const lockedNote = {
+			...note,
+			text: 'Newer committed text',
+			updatedAt: new Date('2025-03-01T00:00:00.000Z'),
+			history: [{
+				createdAt: '2025-01-01T00:00:00.000Z',
+				text: 'Old text',
+			}],
+		} as MiNote;
+		const {
+			service,
+			notesRepository,
+			noteEntityService,
+			globalEventService,
+			searchService,
+		} = createService(lockedNote);
+
+		const result = await service.update(user, note, {
+			text: 'Stale edit',
+			cw: null,
+			files: [],
+			apHashtags: [],
+			apEmojis: [],
+			updatedAt: new Date('2025-02-01T00:00:00.000Z'),
+		}, false);
+
+		expect(result).toEqual(lockedNote);
+		expect(noteEntityService.pack).not.toHaveBeenCalled();
+		expect(notesRepository.update).not.toHaveBeenCalled();
+		expect(globalEventService.publishNoteStream).not.toHaveBeenCalled();
+		expect(searchService.indexNote).not.toHaveBeenCalled();
 	});
 
 	test('resolves local emoji URLs when the normal packed local Note omits emojis', async () => {
@@ -302,13 +412,14 @@ describe(NoteUpdateService, () => {
 	});
 
 	test('allows the history revision count boundary', async () => {
-		const { service, notesRepository } = createService();
 		const history = Array.from({ length: MAX_NOTE_HISTORY_REVISIONS - 1 }, (_, index) => ({
 			createdAt: new Date(index).toISOString(),
 			text: `revision-${index}`,
 		}));
+		const noteWithHistory = { ...note, history } as MiNote;
+		const { service, notesRepository } = createService(noteWithHistory);
 
-		await service.update(user, { ...note, history } as never, {
+		await service.update(user, noteWithHistory, {
 			text: 'New text',
 			cw: null,
 			files: [],
@@ -321,13 +432,14 @@ describe(NoteUpdateService, () => {
 	});
 
 	test('rejects before mutation when the history revision count would exceed the limit', async () => {
-		const { service, notesRepository, globalEventService, searchService } = createService();
 		const history = Array.from({ length: MAX_NOTE_HISTORY_REVISIONS }, (_, index) => ({
 			createdAt: new Date(index).toISOString(),
 			text: `revision-${index}`,
 		}));
+		const noteWithHistory = { ...note, history } as MiNote;
+		const { service, notesRepository, globalEventService, searchService } = createService(noteWithHistory);
 
-		await expect(service.update(user, { ...note, history } as never, {
+		await expect(service.update(user, noteWithHistory, {
 			text: 'New text',
 			cw: null,
 			files: [],
@@ -344,13 +456,14 @@ describe(NoteUpdateService, () => {
 	});
 
 	test('allows a history payload below the byte boundary', async () => {
-		const { service, notesRepository } = createService();
 		const history = [{
 			createdAt: '2024-01-01T00:00:00.000Z',
 			text: 'x'.repeat(MAX_NOTE_HISTORY_BYTES - 2048),
 		}];
+		const noteWithHistory = { ...note, history } as MiNote;
+		const { service, notesRepository } = createService(noteWithHistory);
 
-		await service.update(user, { ...note, history } as never, {
+		await service.update(user, noteWithHistory, {
 			text: 'New text',
 			cw: null,
 			files: [],
@@ -364,13 +477,14 @@ describe(NoteUpdateService, () => {
 	});
 
 	test('rejects before mutation when the history payload exceeds the byte boundary', async () => {
-		const { service, notesRepository, globalEventService, searchService } = createService();
 		const history = [{
 			createdAt: '2024-01-01T00:00:00.000Z',
 			text: 'x'.repeat(MAX_NOTE_HISTORY_BYTES),
 		}];
+		const noteWithHistory = { ...note, history } as MiNote;
+		const { service, notesRepository, globalEventService, searchService } = createService(noteWithHistory);
 
-		await expect(service.update(user, { ...note, history } as never, {
+		await expect(service.update(user, noteWithHistory, {
 			text: 'New text',
 			cw: null,
 			files: [],
@@ -384,5 +498,114 @@ describe(NoteUpdateService, () => {
 		expect(notesRepository.update).not.toHaveBeenCalled();
 		expect(globalEventService.publishNoteStream).not.toHaveBeenCalled();
 		expect(searchService.indexNote).not.toHaveBeenCalled();
+	});
+
+	test('emits no external side effects when persistence fails', async () => {
+		const { service, notesRepository, globalEventService, searchService } = createService();
+		notesRepository.update.mockRejectedValueOnce(new Error('database write failed'));
+
+		await expect(service.update(user, note, {
+			text: 'New text',
+			cw: null,
+			files: [],
+			apHashtags: [],
+			apEmojis: [],
+			updatedAt: new Date('2025-02-01T00:00:00.000Z'),
+		}, false)).rejects.toThrow('database write failed');
+
+		expect(globalEventService.publishNoteStream).not.toHaveBeenCalled();
+		expect(searchService.indexNote).not.toHaveBeenCalled();
+	});
+
+	test('serializes concurrent edits and builds both history revisions from the locked committed note', async () => {
+		const { service, notesRepository, globalEventService, searchService } = createService();
+		let persistedNote = { ...note };
+		let releaseFirstWrite!: () => void;
+		const firstWriteMayFinish = new Promise<void>(resolve => {
+			releaseFirstWrite = resolve;
+		});
+		let signalFirstWrite!: () => void;
+		const firstWriteStarted = new Promise<void>(resolve => {
+			signalFirstWrite = resolve;
+		});
+		let transactionTail = Promise.resolve();
+		let transactionCount = 0;
+		const lockedFindOne = vi.fn(async () => ({ ...persistedNote }));
+		const transactionalUpdate = vi.fn(async (_criteria: unknown, patch: Partial<MiNote>) => {
+			if (transactionalUpdate.mock.calls.length === 1) {
+				signalFirstWrite();
+				await firstWriteMayFinish;
+			}
+			persistedNote = { ...persistedNote, ...patch };
+		});
+		const transaction = vi.fn(async (callback: (manager: {
+			getRepository: () => {
+				findOne: typeof lockedFindOne;
+				update: typeof transactionalUpdate;
+			};
+		}) => Promise<unknown>) => {
+			transactionCount++;
+			const previous = transactionTail;
+			let releaseTransaction!: () => void;
+			transactionTail = new Promise<void>(resolve => {
+				releaseTransaction = resolve;
+			});
+			await previous;
+			try {
+				return await callback({
+					getRepository: () => ({
+						findOne: lockedFindOne,
+						update: transactionalUpdate,
+					}),
+				});
+			} finally {
+				releaseTransaction();
+			}
+		});
+		Object.assign(notesRepository, {
+			manager: { transaction },
+		});
+
+		const firstUpdate = service.update(user, note, {
+			text: 'First edit',
+			cw: null,
+			files: [],
+			apHashtags: [],
+			apEmojis: [],
+			updatedAt: new Date('2025-02-01T00:00:00.000Z'),
+		}, false);
+
+		await vi.waitFor(() => {
+			expect(transaction).toHaveBeenCalledTimes(1);
+		});
+		await firstWriteStarted;
+
+		const secondUpdate = service.update(user, note, {
+			text: 'Second edit',
+			cw: null,
+			files: [],
+			apHashtags: [],
+			apEmojis: [],
+			updatedAt: new Date('2025-03-01T00:00:00.000Z'),
+		}, false);
+		await vi.waitFor(() => {
+			expect(transactionCount).toBe(2);
+		});
+
+		releaseFirstWrite();
+		await Promise.all([firstUpdate, secondUpdate]);
+
+		expect(lockedFindOne).toHaveBeenCalledTimes(2);
+		expect(lockedFindOne).toHaveBeenNthCalledWith(1, expect.objectContaining({
+			lock: { mode: 'pessimistic_write' },
+		}));
+		expect(persistedNote.text).toBe('Second edit');
+		expect(persistedNote.history).toHaveLength(2);
+		expect(persistedNote.history?.map(revision => revision.text)).toEqual([
+			'Old text',
+			'First edit',
+		]);
+		expect(globalEventService.publishNoteStream).toHaveBeenCalledTimes(2);
+		expect(searchService.indexNote).toHaveBeenCalledTimes(2);
 	});
 });

@@ -369,12 +369,17 @@ export class ApNoteService {
 			throw new Error('note.updated field is required');
 		}
 		const updatedAt = new Date(note.updated);
-		if (this.noteUpdateService.isUpdateAlreadyApplied(originNote, updatedAt)) return;
 
 		// Fetch note author
 		if (!note.attributedTo) {
 			throw new Error('invalid note.attributedTo: ' + note.attributedTo);
 		}
+		const actor = await this.apPersonService.resolvePerson(getOneApId(note.attributedTo), resolver) as MiRemoteUser;
+		if (actor.id !== originNote.userId) {
+			throw new Error('note author does not match the cached note owner');
+		}
+
+		if (this.noteUpdateService.isUpdateAlreadyApplied(originNote, updatedAt)) return;
 
 		const apHashtags = extractApHashtags(note.tag);
 
@@ -390,8 +395,7 @@ export class ApNoteService {
 			text = this.apMfmService.htmlToMfm(note.content, note.tag);
 		}
 
-		const actor = await this.apPersonService.resolvePerson(getOneApId(note.attributedTo), resolver) as MiRemoteUser;
-		const preparedUpdate = await this.noteUpdateService.prepareUpdate(actor, originNote);
+		await this.noteUpdateService.prepareUpdate(actor, originNote);
 
 		// 添付ファイル
 		let files: MiDriveFile[] | undefined;
@@ -418,7 +422,7 @@ export class ApNoteService {
 			apHashtags,
 			apEmojis,
 			updatedAt,
-		}, silent, undefined, preparedUpdate);
+		}, silent);
 	}
 
 	/**

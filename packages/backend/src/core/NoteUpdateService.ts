@@ -7,7 +7,7 @@
 import { Injectable, Inject } from '@nestjs/common';
 import * as mfm from 'mfm-js';
 import type { MiUser, MiLocalUser, MiRemoteUser } from '@/models/User.js';
-import type { MiNote } from '@/models/Note.js';
+import { MiNote } from '@/models/Note.js';
 import type { InstancesRepository, MiDriveFile, NotesRepository, PollsRepository, PollVotesRepository, UsersRepository } from '@/models/_.js';
 import { RelayService } from '@/core/RelayService.js';
 import { FederatedInstanceService } from '@/core/FederatedInstanceService.js';
@@ -115,112 +115,72 @@ export class NoteUpdateService {
 		note: MiNote,
 		data: Option,
 		quiet = false,
-		updater?: MiUser,
-		preparation?: NoteUpdatePreparation,
+		_updater?: MiUser,
 	): Promise<MiNote> {
 		if (!data.updatedAt) {
 			throw new Error('update time is required');
 		}
+		const updatedAt = data.updatedAt;
 
-		const fileIds = data.files === undefined
-			? [...note.fileIds]
-			: data.files?.map(file => file.id) ?? [];
-		if ((data.text == null || data.text.length === 0) && fileIds.length === 0) {
-			throw new Error('Note must have text or files');
-		}
+		this.assertNoteOwner(user, note);
 
-		if (this.isUpdateAlreadyApplied(note, data.updatedAt)) {
-			// Same history already exists, skip this
+		if (this.isUpdateAlreadyApplied(note, updatedAt)) {
 			return note;
 		}
 
-		const preparedUpdate = preparation ?? await this.prepareUpdate(user, note);
-		if (
-			preparedUpdate.noteId !== note.id ||
-			preparedUpdate.sourceHistory !== note.history ||
-			preparedUpdate.sourceUpdatedAt !== note.updatedAt
-		) {
-			throw new Error('Prepared note update does not match the current note state');
-		}
-		const history = [...preparedUpdate.history];
-
-		// Parse tags & emojis
 		const meta = await this.metaService.fetch();
-
 		let tags = data.apHashtags;
 		let emojis = data.apEmojis;
 
-		// Parse MFM if needed
 		if (!tags || !emojis) {
 			const tokens = (data.text ? mfm.parse(data.text)! : []);
 			const cwTokens = data.cw ? mfm.parse(data.cw)! : [];
-			// Not include poll data
-
 			const combinedTokens = tokens.concat(cwTokens);
-
 			tags = data.apHashtags ?? extractHashtags(combinedTokens);
-
 			emojis = data.apEmojis ?? extractCustomEmojisFromMfm(combinedTokens);
 		}
 
-		// if the host is media-silenced, custom emojis are not allowed
 		if (this.utilityService.isMediaSilencedHost(meta.mediaSilencedHosts, user.host)) emojis = [];
-
 		tags = tags.filter(tag => Array.from(tag).length <= 128).splice(0, 32);
 
-		const newNote: MiNote = {
-			...note,
-
-			// Overwrite updated fields
-			text: data.text,
-			cw: data.cw,
-			updatedAt: data.updatedAt,
-			tags,
-			emojis,
-			fileIds,
-		};
-
-		if (!quiet) {
-			this.globalEventService.publishNoteStream(note, 'updated', await awaitAll({
-				fileIds: newNote.fileIds,
-				files: this.driveFileEntityService.packManyByIds(newNote.fileIds),
-				cw: data.cw,
-				text: data.text ?? '', // prevent null
-				updatedAt: data.updatedAt.toISOString(),
-				tags: tags.length > 0 ? tags : undefined,
-				emojis: note.userHost != null ? this.customEmojiService.populateEmojis(emojis, note.userHost) : undefined,
-			}));
-
-			if (this.userEntityService.isLocalUser(user) && !note.localOnly) {
-				const content = this.apRendererService.addContext(
-					this.apRendererService.renderUpdateNote(
-						await this.apRendererService.renderNote(newNote, false), newNote,
-					),
-				);
-
-				this.deliverToConcerned(user, newNote, content);
-			}
-		}
-
-		// Check if is latest or previous version
-		let updatedNote: MiNote;
-		if (note.updatedAt && note.updatedAt >= data.updatedAt) {
-			// Previous version, just update history
-			history.sort((h1, h2) => new Date(h1.createdAt).getTime() - new Date(h2.createdAt).getTime()); // earliest -> latest
-
-			await this.notesRepository.update({ id: note.id }, {
-				history,
+		const result = await this.notesRepository.manager.transaction(async transactionalEntityManager => {
+			const transactionalNotesRepository = transactionalEntityManager.getRepository(MiNote);
+			const lockedRow = await transactionalNotesRepository.findOne({
+				where: { id: note.id },
+				lock: { mode: 'pessimistic_write' },
 			});
-			updatedNote = { ...note, history };
-		} else {
-			// Latest version
+			if (lockedRow == null) {
+				throw new Error('note is not registered');
+			}
+			const lockedNote = { ...note, ...lockedRow };
 
-			// Update index
-			this.searchService.indexNote(newNote);
+			this.assertNoteOwner(user, lockedNote);
+			if (this.isUpdateAlreadyApplied(lockedNote, updatedAt)) {
+				return { updatedNote: lockedNote, changed: false };
+			}
 
-			// Update note info
-			await this.notesRepository.update({ id: note.id }, {
-				updatedAt: data.updatedAt,
+			const fileIds = data.files === undefined
+				? [...lockedNote.fileIds]
+				: data.files?.map(file => file.id) ?? [];
+			if ((data.text == null || data.text.length === 0) && fileIds.length === 0) {
+				throw new Error('Note must have text or files');
+			}
+
+			const preparedUpdate = await this.prepareUpdate(user, lockedNote);
+			const history = [...preparedUpdate.history];
+			const newNote: MiNote = {
+				...lockedNote,
+				text: data.text,
+				cw: data.cw,
+				updatedAt,
+				tags,
+				emojis,
+				fileIds,
+				history,
+			};
+
+			await transactionalNotesRepository.update({ id: lockedNote.id }, {
+				updatedAt,
 				fileIds: newNote.fileIds,
 				history,
 				cw: data.cw,
@@ -228,20 +188,35 @@ export class NoteUpdateService {
 				tags,
 				emojis,
 			});
-			updatedNote = { ...newNote, history };
-		}
 
-		// Currently not implemented
-		// if (updater && (note.userId !== updater.id)) {
-		// 	const user = await this.usersRepository.findOneByOrFail({ id: note.userId });
-		// 	this.moderationLogService.log(updater, 'updateNote', {
-		// 		noteId: note.id,
-		// 		noteUserId: note.userId,
-		// 		noteUserUsername: user.username,
-		// 		noteUserHost: user.host,
-		// 		note: note,
-		// 	});
-		// }
+			return { updatedNote: newNote, changed: true };
+		});
+
+		if (!result.changed) return result.updatedNote;
+
+		const updatedNote = result.updatedNote;
+		this.searchService.indexNote(updatedNote);
+
+		if (!quiet) {
+			this.globalEventService.publishNoteStream(updatedNote, 'updated', await awaitAll({
+				fileIds: updatedNote.fileIds,
+				files: this.driveFileEntityService.packManyByIds(updatedNote.fileIds),
+				cw: updatedNote.cw,
+				text: updatedNote.text ?? '',
+				updatedAt: updatedNote.updatedAt!.toISOString(),
+				tags: updatedNote.tags.length > 0 ? updatedNote.tags : undefined,
+				emojis: updatedNote.userHost != null ? this.customEmojiService.populateEmojis(updatedNote.emojis, updatedNote.userHost) : undefined,
+			}));
+
+			if (this.userEntityService.isLocalUser(user) && !updatedNote.localOnly) {
+				const content = this.apRendererService.addContext(
+					this.apRendererService.renderUpdateNote(
+						await this.apRendererService.renderNote(updatedNote, false), updatedNote,
+					),
+				);
+				this.deliverToConcerned(user, updatedNote, content);
+			}
+		}
 
 		return updatedNote;
 	}
@@ -250,7 +225,7 @@ export class NoteUpdateService {
 		note: Pick<MiNote, 'history' | 'updatedAt'>,
 		updatedAt: Date,
 	): boolean {
-		return note.updatedAt?.getTime() === updatedAt.getTime() ||
+		return (note.updatedAt != null && updatedAt.getTime() <= note.updatedAt.getTime()) ||
 			(note.history?.some(revision => revision.createdAt === updatedAt.toISOString()) ?? false);
 	}
 
@@ -258,6 +233,7 @@ export class NoteUpdateService {
 		user: { id: MiUser['id'] },
 		note: MiNote,
 	): Promise<NoteUpdatePreparation> {
+		this.assertNoteOwner(user, note);
 		const oldRevision = await this.snapshotRevision(user, note);
 		const history = [...(note.history || []), oldRevision];
 		if (
@@ -273,6 +249,12 @@ export class NoteUpdateService {
 			sourceUpdatedAt: note.updatedAt,
 			history,
 		};
+	}
+
+	private assertNoteOwner(user: { id: MiUser['id'] }, note: Pick<MiNote, 'userId'>): void {
+		if (user.id !== note.userId) {
+			throw new Error('note author does not match the cached note owner');
+		}
 	}
 
 	private async snapshotRevision(
