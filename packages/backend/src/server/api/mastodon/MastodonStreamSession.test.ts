@@ -185,6 +185,49 @@ describe(MastodonStreamSession, () => {
 		]);
 	});
 
+	test('looks up only the canonical direct-conversation poll once per event', async () => {
+		const multiplePoll = {
+			multiple: true,
+			choices: [
+				{ text: 'A', votes: 2, isVoted: false },
+				{ text: 'B', votes: 1, isVoted: false },
+			],
+		};
+		const { session, outputs, pollVoterCounts, frame } = createSession({
+			conversation: async () => ({
+				id: 'conversation-direct',
+				unread: true,
+				accounts: [{ id: 'actor' }],
+				lastStatus: { ...note('canonical-poll', { visibility: 'specified' }), poll: multiplePoll },
+			}),
+			voterCounts: async notes => new Map(notes.map(value => [value.id, value.id === 'canonical-poll' ? 2 : 0])),
+		});
+		await session.start();
+		await session.subscribe({ stream: 'direct' });
+
+		frame({
+			type: 'channel',
+			body: {
+				id: 'mastodon-0',
+				type: 'mention',
+				body: { ...note('incoming-poll', { visibility: 'specified' }), poll: multiplePoll },
+			},
+		});
+
+		await vi.waitFor(() => expect(outputs).toEqual([{
+			event: 'conversation',
+			payload: {
+				id: 'conversation-direct',
+				unread: true,
+				accounts: [{ id: 'actor' }],
+				last_status: { id: 'canonical-poll', poll: { voters_count: 2 } },
+			},
+			stream: 'direct',
+		}]));
+		expect(pollVoterCounts).toHaveBeenCalledTimes(1);
+		expect(pollVoterCounts.mock.calls[0]?.[0].map(value => value.id)).toEqual(['canonical-poll']);
+	});
+
 	test.each([
 		{
 			name: 'token revocation',

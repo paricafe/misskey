@@ -388,9 +388,24 @@ describe(MastodonEntityService, () => {
 			mentions: ['remote-alice-id', 'local-alice-id', 'bob-id'],
 		} as never);
 		expect(remoteAuthorStatus.mentions).toEqual([
-			expect.objectContaining({ id: 'remote-alice-id', username: 'Alice', acct: 'Alice' }),
-			expect.objectContaining({ id: 'local-alice-id', username: 'alice', acct: 'alice@misskey.example' }),
-			expect.objectContaining({ id: 'bob-id', username: 'bob', acct: 'bob' }),
+			{
+				id: 'remote-alice-id',
+				username: 'Alice',
+				acct: 'Alice@remote.example',
+				url: 'https://remote.example/@Alice',
+			},
+			{
+				id: 'local-alice-id',
+				username: 'alice',
+				acct: 'alice@misskey.example',
+				url: 'https://misskey.example/@alice',
+			},
+			{
+				id: 'bob-id',
+				username: 'bob',
+				acct: 'bob@remote.example',
+				url: 'https://remote.example/@bob',
+			},
 		]);
 
 		const normalizedRemoteHostStatus = service.status({
@@ -400,8 +415,8 @@ describe(MastodonEntityService, () => {
 			mentions: ['remote-alice-id', 'bob-id'],
 		} as never);
 		expect(normalizedRemoteHostStatus.mentions).toEqual([
-			expect.objectContaining({ id: 'remote-alice-id', username: 'Alice' }),
-			expect.objectContaining({ id: 'bob-id', username: 'bob' }),
+			expect.objectContaining({ id: 'remote-alice-id', username: 'Alice', acct: 'Alice@xn--r8jz45g.xn--zckzah' }),
+			expect.objectContaining({ id: 'bob-id', username: 'bob', acct: 'bob@xn--r8jz45g.xn--zckzah' }),
 		]);
 	});
 

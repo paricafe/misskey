@@ -394,18 +394,29 @@ export class MastodonStreamSession {
 	}
 
 	private async handleNote(channel: NativeChannel, note: Packed<'Note'>): Promise<void> {
-		const voterCounts = await this.#entityService.pollVoterCounts([note]);
-		for (const subscription of channel.targets.values()) {
+		const streams = [...channel.targets.values()].flatMap(subscription => {
 			const stream = subscription.stream;
-			if (stream === 'user:notification') continue;
-			if (stream === 'user' && !this.#scopeService.allows(this.#auth.token.scopes, 'read:statuses')) continue;
-			if ((stream === 'hashtag:local' || stream.startsWith('public:local')) && note.user.host != null) continue;
-			if (stream.startsWith('public:remote') && note.user.host == null) continue;
-			if (stream === 'direct' && note.visibility !== 'specified') continue;
-			if (stream.endsWith(':media') && (note.files?.length ?? 0) === 0) continue;
-			if (this.wasDelivered(stream, note.id)) continue;
+			if (stream === 'user:notification') return [];
+			if (stream === 'user' && !this.#scopeService.allows(this.#auth.token.scopes, 'read:statuses')) return [];
+			if ((stream === 'hashtag:local' || stream.startsWith('public:local')) && note.user.host != null) return [];
+			if (stream.startsWith('public:remote') && note.user.host == null) return [];
+			if (stream === 'direct' && note.visibility !== 'specified') return [];
+			if (stream.endsWith(':media') && (note.files?.length ?? 0) === 0) return [];
+			if (this.wasDelivered(stream, note.id)) return [];
+			return [stream];
+		});
+		if (streams.length === 0) return;
+
+		const directConversation = streams.includes('direct')
+			? await this.#conversationService.upsertLive(this.#auth.user, note.id)
+			: null;
+		const voterCounts = await this.#entityService.pollVoterCounts([
+			...(streams.some(stream => stream !== 'direct') ? [note] : []),
+			...(directConversation == null ? [] : [directConversation.lastStatus]),
+		]);
+		for (const stream of streams) {
 			if (stream === 'direct') {
-				await this.emitConversation(note, stream, voterCounts);
+				if (directConversation != null) await this.emitPackedConversation(directConversation, stream, voterCounts);
 				continue;
 			}
 			const status = await this.filteredStatus(note, this.filterContext(stream), voterCounts);
@@ -415,22 +426,12 @@ export class MastodonStreamSession {
 		}
 	}
 
-	private async emitConversation(
-		note: Packed<'Note'>,
-		stream: MastodonStreamName,
-		voterCounts: ReadonlyMap<string, number>,
-	): Promise<void> {
-		const conversation = await this.#conversationService.upsertLive(this.#auth.user, note.id);
-		await this.emitPackedConversation(conversation, stream, conversation.lastStatus.id === note.id ? voterCounts : undefined);
-	}
-
 	private async emitPackedConversation(
 		conversation: MastodonConversation,
 		stream: MastodonStreamName,
-		voterCounts?: ReadonlyMap<string, number>,
+		voterCounts: ReadonlyMap<string, number>,
 	): Promise<void> {
-		const resolvedVoterCounts = voterCounts ?? await this.#entityService.pollVoterCounts([conversation.lastStatus]);
-		const lastStatus = await this.filteredStatus(conversation.lastStatus, 'home', resolvedVoterCounts);
+		const lastStatus = await this.filteredStatus(conversation.lastStatus, 'home', voterCounts);
 		if (lastStatus == null) return;
 		this.remember(stream, conversation.lastStatus, conversation.id);
 		this.#send({
@@ -521,7 +522,10 @@ export class MastodonStreamSession {
 					const conversationId = delivered.conversationIds.get(stream);
 					if (conversationId == null) continue;
 					const conversation = await this.#conversationService.refreshLive(this.#auth.user, conversationId);
-					if (conversation != null) await this.emitPackedConversation(conversation, stream);
+					if (conversation != null) {
+						const voterCounts = await this.#entityService.pollVoterCounts([conversation.lastStatus]);
+						await this.emitPackedConversation(conversation, stream, voterCounts);
+					}
 					continue;
 				}
 				this.#send({ event: 'delete', payload: noteId, stream, rawPayload: true });
@@ -533,10 +537,16 @@ export class MastodonStreamSession {
 		const changes = outer?.body ?? event.body as Partial<Packed<'Note'>> | undefined;
 		const updated = { ...delivered.note, ...(changes ?? {}) } as Packed<'Note'>;
 		delivered.note = updated;
-		const voterCounts = await this.#entityService.pollVoterCounts([updated]);
+		const directConversation = streams.includes('direct')
+			? await this.#conversationService.upsertLive(this.#auth.user, updated.id)
+			: null;
+		const voterCounts = await this.#entityService.pollVoterCounts([
+			...(streams.some(stream => stream !== 'direct') ? [updated] : []),
+			...(directConversation == null ? [] : [directConversation.lastStatus]),
+		]);
 		for (const stream of streams) {
 			if (stream === 'direct') {
-				await this.emitConversation(updated, stream, voterCounts);
+				if (directConversation != null) await this.emitPackedConversation(directConversation, stream, voterCounts);
 				continue;
 			}
 			const status = await this.filteredStatus(updated, this.filterContext(stream), voterCounts);

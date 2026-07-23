@@ -521,20 +521,20 @@ export class MastodonEntityService {
 
 	private mentions(note: Packed<'Note'>) {
 		const ids = note.mentions ?? [];
-		const defaultHost = note.user.host ?? this.config.host;
+		const localHost = domainToASCII(this.config.host.toLowerCase());
 		const seen = new Set<string>();
-		const parsed = extractMentions(mfmParse(note.text ?? '')).filter(mention => {
-			const host = mention.host ?? defaultHost;
-			const normalizedHost = domainToASCII(host.toLowerCase());
-			const key = `${mention.username.toLowerCase()}@${normalizedHost}`;
-			if (seen.has(key)) return false;
+		const parsed = extractMentions(mfmParse(note.text ?? '')).flatMap(mention => {
+			const rawEffectiveHost = mention.host ?? note.user.host;
+			const effectiveHost = rawEffectiveHost == null ? null : domainToASCII(rawEffectiveHost.toLowerCase());
+			const key = `${mention.username.toLowerCase()}@${effectiveHost ?? localHost}`;
+			if (seen.has(key)) return [];
 			seen.add(key);
-			return true;
+			return [{ username: mention.username, effectiveHost }];
 		});
 		return ids.map((id, index) => {
 			const mention = parsed[index];
 			const username = mention?.username ?? id;
-			const host = mention?.host ?? null;
+			const host = mention?.effectiveHost ?? null;
 			const acct = host == null ? username : `${username}@${host}`;
 			return {
 				id,
