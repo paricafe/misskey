@@ -3277,6 +3277,11 @@ describe(MastodonApiServerService, () => {
 		['non-numeric', ['0', 'not-a-choice']],
 		['non-integer', ['0', '1.5']],
 		['negative', ['0', '-1']],
+		['empty', ['0', '']],
+		['null', ['0', null]],
+		['boolean', ['0', true]],
+		['object', ['0', {}]],
+		['comma-delimited scalar', '0,1'],
 	] as const)('rejects a %s poll choice instead of applying the valid subset', async (_label, choices) => {
 		const { fastify, nativeInvoke, pollVoteService } = createServer();
 		const response = await fastify.inject({
@@ -3289,6 +3294,45 @@ describe(MastodonApiServerService, () => {
 		expect(response.statusCode).toBe(400);
 		expect(pollVoteService.vote).not.toHaveBeenCalled();
 		expect(nativeInvoke).not.toHaveBeenCalledWith('notes/polls/vote', expect.anything(), expect.anything(), expect.anything());
+	});
+
+	test.each([
+		['string', '1'],
+		['number', 1],
+	] as const)('accepts one %s scalar form poll choice without comma splitting', async (_label, choice) => {
+		const { fastify, pollVoteService } = createServer();
+		const response = await fastify.inject({
+			method: 'POST',
+			url: '/api/v1/polls/note-with-poll/votes',
+			headers: { authorization: 'Bearer user-token' },
+			payload: { 'choices[]': choice },
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(pollVoteService.vote).toHaveBeenCalledWith('note-with-poll', [1], { id: 'user-id' });
+	});
+
+	test('rejects poll voting from an account that has moved before calling the vote service', async () => {
+		const { fastify, authenticate, pollVoteService } = createServer();
+		authenticate.mockResolvedValue({
+			kind: 'user',
+			user: {
+				id: 'user-id',
+				movedToUri: 'https://remote.example/users/alice',
+			},
+			token: { id: 'token-id', scopes: ['read'] },
+		});
+
+		const response = await fastify.inject({
+			method: 'POST',
+			url: '/api/v1/polls/note-with-poll/votes',
+			headers: { authorization: 'Bearer user-token' },
+			payload: { 'choices[]': ['0'] },
+		});
+
+		expect(response.statusCode).toBe(403);
+		expect(response.json()).toEqual({ error: 'You have moved your account.' });
+		expect(pollVoteService.vote).not.toHaveBeenCalled();
 	});
 
 	test('deletes media with a user token', async () => {

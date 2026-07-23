@@ -105,7 +105,7 @@ export class PollVoteService {
 
 			await pollsRepository.query(
 				'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
-				[`${note.id}\0${me.id}`],
+				[JSON.stringify([note.id, me.id])],
 			);
 
 			const poll = await pollsRepository.findOneByOrFail({ noteId: note.id });

@@ -325,8 +325,10 @@ describe(PollVoteService, () => {
 
 		expect(pollsRepository.query).toHaveBeenCalledWith(
 			expect.stringContaining('pg_advisory_xact_lock(hashtextextended($1, 0))'),
-			[`${note.id}\0${me.id}`],
+			[JSON.stringify([note.id, me.id])],
 		);
+		const lockKey = pollsRepository.query.mock.calls.find(([sql]) => sql.includes('pg_advisory_xact_lock'))?.[1][0];
+		expect(lockKey).not.toContain('\0');
 		expect(order.indexOf('lock')).toBeLessThan(order.indexOf('poll:read'));
 		expect(order.indexOf('lock')).toBeLessThan(order.indexOf('votes:read'));
 		expect(order.indexOf('commit')).toBeLessThan(order.indexOf('event'));

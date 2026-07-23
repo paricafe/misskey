@@ -786,12 +786,15 @@ export class MastodonApiServerService {
 			return this.mastodonEntityService.poll(note.id, note.poll);
 		}));
 		fastify.post<{ Params: { id: string }; Body: Dictionary }>('/api/v1/polls/:id/votes', request => this.withAuth(request, 'write:statuses', async auth => {
-			const choices = this.strings(request.body?.['choices[]'] ?? request.body?.choices)
-				.map(choice => Number(choice));
-			if (choices.length === 0) throw new MastodonApiError(400, 'invalid_request', 'At least one poll choice is required');
-			if (choices.some(choice => !Number.isInteger(choice) || choice < 0)) {
-				throw new MastodonApiError(400, 'invalid_request', 'Poll choices must be non-negative integers');
+			if (auth.user.movedToUri) {
+				throw new ApiError({
+					message: 'You have moved your account.',
+					code: 'YOUR_ACCOUNT_MOVED',
+					kind: 'permission',
+					id: '56f20ec9-fd06-4fa5-841b-edd6d7d4fa31',
+				});
 			}
+			const choices = this.pollVoteChoices(request.body?.['choices[]'] ?? request.body?.choices);
 			await this.pollVoteService.vote(request.params.id, choices, auth.user);
 			const note = await this.invoke('notes/show', { noteId: request.params.id }, auth, request) as Packed<'Note'>;
 			return note.poll == null ? null : this.mastodonEntityService.poll(note.id, note.poll);
@@ -2425,6 +2428,30 @@ export class MastodonApiServerService {
 		if (Array.isArray(value)) return value.flatMap(item => this.strings(item));
 		const item = this.string(value);
 		return item == null || item === '' ? [] : item.split(',').map(part => part.trim()).filter(Boolean);
+	}
+
+	private pollVoteChoices(value: unknown): number[] {
+		if (value == null) {
+			throw new MastodonApiError(400, 'invalid_request', 'At least one poll choice is required');
+		}
+		const rawChoices = Array.isArray(value) ? value : [value];
+		if (rawChoices.length === 0) {
+			throw new MastodonApiError(400, 'invalid_request', 'At least one poll choice is required');
+		}
+
+		return rawChoices.map(choice => {
+			if (
+				(typeof choice !== 'string' && typeof choice !== 'number') ||
+				(typeof choice === 'string' && choice.trim() === '')
+			) {
+				throw new MastodonApiError(400, 'invalid_request', 'Poll choices must be non-negative integers');
+			}
+			const parsed = Number(choice);
+			if (!Number.isInteger(parsed) || parsed < 0) {
+				throw new MastodonApiError(400, 'invalid_request', 'Poll choices must be non-negative integers');
+			}
+			return parsed;
+		});
 	}
 
 	private isHttpUrl(value: string): boolean {
