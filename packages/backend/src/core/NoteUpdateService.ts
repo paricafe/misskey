@@ -1,4 +1,5 @@
 /*
+ * SPDX-FileCopyrightText: Nya Candy and NyaOne
  * SPDX-FileCopyrightText: syuilo and misskey-project
  * SPDX-License-Identifier: AGPL-3.0-only
  */
@@ -246,10 +247,11 @@ export class NoteUpdateService {
 	}
 
 	isUpdateAlreadyApplied(
-		note: Pick<MiNote, 'history'>,
+		note: Pick<MiNote, 'history' | 'updatedAt'>,
 		updatedAt: Date,
 	): boolean {
-		return note.history?.some(revision => revision.createdAt === updatedAt.toISOString()) ?? false;
+		return note.updatedAt?.getTime() === updatedAt.getTime() ||
+			(note.history?.some(revision => revision.createdAt === updatedAt.toISOString()) ?? false);
 	}
 
 	async prepareUpdate(

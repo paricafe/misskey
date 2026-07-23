@@ -6,7 +6,7 @@
 import { describe, expect, test, vi } from 'vitest';
 import { NOTE_HISTORY_LIMIT_ERROR_ID } from '@/core/NoteUpdateService.js';
 import { IdentifiableError } from '@/misc/identifiable-error.js';
-import NoteUpdateEndpoint from './update.js';
+import NoteUpdateEndpoint, { meta } from './update.js';
 
 function createEndpoint(
 	note: { id: string; userId: string; text: string | null; cw: string | null; fileIds: string[] },
@@ -22,6 +22,36 @@ function createEndpoint(
 }
 
 describe('api:notes/update', () => {
+	test('declares and returns the no-content error when nullable text and files are both empty', async () => {
+		expect(meta.errors.noContent).toMatchObject({
+			message: 'A note must have text or files.',
+			code: 'NO_CONTENT',
+			kind: 'client',
+			httpStatusCode: 400,
+		});
+		expect(meta.errors.noContent.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u);
+
+		const note = {
+			id: 'noteid',
+			userId: 'userid',
+			text: 'old',
+			cw: null,
+			fileIds: [],
+		};
+		const noteUpdateService = {
+			update: vi.fn(),
+		};
+		const endpoint = createEndpoint(note, noteUpdateService);
+
+		await expect(endpoint.exec({
+			noteId: 'noteid',
+			text: null,
+			cw: null,
+			fileIds: [],
+		}, { id: 'userid' } as never, null)).rejects.toMatchObject(meta.errors.noContent);
+		expect(noteUpdateService.update).not.toHaveBeenCalled();
+	});
+
 	test('maps the core history bound to a stable native 422 error', async () => {
 		const note = {
 			id: 'noteid',

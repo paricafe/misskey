@@ -61,6 +61,14 @@ export const meta = {
 			kind: 'client',
 			httpStatusCode: 422,
 		},
+
+		noContent: {
+			message: 'A note must have text or files.',
+			code: 'NO_CONTENT',
+			id: '0bee35b5-4dfa-4a0b-a9b7-34d69c4938e1',
+			kind: 'client',
+			httpStatusCode: 400,
+		},
 	},
 } as const;
 
@@ -138,14 +146,7 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 
 			const finalFileIds = fileIds ?? note.fileIds;
 			if (ps.text == null && finalFileIds.length === 0) {
-				throw new ApiError({
-					message: 'Invalid param.',
-					code: 'INVALID_PARAM',
-					id: '3d81ceae-475f-4600-b2a8-2bc116157532',
-				}, {
-					param: '#/properties/text/type',
-					reason: 'must be string',
-				});
+				throw new ApiError(meta.errors.noContent);
 			}
 
 			if (

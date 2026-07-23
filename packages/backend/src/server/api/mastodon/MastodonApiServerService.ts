@@ -14,7 +14,7 @@ import * as fs from 'node:fs';
 import { MAX_NOTE_FILES, MAX_NOTE_TEXT_LENGTH } from '@/const.js';
 import type { Config } from '@/config.js';
 import { DI } from '@/di-symbols.js';
-import type { MiMeta, NoteFavoritesRepository, NotesRepository, UserNotePiningsRepository } from '@/models/_.js';
+import type { DriveFilesRepository, MiDriveFile, MiMeta, NoteFavoritesRepository, NotesRepository, UserNotePiningsRepository } from '@/models/_.js';
 import { createTemp } from '@/misc/create-temp.js';
 import type { Packed } from '@/misc/json-schema.js';
 import { extractMentions } from '@/misc/extract-mentions.js';
@@ -60,6 +60,9 @@ export class MastodonApiServerService {
 
 		@Inject(DI.notesRepository)
 		private notesRepository: NotesRepository,
+
+		@Inject(DI.driveFilesRepository)
+		private driveFilesRepository: DriveFilesRepository,
 
 		@Inject(DI.noteFavoritesRepository)
 		private noteFavoritesRepository: NoteFavoritesRepository,
@@ -717,11 +720,13 @@ export class MastodonApiServerService {
 			const rawSensitive = request.body?.sensitive;
 			const isSensitive = rawSensitive == null ? null : this.profileBoolean(rawSensitive, 'sensitive');
 			if (isSensitive != null) {
-				await this.assertStatusUpdateMediaSensitivity(effectiveFileIds, isSensitive, current, auth, request);
+				await this.assertStatusUpdateMediaSensitivity(effectiveFileIds, isSensitive, current, auth);
 			}
 			const result = await this.invoke('notes/update', {
 				noteId: request.params.id,
-				text: this.string(request.body?.status) ?? current.text ?? null,
+				text: Object.hasOwn(request.body ?? {}, 'status')
+					? this.string(request.body?.status) || null
+					: current.text ?? null,
 				cw: Object.hasOwn(request.body ?? {}, 'spoiler_text') ? this.string(request.body?.spoiler_text) || null : current.cw ?? null,
 				...(hasMediaIds || effectiveFileIds.length > 0 ? { fileIds: effectiveFileIds } : {}),
 			}, auth, request) as { updatedNote: Packed<'Note'> };
@@ -2196,14 +2201,22 @@ export class MastodonApiServerService {
 		isSensitive: boolean,
 		current: Packed<'Note'>,
 		auth: MastodonUserAuth,
-		request: MastodonRequest,
 	): Promise<void> {
-		const currentFilesById = new Map((current.files ?? []).map(file => [file.id, file]));
-		const effectiveFiles = await Promise.all(fileIds.map(async fileId => {
-			const currentFile = currentFilesById.get(fileId);
-			if (currentFile != null) return currentFile;
-			return await this.invoke('drive/files/show', { fileId }, auth, request) as Packed<'DriveFile'>;
-		}));
+		const currentFilesById = new Map<string, Pick<MiDriveFile, 'id' | 'isSensitive'>>(
+			(current.files ?? []).map(file => [file.id, file]),
+		);
+		const unresolvedFileIds = fileIds.filter(fileId => !currentFilesById.has(fileId));
+		if (unresolvedFileIds.length > 0) {
+			const resolvedFiles = await this.driveFilesRepository.findBy({
+				id: In(unresolvedFileIds),
+				userId: auth.user.id,
+			});
+			for (const file of resolvedFiles) currentFilesById.set(file.id, file);
+			if (resolvedFiles.length !== unresolvedFileIds.length) {
+				throw new MastodonApiError(422, 'unprocessable_entity', 'One or more media attachments were not found');
+			}
+		}
+		const effectiveFiles = fileIds.map(fileId => currentFilesById.get(fileId)!);
 		const effectiveSensitive = current.channel?.isSensitive === true ||
 			effectiveFiles.some(file => file.isSensitive);
 		if (effectiveSensitive !== isSensitive) {

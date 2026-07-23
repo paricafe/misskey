@@ -91,6 +91,9 @@ describe(MastodonApiServerService, () => {
 			findOneBy: vi.fn(async ({ id }: { id: string }) => ({ id, threadId: nativeThreads.get(id) ?? null })),
 			query: vi.fn().mockResolvedValue([]),
 		};
+		const driveFilesRepository = {
+			findBy: vi.fn().mockResolvedValue([]),
+		};
 		const noteFavoritesRepository = { findBy: vi.fn().mockResolvedValue([]) };
 		const userNotePiningsRepository = { findBy: vi.fn().mockResolvedValue([]) };
 		const linkHeader = vi.fn().mockReturnValue('<next>; rel="next"');
@@ -405,6 +408,7 @@ describe(MastodonApiServerService, () => {
 				...meta,
 			} as never,
 			notesRepository as never,
+			driveFilesRepository as never,
 			noteFavoritesRepository as never,
 			userNotePiningsRepository as never,
 			pollVoteService as never,
@@ -532,6 +536,7 @@ describe(MastodonApiServerService, () => {
 			getApplication,
 			redis,
 			notesRepository,
+			driveFilesRepository,
 			noteFavoritesRepository,
 			userNotePiningsRepository,
 			linkHeader,
@@ -4339,20 +4344,19 @@ describe(MastodonApiServerService, () => {
 		requested,
 		expectedStatus,
 	) => {
-		const { fastify, nativeInvoke } = createServer();
-		nativeInvoke.mockImplementation(async (name, data) => {
+		const { fastify, nativeInvoke, driveFilesRepository } = createServer();
+		driveFilesRepository.findBy.mockResolvedValue([{
+			id: 'replacement-file',
+			userId: 'user-id',
+			isSensitive: newIsSensitive,
+		}]);
+		nativeInvoke.mockImplementation(async name => {
 			if (name === 'notes/show') {
 				return {
 					id: 'note-id',
 					text: 'old',
 					fileIds: ['old-file'],
 					files: [{ id: 'old-file', isSensitive: oldIsSensitive }],
-				};
-			}
-			if (name === 'drive/files/show') {
-				return {
-					id: data.fileId,
-					isSensitive: newIsSensitive,
 				};
 			}
 			if (name === 'notes/update') return { updatedNote: { id: 'note-id' } };
@@ -4371,19 +4375,17 @@ describe(MastodonApiServerService, () => {
 		});
 
 		expect(response.statusCode).toBe(expectedStatus);
-		expect(nativeInvoke).toHaveBeenCalledWith(
-			'drive/files/show',
-			{ fileId: 'replacement-file' },
-			expect.anything(),
-			expect.anything(),
-		);
+		expect(driveFilesRepository.findBy).toHaveBeenCalledWith({
+			id: expect.anything(),
+			userId: 'user-id',
+		});
+		expect(nativeInvoke).not.toHaveBeenCalledWith('drive/files/show', expect.anything(), expect.anything(), expect.anything());
 		if (expectedStatus === 422) {
 			expect(response.json()).toEqual({
 				error: 'Changing media sensitivity while editing a status is not supported atomically',
 			});
 			expect(nativeInvoke.mock.calls.map(([name]) => name)).toEqual([
 				'notes/show',
-				'drive/files/show',
 			]);
 		} else {
 			expect(nativeInvoke).toHaveBeenCalledWith(
@@ -4394,6 +4396,99 @@ describe(MastodonApiServerService, () => {
 			);
 		}
 		expect(nativeInvoke).not.toHaveBeenCalledWith('drive/files/update', expect.anything(), expect.anything(), expect.anything());
+	});
+
+	test('edits replacement media with only the real write:statuses permission mapping', async () => {
+		const { fastify, authenticate, nativeInvoke, driveFilesRepository } = createServer();
+		const scopeService = new MastodonScopeService();
+		const nativePermissions = scopeService.toMisskeyPermissions(['write:statuses']);
+		authenticate.mockResolvedValue({
+			kind: 'user',
+			user: { id: 'user-id' },
+			token: { id: 'token-id', scopes: ['write:statuses'] },
+		});
+		driveFilesRepository.findBy.mockResolvedValue([{
+			id: 'replacement-file',
+			userId: 'user-id',
+			isSensitive: false,
+		}]);
+		nativeInvoke.mockImplementation(async name => {
+			if (name === 'notes/show') {
+				return {
+					id: 'note-id',
+					text: 'old',
+					fileIds: ['old-file'],
+					files: [{ id: 'old-file', isSensitive: true }],
+				};
+			}
+			if (name === 'drive/files/show' && !nativePermissions.includes('read:drive')) {
+				throw new ApiError({
+					message: 'Your app does not have the necessary permissions to use this endpoint.',
+					code: 'PERMISSION_DENIED',
+					id: '1370e5b7-d4eb-4b50-a9ac-1898c31d2c1c',
+				});
+			}
+			if (name === 'notes/update') return { updatedNote: { id: 'note-id' } };
+			return [];
+		});
+
+		const response = await fastify.inject({
+			method: 'PUT',
+			url: '/api/v1/statuses/note-id',
+			headers: { authorization: 'Bearer limited-token', 'content-type': 'application/json' },
+			payload: {
+				status: 'edited',
+				media_ids: ['replacement-file'],
+				sensitive: false,
+			},
+		});
+
+		expect(nativePermissions).toEqual(['write:drive', 'write:notes', 'write:votes']);
+		expect(response.statusCode).toBe(200);
+		expect(driveFilesRepository.findBy).toHaveBeenCalledWith({
+			id: expect.anything(),
+			userId: 'user-id',
+		});
+		expect(nativeInvoke).not.toHaveBeenCalledWith(
+			'drive/files/show',
+			expect.anything(),
+			expect.anything(),
+			expect.anything(),
+		);
+		expect(nativeInvoke).toHaveBeenCalledWith(
+			'notes/update',
+			expect.objectContaining({ fileIds: ['replacement-file'] }),
+			expect.anything(),
+			expect.anything(),
+		);
+	});
+
+	test('rejects replacement media not owned by the authenticated user before updating', async () => {
+		const { fastify, nativeInvoke, driveFilesRepository } = createServer();
+		driveFilesRepository.findBy.mockResolvedValue([]);
+		nativeInvoke.mockImplementation(async name => {
+			if (name === 'notes/show') return { id: 'note-id', text: 'old', fileIds: [] };
+			if (name === 'notes/update') return { updatedNote: { id: 'note-id' } };
+			return [];
+		});
+
+		const response = await fastify.inject({
+			method: 'PUT',
+			url: '/api/v1/statuses/note-id',
+			headers: { authorization: 'Bearer mastodon-token', 'content-type': 'application/json' },
+			payload: {
+				status: 'edited',
+				media_ids: ['someone-elses-file'],
+				sensitive: false,
+			},
+		});
+
+		expect(response.statusCode).toBe(422);
+		expect(driveFilesRepository.findBy).toHaveBeenCalledWith({
+			id: expect.anything(),
+			userId: 'user-id',
+		});
+		expect(nativeInvoke).not.toHaveBeenCalledWith('notes/update', expect.anything(), expect.anything(), expect.anything());
 	});
 
 	test.each([
@@ -4439,6 +4534,28 @@ describe(MastodonApiServerService, () => {
 		expect(response.statusCode).toBe(200);
 		expect(nativeInvoke).toHaveBeenCalledWith('notes/update', expect.objectContaining({
 			fileIds: ['new-file'],
+			text: null,
+		}), expect.anything(), expect.anything());
+	});
+
+	test('normalizes an explicitly empty status to null when media remains', async () => {
+		const { fastify, nativeInvoke } = createServer();
+		nativeInvoke.mockImplementation(async name => {
+			if (name === 'notes/show') return { id: 'note-id', text: 'old', fileIds: ['file'] };
+			if (name === 'notes/update') return { updatedNote: { id: 'note-id' } };
+			return [];
+		});
+
+		const response = await fastify.inject({
+			method: 'PUT',
+			url: '/api/v1/statuses/note-id',
+			headers: { authorization: 'Bearer mastodon-token', 'content-type': 'application/json' },
+			payload: { status: '', media_ids: ['file'] },
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(nativeInvoke).toHaveBeenCalledWith('notes/update', expect.objectContaining({
+			fileIds: ['file'],
 			text: null,
 		}), expect.anything(), expect.anything());
 	});

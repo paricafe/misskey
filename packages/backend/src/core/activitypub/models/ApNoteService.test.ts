@@ -15,8 +15,9 @@ import { ApNoteService } from './ApNoteService.js';
 function createService(originNoteOverrides: Record<string, unknown> = {}) {
 	const preparedUpdate = { noteId: 'origin-note', history: [] };
 	const noteUpdateService = {
-		isUpdateAlreadyApplied: vi.fn((note: { history?: Array<{ createdAt: string }> | null }, updatedAt: Date) =>
-			note.history?.some(revision => revision.createdAt === updatedAt.toISOString()) ?? false),
+		isUpdateAlreadyApplied: vi.fn((note: { updatedAt?: Date | null; history?: Array<{ createdAt: string }> | null }, updatedAt: Date) =>
+			note.updatedAt?.getTime() === updatedAt.getTime() ||
+			(note.history?.some(revision => revision.createdAt === updatedAt.toISOString()) ?? false)),
 		prepareUpdate: vi.fn().mockResolvedValue(preparedUpdate),
 		update: vi.fn().mockResolvedValue(undefined),
 	};
@@ -151,6 +152,37 @@ describe(ApNoteService, () => {
 			originNote,
 			new Date(update.updated),
 		);
+		expect(apPersonService.resolvePerson).not.toHaveBeenCalled();
+		expect(noteUpdateService.prepareUpdate).not.toHaveBeenCalled();
+		expect(apImageService.resolveImage).not.toHaveBeenCalled();
+		expect(extractEmojis).not.toHaveBeenCalled();
+		expect(noteUpdateService.update).not.toHaveBeenCalled();
+	});
+
+	test('treats a replay of the current version as a no-op before resolving any side effects', async () => {
+		const history = Array.from({ length: MAX_NOTE_HISTORY_REVISIONS }, (_, index) => ({
+			createdAt: new Date(index).toISOString(),
+			text: `revision-${index}`,
+		}));
+		const {
+			service,
+			noteUpdateService,
+			apImageService,
+			apPersonService,
+			extractEmojis,
+		} = createService({
+			updatedAt: new Date(update.updated),
+			history,
+		});
+		noteUpdateService.prepareUpdate.mockRejectedValueOnce(
+			new IdentifiableError(NOTE_HISTORY_LIMIT_ERROR_ID, 'Note edit history limit exceeded.'),
+		);
+
+		await expect(service.updateNote({
+			...update,
+			attachment: [{ type: 'Document', url: 'https://remote.example/files/new.png' }],
+		} as never)).resolves.toBeUndefined();
+
 		expect(apPersonService.resolvePerson).not.toHaveBeenCalled();
 		expect(noteUpdateService.prepareUpdate).not.toHaveBeenCalled();
 		expect(apImageService.resolveImage).not.toHaveBeenCalled();
