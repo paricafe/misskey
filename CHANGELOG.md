@@ -10,6 +10,7 @@
 - Fix: ノートを編集した直後に、表示中の内容が更新されない問題を修正
 - Fix: ノートインポートの形式選択が正しく動作しない問題を修正
 - Fix: CW付きノート内のセンシティブなメディアでぼかしが表示されない問題を修正
+- Fix: 承認制登録とPari Plus設定の英語・中国語翻訳が表示されない問題を修正
 
 ### Server
 - Feat: Mastodon API compatible OAuth, REST, and streaming endpoints are now available for Mastodon clients

@@ -12881,9 +12881,9 @@ export interface Locale extends ILocale {
      */
     "enableRenderingOptimization": string;
     /**
-     * Display translation function on notes in different languages
+     * ノートに翻訳ボタンを表示
      */
-    "autoTranslateButton": string;
+    "enableTranslateButton": string;
     /**
      * Hover the timestamp of the note to expand the detailed time
      */
@@ -12904,6 +12904,10 @@ export interface Locale extends ILocale {
      * Enable undo & clear button in post form
      */
     "enableUndoClearPostForm": string;
+    /**
+     * 返信したノートを折りたたむ
+     */
+    "collapseNotesRepliedTo": string;
     /**
      * Always collapse renotes
      */

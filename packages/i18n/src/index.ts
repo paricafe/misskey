@@ -10,6 +10,7 @@
 import * as fs from 'node:fs';
 import { load as loadYaml } from 'js-yaml';
 import { languages, primaries } from './const.js';
+import { customLocales } from './custom-locales.js';
 import type { Locale } from './autogen/locale.js';
 import type { ILocale, ParameterizedString } from './types.js';
 
@@ -62,7 +63,8 @@ function build(): Record<Language, Locale> {
 	// https://github.com/misskey-dev/misskey/pull/14057#issuecomment-2192833785
 	const metaUrl = import.meta.url;
 	const locales = languages.reduce<Locales>((a, lang) => {
-		a[lang] = (loadYaml(clean(fs.readFileSync(new URL(`./locales/${lang}.yml`, metaUrl), 'utf-8'))) ?? {}) as ILocale;
+		const locale = (loadYaml(clean(fs.readFileSync(new URL(`./locales/${lang}.yml`, metaUrl), 'utf-8'))) ?? {}) as ILocale;
+		a[lang] = merge(locale, customLocales[lang]);
 		return a;
 	}, {} as Locales);
 
