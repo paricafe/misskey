@@ -30,7 +30,7 @@ import type { MiRemoteUser } from '@/models/User.js';
 import { GlobalEventService } from '@/core/GlobalEventService.js';
 import { AbuseReportService } from '@/core/AbuseReportService.js';
 import { IdentifiableError } from '@/misc/identifiable-error.js';
-import { getApHrefNullable, getApId, getApIds, getApType, isAccept, isActor, isAdd, isAnnounce, isBlock, isCollection, isCollectionOrOrderedCollection, isCreate, isDelete, isFlag, isFollow, isLike, isMove, isPost, isReject, isRemove, isTombstone, isUndo, isUpdate, validActor, validPost } from './type.js';
+import { getApHrefNullable, getApId, getApIds, getApType, getOneApId, isAccept, isActor, isAdd, isAnnounce, isBlock, isCollection, isCollectionOrOrderedCollection, isCreate, isDelete, isFlag, isFollow, isLike, isMove, isPost, isReject, isRemove, isTombstone, isUndo, isUpdate, validActor, validPost } from './type.js';
 import { ApNoteService } from './models/ApNoteService.js';
 import { ApLoggerService } from './ApLoggerService.js';
 import { ApDbResolverService } from './ApDbResolverService.js';
@@ -368,7 +368,7 @@ export class ApInboxService {
 				uri,
 			});
 		} finally {
-			unlock();
+			await unlock();
 		}
 	}
 
@@ -464,7 +464,7 @@ export class ApInboxService {
 				throw err;
 			}
 		} finally {
-			unlock();
+			await unlock();
 		}
 	}
 
@@ -549,7 +549,7 @@ export class ApInboxService {
 			await this.noteDeleteService.delete(actor, note);
 			return 'ok: note deleted';
 		} finally {
-			unlock();
+			await unlock();
 		}
 	}
 
@@ -791,6 +791,12 @@ export class ApInboxService {
 			this.logger.error(`Resolution failed: ${e}`);
 			throw e;
 		});
+		if (
+			(getApType(object) === 'Question' || isPost(object)) &&
+			(object.attributedTo == null || actor.uri !== getOneApId(object.attributedTo))
+		) {
+			return 'skip: actor does not match object author';
+		}
 
 		if (isActor(object)) {
 			await this.apPersonService.updatePerson(actor.uri, resolver, object);

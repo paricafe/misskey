@@ -48,6 +48,7 @@ import { NotePiningService } from './NotePiningService.js';
 import { NoteDraftService } from './NoteDraftService.js';
 import { NotificationService } from './NotificationService.js';
 import { PollService } from './PollService.js';
+import { PollVoteService } from './PollVoteService.js';
 import { PushNotificationService } from './PushNotificationService.js';
 import { MastodonPushNotificationService } from './MastodonPushNotificationService.js';
 import { QueryService } from './QueryService.js';
@@ -195,6 +196,7 @@ const $NotePiningService: Provider = { provide: 'NotePiningService', useExisting
 const $NoteDraftService: Provider = { provide: 'NoteDraftService', useExisting: NoteDraftService };
 const $NotificationService: Provider = { provide: 'NotificationService', useExisting: NotificationService };
 const $PollService: Provider = { provide: 'PollService', useExisting: PollService };
+const $PollVoteService: Provider = { provide: 'PollVoteService', useExisting: PollVoteService };
 const $SystemAccountService: Provider = { provide: 'SystemAccountService', useExisting: SystemAccountService };
 const $PushNotificationService: Provider = { provide: 'PushNotificationService', useExisting: PushNotificationService };
 const $MastodonPushNotificationService: Provider = { provide: 'MastodonPushNotificationService', useExisting: MastodonPushNotificationService };
@@ -350,6 +352,7 @@ const $ApQuestionService: Provider = { provide: 'ApQuestionService', useExisting
 		NoteDraftService,
 		NotificationService,
 		PollService,
+		PollVoteService,
 		SystemAccountService,
 		PushNotificationService,
 		MastodonPushNotificationService,
@@ -503,6 +506,7 @@ const $ApQuestionService: Provider = { provide: 'ApQuestionService', useExisting
 		$NoteDraftService,
 		$NotificationService,
 		$PollService,
+		$PollVoteService,
 		$SystemAccountService,
 		$PushNotificationService,
 		$MastodonPushNotificationService,
@@ -656,6 +660,7 @@ const $ApQuestionService: Provider = { provide: 'ApQuestionService', useExisting
 		NoteDraftService,
 		NotificationService,
 		PollService,
+		PollVoteService,
 		SystemAccountService,
 		PushNotificationService,
 		MastodonPushNotificationService,
@@ -808,6 +813,7 @@ const $ApQuestionService: Provider = { provide: 'ApQuestionService', useExisting
 		$NoteDraftService,
 		$NotificationService,
 		$PollService,
+		$PollVoteService,
 		$SystemAccountService,
 		$PushNotificationService,
 		$MastodonPushNotificationService,

@@ -4506,6 +4506,26 @@ export type components = {
                 createdAt: string;
                 text: string | null;
                 cw?: string | null;
+                fileIds?: string[];
+                files?: components['schemas']['DriveFile'][];
+                sensitive?: boolean;
+                emojis?: string[];
+                emojiUrls?: {
+                    [key: string]: string;
+                };
+                poll?: {
+                    /** Format: date-time */
+                    expiresAt?: string | null;
+                    multiple: boolean;
+                    choices: {
+                        isVoted: boolean;
+                        text: string;
+                        votes: number;
+                    }[];
+                } | null;
+                pollVotersCount?: number;
+                /** Format: id */
+                renoteId?: string | null;
             }[] | null;
             /** Format: date-time */
             deletedAt?: string | null;
@@ -32253,7 +32273,7 @@ export interface operations {
                 'application/json': {
                     /** Format: misskey:id */
                     noteId: string;
-                    text: string;
+                    text: string | null;
                     fileIds?: string[];
                     mediaIds?: string[];
                     cw: string | null;

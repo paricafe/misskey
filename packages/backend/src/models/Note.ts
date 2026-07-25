@@ -5,6 +5,7 @@
 
 import { Entity, Index, JoinColumn, Column, PrimaryColumn, ManyToOne } from 'typeorm';
 import { noteVisibilities, noteReactionAcceptances } from '@/types.js';
+import type { Packed } from '@/misc/json-schema.js';
 import { id } from './util/id.js';
 import { MiUser } from './User.js';
 import { MiChannel } from './Channel.js';
@@ -40,6 +41,14 @@ export class MiNote {
 		createdAt: string, // ISO string
 		text: string | null,
 		cw?: string | null,
+		fileIds?: string[],
+		files?: Packed<'DriveFile'>[],
+		sensitive?: boolean,
+		emojis?: string[],
+		emojiUrls?: Record<string, string>,
+		poll?: Packed<'Note'>['poll'],
+		pollVotersCount?: number,
+		renoteId?: MiNote['id'] | null,
 	}[] | null;
 
 	@Index()

@@ -109,7 +109,7 @@ export const MASTODON_4_6_USER_ROUTES: readonly MastodonContractRoute[] = [
 	implemented('GET', '/api/v1/streaming/health', 'public', undefined, 'String', '3.0.0'),
 
 	// Statuses and timelines
-	implemented('GET', '/api/v1/statuses', 'token', 'read:statuses', 'Status[]', '4.6.0'),
+	implemented('GET', '/api/v1/statuses', 'public', 'read:statuses', 'Status[]', '4.3.0'),
 	implemented('POST', '/api/v1/statuses', 'user', 'write:statuses', 'Status', '1.0.0'),
 	implemented('GET', '/api/v1/statuses/:id', 'public', 'read:statuses', 'Status'),
 	implemented('PUT', '/api/v1/statuses/:id', 'user', 'write:statuses', 'Status', '3.5.0'),
@@ -153,10 +153,10 @@ export const MASTODON_4_6_USER_ROUTES: readonly MastodonContractRoute[] = [
 	implemented('DELETE', '/api/v1/scheduled_statuses/:id', 'user', 'write:statuses', 'Object', '2.7.0'),
 
 	// Accounts and profile
-	implemented('GET', '/api/v1/accounts', 'token', 'read:accounts', 'Account[]', '4.6.0'),
+	implemented('GET', '/api/v1/accounts', 'public', 'read:accounts', 'Account[]', '4.3.0'),
 	unsupported('POST', '/api/v1/accounts', 'token', 'write:accounts', 'Token', '2.7.0', ['username', 'email', 'password', 'agreement']),
 	implemented('GET', '/api/v1/accounts/:id', 'public', 'read:accounts', 'Account'),
-	implemented('GET', '/api/v1/accounts/verify_credentials', 'user', 'read:accounts', 'CredentialAccount'),
+	implemented('GET', '/api/v1/accounts/verify_credentials', 'user', ['profile', 'read:accounts'], 'CredentialAccount'),
 	implemented('PATCH', '/api/v1/accounts/update_credentials', 'user', 'write:accounts', 'CredentialAccount'),
 	implemented('GET', '/api/v1/accounts/search', 'user', 'read:accounts', 'Account[]'),
 	implemented('GET', '/api/v1/accounts/lookup', 'user', 'read:accounts', 'Account'),

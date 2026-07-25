@@ -42,6 +42,91 @@ export const packedNoteSchema = {
 						type: 'string',
 						optional: true, nullable: true,
 					},
+					fileIds: {
+						type: 'array',
+						optional: true, nullable: false,
+						items: {
+							type: 'string',
+							optional: false, nullable: false,
+							format: 'id',
+						},
+					},
+					files: {
+						type: 'array',
+						optional: true, nullable: false,
+						items: {
+							type: 'object',
+							optional: false, nullable: false,
+							ref: 'DriveFile',
+						},
+					},
+					sensitive: {
+						type: 'boolean',
+						optional: true, nullable: false,
+					},
+					emojis: {
+						type: 'array',
+						optional: true, nullable: false,
+						items: {
+							type: 'string',
+							optional: false, nullable: false,
+						},
+					},
+					emojiUrls: {
+						type: 'object',
+						optional: true, nullable: false,
+						additionalProperties: {
+							anyOf: [{
+								type: 'string',
+							}],
+						},
+					},
+					poll: {
+						type: 'object',
+						optional: true, nullable: true,
+						properties: {
+							expiresAt: {
+								type: 'string',
+								optional: true, nullable: true,
+								format: 'date-time',
+							},
+							multiple: {
+								type: 'boolean',
+								optional: false, nullable: false,
+							},
+							choices: {
+								type: 'array',
+								optional: false, nullable: false,
+								items: {
+									type: 'object',
+									optional: false, nullable: false,
+									properties: {
+										isVoted: {
+											type: 'boolean',
+											optional: false, nullable: false,
+										},
+										text: {
+											type: 'string',
+											optional: false, nullable: false,
+										},
+										votes: {
+											type: 'number',
+											optional: false, nullable: false,
+										},
+									},
+								},
+							},
+						},
+					},
+					pollVotersCount: {
+						type: 'number',
+						optional: true, nullable: false,
+					},
+					renoteId: {
+						type: 'string',
+						optional: true, nullable: true,
+						format: 'id',
+					},
 				},
 			},
 		},

@@ -64,10 +64,24 @@ const note = {
 	myReaction: '👍',
 };
 
+function renoteTarget(id: string) {
+	return {
+		...note,
+		id,
+		text: 'Renoted note',
+		cw: null,
+		files: [],
+		poll: null,
+		renoteId: null,
+		renote: null,
+	};
+}
+
 describe(MastodonEntityService, () => {
 	const service = new MastodonEntityService(
-		{ url: 'https://misskey.example/' } as never,
+		{ url: 'https://misskey.example/', host: 'misskey.example' } as never,
 		{ toHtml: (nodes: unknown) => `<p>${String(nodes)}</p>` } as never,
+		{ query: vi.fn() } as never,
 	);
 
 	test('converts a Misskey user to a Mastodon account', () => {
@@ -215,6 +229,7 @@ describe(MastodonEntityService, () => {
 		const announcementService = new MastodonEntityService(
 			{ url: 'https://misskey.example/' } as never,
 			{ toHtml } as never,
+			{ query: vi.fn() } as never,
 		);
 
 		const announcement = announcementService.announcement({
@@ -347,6 +362,77 @@ describe(MastodonEntityService, () => {
 		}]);
 	});
 
+	test('keeps distinct mention IDs aligned after duplicate mentions', () => {
+		const status = service.status({
+			...note,
+			text: '@alice @alice @bob',
+			mentions: ['alice-id', 'bob-id'],
+		} as never);
+
+		expect(status.mentions).toEqual([
+			{
+				id: 'alice-id',
+				username: 'alice',
+				acct: 'alice',
+				url: 'https://misskey.example/@alice',
+			},
+			{
+				id: 'bob-id',
+				username: 'bob',
+				acct: 'bob',
+				url: 'https://misskey.example/@bob',
+			},
+		]);
+
+		const normalizedLocalStatus = service.status({
+			...note,
+			text: '@Alice @alice@MISSKEY.EXAMPLE @bob',
+			mentions: ['alice-id', 'bob-id'],
+		} as never);
+		expect(normalizedLocalStatus.mentions).toEqual([
+			expect.objectContaining({ id: 'alice-id', username: 'Alice' }),
+			expect.objectContaining({ id: 'bob-id', username: 'bob' }),
+		]);
+
+		const remoteAuthorStatus = service.status({
+			...note,
+			user: { ...note.user, host: 'remote.example' },
+			text: '@Alice @alice@REMOTE.EXAMPLE @alice@misskey.example @bob',
+			mentions: ['remote-alice-id', 'local-alice-id', 'bob-id'],
+		} as never);
+		expect(remoteAuthorStatus.mentions).toEqual([
+			{
+				id: 'remote-alice-id',
+				username: 'Alice',
+				acct: 'Alice@remote.example',
+				url: 'https://remote.example/@Alice',
+			},
+			{
+				id: 'local-alice-id',
+				username: 'alice',
+				acct: 'alice@misskey.example',
+				url: 'https://misskey.example/@alice',
+			},
+			{
+				id: 'bob-id',
+				username: 'bob',
+				acct: 'bob@remote.example',
+				url: 'https://remote.example/@bob',
+			},
+		]);
+
+		const normalizedRemoteHostStatus = service.status({
+			...note,
+			user: { ...note.user, host: '例え.テスト' },
+			text: '@Alice @alice@XN--R8JZ45G.XN--ZCKZAH @bob',
+			mentions: ['remote-alice-id', 'bob-id'],
+		} as never);
+		expect(normalizedRemoteHostStatus.mentions).toEqual([
+			expect.objectContaining({ id: 'remote-alice-id', username: 'Alice', acct: 'Alice@xn--r8jz45g.xn--zckzah' }),
+			expect.objectContaining({ id: 'bob-id', username: 'bob', acct: 'bob@xn--r8jz45g.xn--zckzah' }),
+		]);
+	});
+
 	test('converts a Misskey note, attachment, and poll to a Mastodon status', () => {
 		const status = service.status(note as never);
 
@@ -366,7 +452,7 @@ describe(MastodonEntityService, () => {
 		expect(status.media_attachments).toEqual([expect.objectContaining({
 			id: 'file-id', type: 'image', description: 'alt text', width: 800, height: 600,
 		})]);
-		expect(status.poll).toMatchObject({ votes_count: 3, voters_count: 3, multiple: true, voted: true });
+		expect(status.poll).toMatchObject({ votes_count: 3, voters_count: null, multiple: true, voted: true });
 		expect(status.tags).toEqual([expect.objectContaining({ name: 'fediverse' })]);
 		expect(status).toMatchObject({
 			quotes_count: 0,
@@ -401,14 +487,167 @@ describe(MastodonEntityService, () => {
 		});
 	});
 
-	test('converts stored Note revisions oldest-to-newest and includes the current revision', () => {
+	test('maps a CW-only renote as a quote in the current status', () => {
+		const quoted = renoteTarget('cw-quote-target-id');
+		const status = service.status({
+			...note,
+			id: 'cw-only-quote-id',
+			text: null,
+			cw: 'Content warning',
+			files: [],
+			poll: null,
+			replyId: null,
+			renoteId: quoted.id,
+			renote: quoted,
+		} as never);
+
+		expect(status.reblog).toBeNull();
+		expect(status.quote).toEqual({
+			state: 'accepted',
+			quoted_status: expect.objectContaining({ id: quoted.id }),
+		});
+	});
+
+	test('retains a CW-only quote in the current status edit', () => {
+		const quoted = renoteTarget('current-edit-quote-target-id');
 		const edits = service.statusEdits({
 			...note,
+			text: null,
+			cw: 'Content warning',
+			files: [],
+			poll: null,
+			replyId: null,
+			renoteId: quoted.id,
+			renote: quoted,
+			history: [],
+		} as never);
+
+		expect(edits).toHaveLength(1);
+		expect(edits[0]).toMatchObject({
+			quote: {
+				state: 'accepted',
+				quoted_status: { id: quoted.id },
+			},
+		});
+	});
+
+	test('retains and resolves a CW-only quote in a historical status edit', () => {
+		const quoted = renoteTarget('historical-cw-quote-target-id');
+		const edits = service.statusEdits({
+			...note,
+			text: 'Current revision',
+			cw: null,
+			files: [],
+			poll: null,
+			renoteId: quoted.id,
+			renote: quoted,
+			history: [{
+				createdAt: '2025-02-03T02:00:00.000Z',
+				text: null,
+				cw: 'Historical content warning',
+				renoteId: quoted.id,
+			}],
+		} as never, undefined, new Map([[quoted.id, quoted as never]]));
+
+		expect(edits[0]).toMatchObject({
+			spoiler_text: 'Historical content warning',
+			quote: {
+				state: 'accepted',
+				quoted_status: { id: quoted.id },
+			},
+		});
+	});
+
+	test('keeps a true pure renote as a reblog', () => {
+		const renoted = renoteTarget('pure-renote-target-id');
+		const status = service.status({
+			...note,
+			id: 'pure-renote-id',
+			text: null,
+			cw: null,
+			files: [],
+			poll: null,
+			replyId: null,
+			renoteId: renoted.id,
+			renote: renoted,
+		} as never);
+
+		expect(status.quote).toBeNull();
+		expect(status.reblog).toEqual(expect.objectContaining({ id: renoted.id }));
+	});
+
+	test('converts stored Note revisions oldest-to-newest and includes the current revision', () => {
+		const quoted = {
+			...note,
+			id: 'quoted-note-id',
+			text: 'Quoted poll',
+			files: [],
+			renoteId: null,
+			renote: null,
+		};
+		const edits = service.statusEdits({
+			...note,
+			text: 'Current revision with quote',
+			renoteId: quoted.id,
+			renote: quoted,
 			history: [
 				{ createdAt: '2025-02-03T03:00:00.000Z', text: 'Second', cw: null },
-				{ createdAt: '2025-02-03T02:00:00.000Z', text: 'First', cw: 'Old CW' },
+				{
+					createdAt: '2025-02-03T02:00:00.000Z',
+					text: 'First',
+					cw: 'Old CW',
+					fileIds: ['old-file-id'],
+					files: [{
+						...note.files[0],
+						id: 'old-file-id',
+						url: 'https://cdn.example/old-image.png',
+						isSensitive: false,
+					}],
+					sensitive: false,
+					emojis: ['old_party'],
+					emojiUrls: { old_party: 'https://cdn.example/old-party.webp' },
+					poll: {
+						expiresAt: null,
+						multiple: true,
+						choices: [
+							{ text: 'Old A', votes: 4, isVoted: false },
+							{ text: 'Old B', votes: 2, isVoted: true },
+						],
+					},
+					pollVotersCount: 5,
+					renoteId: 'old-quoted-note-id',
+					renote: {
+						...quoted,
+						id: 'old-quoted-note-id',
+						text: 'Legacy embedded quote must not be used',
+						poll: {
+							expiresAt: null,
+							multiple: true,
+							choices: [
+								{ text: 'Leaked A', votes: 30, isVoted: true },
+								{ text: 'Leaked B', votes: 10, isVoted: false },
+							],
+						},
+					},
+				},
 			],
-		} as never);
+		} as never, new Map([
+			['note-id', 2],
+			['quoted-note-id', 0],
+			['old-quoted-note-id', 3],
+		]), new Map([['old-quoted-note-id', {
+			...quoted,
+			id: 'old-quoted-note-id',
+			text: 'Visibility-checked historical quote',
+			poll: {
+				expiresAt: null,
+				multiple: true,
+				choices: [
+					{ text: 'Quoted A', votes: 3, isVoted: true },
+					{ text: 'Quoted B', votes: 1, isVoted: false },
+				],
+			},
+		} as never]]));
 
 		expect(edits.map(edit => edit.created_at)).toEqual([
 			'2025-02-03T02:00:00.000Z',
@@ -420,17 +659,84 @@ describe(MastodonEntityService, () => {
 			content: expect.any(String),
 			spoiler_text: 'Old CW',
 			sensitive: false,
+			media_attachments: [expect.objectContaining({
+				id: 'old-file-id',
+				url: 'https://cdn.example/old-image.png',
+			})],
+			emojis: [expect.objectContaining({
+				shortcode: 'old_party',
+				url: 'https://cdn.example/old-party.webp',
+			})],
+			poll: expect.objectContaining({
+				id: 'note-id',
+				votes_count: 6,
+				voters_count: 5,
+				voted: false,
+				own_votes: [],
+			}),
+			quote: {
+				state: 'accepted',
+				quoted_status: expect.objectContaining({
+					id: 'old-quoted-note-id',
+					quote: null,
+					reblog: null,
+					poll: expect.objectContaining({
+						votes_count: 4,
+						voters_count: 3,
+						voted: false,
+						own_votes: [],
+					}),
+				}),
+			},
+		});
+		expect(JSON.stringify(edits[0])).not.toContain('Leaked A');
+		expect(edits[1]).toMatchObject({
+			content: expect.any(String),
+			spoiler_text: '',
+			sensitive: false,
 			media_attachments: [],
 			emojis: [],
 		});
-		expect(edits[0]).not.toHaveProperty('poll');
-		expect(edits[0]).not.toHaveProperty('quote');
+		expect(edits[1]).not.toHaveProperty('poll');
+		expect(edits[1]).not.toHaveProperty('quote');
 		expect(edits.at(-1)).toMatchObject({
 			spoiler_text: 'CW',
 			sensitive: true,
 			media_attachments: [expect.objectContaining({ id: 'file-id' })],
-			poll: expect.objectContaining({ id: 'note-id' }),
+			poll: expect.objectContaining({ id: 'note-id', voters_count: 2 }),
+			quote: {
+				state: 'accepted',
+				quoted_status: expect.objectContaining({
+					id: 'quoted-note-id',
+					poll: expect.objectContaining({ id: 'quoted-note-id', voters_count: 0 }),
+				}),
+			},
 		});
+
+		const singlePollEdits = service.statusEdits({
+			...note,
+			poll: { ...note.poll, multiple: false },
+		} as never, new Map([['note-id', 1]]));
+		expect(singlePollEdits.at(-1)).toMatchObject({ poll: { voters_count: null } });
+	});
+
+	test('returns a null historical quote when its reference is unavailable', () => {
+		const edits = service.statusEdits({
+			...note,
+			history: [{
+				createdAt: '2025-02-03T02:00:00.000Z',
+				text: 'Quote was here',
+				renoteId: 'hidden-quote',
+				renote: {
+					...note,
+					id: 'hidden-quote',
+					text: 'Stored hidden content',
+				},
+			}],
+		} as never, undefined, new Map());
+
+		expect(edits[0]).toMatchObject({ quote: null });
+		expect(JSON.stringify(edits[0])).not.toContain('Stored hidden content');
 	});
 
 	test('converts native translation results to Mastodon Translation', () => {
@@ -468,7 +774,7 @@ describe(MastodonEntityService, () => {
 		expect(poll).toMatchObject({
 			id: 'note-id',
 			votes_count: 3,
-			voters_count: 3,
+			voters_count: null,
 			multiple: true,
 			voted: true,
 			own_votes: [0],
@@ -477,6 +783,20 @@ describe(MastodonEntityService, () => {
 				{ title: 'B', votes_count: 1 },
 			],
 		});
+	});
+
+	test('maps voters_count from poll cardinality rather than summed choices', () => {
+		const singlePoll = {
+			...note.poll,
+			multiple: false,
+		};
+		const multiplePoll = {
+			...note.poll,
+			multiple: true,
+		};
+
+		expect(service.poll('single', singlePoll as never).voters_count).toBeNull();
+		expect(service.poll('multiple', multiplePoll as never, 2).voters_count).toBe(2);
 	});
 
 	test('converts relation flags and supported notifications', () => {

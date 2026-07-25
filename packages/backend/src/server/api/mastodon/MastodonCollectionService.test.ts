@@ -111,7 +111,7 @@ describe(MastodonCollectionService, () => {
 		};
 		const config = { url: 'https://misskey.example/' };
 		const mfmService = new MfmService(config as never);
-		const mastodonEntityService = new MastodonEntityService(config as never, mfmService);
+		const mastodonEntityService = new MastodonEntityService(config as never, mfmService, { query: vi.fn() } as never);
 		const userEntityService = {
 			packMany: vi.fn(async (requested: User[]) => [...requested].reverse().map(user => ({
 				id: user.id,

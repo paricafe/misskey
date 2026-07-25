@@ -358,6 +358,21 @@ export class ApNoteService {
 		// Check if note is from local
 		if (uri.startsWith(`${this.config.url}/`)) throw new Error('uri points local');
 
+		const unlock = await acquireApObjectLock(this.redisClient, uri);
+		try {
+			await this.updateNoteLocked(value, uri, resolver, silent, unlock.assertOwned);
+		} finally {
+			await unlock();
+		}
+	}
+
+	private async updateNoteLocked(
+		value: string | IObject,
+		uri: string,
+		resolver: Resolver | undefined,
+		silent: boolean,
+		assertLockOwned: () => Promise<void>,
+	): Promise<void> {
 		const originNote = await this.notesRepository.findOneBy({ uri });
 		if (originNote === null) throw new Error('note is not registered');
 
@@ -368,11 +383,18 @@ export class ApNoteService {
 		if (!note.updated) {
 			throw new Error('note.updated field is required');
 		}
+		const updatedAt = new Date(note.updated);
 
 		// Fetch note author
 		if (!note.attributedTo) {
 			throw new Error('invalid note.attributedTo: ' + note.attributedTo);
 		}
+		const actor = await this.apPersonService.resolvePerson(getOneApId(note.attributedTo), resolver) as MiRemoteUser;
+		if (actor.id !== originNote.userId) {
+			throw new Error('note author does not match the cached note owner');
+		}
+
+		if (this.noteUpdateService.isUpdateAlreadyApplied(originNote, updatedAt)) return;
 
 		const apHashtags = extractApHashtags(note.tag);
 
@@ -388,15 +410,21 @@ export class ApNoteService {
 			text = this.apMfmService.htmlToMfm(note.content, note.tag);
 		}
 
-		const actor = await this.apPersonService.resolvePerson(getOneApId(note.attributedTo), resolver) as MiRemoteUser;
+		await this.noteUpdateService.prepareUpdate(actor, originNote);
 
+		// This may register a remote input-cache artifact and its Drive cache events,
+		// so it must finish before NoteUpdateService opens its database transaction.
+		// A rare later rollback can leave that artifact unattached; non-link cache
+		// bytes are capacity-bounded, but isLink rows are not universally swept.
 		// 添付ファイル
-		const files: MiDriveFile[] = [];
-
-		for (const attach of toArray(note.attachment)) {
-			attach.sensitive ??= note.sensitive;
-			const file = await this.apImageService.resolveImage(actor, attach);
-			if (file) files.push(file);
+		let files: MiDriveFile[] | undefined;
+		if (Object.hasOwn(note, 'attachment')) {
+			files = [];
+			for (const attach of toArray(note.attachment)) {
+				attach.sensitive ??= note.sensitive;
+				const file = await this.apImageService.resolveImage(actor, attach);
+				if (file) files.push(file);
+			}
 		}
 
 		const emojis = await this.extractEmojis(note.tag ?? [], actor.host).catch(e => {
@@ -406,13 +434,14 @@ export class ApNoteService {
 
 		const apEmojis = emojis.map(emoji => emoji.name);
 
+		await assertLockOwned();
 		await this.noteUpdateService.update(actor, originNote, {
 			files,
 			cw,
 			text,
 			apHashtags,
 			apEmojis,
-			updatedAt: new Date(note.updated),
+			updatedAt,
 		}, silent);
 	}
 
@@ -448,7 +477,7 @@ export class ApNoteService {
 			const createFrom = options.sentFrom?.origin === new URL(uri).origin ? value : uri;
 			return await this.createNote(createFrom, undefined, options.resolver, true);
 		} finally {
-			unlock();
+			await unlock();
 		}
 	}
 

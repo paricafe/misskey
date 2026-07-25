@@ -11,22 +11,25 @@ import { extract, parse as mfmParse } from 'mfm-js';
 import { In } from 'typeorm';
 import { pipeline } from 'node:stream/promises';
 import * as fs from 'node:fs';
-import { MAX_NOTE_TEXT_LENGTH } from '@/const.js';
+import { MAX_NOTE_FILES, MAX_NOTE_TEXT_LENGTH } from '@/const.js';
 import type { Config } from '@/config.js';
 import { DI } from '@/di-symbols.js';
-import type { MiMeta, NoteFavoritesRepository, NotesRepository, UserNotePiningsRepository } from '@/models/_.js';
+import type { DriveFilesRepository, MiDriveFile, MiMeta, NoteFavoritesRepository, NotesRepository, UserNotePiningsRepository } from '@/models/_.js';
 import { createTemp } from '@/misc/create-temp.js';
 import type { Packed } from '@/misc/json-schema.js';
 import { extractMentions } from '@/misc/extract-mentions.js';
 import { bindThis } from '@/decorators.js';
 import { ApiError } from '@/server/api/error.js';
+import { PollVoteService } from '@/core/PollVoteService.js';
+import { MAX_NOTE_HISTORY_REVISIONS } from '@/core/NoteUpdateService.js';
 import type { FastifyInstance, FastifyPluginOptions, FastifyReply, FastifyRequest } from 'fastify';
 import { MastodonApiCallService } from './MastodonApiCallService.js';
+import { MastodonApiStateService } from './MastodonApiStateService.js';
 import { MASTODON_4_6_USER_ROUTES, type MastodonContractRoute } from './MastodonApiContract.js';
 import { MastodonAuthenticateService } from './MastodonAuthenticateService.js';
 import { MASTODON_COLLECTION_WINDOW_LIMIT, MastodonCollectionService, type MastodonCollectionPage } from './MastodonCollectionService.js';
 import { MastodonConversationService, type MastodonConversation } from './MastodonConversationService.js';
-import { MastodonEntityService } from './MastodonEntityService.js';
+import { MastodonEntityService, resolvePollVoterCounts } from './MastodonEntityService.js';
 import { MastodonFilterService, type MastodonFilterApplyOptions, type MastodonFilterContext } from './MastodonFilterService.js';
 import { MastodonMarkerService, type MastodonMarkerTimeline } from './MastodonMarkerService.js';
 import { MastodonOAuthService } from './MastodonOAuthService.js';
@@ -58,12 +61,16 @@ export class MastodonApiServerService {
 		@Inject(DI.notesRepository)
 		private notesRepository: NotesRepository,
 
+		@Inject(DI.driveFilesRepository)
+		private driveFilesRepository: DriveFilesRepository,
+
 		@Inject(DI.noteFavoritesRepository)
 		private noteFavoritesRepository: NoteFavoritesRepository,
 
 		@Inject(DI.userNotePiningsRepository)
 		private userNotePiningsRepository: UserNotePiningsRepository,
 
+		private pollVoteService: PollVoteService,
 		private mastodonOAuthService: MastodonOAuthService,
 		private mastodonAuthenticateService: MastodonAuthenticateService,
 		private mastodonScopeService: MastodonScopeService,
@@ -79,6 +86,7 @@ export class MastodonApiServerService {
 		private mastodonReportService: MastodonReportService,
 		private mastodonPushSubscriptionService: MastodonPushSubscriptionService,
 		private mastodonUserFeatureService: MastodonUserFeatureService,
+		private mastodonApiStateService: MastodonApiStateService,
 
 		@Inject(DI.redis)
 		private redis: Redis.Redis,
@@ -228,7 +236,7 @@ export class MastodonApiServerService {
 			return this.mastodonEntityService.tag(hashtag.tag);
 		}));
 
-		fastify.get('/api/v1/accounts/verify_credentials', request => this.withAuth(request, 'read:accounts', async auth => {
+		fastify.get('/api/v1/accounts/verify_credentials', request => this.withAuth(request, ['profile', 'read:accounts'], async auth => {
 			const user = await this.invoke('i', {}, auth, request);
 			return this.mastodonEntityService.credentialAccount(user as Packed<'MeDetailed'>);
 		}));
@@ -243,8 +251,7 @@ export class MastodonApiServerService {
 			'reading:expand:spoilers': false,
 		} as Dictionary)));
 		this.registerProfile(fastify);
-		fastify.get('/api/v1/accounts', request => this.withToken(request, 'read:accounts', async tokenAuth => {
-			const auth = tokenAuth.kind === 'user' ? tokenAuth : null;
+		fastify.get('/api/v1/accounts', request => this.withOptionalUser(request, 'read:accounts', async auth => {
 			const users = await this.invokePublicBatch(
 				'users/show',
 				'userId',
@@ -604,8 +611,7 @@ export class MastodonApiServerService {
 	}
 
 	private registerStatuses(fastify: FastifyInstance): void {
-		fastify.get('/api/v1/statuses', request => this.withToken(request, 'read:statuses', async tokenAuth => {
-			const auth = tokenAuth.kind === 'user' ? tokenAuth : null;
+		fastify.get('/api/v1/statuses', request => this.withOptionalUser(request, 'read:statuses', async auth => {
 			const notes = await this.invokePublicBatch(
 				'notes/show',
 				'noteId',
@@ -637,7 +643,29 @@ export class MastodonApiServerService {
 		}));
 		fastify.get<{ Params: { id: string } }>('/api/v1/statuses/:id/history', request => this.withOptionalScopedUser(request, 'read:statuses', async auth => {
 			const note = await this.invokePublic('notes/show', { noteId: request.params.id }, auth, request) as Packed<'Note'>;
-			return this.mastodonEntityService.statusEdits(note);
+			const historicalRenoteIds = [...new Set((note.history ?? []).flatMap(revision => {
+				const legacyRenote = (revision as typeof revision & { renote?: Packed<'Note'> | null }).renote;
+				const renoteId = revision.renoteId ?? legacyRenote?.id;
+				return renoteId == null ? [] : [renoteId];
+			}))];
+			const historicalRenotes = (await this.invokePublicBatch(
+				'notes/show',
+				'noteId',
+				historicalRenoteIds,
+				auth,
+				request,
+				MAX_NOTE_HISTORY_REVISIONS,
+			) as Packed<'Note'>[])
+				.filter(renote => renote.isHidden !== true)
+				.map(renote => this.sanitizeHistoricalQuote(renote));
+			const historicalRenotesById = new Map(historicalRenotes.map(renote => [renote.id, renote]));
+			const historicalPollNotes = historicalRenotes.map(renote => ({
+				...renote,
+				renoteId: null,
+				renote: null,
+			}));
+			const voterCounts = await this.pollVoterCounts([note, ...historicalPollNotes]);
+			return this.mastodonEntityService.statusEdits(note, voterCounts, historicalRenotesById);
 		}));
 		fastify.post<{ Params: { id: string }; Body: Dictionary }>('/api/v1/statuses/:id/translate', request => this.withAuth(request, 'read:statuses', async auth => {
 			const query = request.query as Dictionary;
@@ -666,36 +694,41 @@ export class MastodonApiServerService {
 		}));
 		fastify.get<{ Params: { id: string } }>('/api/v1/statuses/:id/quotes', (request, reply) => this.withToken(request, 'read:statuses', async tokenAuth => {
 			const auth = tokenAuth.kind === 'user' ? tokenAuth : null;
-			const renotes = await this.invokePublic('notes/renotes', {
-				noteId: request.params.id,
-				...this.mastodonPaginationService.toMisskey(request.query as Dictionary, 100),
-			}, auth, request) as Packed<'Note'>[];
-			const quotes = renotes.filter(note => note.renoteId != null && !this.isPurePackedRenote(note));
-			return this.page(request, reply, quotes, await this.statusesWithState(quotes, auth, 'thread'));
+			const { quotes, source } = await this.quotePage(request.params.id, request, auth);
+			return this.page(request, reply, source, await this.statusesWithState(quotes, auth, 'thread'));
 		}));
-		fastify.get<{ Params: { id: string } }>('/api/v1/statuses/:id/reblogged_by', request => this.withOptionalUser(request, 'read:statuses', async auth => {
-			const renotes = await this.invokePublic('notes/renotes', { noteId: request.params.id, ...this.mastodonPaginationService.toMisskey(request.query as Dictionary, 100) }, auth, request) as Packed<'Note'>[];
-			return renotes.map(note => this.mastodonEntityService.account(note.user));
+		fastify.get<{ Params: { id: string } }>('/api/v1/statuses/:id/reblogged_by', (request, reply) => this.withOptionalUser(request, 'read:statuses', async auth => {
+			const renotes = await this.invokePublic('notes/renotes', { noteId: request.params.id, ...this.mastodonPaginationService.toMisskey(request.query as Dictionary, 80) }, auth, request) as Packed<'Note'>[];
+			const reblogs = renotes.filter(note => this.isPurePackedRenote(note));
+			return this.page(request, reply, renotes, reblogs.map(note => this.mastodonEntityService.account(note.user)));
 		}));
-		fastify.get<{ Params: { id: string } }>('/api/v1/statuses/:id/favourited_by', request => this.withOptionalUser(request, 'read:statuses', async auth => {
-			const reactions = await this.invokePublic('notes/reactions', { noteId: request.params.id, ...this.mastodonPaginationService.toMisskey(request.query as Dictionary, 100) }, auth, request) as Array<{ user: Packed<'UserLite'> }>;
-			return reactions.map(reaction => this.mastodonEntityService.account(reaction.user));
+		fastify.get<{ Params: { id: string } }>('/api/v1/statuses/:id/favourited_by', (request, reply) => this.withOptionalUser(request, 'read:statuses', async auth => {
+			const reactions = await this.invokePublic('notes/reactions', { noteId: request.params.id, ...this.mastodonPaginationService.toMisskey(request.query as Dictionary, 80) }, auth, request) as Array<{ id: string; user: Packed<'UserLite'> }>;
+			return this.page(request, reply, reactions, reactions.map(reaction => this.mastodonEntityService.account(reaction.user)));
 		}));
 		fastify.post<{ Body: Dictionary }>('/api/v1/statuses', request => this.withAuth(request, 'write:statuses', async auth => {
 			return await this.createStatus(request, auth);
 		}));
 		fastify.put<{ Params: { id: string }; Body: Dictionary }>('/api/v1/statuses/:id', request => this.withAuth(request, 'write:statuses', async auth => {
 			this.validateStatusUpdateSemantics(request.body ?? {});
-			const fileIds = this.strings(request.body?.['media_ids[]'] ?? request.body?.media_ids);
-			const current = await this.invoke('notes/show', { noteId: request.params.id }, auth, request) as Packed<'Note'>;
 			const hasMediaIds = Object.hasOwn(request.body ?? {}, 'media_ids') || Object.hasOwn(request.body ?? {}, 'media_ids[]');
+			const fileIds = this.strings(request.body?.['media_ids[]'] ?? request.body?.media_ids);
+			if (hasMediaIds) this.validateStatusUpdateFileIds(fileIds);
+			const current = await this.invoke('notes/show', { noteId: request.params.id }, auth, request) as Packed<'Note'>;
 			const effectiveFileIds = hasMediaIds ? fileIds : current.fileIds ?? [];
-			await this.updateMediaSensitivity(effectiveFileIds, request.body?.sensitive, auth, request);
+			if (!hasMediaIds) this.validateStatusUpdateFileIds(effectiveFileIds);
+			const rawSensitive = request.body?.sensitive;
+			const isSensitive = rawSensitive == null ? null : this.profileBoolean(rawSensitive, 'sensitive');
+			if (isSensitive != null) {
+				await this.assertStatusUpdateMediaSensitivity(effectiveFileIds, isSensitive, current, auth);
+			}
 			const result = await this.invoke('notes/update', {
 				noteId: request.params.id,
-				text: this.string(request.body?.status) ?? current.text ?? '',
+				text: Object.hasOwn(request.body ?? {}, 'status')
+					? this.string(request.body?.status) || null
+					: current.text ?? null,
 				cw: Object.hasOwn(request.body ?? {}, 'spoiler_text') ? this.string(request.body?.spoiler_text) || null : current.cw ?? null,
-				...(effectiveFileIds.length > 0 ? { fileIds: effectiveFileIds } : {}),
+				...(hasMediaIds || effectiveFileIds.length > 0 ? { fileIds: effectiveFileIds } : {}),
 			}, auth, request) as { updatedNote: Packed<'Note'> };
 			return await this.statusWithState(result.updatedNote, auth, 'thread');
 		}));
@@ -714,7 +747,17 @@ export class MastodonApiServerService {
 		];
 		for (const [action, endpoint, scope, extra] of actions) {
 			fastify.post<{ Params: { id: string } }>(`/api/v1/statuses/:id/${action}`, request => this.withAuth(request, scope, async auth => {
-				await this.invoke(endpoint, { noteId: request.params.id, ...extra }, auth, request);
+				try {
+					await this.invoke(endpoint, { noteId: request.params.id, ...extra }, auth, request);
+				} catch (error) {
+					const isIdempotentActionError = error instanceof ApiError && (
+						(action === 'favourite' && error.code === 'ALREADY_REACTED') ||
+						(action === 'unfavourite' && error.code === 'NOT_REACTED') ||
+						(action === 'bookmark' && error.code === 'ALREADY_FAVORITED') ||
+						(action === 'unbookmark' && error.code === 'NOT_FAVORITED')
+					);
+					if (!isIdempotentActionError) throw error;
+				}
 				const note = await this.invoke('notes/show', { noteId: request.params.id }, auth, request);
 				const status = await this.statusWithState(note as Packed<'Note'>, auth, 'thread');
 				if (action === 'favourite' || action === 'unfavourite') status.favourited = action === 'favourite';
@@ -736,9 +779,21 @@ export class MastodonApiServerService {
 				return { ...await this.statusWithState(note, auth, 'thread'), muted: action === 'mute' };
 			}));
 		}
-		fastify.post<{ Params: { id: string } }>('/api/v1/statuses/:id/reblog', request => this.withAuth(request, 'write:statuses', async auth => {
-			const result = await this.invoke('notes/create', { renoteId: request.params.id }, auth, request) as { createdNote: Packed<'Note'> };
-			return { ...await this.statusWithState(result.createdNote, auth, 'thread'), reblogged: true };
+		fastify.post<{ Params: { id: string }; Body: Dictionary }>('/api/v1/statuses/:id/reblog', request => this.withAuth(request, 'write:statuses', async auth => {
+			const visibility = this.toMisskeyVisibility(this.string(request.body?.visibility) ?? 'public');
+			return await this.mastodonApiStateService.withUserKindLock(auth.user.id, `status_reblog:${request.params.id}`, async () => {
+				const existing = (await this.notesRepository.findBy({
+					userId: auth.user.id,
+					renoteId: request.params.id,
+				})).find(note => this.isPureRenote(note));
+				const note = existing == null
+					? (await this.invoke('notes/create', {
+						renoteId: request.params.id,
+						visibility,
+					}, auth, request) as { createdNote: Packed<'Note'> }).createdNote
+					: await this.invoke('notes/show', { noteId: existing.id }, auth, request) as Packed<'Note'>;
+				return { ...await this.statusWithState(note, auth, 'thread'), reblogged: true };
+			});
 		}));
 		fastify.post<{ Params: { id: string } }>('/api/v1/statuses/:id/unreblog', request => this.withAuth(request, 'write:statuses', async auth => {
 			const renotes = await this.notesRepository.findBy({ userId: auth.user.id, renoteId: request.params.id });
@@ -758,18 +813,24 @@ export class MastodonApiServerService {
 		fastify.get<{ Params: { id: string } }>('/api/v1/polls/:id', request => this.withOptionalUser(request, 'read:statuses', async auth => {
 			const note = await this.invokePublic('notes/show', { noteId: request.params.id }, auth, request) as Packed<'Note'>;
 			if (note.poll == null) throw new MastodonApiError(404, 'not_found', 'Poll not found');
-			return this.mastodonEntityService.poll(note.id, note.poll);
+			const voterCounts = await this.pollVoterCounts([note]);
+			return this.mastodonEntityService.poll(note.id, note.poll, voterCounts.get(note.id));
 		}));
 		fastify.post<{ Params: { id: string }; Body: Dictionary }>('/api/v1/polls/:id/votes', request => this.withAuth(request, 'write:statuses', async auth => {
-			const choices = this.strings(request.body?.['choices[]'] ?? request.body?.choices)
-				.map(choice => Number(choice))
-				.filter(choice => Number.isInteger(choice) && choice >= 0);
-			if (choices.length === 0) throw new MastodonApiError(400, 'invalid_request', 'At least one poll choice is required');
-			for (const choice of new Set(choices)) {
-				await this.invoke('notes/polls/vote', { noteId: request.params.id, choice }, auth, request);
+			if (auth.user.movedToUri) {
+				throw new ApiError({
+					message: 'You have moved your account.',
+					code: 'YOUR_ACCOUNT_MOVED',
+					kind: 'permission',
+					id: '56f20ec9-fd06-4fa5-841b-edd6d7d4fa31',
+				});
 			}
+			const choices = this.pollVoteChoices(request.body?.['choices[]'] ?? request.body?.choices);
+			await this.pollVoteService.vote(request.params.id, choices, auth.user);
 			const note = await this.invoke('notes/show', { noteId: request.params.id }, auth, request) as Packed<'Note'>;
-			return note.poll == null ? null : this.mastodonEntityService.poll(note.id, note.poll);
+			if (note.poll == null) return null;
+			const voterCounts = await this.pollVoterCounts([note]);
+			return this.mastodonEntityService.poll(note.id, note.poll, voterCounts.get(note.id));
 		}));
 		fastify.post('/api/v1/media', request => this.upload(request));
 		fastify.post('/api/v2/media', request => this.upload(request));
@@ -795,6 +856,12 @@ export class MastodonApiServerService {
 		const quoteApprovalPolicy = this.string(body.quote_approval_policy);
 		if (quoteApprovalPolicy != null && quoteApprovalPolicy !== '' && quoteApprovalPolicy !== 'public') {
 			throw new MastodonApiError(422, 'unprocessable_entity', `Unsupported quote approval policy: ${quoteApprovalPolicy}`);
+		}
+	}
+
+	private validateStatusUpdateFileIds(fileIds: readonly string[]): void {
+		if (fileIds.length > MAX_NOTE_FILES || new Set(fileIds).size !== fileIds.length) {
+			throw new MastodonApiError(400, 'invalid_request', 'Invalid param.');
 		}
 	}
 
@@ -1321,7 +1388,13 @@ export class MastodonApiServerService {
 				minId: this.string(query.min_id),
 				sinceId: this.string(query.since_id),
 			});
-			const entities = await Promise.all(conversations.map(conversation => this.conversation(conversation, auth)));
+			const statuses = await this.statusesWithState(
+				conversations.map(conversation => conversation.lastStatus),
+				auth,
+				'thread',
+				{ preserveHidden: true },
+			);
+			const entities = conversations.map((conversation, index) => this.conversationEntity(conversation, statuses[index]!));
 			return this.page(request, reply, conversations.map(conversation => ({ id: conversation.lastStatus.id })), entities);
 		}));
 
@@ -1338,11 +1411,16 @@ export class MastodonApiServerService {
 	}
 
 	private async conversation(conversation: MastodonConversation, auth: MastodonUserAuth): Promise<Dictionary> {
+		const lastStatus = await this.statusWithState(conversation.lastStatus, auth, 'thread');
+		return this.conversationEntity(conversation, lastStatus);
+	}
+
+	private conversationEntity(conversation: MastodonConversation, lastStatus: Record<string, unknown>): Dictionary {
 		return {
 			id: conversation.id,
 			unread: conversation.unread,
 			accounts: conversation.accounts,
-			last_status: await this.statusWithState(conversation.lastStatus, auth, 'thread'),
+			last_status: lastStatus,
 		};
 	}
 
@@ -1664,6 +1742,8 @@ export class MastodonApiServerService {
 			throw new MastodonApiError(400, 'invalid_request', 'scheduled_at must be an ISO 8601 date-time');
 		}
 		const scheduledAt = this.parseScheduledAt(body.scheduled_at, false);
+		const fileIds = this.strings(body['media_ids[]'] ?? body.media_ids);
+		const poll = this.parseStatusPoll(body, fileIds);
 		const idempotencyKey = this.string(request.headers['idempotency-key']);
 		const cacheKey = idempotencyKey == null || idempotencyKey === ''
 			? null
@@ -1679,8 +1759,6 @@ export class MastodonApiServerService {
 			const text = this.string(body.status) ?? null;
 			const visibility = this.string(body.visibility) ?? 'public';
 			const misskeyVisibility = this.toMisskeyVisibility(visibility);
-			const choices = this.strings(body['poll[options][]'] ?? (body.poll as Dictionary | undefined)?.options);
-			const fileIds = this.strings(body['media_ids[]'] ?? body.media_ids);
 			await this.updateMediaSensitivity(fileIds, body.sensitive, auth, request);
 			const replyId = this.string(body.in_reply_to_id) ?? null;
 			const renoteId = this.string(body.quoted_status_id) ?? null;
@@ -1695,11 +1773,7 @@ export class MastodonApiServerService {
 				replyId,
 				renoteId,
 				...(fileIds.length > 0 ? { fileIds } : {}),
-				...(choices.length >= 2 ? { poll: {
-					choices,
-					multiple: this.boolean(body['poll[multiple]'] ?? (body.poll as Dictionary | undefined)?.multiple),
-					expiredAfter: Math.max(1, Number(this.string(body['poll[expires_in]'] ?? (body.poll as Dictionary | undefined)?.expires_in) ?? 300)) * 1000,
-				} } : {}),
+				...(poll == null ? {} : { poll }),
 			};
 			if (scheduledAt != null) {
 				const result = await this.invoke('notes/drafts/create', {
@@ -1741,8 +1815,53 @@ export class MastodonApiServerService {
 		if (typeof rawValue !== 'string') throw new MastodonApiError(400, 'invalid_request', 'scheduled_at must be an ISO 8601 date-time');
 		const date = new Date(rawValue);
 		if (!Number.isFinite(date.getTime())) throw new MastodonApiError(400, 'invalid_request', 'scheduled_at must be an ISO 8601 date-time');
-		if (date.getTime() <= Date.now()) throw new MastodonApiError(422, 'unprocessable_entity', 'scheduled_at must be in the future');
+		if (date.getTime() < Date.now() + 300_000) throw new MastodonApiError(422, 'unprocessable_entity', 'scheduled_at must be at least five minutes in the future');
 		return date;
+	}
+
+	private parseStatusPoll(body: Dictionary, fileIds: string[]): { choices: string[]; multiple: boolean; expiredAfter: number } | undefined {
+		const nested = this.dictionary(body.poll);
+		const hasPoll = nested != null || Object.keys(body).some(key => key.startsWith('poll['));
+		if (!hasPoll) return undefined;
+		const rawChoices = body['poll[options][]'] ?? nested?.options;
+		const choices = this.pollOptions(rawChoices);
+		const expiresRaw = body['poll[expires_in]'] ?? nested?.expires_in;
+		if (choices.length < 2 || choices.some(choice => choice.trim() === '')) {
+			throw new MastodonApiError(422, 'unprocessable_entity', 'A poll requires at least two non-empty options');
+		}
+		if (expiresRaw == null || expiresRaw === '') {
+			throw new MastodonApiError(422, 'unprocessable_entity', 'poll.expires_in is required');
+		}
+		if (fileIds.length > 0) {
+			throw new MastodonApiError(422, 'unprocessable_entity', 'A poll cannot be combined with media');
+		}
+		const expiresIn = Number(expiresRaw);
+		if (!Number.isInteger(expiresIn) || expiresIn < 1 || expiresIn > 2629746) {
+			throw new MastodonApiError(422, 'unprocessable_entity', 'poll.expires_in is invalid');
+		}
+		const hideTotals = this.pollBoolean(body['poll[hide_totals]'] ?? nested?.hide_totals, 'hide_totals');
+		if (hideTotals) {
+			throw new MastodonApiError(422, 'unprocessable_entity', 'Hidden poll totals are not supported');
+		}
+		return {
+			choices,
+			multiple: this.pollBoolean(body['poll[multiple]'] ?? nested?.multiple, 'multiple'),
+			expiredAfter: expiresIn * 1000,
+		};
+	}
+
+	private pollOptions(value: unknown): string[] {
+		if (!Array.isArray(value) || value.some(option => typeof option !== 'string')) {
+			throw new MastodonApiError(422, 'unprocessable_entity', 'poll.options must be an array of strings');
+		}
+		return value;
+	}
+
+	private pollBoolean(value: unknown, name: string): boolean {
+		if (value == null) return false;
+		if (value === true || value === 1 || value === '1' || value === 'true' || value === 'on') return true;
+		if (value === false || value === 0 || value === '0' || value === 'false' || value === 'off') return false;
+		throw new MastodonApiError(422, 'unprocessable_entity', `poll.${name} is invalid`);
 	}
 
 	private async featuredTagEntities(
@@ -1830,10 +1949,15 @@ export class MastodonApiServerService {
 		options: MastodonFilterApplyOptions = {},
 	): Promise<Record<string, unknown>[]> {
 		if (notes.length === 0) return [];
-		if (auth == null) return notes.map(note => this.mastodonEntityService.status(note));
+		const voterCountsPromise = this.pollVoterCounts(notes);
+		if (auth == null) {
+			const voterCounts = await voterCountsPromise;
+			return notes.map(note => this.mastodonEntityService.status(note, voterCounts));
+		}
 		const rootNoteIds = [...new Set(notes.map(note => note.id))];
 		const noteIds = this.collectNoteIds(notes);
-		const [renotes, favorites, pinings, mutedNoteIds] = await Promise.all([
+		const [voterCounts, renotes, favorites, pinings, mutedNoteIds] = await Promise.all([
+			voterCountsPromise,
 			this.notesRepository.findBy({ userId: auth.user.id, renoteId: In(rootNoteIds) }),
 			this.noteFavoritesRepository.findBy({ userId: auth.user.id, noteId: In(rootNoteIds) }),
 			this.userNotePiningsRepository.findBy({ userId: auth.user.id, noteId: In(rootNoteIds) }),
@@ -1843,7 +1967,7 @@ export class MastodonApiServerService {
 		const bookmarkedIds = new Set(favorites.map(favorite => favorite.noteId));
 		const pinnedIds = new Set(pinings.map(pining => pining.noteId));
 		const statuses = notes.map(note => ({
-			...this.applyMutedState(this.mastodonEntityService.status(note), mutedNoteIds),
+			...this.applyMutedState(this.mastodonEntityService.status(note, voterCounts), mutedNoteIds),
 			reblogged: renotedIds.has(note.id),
 			bookmarked: bookmarkedIds.has(note.id),
 			pinned: pinnedIds.has(note.id),
@@ -1851,6 +1975,10 @@ export class MastodonApiServerService {
 		}));
 		const corpora = new Map(notes.map(note => [note.id, this.filterCorpus(note)]));
 		return await this.mastodonFilterService.apply(auth.user.id, context, statuses, { ...options, corpora });
+	}
+
+	private async pollVoterCounts(notes: Packed<'Note'>[]): Promise<ReadonlyMap<string, number>> {
+		return await resolvePollVoterCounts(this.notesRepository, notes);
 	}
 
 	private notificationOptions(query: Dictionary): {
@@ -1884,8 +2012,9 @@ export class MastodonApiServerService {
 		params: Dictionary,
 	): Promise<{ sources: MastodonNotificationSource[]; page: { id: string }[] }> {
 		const notifications = await this.invoke('i/notifications', params, auth, request) as Packed<'Notification'>[];
+		const voterCounts = await this.pollVoterCounts(notifications.flatMap(notification => notification.note == null ? [] : [notification.note]));
 		const converted = notifications
-			.map(notification => this.mastodonEntityService.notification(notification))
+			.map(notification => this.mastodonEntityService.notification(notification, voterCounts))
 			.filter(value => value != null) as Dictionary[];
 		const filtered = await this.notificationFilters(auth.user.id, converted, notifications);
 		const entitiesById = new Map(filtered.flatMap(entity => {
@@ -2060,10 +2189,58 @@ export class MastodonApiServerService {
 	}
 
 	private async updateMediaSensitivity(fileIds: string[], rawSensitive: unknown, auth: MastodonUserAuth, request: MastodonRequest): Promise<void> {
-		if (rawSensitive == null || !this.boolean(rawSensitive)) return;
+		if (rawSensitive == null) return;
+		const isSensitive = this.profileBoolean(rawSensitive, 'sensitive');
 		for (const fileId of fileIds) {
-			await this.invoke('drive/files/update', { fileId, isSensitive: true }, auth, request);
+			await this.invoke('drive/files/update', { fileId, isSensitive }, auth, request);
 		}
+	}
+
+	private async assertStatusUpdateMediaSensitivity(
+		fileIds: string[],
+		isSensitive: boolean,
+		current: Packed<'Note'>,
+		auth: MastodonUserAuth,
+	): Promise<void> {
+		const currentFilesById = new Map<string, Pick<MiDriveFile, 'id' | 'isSensitive'>>(
+			(current.files ?? []).map(file => [file.id, file]),
+		);
+		const unresolvedFileIds = fileIds.filter(fileId => !currentFilesById.has(fileId));
+		if (unresolvedFileIds.length > 0) {
+			const resolvedFiles = await this.driveFilesRepository.findBy({
+				id: In(unresolvedFileIds),
+				userId: auth.user.id,
+			});
+			for (const file of resolvedFiles) currentFilesById.set(file.id, file);
+			if (resolvedFiles.length !== unresolvedFileIds.length) {
+				throw new MastodonApiError(422, 'unprocessable_entity', 'One or more media attachments were not found');
+			}
+		}
+		const effectiveFiles = fileIds.map(fileId => currentFilesById.get(fileId)!);
+		const effectiveSensitive = current.channel?.isSensitive === true ||
+			effectiveFiles.some(file => file.isSensitive);
+		if (effectiveSensitive !== isSensitive) {
+			throw new MastodonApiError(
+				422,
+				'unprocessable_entity',
+				'Changing media sensitivity while editing a status is not supported atomically',
+			);
+		}
+	}
+
+	private sanitizeHistoricalQuote(note: Packed<'Note'>, depth = 1): Packed<'Note'> {
+		return {
+			...note,
+			poll: note.poll == null
+				? note.poll
+				: {
+					...note.poll,
+					choices: note.poll.choices.map(choice => ({ ...choice, isVoted: false })),
+				},
+			...(depth > 0 && note.renote != null
+				? { renote: this.sanitizeHistoricalQuote(note.renote, depth - 1) }
+				: {}),
+		};
 	}
 
 	private async assertApplicationRegistrationRate(ip: string): Promise<void> {
@@ -2199,8 +2376,9 @@ export class MastodonApiServerService {
 		rawIds: unknown,
 		auth: MastodonUserAuth | null,
 		request: MastodonRequest,
+		limit = 40,
 	): Promise<unknown[]> {
-		const requestedIds = this.strings(rawIds).slice(0, 40);
+		const requestedIds = this.strings(rawIds).slice(0, limit);
 		const uniqueIds = [...new Set(requestedIds)];
 		const entries = await Promise.all(uniqueIds.map(async id => {
 			try {
@@ -2237,6 +2415,51 @@ export class MastodonApiServerService {
 		const link = this.mastodonPaginationService.linkHeader(new URL(request.url, this.config.url).toString(), source);
 		if (link != null) reply.header('Link', link);
 		return converted;
+	}
+
+	private async quotePage(noteId: string, request: MastodonRequest, auth: MastodonUserAuth | null): Promise<{ quotes: Packed<'Note'>[]; source: { id: string }[] }> {
+		const nativeBatchLimit = 100;
+		const pagination = this.mastodonPaginationService.toMisskey(request.query as Dictionary, 40);
+		const newerTraversal = pagination.sinceId != null && pagination.untilId == null;
+		const quotes: Packed<'Note'>[] = [];
+		let untilId = pagination.untilId;
+		let sinceId = pagination.sinceId;
+		let lastSourceId: string | undefined;
+		let pagesScanned = 0;
+		let nativeExhausted = false;
+
+		while (!nativeExhausted && pagesScanned < 10 && quotes.length < pagination.limit + 1) {
+			const renotes = await this.invokePublic('notes/renotes', {
+				noteId,
+				...(newerTraversal ? {} : pagination),
+				limit: nativeBatchLimit,
+				...(newerTraversal
+					? (sinceId != null ? { sinceId } : {})
+					: (untilId != null ? { untilId } : {})),
+			}, auth, request) as Packed<'Note'>[];
+			if (renotes.length === 0) break;
+
+			pagesScanned += 1;
+			lastSourceId = renotes.at(-1)!.id;
+			if (newerTraversal) {
+				sinceId = lastSourceId;
+			} else {
+				untilId = lastSourceId;
+			}
+			quotes.push(...renotes.filter(note => note.renoteId != null && !this.isPurePackedRenote(note)));
+			nativeExhausted = renotes.length < nativeBatchLimit;
+		}
+
+		const page = (newerTraversal ? [...quotes].reverse() : quotes).slice(0, pagination.limit);
+		const source = page.flatMap(note => note.id == null ? [] : [{ id: note.id }]);
+		if (!nativeExhausted && pagesScanned === 10 && quotes.length < pagination.limit + 1 && lastSourceId != null) {
+			if (newerTraversal) {
+				if (source[0]?.id !== lastSourceId) source.unshift({ id: lastSourceId });
+			} else if (source.at(-1)?.id !== lastSourceId) {
+				source.push({ id: lastSourceId });
+			}
+		}
+		return { quotes: page, source };
 	}
 
 	private offsetPagination(query: Dictionary, defaultLimit: number, maximumLimit: number): { limit: number; offset: number; readLimit: number } {
@@ -2280,7 +2503,7 @@ export class MastodonApiServerService {
 			thumbnail: this.instanceImageUrl(),
 			languages: this.meta.langs,
 			registrations: !this.meta.disableRegistration,
-			approval_required: false,
+			approval_required: this.meta.approvalRequiredForSignup,
 			invites_enabled: false,
 			configuration: v2.configuration,
 			contact_account: null,
@@ -2311,7 +2534,12 @@ export class MastodonApiServerService {
 				},
 				polls: { max_options: 10, max_characters_per_option: 50, min_expiration: 300, max_expiration: 2629746 },
 			},
-			registrations: { enabled: !this.meta.disableRegistration, approval_required: false, message: null },
+			registrations: {
+				enabled: !this.meta.disableRegistration,
+				approval_required: this.meta.approvalRequiredForSignup,
+				reason_required: this.meta.approvalRequiredForSignup,
+				message: null,
+			},
 			contact: { email: this.meta.maintainerEmail ?? '', account: null },
 			rules: this.rules(),
 		};
@@ -2353,6 +2581,30 @@ export class MastodonApiServerService {
 		if (Array.isArray(value)) return value.flatMap(item => this.strings(item));
 		const item = this.string(value);
 		return item == null || item === '' ? [] : item.split(',').map(part => part.trim()).filter(Boolean);
+	}
+
+	private pollVoteChoices(value: unknown): number[] {
+		if (value == null) {
+			throw new MastodonApiError(400, 'invalid_request', 'At least one poll choice is required');
+		}
+		const rawChoices = Array.isArray(value) ? value : [value];
+		if (rawChoices.length === 0) {
+			throw new MastodonApiError(400, 'invalid_request', 'At least one poll choice is required');
+		}
+
+		return rawChoices.map(choice => {
+			if (
+				(typeof choice !== 'string' && typeof choice !== 'number') ||
+				(typeof choice === 'string' && choice.trim() === '')
+			) {
+				throw new MastodonApiError(400, 'invalid_request', 'Poll choices must be non-negative integers');
+			}
+			const parsed = Number(choice);
+			if (!Number.isInteger(parsed) || parsed < 0) {
+				throw new MastodonApiError(400, 'invalid_request', 'Poll choices must be non-negative integers');
+			}
+			return parsed;
+		});
 	}
 
 	private isHttpUrl(value: string): boolean {

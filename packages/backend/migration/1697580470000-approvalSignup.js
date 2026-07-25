@@ -1,5 +1,6 @@
 /*
  * SPDX-FileCopyrightText: marie and other Sharkey contributors
+ * SPDX-FileCopyrightText: syuilo and misskey-project
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 

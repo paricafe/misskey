@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { domainToASCII } from 'node:url';
 import { Inject, Injectable } from '@nestjs/common';
 import { parse as mfmParse } from 'mfm-js';
 import { MfmService } from '@/core/MfmService.js';
@@ -10,10 +11,63 @@ import type { Config } from '@/config.js';
 import { DI } from '@/di-symbols.js';
 import type { Packed } from '@/misc/json-schema.js';
 import type { MiAbuseUserReport } from '@/models/AbuseUserReport.js';
+import type { NotesRepository } from '@/models/_.js';
 import { extractMentions } from '@/misc/extract-mentions.js';
 import type { MastodonReportInput } from './MastodonReportService.js';
 
 type PackedUser = Packed<'UserLite'> & Partial<Packed<'UserDetailedNotMeOnly'>>;
+
+function isPureRenote(note: {
+	text?: string | null;
+	cw?: string | null;
+	files?: readonly unknown[];
+	poll?: unknown | null;
+	replyId?: string | null;
+}): boolean {
+	return note.text == null &&
+		note.cw == null &&
+		(note.files?.length ?? 0) === 0 &&
+		note.poll == null &&
+		note.replyId == null;
+}
+
+export async function resolvePollVoterCounts(notesRepository: NotesRepository, notes: Packed<'Note'>[]): Promise<ReadonlyMap<string, number>> {
+	const noteIds = new Set<string>();
+	const visited = new Set<string>();
+	const visit = (note: Packed<'Note'>): void => {
+		if (visited.has(note.id)) return;
+		visited.add(note.id);
+		if (note.poll?.multiple === true) noteIds.add(note.id);
+		if (note.renote != null) visit(note.renote);
+	};
+	for (const note of notes) visit(note);
+	if (noteIds.size === 0) return new Map();
+
+	const requestedIds = [...noteIds];
+	const rows = await notesRepository.query(`
+		SELECT
+			vote."noteId" AS "noteId",
+			COUNT(DISTINCT vote."userId") AS "votersCount"
+		FROM "poll_vote" vote
+		WHERE vote."noteId" = ANY($1::varchar[])
+		GROUP BY vote."noteId"
+	`, [requestedIds]) as Array<{ noteId: unknown; votersCount: unknown }>;
+	const counts = new Map(requestedIds.map(noteId => [noteId, 0]));
+	for (const row of rows) {
+		if (typeof row.noteId !== 'string' || !counts.has(row.noteId)) continue;
+		const votersCount = typeof row.votersCount === 'number'
+			? row.votersCount
+			: typeof row.votersCount === 'string' && /^[0-9]+$/u.test(row.votersCount)
+				? Number(row.votersCount)
+				: Number.NaN;
+		if (!Number.isSafeInteger(votersCount) || votersCount < 0) {
+			counts.delete(row.noteId);
+			continue;
+		}
+		counts.set(row.noteId, votersCount);
+	}
+	return counts;
+}
 
 @Injectable()
 export class MastodonEntityService {
@@ -22,7 +76,14 @@ export class MastodonEntityService {
 		private config: Config,
 
 		private mfmService: MfmService,
+
+		@Inject(DI.notesRepository)
+		private notesRepository: NotesRepository,
 	) {}
+
+	public async pollVoterCounts(notes: Packed<'Note'>[]): Promise<ReadonlyMap<string, number>> {
+		return await resolvePollVoterCounts(this.notesRepository, notes);
+	}
 
 	public account(user: PackedUser) {
 		const host = user.host;
@@ -128,15 +189,15 @@ export class MastodonEntityService {
 		};
 	}
 
-	public status(note: Packed<'Note'>): Record<string, unknown> {
-		return this.statusEntity(note, false);
+	public status(note: Packed<'Note'>, voterCounts?: ReadonlyMap<string, number>): Record<string, unknown> {
+		return this.statusEntity(note, false, voterCounts);
 	}
 
-	private statusEntity(note: Packed<'Note'>, shallow: boolean): Record<string, unknown> {
+	private statusEntity(note: Packed<'Note'>, shallow: boolean, voterCounts?: ReadonlyMap<string, number>): Record<string, unknown> {
 		const localUrl = new URL(`/notes/${note.id}`, this.config.url).toString();
 		const url = note.url ?? note.uri ?? localUrl;
 		const files = note.files ?? [];
-		const isPureRenote = note.renote != null && note.text == null && files.length === 0 && note.poll == null && note.replyId == null;
+		const isPure = note.renote != null && isPureRenote(note);
 
 		return {
 			id: note.id,
@@ -155,10 +216,10 @@ export class MastodonEntityService {
 			favourites_count: note.reactionCount,
 			quotes_count: 0,
 			content: this.render(note.text ?? ''),
-			reblog: !shallow && isPureRenote ? this.statusEntity(note.renote!, true) : null,
-			quote: !shallow && !isPureRenote && note.renote != null ? {
+			reblog: !shallow && isPure ? this.statusEntity(note.renote!, true, voterCounts) : null,
+			quote: !shallow && !isPure && note.renote != null ? {
 				state: 'accepted',
-				quoted_status: this.statusEntity(note.renote, true),
+				quoted_status: this.statusEntity(note.renote, true, voterCounts),
 			} : null,
 			application: null,
 			account: this.account(note.user),
@@ -170,7 +231,7 @@ export class MastodonEntityService {
 			})),
 			emojis: this.emojis(note.emojis),
 			card: null,
-			poll: note.poll == null ? null : this.poll(note.id, note.poll),
+			poll: note.poll == null ? null : this.poll(note.id, note.poll, voterCounts?.get(note.id)),
 			favourited: note.myReaction != null,
 			reblogged: false,
 			muted: false,
@@ -186,18 +247,52 @@ export class MastodonEntityService {
 		};
 	}
 
-	public statusEdits(note: Packed<'Note'>) {
+	public statusEdits(
+		note: Packed<'Note'>,
+		voterCounts?: ReadonlyMap<string, number>,
+		historicalRenotes: ReadonlyMap<string, Packed<'Note'>> = new Map(),
+	) {
 		const historical = [...(note.history ?? [])]
 			.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
-			.map(revision => ({
-				account: this.account(note.user),
-				content: this.render(revision.text ?? ''),
-				spoiler_text: revision.cw ?? '',
-				sensitive: false,
-				created_at: revision.createdAt,
-				media_attachments: [],
-				emojis: [],
-			}));
+			.map(revision => {
+				const files = revision.files ?? [];
+				const legacyRenote = (revision as typeof revision & { renote?: Packed<'Note'> | null }).renote;
+				const renoteId = revision.renoteId ?? legacyRenote?.id;
+				const resolvedRenote = renoteId == null ? undefined : historicalRenotes.get(renoteId);
+				const renote = resolvedRenote?.isHidden === true
+					? undefined
+					: resolvedRenote == null
+						? undefined
+						: this.sanitizeHistoricalQuote(resolvedRenote);
+				const poll = revision.poll == null
+					? undefined
+					: {
+						...revision.poll,
+						choices: revision.poll.choices.map(choice => ({ ...choice, isVoted: false })),
+					};
+				const hasQuote = renoteId != null && !isPureRenote({
+					...revision,
+					replyId: note.replyId,
+				});
+				return {
+					account: this.account(note.user),
+					content: this.render(revision.text ?? ''),
+					spoiler_text: revision.cw ?? '',
+					sensitive: revision.sensitive ?? files.some(file => file.isSensitive),
+					created_at: revision.createdAt,
+					media_attachments: files.map(file => this.attachment(file)),
+					emojis: this.emojis(revision.emojiUrls),
+					...(poll == null ? {} : {
+						poll: this.poll(note.id, poll, revision.pollVotersCount),
+					}),
+					...(hasQuote ? {
+						quote: renote == null ? null : {
+							state: 'accepted',
+							quoted_status: this.statusEntity(renote, true, voterCounts),
+						},
+					} : {}),
+				};
+			});
 		const files = note.files ?? [];
 		const current = {
 			account: this.account(note.user),
@@ -207,15 +302,30 @@ export class MastodonEntityService {
 			created_at: note.updatedAt ?? note.createdAt,
 			media_attachments: files.map(file => this.attachment(file)),
 			emojis: this.emojis(note.emojis),
-			...(note.poll == null ? {} : { poll: this.poll(note.id, note.poll) }),
-			...(note.renote != null && !(note.text == null && files.length === 0 && note.poll == null && note.replyId == null) ? {
+			...(note.poll == null ? {} : { poll: this.poll(note.id, note.poll, voterCounts?.get(note.id)) }),
+			...(note.renote != null && !isPureRenote(note) ? {
 				quote: {
 					state: 'accepted',
-					quoted_status: this.statusEntity(note.renote, true),
+					quoted_status: this.statusEntity(note.renote, true, voterCounts),
 				},
 			} : {}),
 		};
 		return [...historical, current];
+	}
+
+	private sanitizeHistoricalQuote(note: Packed<'Note'>, depth = 1): Packed<'Note'> {
+		return {
+			...note,
+			poll: note.poll == null
+				? note.poll
+				: {
+					...note.poll,
+					choices: note.poll.choices.map(choice => ({ ...choice, isVoted: false })),
+				},
+			...(depth > 0 && note.renote != null
+				? { renote: this.sanitizeHistoricalQuote(note.renote, depth - 1) }
+				: {}),
+		};
 	}
 
 	public translation(result: { sourceLang: string; text: string }, targetLanguage: string) {
@@ -305,12 +415,12 @@ export class MastodonEntityService {
 		};
 	}
 
-	public notification(notification: Packed<'Notification'>) {
+	public notification(notification: Packed<'Notification'>, voterCounts?: ReadonlyMap<string, number>) {
 		const type = this.notificationType(notification.type);
 		if (type == null || !('user' in notification) || notification.user == null) return null;
 
 		const status = 'note' in notification && notification.note != null
-			? this.status(notification.note)
+			? this.status(notification.note, voterCounts)
 			: undefined;
 		if (['favourite', 'mention', 'reblog', 'poll', 'status'].includes(type) && status == null) return null;
 
@@ -445,7 +555,7 @@ export class MastodonEntityService {
 		};
 	}
 
-	public poll(noteId: string, poll: NonNullable<Packed<'Note'>['poll']>) {
+	public poll(noteId: string, poll: NonNullable<Packed<'Note'>['poll']>, votersCount?: number) {
 		const votesCount = poll.choices.reduce((total, choice) => total + choice.votes, 0);
 		const ownVotes = poll.choices.flatMap((choice, index) => choice.isVoted ? [index] : []);
 
@@ -455,7 +565,7 @@ export class MastodonEntityService {
 			expired: poll.expiresAt != null && new Date(poll.expiresAt).getTime() <= Date.now(),
 			multiple: poll.multiple,
 			votes_count: votesCount,
-			voters_count: votesCount,
+			voters_count: poll.multiple ? votersCount ?? null : null,
 			voted: ownVotes.length > 0,
 			own_votes: ownVotes,
 			options: poll.choices.map(choice => ({ title: choice.text, votes_count: choice.votes })),
@@ -474,11 +584,20 @@ export class MastodonEntityService {
 
 	private mentions(note: Packed<'Note'>) {
 		const ids = note.mentions ?? [];
-		const parsed = extractMentions(mfmParse(note.text ?? ''));
+		const localHost = domainToASCII(this.config.host.toLowerCase());
+		const seen = new Set<string>();
+		const parsed = extractMentions(mfmParse(note.text ?? '')).flatMap(mention => {
+			const rawEffectiveHost = mention.host ?? note.user.host;
+			const effectiveHost = rawEffectiveHost == null ? null : domainToASCII(rawEffectiveHost.toLowerCase());
+			const key = `${mention.username.toLowerCase()}@${effectiveHost ?? localHost}`;
+			if (seen.has(key)) return [];
+			seen.add(key);
+			return [{ username: mention.username, effectiveHost }];
+		});
 		return ids.map((id, index) => {
 			const mention = parsed[index];
 			const username = mention?.username ?? id;
-			const host = mention?.host ?? null;
+			const host = mention?.effectiveHost ?? null;
 			const acct = host == null ? username : `${username}@${host}`;
 			return {
 				id,

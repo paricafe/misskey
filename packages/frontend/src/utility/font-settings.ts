@@ -1,3 +1,8 @@
+/*
+ * SPDX-FileCopyrightText: syuilo and misskey-project
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
 import { computed, ref, watch } from 'vue';
 import { loadFontStyle } from './load-font.js';
 import type { Ref } from 'vue';

@@ -402,7 +402,7 @@ export default abstract class Chart<T extends Schema> {
 
 			return log;
 		} finally {
-			unlock();
+			await unlock();
 		}
 	}
 

@@ -1,17 +1,19 @@
 /*
  * SPDX-FileCopyrightText: Nya Candy and NyaOne
+ * SPDX-FileCopyrightText: syuilo and misskey-project
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
 import { Injectable, Inject } from '@nestjs/common';
 import * as mfm from 'mfm-js';
 import type { MiUser, MiLocalUser, MiRemoteUser } from '@/models/User.js';
-import type { MiNote } from '@/models/Note.js';
-import type { InstancesRepository, MiDriveFile, NotesRepository, UsersRepository } from '@/models/_.js';
+import { MiNote } from '@/models/Note.js';
+import type { InstancesRepository, MiDriveFile, NotesRepository, PollsRepository, PollVotesRepository, UsersRepository } from '@/models/_.js';
 import { RelayService } from '@/core/RelayService.js';
 import { FederatedInstanceService } from '@/core/FederatedInstanceService.js';
 import { DI } from '@/di-symbols.js';
 import type { Config } from '@/config.js';
+import type { Packed } from '@/misc/json-schema.js';
 import NotesChart from '@/core/chart/charts/notes.js';
 import PerUserNotesChart from '@/core/chart/charts/per-user-notes.js';
 import InstanceChart from '@/core/chart/charts/instance.js';
@@ -34,6 +36,11 @@ import { UtilityService } from "@/core/UtilityService.js";
 import { CustomEmojiService } from "@/core/CustomEmojiService.js";
 import { DriveFileEntityService } from "@/core/entities/DriveFileEntityService.js";
 import { awaitAll } from "@/misc/prelude/await-all.js";
+import { IdentifiableError } from '@/misc/identifiable-error.js';
+
+export const MAX_NOTE_HISTORY_REVISIONS = 100;
+export const MAX_NOTE_HISTORY_BYTES = 1024 * 1024;
+export const NOTE_HISTORY_LIMIT_ERROR_ID = '8a2c5b6f-8e2b-4f1d-a5d9-f2b96c5b0d34';
 
 type Option = {
 	updatedAt?: Date | null;
@@ -43,6 +50,18 @@ type Option = {
 	apHashtags?: string[] | null;
 	apEmojis?: string[] | null;
 };
+
+type PollSnapshot = {
+	poll?: NonNullable<Packed<'Note'>['poll']>;
+	votersCount?: number;
+};
+
+export type NoteUpdatePreparation = Readonly<{
+	noteId: MiNote['id'];
+	sourceHistory: MiNote['history'];
+	sourceUpdatedAt: MiNote['updatedAt'];
+	history: NonNullable<MiNote['history']>;
+}>;
 
 @Injectable()
 export class NoteUpdateService {
@@ -58,6 +77,12 @@ export class NoteUpdateService {
 
 		@Inject(DI.instancesRepository)
 		private instancesRepository: InstancesRepository,
+
+		@Inject(DI.pollsRepository)
+		private pollsRepository: PollsRepository,
+
+		@Inject(DI.pollVotesRepository)
+		private pollVotesRepository: PollVotesRepository,
 
 		private customEmojiService: CustomEmojiService,
 		private driveFileEntityService: DriveFileEntityService,
@@ -85,98 +110,79 @@ export class NoteUpdateService {
 	 * @param note Note to update
 	 * @param data New note info
 	 */
-	async update(user: { id: MiUser['id']; uri: MiUser['uri']; host: MiUser['host']; isBot: MiUser['isBot']; }, note: MiNote, data: Option, quiet = false, updater?: MiUser): Promise<MiNote> {
+	async update(
+		user: { id: MiUser['id']; uri: MiUser['uri']; host: MiUser['host']; isBot: MiUser['isBot']; },
+		note: MiNote,
+		data: Option,
+		quiet = false,
+		_updater?: MiUser,
+	): Promise<MiNote> {
 		if (!data.updatedAt) {
 			throw new Error('update time is required');
 		}
+		const updatedAt = data.updatedAt;
 
-		if (note.history && note.history.findIndex(h => h.createdAt === data.updatedAt?.toISOString()) !== -1) {
-			// Same history already exists, skip this
+		this.assertNoteOwner(user, note);
+
+		if (this.isUpdateAlreadyApplied(note, updatedAt)) {
 			return note;
 		}
 
-		// Parse tags & emojis
 		const meta = await this.metaService.fetch();
-
 		let tags = data.apHashtags;
 		let emojis = data.apEmojis;
 
-		// Parse MFM if needed
 		if (!tags || !emojis) {
 			const tokens = (data.text ? mfm.parse(data.text)! : []);
 			const cwTokens = data.cw ? mfm.parse(data.cw)! : [];
-			// Not include poll data
-
 			const combinedTokens = tokens.concat(cwTokens);
-
 			tags = data.apHashtags ?? extractHashtags(combinedTokens);
-
 			emojis = data.apEmojis ?? extractCustomEmojisFromMfm(combinedTokens);
 		}
 
-		// if the host is media-silenced, custom emojis are not allowed
 		if (this.utilityService.isMediaSilencedHost(meta.mediaSilencedHosts, user.host)) emojis = [];
-
 		tags = tags.filter(tag => Array.from(tag).length <= 128).splice(0, 32);
 
-		const newNote: MiNote = {
-			...note,
-
-			// Overwrite updated fields
-			text: data.text,
-			cw: data.cw,
-			updatedAt: data.updatedAt,
-			tags,
-			emojis,
-			fileIds: data.files ? data.files.map(file => file.id) : [],
-		};
-
-		if (!quiet) {
-			this.globalEventService.publishNoteStream(note, 'updated', await awaitAll({
-				fileIds: newNote.fileIds,
-				files: this.driveFileEntityService.packManyByIds(newNote.fileIds),
-				cw: data.cw,
-				text: data.text ?? '', // prevent null
-				updatedAt: data.updatedAt.toISOString(),
-				tags: tags.length > 0 ? tags : undefined,
-				emojis: note.userHost != null ? this.customEmojiService.populateEmojis(emojis, note.userHost) : undefined,
-			}));
-
-			if (this.userEntityService.isLocalUser(user) && !note.localOnly) {
-				const content = this.apRendererService.addContext(
-					this.apRendererService.renderUpdateNote(
-						await this.apRendererService.renderNote(newNote, false), newNote,
-					),
-				);
-
-				this.deliverToConcerned(user, newNote, content);
-			}
-		}
-
-		// Check if is latest or previous version
-		const history = [...(note.history || []), {
-			createdAt: (note.updatedAt || this.idService.parse(note.id).date).toISOString(),
-			cw: note.cw,
-			text: note.text,
-		}];
-		let updatedNote: MiNote;
-		if (note.updatedAt && note.updatedAt >= data.updatedAt) {
-			// Previous version, just update history
-			history.sort((h1, h2) => new Date(h1.createdAt).getTime() - new Date(h2.createdAt).getTime()); // earliest -> latest
-
-			await this.notesRepository.update({ id: note.id }, {
-				history,
+		// Keep this transaction DB-local. ActivityPub actor, attachment, and emoji
+		// resolution must be completed by the caller before entering it.
+		const result = await this.notesRepository.manager.transaction(async transactionalEntityManager => {
+			const transactionalNotesRepository = transactionalEntityManager.getRepository(MiNote);
+			const lockedRow = await transactionalNotesRepository.findOne({
+				where: { id: note.id },
+				lock: { mode: 'pessimistic_write' },
 			});
-			updatedNote = { ...note, history };
-		} else {
-			// Latest version
+			if (lockedRow == null) {
+				throw new Error('note is not registered');
+			}
+			const lockedNote = { ...note, ...lockedRow };
 
-			// Update index
-			this.searchService.indexNote(newNote);
+			this.assertNoteOwner(user, lockedNote);
+			if (this.isUpdateAlreadyApplied(lockedNote, updatedAt)) {
+				return { updatedNote: lockedNote, changed: false };
+			}
 
-			// Update note info
-			await this.notesRepository.update({ id: note.id }, {
-				updatedAt: data.updatedAt,
+			const fileIds = data.files === undefined
+				? [...lockedNote.fileIds]
+				: data.files?.map(file => file.id) ?? [];
+			if ((data.text == null || data.text.length === 0) && fileIds.length === 0) {
+				throw new Error('Note must have text or files');
+			}
+
+			const preparedUpdate = await this.prepareUpdate(user, lockedNote);
+			const history = [...preparedUpdate.history];
+			const newNote: MiNote = {
+				...lockedNote,
+				text: data.text,
+				cw: data.cw,
+				updatedAt,
+				tags,
+				emojis,
+				fileIds,
+				history,
+			};
+
+			await transactionalNotesRepository.update({ id: lockedNote.id }, {
+				updatedAt,
 				fileIds: newNote.fileIds,
 				history,
 				cw: data.cw,
@@ -184,22 +190,148 @@ export class NoteUpdateService {
 				tags,
 				emojis,
 			});
-			updatedNote = { ...newNote, history };
+
+			return { updatedNote: newNote, changed: true };
+		});
+
+		if (!result.changed) return result.updatedNote;
+
+		const updatedNote = result.updatedNote;
+		this.searchService.indexNote(updatedNote);
+
+		if (!quiet) {
+			this.globalEventService.publishNoteStream(updatedNote, 'updated', await awaitAll({
+				fileIds: updatedNote.fileIds,
+				files: this.driveFileEntityService.packManyByIds(updatedNote.fileIds),
+				cw: updatedNote.cw,
+				text: updatedNote.text ?? '',
+				updatedAt: updatedNote.updatedAt!.toISOString(),
+				tags: updatedNote.tags.length > 0 ? updatedNote.tags : undefined,
+				emojis: updatedNote.userHost != null ? this.customEmojiService.populateEmojis(updatedNote.emojis, updatedNote.userHost) : undefined,
+			}));
+
+			if (this.userEntityService.isLocalUser(user) && !updatedNote.localOnly) {
+				const content = this.apRendererService.addContext(
+					this.apRendererService.renderUpdateNote(
+						await this.apRendererService.renderNote(updatedNote, false), updatedNote,
+					),
+				);
+				this.deliverToConcerned(user, updatedNote, content);
+			}
 		}
 
-		// Currently not implemented
-		// if (updater && (note.userId !== updater.id)) {
-		// 	const user = await this.usersRepository.findOneByOrFail({ id: note.userId });
-		// 	this.moderationLogService.log(updater, 'updateNote', {
-		// 		noteId: note.id,
-		// 		noteUserId: note.userId,
-		// 		noteUserUsername: user.username,
-		// 		noteUserHost: user.host,
-		// 		note: note,
-		// 	});
-		// }
-
 		return updatedNote;
+	}
+
+	isUpdateAlreadyApplied(
+		note: Pick<MiNote, 'history' | 'updatedAt'>,
+		updatedAt: Date,
+	): boolean {
+		return (note.updatedAt != null && updatedAt.getTime() <= note.updatedAt.getTime()) ||
+			(note.history?.some(revision => revision.createdAt === updatedAt.toISOString()) ?? false);
+	}
+
+	async prepareUpdate(
+		user: { id: MiUser['id'] },
+		note: MiNote,
+	): Promise<NoteUpdatePreparation> {
+		this.assertNoteOwner(user, note);
+		const oldRevision = await this.snapshotRevision(user, note);
+		const history = [...(note.history || []), oldRevision];
+		if (
+			history.length > MAX_NOTE_HISTORY_REVISIONS ||
+			Buffer.byteLength(JSON.stringify(history), 'utf8') > MAX_NOTE_HISTORY_BYTES
+		) {
+			throw new IdentifiableError(NOTE_HISTORY_LIMIT_ERROR_ID, 'Note edit history limit exceeded.');
+		}
+
+		return {
+			noteId: note.id,
+			sourceHistory: note.history,
+			sourceUpdatedAt: note.updatedAt,
+			history,
+		};
+	}
+
+	private assertNoteOwner(user: { id: MiUser['id'] }, note: Pick<MiNote, 'userId'>): void {
+		if (user.id !== note.userId) {
+			throw new Error('note author does not match the cached note owner');
+		}
+	}
+
+	private async snapshotRevision(
+		user: { id: MiUser['id'] },
+		note: MiNote,
+	): Promise<NonNullable<MiNote['history']>[number]> {
+		const [packed, pollSnapshot] = await Promise.all([
+			this.noteEntityService.pack(note, user, {
+				detail: false,
+				skipHide: true,
+			}),
+			this.snapshotPoll(note),
+		]);
+		const files = (packed.files ?? []).map(file => ({
+			...file,
+			properties: { ...file.properties },
+		}));
+		const emojiUrls = packed.emojis == null && note.userHost == null
+			? this.snapshotLocalEmojiUrls(note.emojis, await this.customEmojiService.localEmojisCache.fetch())
+			: { ...(packed.emojis ?? {}) };
+
+		return {
+			createdAt: (note.updatedAt || this.idService.parse(note.id).date).toISOString(),
+			cw: note.cw,
+			text: note.text,
+			fileIds: [...note.fileIds],
+			files,
+			sensitive: files.some(file => file.isSensitive) || packed.channel?.isSensitive === true,
+			emojis: [...note.emojis],
+			emojiUrls,
+			...(pollSnapshot.poll == null ? {} : { poll: pollSnapshot.poll }),
+			...(pollSnapshot.votersCount == null ? {} : { pollVotersCount: pollSnapshot.votersCount }),
+			renoteId: note.renoteId,
+		};
+	}
+
+	private snapshotLocalEmojiUrls(
+		names: readonly string[],
+		localEmojis: ReadonlyMap<string, { publicUrl: string; originalUrl: string }>,
+	): Record<string, string> {
+		return Object.fromEntries(names.flatMap(name => {
+			const emoji = localEmojis.get(name);
+			const url = emoji?.publicUrl || emoji?.originalUrl;
+			return url == null ? [] : [[name, url]];
+		}));
+	}
+
+	private async snapshotPoll(note: Pick<MiNote, 'id' | 'hasPoll'>): Promise<PollSnapshot> {
+		if (!note.hasPoll) return {};
+
+		const poll = await this.pollsRepository.findOneByOrFail({ noteId: note.id });
+		const snapshot: PollSnapshot = {
+			poll: {
+				multiple: poll.multiple,
+				expiresAt: poll.expiresAt?.toISOString() ?? null,
+				choices: poll.choices.map((text, index) => ({
+					text,
+					votes: poll.votes[index] ?? 0,
+					isVoted: false,
+				})),
+			},
+		};
+
+		if (poll.multiple) {
+			const row = await this.pollVotesRepository.createQueryBuilder('vote')
+				.select('COUNT(DISTINCT vote."userId")', 'count')
+				.where('vote."noteId" = :noteId', { noteId: note.id })
+				.getRawOne<{ count: number | string }>();
+			const votersCount = Number(row?.count ?? 0);
+			if (Number.isSafeInteger(votersCount) && votersCount >= 0) {
+				snapshot.votersCount = votersCount;
+			}
+		}
+
+		return snapshot;
 	}
 
 	@bindThis
