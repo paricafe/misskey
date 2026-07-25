@@ -83,8 +83,5 @@ vite.config.local-dev.ts.timestamp-*
 
 /dump.rdb
 
-# Local Git worktrees
-/.worktrees/
-
 # Affinity
 *.af~lock~

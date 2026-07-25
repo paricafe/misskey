@@ -5,12 +5,11 @@
 
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest';
 import { Test, TestingModule } from '@nestjs/testing';
-import { DataSource } from 'typeorm';
 import type { Index, Meilisearch } from 'meilisearch';
 import { type Config, loadConfig } from '@/config.js';
 import { GlobalModule } from '@/GlobalModule.js';
 import { CoreModule } from '@/core/CoreModule.js';
-import { applyNoteTextSearchQuery, SearchService } from '@/core/SearchService.js';
+import { SearchService } from '@/core/SearchService.js';
 import { CacheService } from '@/core/CacheService.js';
 import { IdService } from '@/core/IdService.js';
 import { DI } from '@/di-symbols.js';
@@ -605,42 +604,5 @@ describe('SearchService', () => {
 		});
 
 		defineSearchNoteTests(() => ctx, { supportsFollowersVisibility: false, sinceIdOrder: 'desc' });
-	});
-});
-
-describe('applyNoteTextSearchQuery', () => {
-	function createNoteQuery() {
-		const db = new DataSource({ type: 'postgres' });
-		return db.createQueryBuilder()
-			.select('note.id', 'id')
-			.from('note', 'note');
-	}
-
-	test('materializes PGroonga matches before the outer note query', () => {
-		const query = createNoteQuery()
-			.orderBy('note.id', 'DESC')
-			.limit(10);
-
-		applyNoteTextSearchQuery(query, 'sqlPgroonga', 'pari');
-
-		const [sql, parameters] = query.getQueryAndParameters();
-
-		expect(sql).toContain('WITH "matched_note" AS MATERIALIZED');
-		expect(sql).toContain('FROM "note" "search_note" WHERE search_note.text &@~ $1');
-		expect(sql).toContain('INNER JOIN "matched_note" "matched_note" ON matched_note.id = note.id');
-		expect(sql).toContain('ORDER BY note.id DESC LIMIT 10');
-		expect(parameters).toEqual(['pari']);
-	});
-
-	test('keeps SQL-like matching on the outer note query', () => {
-		const query = createNoteQuery();
-
-		applyNoteTextSearchQuery(query, 'sqlLike', '100%_MATCH');
-
-		const [sql, parameters] = query.getQueryAndParameters();
-
-		expect(sql).not.toContain('WITH "matched_note"');
-		expect(sql).toContain('WHERE LOWER(note.text) LIKE $1');
-		expect(parameters).toEqual(['%100\\%\\_match%']);
 	});
 });

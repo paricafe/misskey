@@ -4,7 +4,7 @@
  */
 
 import { Inject, Injectable } from '@nestjs/common';
-import { In, type ObjectLiteral, type SelectQueryBuilder } from 'typeorm';
+import { In } from 'typeorm';
 import { DI } from '@/di-symbols.js';
 import { type Config, FulltextSearchProvider } from '@/config.js';
 import { bindThis } from '@/decorators.js';
@@ -47,25 +47,6 @@ export type SearchPagination = {
 	sinceId?: MiNote['id'];
 	limit: number;
 };
-
-export function applyNoteTextSearchQuery<T extends ObjectLiteral>(
-	query: SelectQueryBuilder<T>,
-	provider: 'sqlLike' | 'sqlPgroonga',
-	q: string,
-): void {
-	if (provider === 'sqlPgroonga') {
-		const matchedNotesQuery = query.dataSource.createQueryBuilder()
-			.select('search_note.id', 'id')
-			.from('note', 'search_note')
-			.where('search_note.text &@~ :q', { q });
-
-		query
-			.addCommonTableExpression(matchedNotesQuery, 'matched_note', { materialized: true })
-			.innerJoin('matched_note', 'matched_note', 'matched_note.id = note.id');
-	} else {
-		query.andWhere('LOWER(note.text) LIKE :q', { q: `%${ sqlLikeEscape(q.toLowerCase()) }%` });
-	}
-}
 
 function compileValue(value: V): string {
 	if (typeof value === 'string') {
@@ -239,11 +220,11 @@ export class SearchService {
 			.leftJoinAndSelect('reply.user', 'replyUser')
 			.leftJoinAndSelect('renote.user', 'renoteUser');
 
-		applyNoteTextSearchQuery(
-			query,
-			this.config.fulltextSearch?.provider === 'sqlPgroonga' ? 'sqlPgroonga' : 'sqlLike',
-			q,
-		);
+		if (this.config.fulltextSearch?.provider === 'sqlPgroonga') {
+			query.andWhere('note.text &@~ :q', { q });
+		} else {
+			query.andWhere('LOWER(note.text) LIKE :q', { q: `%${ sqlLikeEscape(q.toLowerCase()) }%` });
+		}
 
 		if (opts.host) {
 			if (opts.host === '.') {
