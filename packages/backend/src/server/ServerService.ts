@@ -34,7 +34,6 @@ import { OpenApiServerService } from './api/openapi/OpenApiServerService.js';
 import { OAuth2ProviderService } from './oauth/OAuth2ProviderService.js';
 import { makeHstsHook } from './hsts.js';
 import { MastodonApiIntegrationService } from './api/mastodon/MastodonApiIntegrationService.js';
-import { registerHttpServerInstrumentation } from './http-server-instrumentation.js';
 import { registerHttpAccessLog } from './http-access-log.js';
 
 const _dirname = fileURLToPath(new URL('.', import.meta.url));
@@ -85,7 +84,6 @@ export class ServerService implements OnApplicationShutdown {
 			logger: false,
 		});
 		this.#fastify = fastify;
-		await registerHttpServerInstrumentation(fastify, this.config);
 		registerHttpAccessLog(fastify);
 
 		// HSTS
