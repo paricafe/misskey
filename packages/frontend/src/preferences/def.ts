@@ -333,9 +333,6 @@ export const PREF_DEF = definePreferences({
 	notificationClickable: {
 		default: false,
 	},
-	enableCondensedLine: {
-		default: false,
-	},
 	keepScreenOn: {
 		default: false,
 	},

@@ -33,10 +33,10 @@ import * as Misskey from 'misskey-js';
 import { inject, watch, ref } from 'vue';
 import { TransitionGroup } from 'vue';
 import { isSupportedEmoji } from '@@/js/emojilist.js';
+import { getEmojiNameFromReaction } from '@@/js/emoji-name.js';
 import XReaction from '@/components/MkReactionsViewer.reaction.vue';
 import { $i } from '@/i.js';
 import { prefer } from '@/preferences.js';
-import { customEmojisMap } from '@/custom-emojis.js';
 import { DI } from '@/di.js';
 
 const props = withDefaults(defineProps<{
@@ -73,35 +73,40 @@ function onMockToggleReaction(emoji: string, count: number) {
 	emit('mockUpdateMyReaction', emoji, (count - _reactions.value[i][1]));
 }
 
+const remoteReactionRegex = /@\w/;
+
 function canReact(reaction: string) {
 	if (!$i) return false;
+	const normalizedReaction = getEmojiNameFromReaction(reaction);
 	// TODO: CheckPermissions
-	//return !reaction.match(/@\w/) && (customEmojisMap.has(reaction) || isSupportedEmoji(reaction));
 	// We have checked in the backend whether the emoji exists
-	return !reaction.match(/@\w/) && isSupportedEmoji(reaction);
+	return !remoteReactionRegex.test(normalizedReaction) && isSupportedEmoji(normalizedReaction);
 }
 
 watch([() => props.reactions, () => props.maxNumber], ([newSource, maxNumber]) => {
-	let newReactions: [string, number][] = [];
 	hasMoreReactions.value = Object.keys(newSource).length > maxNumber;
 
-	newReactions = Object.entries(newSource)
-		.filter(([, count]) => count !== 0)
-		.sort(([emojiA, countA], [emojiB, countB]) => {
-			if (prefer.s.showAvailableReactionsFirstInNote) {
-				if (!canReact(emojiA) && canReact(emojiB)) return 1;
-				if (canReact(emojiA) && !canReact(emojiB)) return -1;
-				return countB - countA;
-			} else {
-				return countB - countA;
-			}
-		})
-		.slice(0, props.maxNumber);
-
-	if (props.myReaction && !newReactions.some(([x]) => x === props.myReaction) && props.myReaction in newSource) {
-		if (newSource[props.myReaction] > 0) {
-			newReactions.push([props.myReaction, newSource[props.myReaction]]);
+	const sorted = Object.entries(newSource).filter(([, count]) => count !== 0);
+	if (prefer.s.showAvailableReactionsFirstInNote) {
+		// ソートの比較関数内で評価すると同じ絵文字に対して何度も実行されるため、事前に1回だけ評価しておく
+		const canReactCache = new Map<string, boolean>();
+		for (const [emoji] of sorted) {
+			canReactCache.set(emoji, canReact(emoji));
 		}
+		sorted.sort(([emojiA, countA], [emojiB, countB]) => {
+			const canReactA = canReactCache.get(emojiA)!;
+			const canReactB = canReactCache.get(emojiB)!;
+			if (canReactA !== canReactB) return canReactA ? -1 : 1;
+			return countB - countA;
+		});
+	} else {
+		sorted.sort(([, countA], [, countB]) => countB - countA);
+	}
+
+	const newReactions = sorted.slice(0, props.maxNumber);
+
+	if (props.myReaction && !newReactions.some(([x]) => x === props.myReaction) && props.myReaction in newSource && newSource[props.myReaction] > 0) {
+		newReactions.push([props.myReaction, newSource[props.myReaction]]);
 	}
 
 	_reactions.value = newReactions;
