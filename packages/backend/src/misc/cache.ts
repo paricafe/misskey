@@ -116,6 +116,7 @@ export class RedisSingleCache<T> {
 	private readonly fetcher: () => Promise<T>;
 	private readonly toRedisConverter: (value: T) => string;
 	private readonly fromRedisConverter: (value: string) => T | undefined;
+	private pendingFetch: Promise<T> | undefined;
 
 	constructor(
 		private redisClient: Redis.Redis,
@@ -183,16 +184,36 @@ export class RedisSingleCache<T> {
 	 */
 	@bindThis
 	public async fetch(): Promise<T> {
-		const cachedValue = await this.get();
-		if (cachedValue !== undefined) {
-			// Cache HIT
-			return cachedValue;
+		const memoryCached = this.memoryCache.get();
+		if (memoryCached !== undefined) {
+			return memoryCached;
 		}
 
-		// Cache MISS
-		const value = await this.fetcher();
-		await this.set(value);
-		return value;
+		if (this.pendingFetch !== undefined) {
+			return this.pendingFetch;
+		}
+
+		const pendingFetch = (async () => {
+			const cachedValue = await this.get();
+			if (cachedValue !== undefined) {
+				// Cache HIT
+				return cachedValue;
+			}
+
+			// Cache MISS
+			const value = await this.fetcher();
+			await this.set(value);
+			return value;
+		})();
+		this.pendingFetch = pendingFetch;
+
+		try {
+			return await pendingFetch;
+		} finally {
+			if (this.pendingFetch === pendingFetch) {
+				this.pendingFetch = undefined;
+			}
+		}
 	}
 
 	@bindThis

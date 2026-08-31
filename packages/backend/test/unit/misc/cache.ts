@@ -4,7 +4,57 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { MemoryKVCache, MemorySingleCache } from '@/misc/cache.js';
+import { MemoryKVCache, MemorySingleCache, RedisSingleCache } from '@/misc/cache.js';
+
+describe('misc:RedisSingleCache', () => {
+	test('deduplicates concurrent cache misses', async () => {
+		let resolveFetcher: ((value: string) => void) | undefined;
+		const redisClient = {
+			get: vi.fn().mockResolvedValue(null),
+			set: vi.fn().mockResolvedValue('OK'),
+		};
+		const fetcher = vi.fn(() => new Promise<string>((resolve) => {
+			resolveFetcher = resolve;
+		}));
+		const cache = new RedisSingleCache<string>(redisClient as never, 'test', {
+			lifetime: 1000,
+			memoryCacheLifetime: 1000,
+			fetcher,
+			toRedisConverter: value => value,
+			fromRedisConverter: value => value,
+		});
+
+		const first = cache.fetch();
+		const second = cache.fetch();
+		await vi.waitFor(() => expect(fetcher).toHaveBeenCalledOnce());
+		resolveFetcher?.('fetched');
+
+		await expect(Promise.all([first, second])).resolves.toEqual(['fetched', 'fetched']);
+		expect(redisClient.get).toHaveBeenCalledOnce();
+		expect(redisClient.set).toHaveBeenCalledOnce();
+	});
+
+	test('allows retry after a pending fetch rejects', async () => {
+		const redisClient = {
+			get: vi.fn().mockResolvedValue(null),
+			set: vi.fn().mockResolvedValue('OK'),
+		};
+		const fetcher = vi.fn()
+			.mockRejectedValueOnce(new Error('fetch failed'))
+			.mockResolvedValueOnce('fetched');
+		const cache = new RedisSingleCache<string>(redisClient as never, 'test', {
+			lifetime: 1000,
+			memoryCacheLifetime: 1000,
+			fetcher,
+			toRedisConverter: value => value,
+			fromRedisConverter: value => value,
+		});
+
+		await expect(cache.fetch()).rejects.toThrow('fetch failed');
+		await expect(cache.fetch()).resolves.toBe('fetched');
+		expect(fetcher).toHaveBeenCalledTimes(2);
+	});
+});
 
 describe('misc:MemoryKVCache', () => {
 	beforeEach(() => {

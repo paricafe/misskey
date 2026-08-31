@@ -77,7 +77,7 @@ export class CustomEmojiService implements OnApplicationShutdown {
 
 		this.localEmojisCache = new RedisSingleCache<Map<string, MiEmoji>>(this.redisClient, 'localEmojis', {
 			lifetime: 1000 * 60 * 30, // 30m
-			memoryCacheLifetime: 1000 * 60 * 3, // 3m
+			memoryCacheLifetime: 1000 * 60 * 10, // 10m
 			fetcher: () => this.emojisRepository.find({ where: { host: IsNull() } }).then(emojis => new Map(emojis.map(emoji => [emoji.name, emoji]))),
 			toRedisConverter: (value) => JSON.stringify(Array.from(value.values())),
 			fromRedisConverter: (value) => {
