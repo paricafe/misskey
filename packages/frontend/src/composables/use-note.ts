@@ -37,6 +37,7 @@ import { notePage } from '@/filters/note.js';
 import type { DI as DIType } from '@/di.js';
 import type { ExtractInjectedType } from '@/types/misc.js';
 import type { MenuItem } from '@/types/menu.js';
+import type { WordMuteResult } from '@/utility/check-word-mute.js';
 
 export interface UseNoteProps {
 	note: Misskey.entities.Note;
@@ -65,36 +66,34 @@ export interface UseNoteOptions {
 	forceNoteCapture?: boolean;
 }
 
-export function calculateMuteStatus<
-	CheckOnly extends boolean,
-	CheckForSensitiveMedia extends boolean,
-	ReturnTypeA = CheckOnly extends true ? boolean : Array<string | string[]> | false | 'sensitiveMute',
-	ReturnTypeB = CheckForSensitiveMedia extends true ? ReturnTypeA : Exclude<ReturnTypeA, 'sensitiveMute'>,
->(
+export function checkNoteWordMute(
 	noteToCheck: Misskey.entities.Note,
 	user: typeof $i,
 	mutedWords: Array<string | string[]> | null,
-	checkForSensitiveMedia: CheckForSensitiveMedia,
-	checkOnly: CheckOnly = false as CheckOnly,
-): ReturnTypeB {
+): WordMuteResult {
 	if (mutedWords != null) {
 		const result = checkWordMute(noteToCheck, user, mutedWords);
-		if (Array.isArray(result)) return checkOnly ? (result.length > 0) as ReturnTypeB : result as ReturnTypeB;
+		if (Array.isArray(result)) return result;
 
 		const replyResult = noteToCheck.reply && checkWordMute(noteToCheck.reply, user, mutedWords);
-		if (Array.isArray(replyResult)) return checkOnly ? (replyResult.length > 0) as ReturnTypeB : replyResult as ReturnTypeB;
+		if (Array.isArray(replyResult)) return replyResult;
 
 		const renoteResult = noteToCheck.renote && checkWordMute(noteToCheck.renote, user, mutedWords);
-		if (Array.isArray(renoteResult)) return checkOnly ? (renoteResult.length > 0) as ReturnTypeB : renoteResult as ReturnTypeB;
+		if (Array.isArray(renoteResult)) return renoteResult;
 	}
 
-	if (checkOnly) return false as ReturnTypeB;
+	return false;
+}
 
+export function checkBuiltinSoftMute(
+	noteToCheck: Misskey.entities.Note,
+	checkForSensitiveMedia: boolean,
+): 'sensitiveMute' | false {
 	if (checkForSensitiveMedia && noteToCheck.files?.some((v) => v.isSensitive)) {
-		return 'sensitiveMute' as ReturnTypeB;
+		return 'sensitiveMute' as never;
 	}
 
-	return false as ReturnTypeB;
+	return false;
 }
 
 /** MkNote, MkNoteDetailedの共通ロジック */
@@ -111,7 +110,7 @@ export function useNote(
 
 	// プラグインの割り込み処理
 	let rawNote = deepClone(props.note);
-	const hideByPlugin = ref(false);
+	let hideByPlugin = false;
 	const noteViewInterruptors = getPluginHandlers('note_view_interruptor');
 
 	if (noteViewInterruptors.length > 0) {
@@ -119,14 +118,19 @@ export function useNote(
 		for (const interruptor of noteViewInterruptors) {
 			try {
 				result = interruptor.handler(result!) as Misskey.entities.Note | null;
+
+				// nullになった場合（非表示）はこれ以上やることがないのでループを抜ける
+				if (result == null) {
+					break;
+				}
 			} catch (err) {
 				console.error(err);
 			}
 		}
 		if (result == null) {
-			hideByPlugin.value = true;
+			hideByPlugin = true;
 		} else {
-			rawNote = result as Misskey.entities.Note;
+			rawNote = result;
 		}
 	}
 	rawNote = reactive(rawNote);
@@ -151,8 +155,9 @@ export function useNote(
 	const translation = ref<Misskey.entities.NotesTranslateResponse | null>(null);
 
 	// ミュート判定
-	const muted = ref($i ? calculateMuteStatus(appearNote, $i, $i.mutedWords, inTimeline && !tl_withSensitive.value) : false);
-	const hardMuted = ref(props.withHardMute && $i ? calculateMuteStatus(appearNote, $i, $i.hardMutedWords, inTimeline && !tl_withSensitive.value, true) : false);
+	// mutedはミュート解除の操作で書き換わるのでrefだが、hardMutedは解除できないのでリアクティブにしない
+	const muted = ref($i ? checkNoteWordMute(appearNote, $i, $i.mutedWords) || checkBuiltinSoftMute(appearNote, inTimeline && !tl_withSensitive.value) : false);
+	const hardMuted = props.withHardMute && $i ? checkNoteWordMute(appearNote, $i, $i.hardMutedWords) : false;
 
 	// 計算プロパティ (Computed)
 	const isMyRenote = computed(() => $i && ($i.id === rawNote.userId));
@@ -169,10 +174,10 @@ export function useNote(
 		)),
 	);
 
-	const pleaseLoginContext = computed<OpenOnRemoteOptions>(() => ({
+	const pleaseLoginContext: OpenOnRemoteOptions = {
 		type: 'lookup',
 		url: `https://${host}/notes/${appearNote.id}`,
-	}));
+	};
 
 	// グローバルイベントの監視
 	useGlobalEvent('noteDeleted', (noteId) => {
@@ -227,7 +232,7 @@ export function useNote(
 	// 共通アクション関数群
 	async function renote() {
 		if (props.mock) return;
-		const isLoggedIn = await pleaseLogin({ openOnRemote: pleaseLoginContext.value });
+		const isLoggedIn = await pleaseLogin({ openOnRemote: pleaseLoginContext });
 		if (!isLoggedIn) return;
 		showMovedDialog();
 		if (els.renoteButton == null) return;
@@ -242,7 +247,7 @@ export function useNote(
 
 	async function reply() {
 		if (props.mock) return;
-		const isLoggedIn = await pleaseLogin({ openOnRemote: pleaseLoginContext.value });
+		const isLoggedIn = await pleaseLogin({ openOnRemote: pleaseLoginContext });
 		if (!isLoggedIn) return;
 		os.post({
 			reply: appearNote,
@@ -253,7 +258,7 @@ export function useNote(
 	}
 
 	async function react(arg?: ((reaction: string) => void) | string): Promise<void> {
-		const isLoggedIn = await pleaseLogin({ openOnRemote: pleaseLoginContext.value });
+		const isLoggedIn = await pleaseLogin({ openOnRemote: pleaseLoginContext });
 		if (!isLoggedIn) return;
 		showMovedDialog();
 
@@ -329,7 +334,7 @@ export function useNote(
 
 	async function reactViaMfmEmoji(reaction: string) {
 		if (props.mock) return;
-		const isLoggedIn = await pleaseLogin({ openOnRemote: pleaseLoginContext.value });
+		const isLoggedIn = await pleaseLogin({ openOnRemote: pleaseLoginContext });
 		if (!isLoggedIn) return;
 		showMovedDialog();
 		sound.playMisskeySfx('reaction');
@@ -407,7 +412,7 @@ export function useNote(
 
 	async function showRenoteMenu() {
 		if (props.mock) return;
-		const isLoggedIn = await pleaseLogin({ openOnRemote: pleaseLoginContext.value });
+		const isLoggedIn = await pleaseLogin({ openOnRemote: pleaseLoginContext });
 		if (!isLoggedIn) return;
 
 		const getUnrenote = () => ({
@@ -472,7 +477,7 @@ export function useNote(
 		collapsed,
 		renoteCollapsed,
 
-		// 計算プロパティ
+		// 導出値
 		isMyRenote,
 		parsed,
 		urls,
