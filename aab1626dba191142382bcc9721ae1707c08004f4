@@ -1,0 +1,44 @@
+packages/backend/src/misc/cache.ts
+  c075468c7a42f61f 119,187-189,192-216
+packages/backend/src/core/CustomEmojiService.ts
+  c075468c7a42f61f 80
+packages/backend/test/unit/misc/cache.ts
+  c075468c7a42f61f 7-57
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8-ntes.9",
+  "base_commit_sha": "aab1626dba191142382bcc9721ae1707c08004f4",
+  "prompts": {
+    "c075468c7a42f61f": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0579d-8585-75c0-a9d0-4bb0ff51e22a",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Natsuki-Kaede",
+      "messages": [],
+      "total_additions": 81,
+      "total_deletions": 10,
+      "accepted_lines": 81,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "packages/backend/src/core/CustomEmojiService.ts": {
+          "additions": 1,
+          "deletions": 1,
+          "accepted_lines": 1
+        },
+        "packages/backend/test/unit/misc/cache.ts": {
+          "additions": 51,
+          "deletions": 1,
+          "accepted_lines": 51
+        },
+        "packages/backend/src/misc/cache.ts": {
+          "additions": 29,
+          "deletions": 8,
+          "accepted_lines": 29
+        }
+      }
+    }
+  }
+}
