@@ -1,0 +1,1063 @@
+packages-private/diagnostics-shared/test/format.test.ts
+  c075468c7a42f61f 23-31
+packages/misskey-reversi/package.json
+  c075468c7a42f61f 27-31
+CONTRIBUTING.md
+  c075468c7a42f61f 734-739
+packages/frontend-builder/package.json
+  c075468c7a42f61f 14-17,21-24
+packages/frontend/src/components/MkNote.vue
+  c075468c7a42f61f 99
+packages/frontend/src/components/MkInput.vue
+  c075468c7a42f61f 164
+packages/backend/src/server/WellKnownServerService.ts
+  c075468c7a42f61f 114-117
+packages-private/diagnostics-frontend/src/bundle/chunk-report.ts
+  c075468c7a42f61f 134,154
+.github/workflows/locale.yml
+  c075468c7a42f61f 10-11
+.claude/commands/harness-audit.md
+  c075468c7a42f61f 15-17,38,41,49-51,101,105,108,132,137
+.github/workflows/test-backend.yml
+  c075468c7a42f61f 15-16
+locales/fr-FR.yml
+  c075468c7a42f61f 144,1006,1044,1288,1764-1765,2295
+.claude/agents/misskey-api-reviewer.md
+  c075468c7a42f61f 3,38,52,67,74,83,99,110,145
+locales/ko-KR.yml
+  c075468c7a42f61f 1043
+locales/en-US.yml
+  c075468c7a42f61f 1043,1425
+locales/vi-VN.yml
+  c075468c7a42f61f 1024
+packages/frontend/src/utility/intl-string.ts
+  c075468c7a42f61f 24-25,35-39
+packages/misskey-js/src/autogen/apiClientJSDoc.ts
+  c075468c7a42f61f 774,3462,3464
+pnpm-workspace.yaml
+  c075468c7a42f61f 56-57,62
+packages/backend/src/server/api/endpoints/i/revoke-token.ts
+  c075468c7a42f61f 13,16,18-31,68-91,94-96,101-104,106-107
+packages/frontend/test/e2e/shared.ts
+  c075468c7a42f61f 118
+packages/frontend/src/utility/get-note-menu.ts
+  c075468c7a42f61f 310-316,321,331,341
+packages/i18n/package.json
+  c075468c7a42f61f 31-33,35-36,38,41
+packages/backend/test-federation/test/move.test.ts
+  c075468c7a42f61f 3,33-35
+packages/frontend/src/components/page/page.image.vue
+  c075468c7a42f61f 8
+locales/zh-TW.yml
+  c075468c7a42f61f 622-623,1043,1423-1425,2158-2166,2479,2995
+locales/zh-CN.yml
+  c075468c7a42f61f 1043,1425
+packages/backend/test-federation/test/block.test.ts
+  c075468c7a42f61f 1,4,7-13,32,114,157,221
+.agents/skills/shipping-misskey-change/SKILL.md
+  c075468c7a42f61f 3
+.github/workflows/check-spdx-license-id.yml
+  c075468c7a42f61f 9-10,19
+.github/workflows/validate-api-json.yml
+  c075468c7a42f61f 12-13
+packages-private/diagnostics-frontend/package.json
+  c075468c7a42f61f 18,20-22
+packages/backend/test-federation/test/abuse-report.test.ts
+  c075468c7a42f61f 1,4,35-41
+.claude/skills/working-on-backend/SKILL.md
+  c075468c7a42f61f 33
+packages/backend/src/server/api/endpoints/admin/queue/stats.ts
+  c075468c7a42f61f 15
+packages-private/diagnostics-shared/package.json
+  c075468c7a42f61f 20-21
+packages/frontend/src/components/MkLightbox.item.controls.vue
+  c075468c7a42f61f 51-61,103,122-123,131-132,139-140,143,148,150-153,158,160-166,179,181-184,186-189,191-194,196-199,201-205,207-211,213-218,220-223,225-226,228-231,233-235,237-250,252-253,255,257-260,262-264,266,268,270-292,294-317,319-364,368-371,375-376,380-381,384-385,389,393,433-437
+packages/backend/src/server/api/endpoints/notes/thread-muting/create.ts
+  c075468c7a42f61f 33-38,68-70,72-73,76-78
+packages/frontend/src/components/MkMediaAudio.vue
+  c075468c7a42f61f 10,13,22-68,70-73,75-76,82,85,87,89,95-97,99,110-111,114-115,120,128-132,154,173-177,180-185,188-195,198-204,207-214,217-240,243-246,249-252
+packages/frontend/src/components/MkSubNoteContent.vue
+  c075468c7a42f61f 17
+.github/workflows/test-production.yml
+  c075468c7a42f61f 9-10
+locales/uk-UA.yml
+  c075468c7a42f61f 1039
+locales/tr-TR.yml
+  c075468c7a42f61f 1039
+packages/backend/test-federation/test/emoji.test.ts
+  c075468c7a42f61f 1,4,22,25-33,38,48,52,60-64,73,82,86,95-99
+packages/frontend/src/ui/_common_/common.vue
+  c075468c7a42f61f 236,240,291-299
+packages/backend/test-federation/test/user.test.ts
+  c075468c7a42f61f 1,4,73-76,145-147,151-154,170,197-201,209-212,237,260,281-287,309,323,336,339-342,364,367,398,401,431,487,490,536,550
+packages/frontend/src/components/MkBlurhash.vue
+  c075468c7a42f61f 83-87
+packages/sw/package.json
+  c075468c7a42f61f 13,18
+packages/misskey-js/src/autogen/types.ts
+  c075468c7a42f61f 637,2843,2845,10090
+locales/cs-CZ.yml
+  c075468c7a42f61f 974
+locales/ru-RU.yml
+  c075468c7a42f61f 1038
+packages/frontend/src/components/MkPostFormAttaches.vue
+  c075468c7a42f61f 55-56,173,178,180,192
+packages/frontend/src/components/MkMediaImage.vue
+  c075468c7a42f61f 73,142-145
+packages/frontend/src/components/MkSelect.vue
+  c075468c7a42f61f 112
+packages/misskey-js/package.json
+  c075468c7a42f61f 4,40-46,50
+packages/frontend/src/components/MkNoteDetailed.vue
+  c075468c7a42f61f 119
+locales/de-DE.yml
+  c075468c7a42f61f 1039
+packages-private/diagnostics-shared/src/metric-table.ts
+  c075468c7a42f61f 39
+packages-private/diagnostics-frontend/test/report.test.ts
+  c075468c7a42f61f 180-181,254,271-273
+packages/backend/test-federation/test/timeline.test.ts
+  c075468c7a42f61f 1,4,24-26,57,69-71,74-81,91,95-98
+scripts/check-spdx.mjs
+  c075468c7a42f61f 1-341
+packages/frontend/src/utility/lightbox.ts
+  c075468c7a42f61f 1-19
+.claude/agents/vue-component-reviewer.md
+  c075468c7a42f61f 3,37,44,51,66,83,96,103,119,130-132,153
+AGENTS.md
+  c075468c7a42f61f 21-23,39,66-67,70-73,81
+packages/frontend/src/pages/admin/job-queue.vue
+  c075468c7a42f61f 191
+packages/frontend/src/components/MkSuperMenu.vue
+  c075468c7a42f61f 98-99,113-121,124,133,140-141,160,172-173,176-177,180,185-186,189,194-195,198,202-219,221-222
+packages/i18n/src/autogen/locale.ts
+  c075468c7a42f61f 4176-4178,5710-5713
+.github/workflows/test-federation.yml
+  c075468c7a42f61f 13-14,60
+packages/frontend/test/e2e/basic.spec.ts
+  c075468c7a42f61f 88-90
+packages/backend/src/server/api/endpoints/i/revoke-token.test.ts
+  c075468c7a42f61f 17,20,39-69,75-76,92-93,128,139
+locales/ja-JP.yml
+  c075468c7a42f61f 1043,1426
+packages/frontend/src/components/global/MkMfm.ts
+  c075468c7a42f61f 327-335
+packages-private/changelog-checker/package.json
+  c075468c7a42f61f 13-23
+packages/frontend/src/composables/use-uploader.ts
+  c075468c7a42f61f 21,240,246,249
+.claude/skills/shipping-misskey-change/references/tasks/changelog-update.md
+  c075468c7a42f61f 1,3-4
+packages/frontend/src/composables/use-note.ts
+  c075468c7a42f61f 40,69,73,76,79,82,85-86,88-91,93,96,113,121-125,131,133,158-160,177,180,235,250,261,337,415,480
+packages/misskey-js/generator/package.json
+  c075468c7a42f61f 10-13,17
+packages/misskey-bubble-game/package.json
+  c075468c7a42f61f 28,30-33
+packages-private/diagnostics-shared/src/heap-snapshot/render.ts
+  c075468c7a42f61f 24
+.claude/THIRD_PARTY_LICENSES.md
+  c075468c7a42f61f 21
+locales/ar-SA.yml
+  c075468c7a42f61f 896
+.claude/skills/shipping-misskey-change/SKILL.md
+  c075468c7a42f61f 3,8-9,11,13-17,19-20,22,24,26-28,30-31,33-53
+packages/frontend/src/di.ts
+  c075468c7a42f61f 22
+scripts/check-shipping.mjs
+  c075468c7a42f61f 1-261
+packages/backend/test-federation/test/utils.ts
+  c075468c7a42f61f 2,44-58,174-183,186-204,274-275,286,289-290,305-307,310,321,324-325,341-343,346,358-367,370,373-379
+.claude/agents/README.md
+  c075468c7a42f61f 13-14
+locales/fa-IR.yml
+  c075468c7a42f61f 1-322
+locales/ja-KS.yml
+  c075468c7a42f61f 1033
+packages/backend/vitest.config.fed.ts
+  c075468c7a42f61f 9-10
+packages/frontend/src/components/MkLightbox.item.audio-visualizer.vue
+  c075468c7a42f61f 1-742
+packages/frontend/src/components/MkMediaList.vue
+  c075468c7a42f61f 8-9,22-29,33,41,59,61,66,71,76-93,134,147,159,161,171-173,178-179
+packages/frontend/src/components/global/MkCustomEmoji.vue
+  c075468c7a42f61f 41,71-72,84
+packages/frontend/src/pages/chat/XMessage.vue
+  c075468c7a42f61f 22
+packages/backend/src/core/QueueService.ts
+  c075468c7a42f61f 963
+packages/backend/package.json
+  c075468c7a42f61f 54-55,58-60,66-70,72-73,75,81,83,87,90-91,93,97,101,105-106,112,115-116,119,121,126,130,133,137,140,145,150,152,161,163,169,177-179,184,186,188,190-192
+packages/backend/src/server/api/endpoints/notes/translate.ts
+  c075468c7a42f61f 15,86-88,91,103
+packages/frontend/src/types/media-component.ts
+  c075468c7a42f61f 1-8
+packages/frontend/src/components/MkUploaderItems.vue
+  c075468c7a42f61f 58,105,107,110
+packages/frontend-shared/package.json
+  c075468c7a42f61f 11,13-15,26,28
+.github/workflows/api-misskey-js.yml
+  c075468c7a42f61f 9-10
+packages/backend/src/core/UserKeypairService.ts
+  c075468c7a42f61f 8,27,30,50-62
+locales/id-ID.yml
+  c075468c7a42f61f 1041
+locales/it-IT.yml
+  c075468c7a42f61f 1043
+.github/workflows/test-frontend.yml
+  c075468c7a42f61f 17-18
+locales/pt-PT.yml
+  c075468c7a42f61f 1029
+packages/frontend/package.json
+  c075468c7a42f61f 26,30,34,46,56,64,66,71,77,82,93-94,103,110-114,116,118-120,122,124,126,128-136,138-141,143,145,147
+package.json
+  c075468c7a42f61f 3,9,57-58,60-61,66-68,72,74-75
+packages/frontend/src/components/MkMediaVideo.vue
+  c075468c7a42f61f 53,87-90
+packages/frontend/src/pages/drive.file.info.vue
+  c075468c7a42f61f 12
+packages-private/diagnostics-shared/test/metric-table.test.ts
+  c075468c7a42f61f 36
+packages-private/diagnostics-shared/src/format.ts
+  c075468c7a42f61f 36,47
+.github/copilot-instructions.md
+  c075468c7a42f61f 13-14,33-34,55-56,59-62,67
+.claude/skills/working-on-frontend/SKILL.md
+  c075468c7a42f61f 3,34,36
+packages/frontend/src/components/MkLightbox.item.vue
+  c075468c7a42f61f 58,76,85,93,95,100-119,122,141-142,163,200,202-203,218,220,222,233,235-238,242-258,260,267-273,276-300,317,375-376,556,600,604,904-905,919-932,934-940,947-948,954,956,958-959,961,980-987,1009,1017-1018,1064-1067,1087-1098
+packages/frontend/src/components/MkMediaBanner.vue
+  c075468c7a42f61f 8
+packages/backend/test/unit/server/FileServerService.ts
+  c075468c7a42f61f 14,150,153-154
+scripts/lib/git.mjs
+  c075468c7a42f61f 1-139
+locales/ro-RO.yml
+  c075468c7a42f61f 1021
+packages/frontend/src/components/MkReactionsViewer.vue
+  c075468c7a42f61f 36,76-77,80,83,89-94,96-109
+packages/backend/src/core/SensitiveMediaDetectionService.ts
+  c075468c7a42f61f 72,82
+.claude/commands/quality-gate.md
+  c075468c7a42f61f 2,17-18,21,25-26,30,33,37,39-41,44-45,61-62,73,84,87-88,93-94,99-102,105-106,110,117-118
+.github/workflows/packages-private.yml
+  c075468c7a42f61f 16-17
+packages/backend/src/config.ts
+  c075468c7a42f61f 12-13,16,24-25,227-231,391
+packages/backend/src/logging/LogNormalizer.ts
+  c075468c7a42f61f 135-155,157
+packages/frontend/src/components/MkImgWithBlurhash.vue
+  c075468c7a42f61f 21-22
+packages/frontend-shared/js/emoji-name.ts
+  c075468c7a42f61f 1-48
+packages/frontend/src/components/MkObjectView.vue
+  c075468c7a42f61f 7
+packages-private/diagnostics-backend/package.json
+  c075468c7a42f61f 16,19-24
+packages/backend/src/core/FileInfoService.ts
+  c075468c7a42f61f 19,24,57,269,294
+packages/frontend-embed/package.json
+  c075468c7a42f61f 21,23-24,33,37-41,43,45-50,52
+packages/backend/test/unit/FileInfoService.ts
+  c075468c7a42f61f 17,44,50
+.github/workflows/lint.yml
+  c075468c7a42f61f 24-25
+packages/backend/test-federation/test/drive.test.ts
+  c075468c7a42f61f 1,4,109,117-121
+packages/frontend/src/components/MkLightbox.vue
+  c075468c7a42f61f 31,33-34,54,66-67,80
+packages/frontend/src/components/MkReactionsViewer.reaction.vue
+  c075468c7a42f61f 29,67,77,178
+CHANGELOG.md
+  c075468c7a42f61f 32-52
+packages/backend/test/unit/SensitiveMediaDetectionService.ts
+  c075468c7a42f61f 10,21,27,45
+packages/icons-subsetter/package.json
+  c075468c7a42f61f 14,16-17,21-22
+locales/es-ES.yml
+  c075468c7a42f61f 1043,1425
+packages/frontend-embed/src/components/EmCustomEmoji.vue
+  c075468c7a42f61f 28,45-46,55
+packages/backend/src/server/api/endpoints/admin/queue/jobs.ts
+  c075468c7a42f61f 31
+packages/backend/test-federation/test/note.test.ts
+  c075468c7a42f61f 1,4,88-91,149,157,163,168,177-180,184,190,199-202,206,212,275-282,290,301,314,328,347-352,369,378-383
+packages/backend/src/core/CoreModule.ts
+  c075468c7a42f61f 21,170,326,480,634,787
+locales/th-TH.yml
+  c075468c7a42f61f 1039
+locales/ca-ES.yml
+  c075468c7a42f61f 1043,1425
+packages/backend/test-federation/test/notification.test.ts
+  c075468c7a42f61f 3,30-33,35,47-52
+packages-private/diagnostics-shared/test/heap-snapshot-render.test.ts
+  c075468c7a42f61f 48,59,70
+.github/workflows/dockle.yml
+  c075468c7a42f61f 10-11
+packages/frontend/src/utility/check-word-mute.ts
+  c075468c7a42f61f 7-44,48,50,52,55-56,58,61-62,64-66
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8-ntes.9",
+  "base_commit_sha": "d16a43d064c42377ad31afd057c00459937d91fd",
+  "prompts": {
+    "c075468c7a42f61f": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0579d-8585-75c0-a9d0-4bb0ff51e22a",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Natsuki-Kaede",
+      "messages": [],
+      "total_additions": 5300,
+      "total_deletions": 2772,
+      "accepted_lines": 4734,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "CHANGELOG.md": {
+          "additions": 30,
+          "deletions": 8,
+          "accepted_lines": 24
+        },
+        "packages/frontend/src/directives/ripple.ts": {
+          "deletions": 1
+        },
+        "packages/backend/test-federation/test/note.test.ts": {
+          "additions": 49,
+          "deletions": 44,
+          "accepted_lines": 49
+        },
+        "packages/frontend-shared/js/emoji-name.ts": {
+          "additions": 48,
+          "accepted_lines": 48
+        },
+        ".github/workflows/locale.yml": {
+          "additions": 2,
+          "accepted_lines": 2
+        },
+        "packages/frontend/package.json": {
+          "additions": 44,
+          "deletions": 44,
+          "accepted_lines": 41
+        },
+        ".github/workflows/lint.yml": {
+          "additions": 2,
+          "accepted_lines": 2
+        },
+        "packages/frontend/src/components/MkInput.vue": {
+          "additions": 1,
+          "deletions": 1,
+          "accepted_lines": 1
+        },
+        "packages/backend/test-federation/test/drive.test.ts": {
+          "additions": 9,
+          "deletions": 8,
+          "accepted_lines": 9
+        },
+        "locales/zh-TW.yml": {
+          "additions": 17,
+          "accepted_lines": 17
+        },
+        ".github/workflows/packages-private.yml": {
+          "additions": 2,
+          "accepted_lines": 2
+        },
+        ".claude/commands/harness-audit.md": {
+          "additions": 13,
+          "deletions": 21,
+          "accepted_lines": 13
+        },
+        "packages/backend/src/core/FileInfoService.ts": {
+          "additions": 5,
+          "deletions": 5,
+          "accepted_lines": 5
+        },
+        "locales/vi-VN.yml": {
+          "additions": 1,
+          "accepted_lines": 1
+        },
+        "packages/frontend/src/pages/chat/XMessage.vue": {
+          "additions": 1,
+          "deletions": 1,
+          "accepted_lines": 1
+        },
+        "packages-private/diagnostics-frontend/src/bundle/chunk-report.ts": {
+          "additions": 2,
+          "deletions": 2,
+          "accepted_lines": 2
+        },
+        ".claude/skills/working-on-backend/SKILL.md": {
+          "additions": 1,
+          "deletions": 1,
+          "accepted_lines": 1
+        },
+        "packages/backend/test/unit/server/FileServerService.ts": {
+          "additions": 4,
+          "deletions": 4,
+          "accepted_lines": 4
+        },
+        ".claude/skills/working-on-frontend/references/knowledge/i18n-usage.md": {
+          "deletions": 12
+        },
+        "locales/ru-RU.yml": {
+          "additions": 1,
+          "accepted_lines": 1
+        },
+        "packages/backend/test-federation/test/emoji.test.ts": {
+          "additions": 28,
+          "deletions": 24,
+          "accepted_lines": 28
+        },
+        ".claude/skills/working-on-frontend/references/tasks/adding-i18n-key.md": {
+          "deletions": 2
+        },
+        "packages/sw/package.json": {
+          "additions": 2,
+          "deletions": 2,
+          "accepted_lines": 2
+        },
+        "packages-private/diagnostics-shared/src/format.ts": {
+          "additions": 2,
+          "deletions": 2,
+          "accepted_lines": 2
+        },
+        "packages/backend/src/core/SensitiveMediaDetectionService.ts": {
+          "additions": 181,
+          "accepted_lines": 181
+        },
+        ".github/workflows/test-backend.yml": {
+          "additions": 2,
+          "accepted_lines": 2
+        },
+        "packages-private/diagnostics-shared/test/metric-table.test.ts": {
+          "additions": 1,
+          "deletions": 1,
+          "accepted_lines": 1
+        },
+        "packages/frontend/src/components/MkPostFormAttaches.vue": {
+          "additions": 6,
+          "deletions": 6,
+          "accepted_lines": 6
+        },
+        "packages/backend/test/unit/SensitiveMediaDetectionService.ts": {
+          "additions": 150,
+          "accepted_lines": 150
+        },
+        "packages/frontend-embed/src/components/EmCustomEmoji.vue": {
+          "additions": 4,
+          "deletions": 3,
+          "accepted_lines": 4
+        },
+        "scripts/check-spdx.mjs": {
+          "additions": 341,
+          "accepted_lines": 341
+        },
+        "packages/frontend/src/types/media-component.ts": {
+          "additions": 8,
+          "accepted_lines": 8
+        },
+        "packages-private/diagnostics-shared/test/format.test.ts": {
+          "additions": 9,
+          "deletions": 9,
+          "accepted_lines": 9
+        },
+        "packages/frontend/src/components/MkMediaList.vue": {
+          "additions": 44,
+          "deletions": 14,
+          "accepted_lines": 44
+        },
+        "packages/frontend/src/components/MkObjectView.vue": {
+          "additions": 1,
+          "deletions": 1,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/server/api/endpoints/notes/thread-muting/create.ts": {
+          "additions": 15,
+          "deletions": 5,
+          "accepted_lines": 15
+        },
+        "locales/ar-SA.yml": {
+          "additions": 1,
+          "accepted_lines": 1
+        },
+        "packages/misskey-js/package.json": {
+          "additions": 9,
+          "deletions": 9,
+          "accepted_lines": 9
+        },
+        "packages/frontend/src/utility/intl-string.ts": {
+          "additions": 7,
+          "deletions": 2,
+          "accepted_lines": 7
+        },
+        "packages-private/diagnostics-shared/package.json": {
+          "additions": 2,
+          "deletions": 3,
+          "accepted_lines": 2
+        },
+        "packages/backend/src/core/UserKeypairService.ts": {
+          "additions": 17,
+          "deletions": 2,
+          "accepted_lines": 17
+        },
+        "locales/es-ES.yml": {
+          "additions": 2,
+          "accepted_lines": 2
+        },
+        "packages-private/diagnostics-backend/package.json": {
+          "additions": 7,
+          "deletions": 8,
+          "accepted_lines": 7
+        },
+        "packages/frontend/src/components/global/MkCustomEmoji.vue": {
+          "additions": 4,
+          "deletions": 3,
+          "accepted_lines": 4
+        },
+        "packages/frontend/src/components/MkMediaVideo.vue": {
+          "additions": 5,
+          "accepted_lines": 5
+        },
+        "packages/frontend/src/components/MkBlurhash.vue": {
+          "additions": 8,
+          "deletions": 7,
+          "accepted_lines": 5
+        },
+        "packages/misskey-bubble-game/package.json": {
+          "additions": 5,
+          "deletions": 5,
+          "accepted_lines": 5
+        },
+        "packages/backend/src/server/api/endpoints/notes/translate.ts": {
+          "additions": 8,
+          "deletions": 3,
+          "accepted_lines": 8
+        },
+        "packages/frontend/src/pages/admin/job-queue.vue": {
+          "additions": 1,
+          "deletions": 5,
+          "accepted_lines": 1
+        },
+        "packages/frontend/src/components/MkNoteDetailed.vue": {
+          "additions": 1,
+          "deletions": 1,
+          "accepted_lines": 1
+        },
+        "locales/tr-TR.yml": {
+          "additions": 1,
+          "accepted_lines": 1
+        },
+        "locales/ro-RO.yml": {
+          "additions": 1,
+          "accepted_lines": 1
+        },
+        "locales/ca-ES.yml": {
+          "additions": 2,
+          "accepted_lines": 2
+        },
+        ".claude/skills/working-on-backend/references/tasks/creating-migration.md": {
+          "deletions": 7
+        },
+        "packages/misskey-reversi/package.json": {
+          "additions": 5,
+          "deletions": 5,
+          "accepted_lines": 5
+        },
+        "packages/frontend/src/components/MkSuperMenu.vue": {
+          "additions": 49,
+          "deletions": 21,
+          "accepted_lines": 49
+        },
+        "packages/frontend/src/components/MkMediaAudio.vue": {
+          "additions": 147,
+          "deletions": 395,
+          "accepted_lines": 147
+        },
+        "packages/frontend/src/components/MkLightbox.item.audio-visualizer.vue": {
+          "additions": 742,
+          "accepted_lines": 742
+        },
+        ".github/workflows/test-federation.yml": {
+          "additions": 3,
+          "accepted_lines": 3
+        },
+        "packages/backend/test-federation/test/abuse-report.test.ts": {
+          "additions": 9,
+          "deletions": 5,
+          "accepted_lines": 9
+        },
+        ".agents/skills/shipping-misskey-change/SKILL.md": {
+          "additions": 1,
+          "deletions": 1,
+          "accepted_lines": 1
+        },
+        "locales/pt-PT.yml": {
+          "additions": 1,
+          "accepted_lines": 1
+        },
+        "pnpm-workspace.yaml": {
+          "additions": 3,
+          "deletions": 10,
+          "accepted_lines": 3
+        },
+        "package.json": {
+          "additions": 16,
+          "deletions": 16,
+          "accepted_lines": 12
+        },
+        "packages/frontend/src/components/MkMediaImage.vue": {
+          "additions": 5,
+          "accepted_lines": 5
+        },
+        "packages/frontend/src/components/MkReactionsViewer.reaction.vue": {
+          "additions": 4,
+          "deletions": 3,
+          "accepted_lines": 4
+        },
+        "locales/ko-KR.yml": {
+          "additions": 1,
+          "accepted_lines": 1
+        },
+        "packages/backend/test-federation/test/timeline.test.ts": {
+          "additions": 23,
+          "deletions": 9,
+          "accepted_lines": 23
+        },
+        "packages/misskey-js/src/autogen/types.ts": {
+          "additions": 4,
+          "deletions": 5,
+          "accepted_lines": 4
+        },
+        ".claude/skills/working-on-frontend/SKILL.md": {
+          "additions": 3,
+          "deletions": 3,
+          "accepted_lines": 3
+        },
+        "Dockerfile": {
+          "deletions": 1
+        },
+        ".github/workflows/check-spdx-license-id.yml": {
+          "additions": 3,
+          "deletions": 64,
+          "accepted_lines": 3
+        },
+        "packages/backend/test-federation/test/move.test.ts": {
+          "additions": 4,
+          "deletions": 2,
+          "accepted_lines": 4
+        },
+        "packages/backend/src/config.ts": {
+          "additions": 11,
+          "deletions": 8,
+          "accepted_lines": 11
+        },
+        ".claude/agents/misskey-api-reviewer.md": {
+          "additions": 9,
+          "deletions": 33,
+          "accepted_lines": 9
+        },
+        ".claude/agents/README.md": {
+          "additions": 2,
+          "deletions": 1,
+          "accepted_lines": 2
+        },
+        "locales/en-US.yml": {
+          "additions": 2,
+          "accepted_lines": 2
+        },
+        "packages/backend/test-federation/test/user.test.ts": {
+          "additions": 48,
+          "deletions": 47,
+          "accepted_lines": 48
+        },
+        "packages/frontend/src/components/MkLightbox.item.controls.vue": {
+          "additions": 455,
+          "accepted_lines": 455
+        },
+        "locales/ja-JP.yml": {
+          "additions": 2,
+          "accepted_lines": 2
+        },
+        "packages/frontend/src/components/MkSubNoteContent.vue": {
+          "additions": 6,
+          "deletions": 6,
+          "accepted_lines": 1
+        },
+        "packages/backend/test-federation/test/utils.ts": {
+          "additions": 82,
+          "deletions": 5,
+          "accepted_lines": 82
+        },
+        "locales/fa-IR.yml": {
+          "additions": 322,
+          "accepted_lines": 322
+        },
+        "locales/zh-CN.yml": {
+          "additions": 2,
+          "accepted_lines": 2
+        },
+        "packages/frontend/src/components/MkLightbox.item.vue": {
+          "additions": 160,
+          "deletions": 37,
+          "accepted_lines": 160
+        },
+        "packages/frontend/src/components/page/page.image.vue": {
+          "additions": 1,
+          "deletions": 1,
+          "accepted_lines": 1
+        },
+        "packages/frontend/src/components/MkNote.vue": {
+          "additions": 29,
+          "deletions": 29,
+          "accepted_lines": 2
+        },
+        "CONTRIBUTING.md": {
+          "additions": 6,
+          "accepted_lines": 6
+        },
+        ".github/workflows/dockle.yml": {
+          "additions": 2,
+          "accepted_lines": 2
+        },
+        "packages-private/diagnostics-shared/src/heap-snapshot/render.ts": {
+          "additions": 1,
+          "deletions": 1,
+          "accepted_lines": 1
+        },
+        ".github/workflows/test-frontend.yml": {
+          "additions": 2,
+          "accepted_lines": 2
+        },
+        "packages/backend/src/server/api/endpoints/i/revoke-token.ts": {
+          "additions": 76,
+          "deletions": 40,
+          "accepted_lines": 56
+        },
+        "packages/backend/test/unit/AiService.ts": {
+          "additions": 4,
+          "deletions": 4,
+          "accepted_lines": 4
+        },
+        ".claude/THIRD_PARTY_LICENSES.md": {
+          "additions": 1,
+          "deletions": 1,
+          "accepted_lines": 1
+        },
+        "packages/frontend/src/di.ts": {
+          "additions": 1,
+          "deletions": 1,
+          "accepted_lines": 1
+        },
+        "packages/frontend/src/utility/lightbox.ts": {
+          "additions": 19,
+          "accepted_lines": 19
+        },
+        "packages/frontend/src/utility/check-word-mute.ts": {
+          "additions": 50,
+          "deletions": 19,
+          "accepted_lines": 50
+        },
+        "packages-private/diagnostics-frontend/package.json": {
+          "additions": 4,
+          "deletions": 5,
+          "accepted_lines": 4
+        },
+        "packages/frontend/src/components/MkSelect.vue": {
+          "additions": 1,
+          "deletions": 1,
+          "accepted_lines": 1
+        },
+        "packages/frontend/src/components/MkMediaBanner.vue": {
+          "additions": 1,
+          "deletions": 3,
+          "accepted_lines": 1
+        },
+        "packages/frontend/src/composables/use-note.ts": {
+          "additions": 62,
+          "deletions": 57,
+          "accepted_lines": 36
+        },
+        "packages/frontend-builder/package.json": {
+          "additions": 11,
+          "deletions": 12,
+          "accepted_lines": 8
+        },
+        "packages/backend/test-federation/test/notification.test.ts": {
+          "additions": 12,
+          "deletions": 3,
+          "accepted_lines": 12
+        },
+        "packages/frontend/src/composables/use-uploader.ts": {
+          "additions": 4,
+          "deletions": 3,
+          "accepted_lines": 4
+        },
+        "packages/backend/src/core/QueueService.ts": {
+          "additions": 1,
+          "deletions": 1,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/server/api/endpoints/admin/queue/jobs.ts": {
+          "additions": 1,
+          "deletions": 1,
+          "accepted_lines": 1
+        },
+        "locales/th-TH.yml": {
+          "additions": 1,
+          "accepted_lines": 1
+        },
+        "packages/frontend-shared/package.json": {
+          "additions": 6,
+          "deletions": 6,
+          "accepted_lines": 6
+        },
+        ".claude/skills/working-on-backend/references/tasks/adding-api-endpoint.md": {
+          "deletions": 7
+        },
+        ".claude/skills/working-on-frontend/references/tasks/adding-mk-component.md": {
+          "deletions": 4
+        },
+        "packages/frontend/src/ui/_common_/common.vue": {
+          "additions": 12,
+          "deletions": 2,
+          "accepted_lines": 12
+        },
+        "locales/cs-CZ.yml": {
+          "additions": 1,
+          "accepted_lines": 1
+        },
+        "packages/i18n/package.json": {
+          "additions": 7,
+          "deletions": 7,
+          "accepted_lines": 7
+        },
+        "packages/backend/test-federation/test/block.test.ts": {
+          "additions": 13,
+          "deletions": 6,
+          "accepted_lines": 13
+        },
+        ".github/copilot-instructions.md": {
+          "additions": 11,
+          "deletions": 6,
+          "accepted_lines": 11
+        },
+        "packages/backend/src/core/CoreModule.ts": {
+          "additions": 6,
+          "deletions": 6,
+          "accepted_lines": 6
+        },
+        "locales/it-IT.yml": {
+          "additions": 1,
+          "accepted_lines": 1
+        },
+        "packages/frontend/src/components/MkUploaderItems.vue": {
+          "additions": 4,
+          "deletions": 3,
+          "accepted_lines": 4
+        },
+        ".github/workflows/validate-api-json.yml": {
+          "additions": 2,
+          "accepted_lines": 2
+        },
+        "packages/i18n/src/autogen/locale.ts": {
+          "additions": 8,
+          "accepted_lines": 8
+        },
+        ".github/workflows/test-production.yml": {
+          "additions": 2,
+          "accepted_lines": 2
+        },
+        ".claude/skills/shipping-misskey-change/SKILL.md": {
+          "additions": 39,
+          "deletions": 19,
+          "accepted_lines": 39
+        },
+        "packages/backend/src/server/api/endpoints/admin/queue/stats.ts": {
+          "additions": 1,
+          "deletions": 1,
+          "accepted_lines": 1
+        },
+        "locales/fr-FR.yml": {
+          "additions": 7,
+          "deletions": 2,
+          "accepted_lines": 7
+        },
+        ".claude/agents/vue-component-reviewer.md": {
+          "additions": 13,
+          "deletions": 38,
+          "accepted_lines": 13
+        },
+        "locales/de-DE.yml": {
+          "additions": 1,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/server/WellKnownServerService.ts": {
+          "additions": 4,
+          "deletions": 4,
+          "accepted_lines": 4
+        },
+        ".claude/skills/shipping-misskey-change/references/tasks/changelog-update.md": {
+          "additions": 3,
+          "deletions": 2,
+          "accepted_lines": 3
+        },
+        "packages/frontend/src/preferences/def.ts": {
+          "additions": 3,
+          "deletions": 6
+        },
+        "packages/backend/package.json": {
+          "additions": 48,
+          "deletions": 48,
+          "accepted_lines": 48
+        },
+        "scripts/check-shipping.mjs": {
+          "additions": 261,
+          "accepted_lines": 261
+        },
+        "packages/backend/vitest.config.fed.ts": {
+          "additions": 2,
+          "accepted_lines": 2
+        },
+        "packages/frontend/test/e2e/shared.ts": {
+          "additions": 1,
+          "accepted_lines": 1
+        },
+        ".github/workflows/api-misskey-js.yml": {
+          "additions": 2,
+          "accepted_lines": 2
+        },
+        "locales/uk-UA.yml": {
+          "additions": 1,
+          "accepted_lines": 1
+        },
+        "packages/backend/test/unit/FileInfoService.ts": {
+          "additions": 3,
+          "deletions": 3,
+          "accepted_lines": 3
+        },
+        "packages/backend/src/core/PageService.ts": {
+          "deletions": 2
+        },
+        "packages/frontend/src/components/MkImgWithBlurhash.vue": {
+          "additions": 5,
+          "deletions": 5,
+          "accepted_lines": 2
+        },
+        "packages/frontend/src/utility/get-note-menu.ts": {
+          "additions": 10,
+          "deletions": 4,
+          "accepted_lines": 10
+        },
+        "packages/frontend/src/components/MkReactionsViewer.vue": {
+          "additions": 44,
+          "deletions": 39,
+          "accepted_lines": 25
+        },
+        "packages-private/diagnostics-shared/src/metric-table.ts": {
+          "additions": 1,
+          "deletions": 1,
+          "accepted_lines": 1
+        },
+        "packages/frontend/src/pages/drive.file.info.vue": {
+          "additions": 1,
+          "deletions": 1,
+          "accepted_lines": 1
+        },
+        "packages/frontend/src/pages/settings/other.vue": {
+          "deletions": 4
+        },
+        "locales/ja-KS.yml": {
+          "additions": 1,
+          "accepted_lines": 1
+        },
+        "packages/frontend/src/components/MkLightbox.vue": {
+          "additions": 8,
+          "deletions": 1,
+          "accepted_lines": 8
+        },
+        "packages/misskey-js/src/autogen/apiClientJSDoc.ts": {
+          "additions": 942,
+          "deletions": 943,
+          "accepted_lines": 498
+        },
+        "packages/frontend/src/components/global/MkMfm.ts": {
+          "additions": 9,
+          "deletions": 6,
+          "accepted_lines": 9
+        },
+        "packages/backend/src/logging/LogNormalizer.ts": {
+          "additions": 22,
+          "deletions": 17,
+          "accepted_lines": 22
+        },
+        "packages/icons-subsetter/package.json": {
+          "additions": 5,
+          "deletions": 5,
+          "accepted_lines": 5
+        },
+        "packages/frontend-embed/package.json": {
+          "additions": 17,
+          "deletions": 17,
+          "accepted_lines": 17
+        },
+        "packages/misskey-js/generator/package.json": {
+          "additions": 5,
+          "deletions": 5,
+          "accepted_lines": 5
+        },
+        "packages/backend/src/core/AiService.ts": {
+          "additions": 2,
+          "deletions": 2,
+          "accepted_lines": 2
+        },
+        "locales/id-ID.yml": {
+          "additions": 1,
+          "accepted_lines": 1
+        },
+        "packages-private/changelog-checker/package.json": {
+          "additions": 11,
+          "deletions": 11,
+          "accepted_lines": 11
+        },
+        ".claude/commands/quality-gate.md": {
+          "additions": 32,
+          "deletions": 37,
+          "accepted_lines": 32
+        },
+        "AGENTS.md": {
+          "additions": 11,
+          "deletions": 26,
+          "accepted_lines": 11
+        },
+        "packages-private/diagnostics-shared/test/heap-snapshot-render.test.ts": {
+          "additions": 3,
+          "deletions": 3,
+          "accepted_lines": 3
+        },
+        "scripts/lib/git.mjs": {
+          "additions": 139,
+          "accepted_lines": 139
+        },
+        "packages-private/diagnostics-frontend/test/report.test.ts": {
+          "additions": 6,
+          "deletions": 6,
+          "accepted_lines": 6
+        },
+        "packages/frontend/src/components/MkVideoControl.vue": {
+          "deletions": 318
+        },
+        "packages/backend/src/server/api/endpoints/i/revoke-token.test.ts": {
+          "additions": 39,
+          "deletions": 13,
+          "accepted_lines": 39
+        },
+        "packages/frontend/test/e2e/basic.spec.ts": {
+          "additions": 3,
+          "deletions": 1,
+          "accepted_lines": 3
+        }
+      }
+    }
+  }
+}
