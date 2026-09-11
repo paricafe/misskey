@@ -4,15 +4,12 @@
  */
 
 import { Inject, Injectable } from '@nestjs/common';
-import * as Redis from 'ioredis';
 import { DI } from '@/di-symbols.js';
 import type { NoteDraftsRepository } from '@/models/_.js';
 import type Logger from '@/logger.js';
 import { NotificationService } from '@/core/NotificationService.js';
 import { bindThis } from '@/decorators.js';
 import { NoteCreateService } from '@/core/NoteCreateService.js';
-import { MastodonApiStateService } from '@/server/api/mastodon/MastodonApiStateService.js';
-import { acquireDistributedLock } from '@/misc/distributed-lock.js';
 import { QueueLoggerService } from '../QueueLoggerService.js';
 import type * as Bull from 'bullmq';
 import type { PostScheduledNoteJobData } from '../types.js';
@@ -28,8 +25,6 @@ export class PostScheduledNoteProcessorService {
 		private noteCreateService: NoteCreateService,
 		private notificationService: NotificationService,
 		private queueLoggerService: QueueLoggerService,
-		private mastodonApiStateService: MastodonApiStateService,
-		@Inject(DI.redis) private redis: Redis.Redis,
 	) {
 		this.logger = this.queueLoggerService.logger.createSubLogger('post-scheduled-note');
 	}
@@ -44,8 +39,6 @@ export class PostScheduledNoteProcessorService {
 			return;
 		}
 
-		const metadata = await this.mastodonApiStateService.get(draft.userId, 'status_metadata', draft.id);
-		const unlock = metadata == null ? null : await acquireDistributedLock(this.redis, `mastodon-status-write:${draft.userId}`, 30_000, 100, 100);
 		try {
 			const note = await this.noteCreateService.fetchAndCreate(draft.user, {
 				createdAt: new Date(),
@@ -65,10 +58,6 @@ export class PostScheduledNoteProcessorService {
 				visibleUserIds: draft.visibleUserIds,
 				channelId: draft.channelId,
 			});
-			if (metadata != null) {
-				await this.mastodonApiStateService.put({ userId: draft.userId, kind: 'status_metadata', key: note.id, value: metadata.value });
-				await this.mastodonApiStateService.delete(draft.userId, 'status_metadata', draft.id);
-			}
 
 			// await不要
 			this.noteDraftsRepository.remove(draft);
@@ -81,8 +70,6 @@ export class PostScheduledNoteProcessorService {
 			this.notificationService.createNotification(draft.userId, 'scheduledNotePostFailed', {
 				noteDraftId: draft.id,
 			});
-		} finally {
-			await unlock?.();
 		}
 	}
 }

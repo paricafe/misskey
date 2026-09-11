@@ -3,6 +3,7 @@
 .travis
 .vscode
 .config
+.mastodon-compat
 Dockerfile
 build/
 built/
@@ -11,6 +12,7 @@ db/
 .devcontainer/compose.yml
 node_modules/
 packages/*/node_modules
+packages/mastodon-compat/dist
 redis/
 files/
 fluent-emojis/

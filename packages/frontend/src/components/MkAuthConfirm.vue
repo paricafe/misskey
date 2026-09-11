@@ -115,7 +115,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 </template>
 
 <script setup lang="ts">
-import { ref, computed, defineAsyncComponent } from 'vue';
+import { ref, computed } from 'vue';
 import * as Misskey from 'misskey-js';
 import MkButton from '@/components/MkButton.vue';
 import { $i } from '@/i.js';
@@ -131,7 +131,6 @@ const props = defineProps<{
 	permissions?: (typeof Misskey.permissions[number])[];
 	manualWaiting?: boolean;
 	waitOnDeny?: boolean;
-	requireSignin?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -245,31 +244,10 @@ async function clickAccept() {
 
 	const user = users.value.get(selectedUser.value)!;
 
+	const token = user.token;
+
 	waiting.value = true;
-	if (props.requireSignin) {
-		const signedIn = await new Promise<(Misskey.entities.SigninFlowResponse & { finished: true }) | null>((resolve) => {
-			const { dispose } = os.popup(defineAsyncComponent(() => import('@/components/MkSigninDialog.vue')), {
-				initialUsername: user.username,
-				message: i18n.ts.authenticationRequiredToContinue,
-			}, {
-				done: resolve,
-				cancelled: () => resolve(null),
-				closed: () => dispose(),
-			});
-		});
-		if (signedIn == null) {
-			waiting.value = false;
-			return;
-		}
-		if (signedIn.id !== user.id) {
-			waiting.value = false;
-			await os.alert({ type: 'error', text: i18n.ts._auth.accountMismatch });
-			return;
-		}
-		emit('accept', signedIn.i);
-		return;
-	}
-	emit('accept', user.token);
+	emit('accept', token);
 }
 
 function showUI(state: 'success' | 'denied' | 'failed') {

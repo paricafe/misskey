@@ -60,8 +60,13 @@ export const paramDef = {
 	properties: {
 		noteId: { type: 'string', format: 'misskey:id' },
 		choice: { type: 'integer' },
+		choices: { type: 'array', minItems: 1, maxItems: 10, uniqueItems: true, items: { type: 'integer' } },
 	},
-	required: ['noteId', 'choice'],
+	required: ['noteId'],
+	oneOf: [
+		{ type: 'object', properties: { choice: { type: 'integer' } }, required: ['choice'] },
+		{ type: 'object', properties: { choices: { type: 'array', minItems: 1, maxItems: 10, uniqueItems: true, items: { type: 'integer' } } }, required: ['choices'] },
+	],
 } as const;
 
 @Injectable()
@@ -70,7 +75,7 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 		private pollVoteService: PollVoteService,
 	) {
 		super(meta, paramDef, async (ps, me) => {
-			await this.pollVoteService.vote(ps.noteId, [ps.choice], me);
+			await this.pollVoteService.vote(ps.noteId, ps.choices ?? [ps.choice!], me);
 		});
 	}
 }

@@ -7,6 +7,7 @@ on:
       - develop
     paths:
       - packages/backend/**
+      - packages/mastodon-compat/**
       # for permissions
       - packages/misskey-js/**
       - .github/workflows/test-backend.yml
@@ -16,6 +17,7 @@ on:
       - master
     paths:
       - packages/backend/**
+      - packages/mastodon-compat/**
       # for permissions
       - packages/misskey-js/**
       - .github/workflows/test-backend.yml
@@ -74,6 +76,8 @@ jobs:
       run: cp .github/misskey/test.yml .config
     - name: Build
       run: pnpm build
+    - name: Gateway protocol tests
+      run: pnpm --filter @pari/mastodon-compat test
     - name: Test
       run: pnpm --filter backend test-and-coverage
     - name: Upload to Codecov

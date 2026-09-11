@@ -25311,7 +25311,6 @@ export interface operations {
                         /** Format: date-time */
                         lastUsedAt?: string;
                         permission: string[];
-                        mastodonScopes?: string[];
                         iconUrl?: string | null;
                         description?: string | null;
                     }[];
@@ -31103,8 +31102,13 @@ export interface operations {
                 'application/json': {
                     /** Format: misskey:id */
                     noteId: string;
+                    choice?: number;
+                    choices?: number[];
+                } & ({
                     choice: number;
-                };
+                } | {
+                    choices: number[];
+                });
             };
         };
         responses: {
@@ -31243,6 +31247,8 @@ export interface operations {
                     /** Format: misskey:id */
                     noteId: string;
                     reaction: string;
+                    /** @default true */
+                    replaceExisting?: boolean;
                 };
             };
         };
@@ -31306,6 +31312,7 @@ export interface operations {
                 'application/json': {
                     /** Format: misskey:id */
                     noteId: string;
+                    expectedReaction?: string;
                 };
             };
         };

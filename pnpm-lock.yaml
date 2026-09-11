@@ -214,6 +214,9 @@ importers:
       '@oxc-project/runtime':
         specifier: 0.147.0
         version: 0.147.0
+      '@pari/mastodon-compat':
+        specifier: workspace:*
+        version: link:../mastodon-compat
       '@peertube/http-signature':
         specifier: 1.7.0
         version: 1.7.0
@@ -1257,6 +1260,43 @@ importers:
       '@typescript-eslint/parser':
         specifier: 8.68.0
         version: 8.68.0(@typescript/typescript6@6.0.2)(eslint@9.39.5(supports-color@10.2.2))(supports-color@10.2.2)
+
+  packages/mastodon-compat:
+    dependencies:
+      '@fastify/cors':
+        specifier: 11.3.0
+        version: 11.3.0
+      '@fastify/multipart':
+        specifier: 10.1.1
+        version: 10.1.1
+      fastify:
+        specifier: 5.12.1
+        version: 5.12.1
+      mfm-js:
+        specifier: 0.26.0
+        version: 0.26.0
+      ws:
+        specifier: 8.21.3
+        version: 8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+    devDependencies:
+      '@types/node':
+        specifier: 26.4.0
+        version: 26.4.0
+      '@types/ws':
+        specifier: 8.18.1
+        version: 8.18.1
+      '@typescript-eslint/eslint-plugin':
+        specifier: 8.68.0
+        version: 8.68.0(@typescript-eslint/parser@8.68.0(@typescript/typescript6@6.0.2)(eslint@9.39.5(supports-color@10.2.2))(supports-color@10.2.2))(@typescript/typescript6@6.0.2)(eslint@9.39.5(supports-color@10.2.2))(supports-color@10.2.2)
+      '@typescript-eslint/parser':
+        specifier: 8.68.0
+        version: 8.68.0(@typescript/typescript6@6.0.2)(eslint@9.39.5(supports-color@10.2.2))(supports-color@10.2.2)
+      eslint:
+        specifier: 9.39.5
+        version: 9.39.5(supports-color@10.2.2)
+      typescript:
+        specifier: npm:@typescript/typescript6@6.0.2
+        version: '@typescript/typescript6@6.0.2'
 
   packages/misskey-bubble-game:
     dependencies:

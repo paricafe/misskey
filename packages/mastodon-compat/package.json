@@ -1,0 +1,33 @@
+{
+	"name": "@pari/mastodon-compat",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"license": "AGPL-3.0-only",
+	"description": "Standalone Mastodon protocol gateway for the public Misskey HTTP and WebSocket APIs",
+	"main": "./dist/src/index.js",
+	"types": "./dist/src/index.d.ts",
+	"exports": { ".": "./dist/src/index.js" },
+	"scripts": {
+		"build": "tsc6 -p tsconfig.json",
+		"typecheck": "tsc6 -p tsconfig.json --noEmit",
+		"lint": "eslint --quiet src test",
+		"test": "pnpm build && node --test dist/test/*.test.js",
+		"start": "node dist/src/cli.js"
+	},
+	"dependencies": {
+		"@fastify/cors": "11.3.0",
+		"@fastify/multipart": "10.1.1",
+		"fastify": "5.12.1",
+		"mfm-js": "0.26.0",
+		"ws": "8.21.3"
+	},
+	"devDependencies": {
+		"@types/node": "26.4.0",
+		"@types/ws": "8.18.1",
+		"@typescript-eslint/eslint-plugin": "8.68.0",
+		"@typescript-eslint/parser": "8.68.0",
+		"eslint": "9.39.5",
+		"typescript": "npm:@typescript/typescript6@6.0.2"
+	}
+}

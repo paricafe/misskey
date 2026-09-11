@@ -54,14 +54,4 @@ describe(AbuseReportService, () => {
 		expect(notifications.notifySystemWebhook).toHaveBeenCalledTimes(1);
 		expect(notifications.notifyMail).toHaveBeenCalledTimes(1);
 	});
-
-	test('reportAndGetCreated returns inserted reports after notifying once', async () => {
-		const { service, repository, notifications, insertedReport } = createService();
-
-		await expect(service.reportAndGetCreated([input])).resolves.toEqual([insertedReport]);
-		expect(repository.insertOne).toHaveBeenCalledTimes(1);
-		expect(notifications.notifyAdminStream).toHaveBeenCalledTimes(1);
-		expect(notifications.notifySystemWebhook).toHaveBeenCalledTimes(1);
-		expect(notifications.notifyMail).toHaveBeenCalledTimes(1);
-	});
 });

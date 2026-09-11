@@ -24,10 +24,8 @@
 
 	//#region Detect language
 	const supportedLangs = LANGS;
-	const oauthLanguage = document.querySelector('meta[name="misskey:oauth:lang"]')?.content;
-	const transientLanguage = supportedLangs.includes(oauthLanguage) ? oauthLanguage : null;
 	/** @type { string } */
-	let lang = transientLanguage ?? localStorage.getItem('lang');
+	let lang = localStorage.getItem('lang');
 	if (lang == null || !supportedLangs.includes(lang)) {
 		if (supportedLangs.includes(navigator.language)) {
 			lang = navigator.language;
@@ -45,7 +43,7 @@
 		lang = 'en-US';
 	}
 
-	if (transientLanguage == null) localStorage.setItem('lang', lang);
+	localStorage.setItem('lang', lang);
 	//#endregion
 
 	//#region Script
