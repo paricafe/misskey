@@ -1,0 +1,217 @@
+packages/backend/src/core/MastodonPushNotificationService.test.ts
+  s_d8966b8bcf3b74::t_034e6ddd27cb03 62,65-70,72-75,80-81,83,85-86,145-147
+  s_d8966b8bcf3b74::t_93fe572ec879b4 159,212,248,267,301
+  s_d8966b8bcf3b74::t_85f4ba6917d5d7 63,82,156,209,245,265,303
+  s_d8966b8bcf3b74::t_a058cdfb1fb284 28-57,87-144
+  s_d8966b8bcf3b74::t_f59b5dcaab60e2 64,71,76-79,84
+packages/frontend/src/components/MkAuthConfirm.vue
+  s_d8966b8bcf3b74::t_7990f6bae0b7e4 118,134,249-272
+packages/backend/src/server/api/mastodon/MastodonEntityService.ts
+  s_d8966b8bcf3b74::t_2c56b1bf228c2f 17,217,236,420
+packages/backend/src/server/oauth/OAuth2ProviderService.ts
+  s_d8966b8bcf3b74::t_fef1d917ab46f7 763
+  s_d8966b8bcf3b74::t_f82668cbf6507f 12,38,43,560,573-575,625-626,628-630,641-647,704,755,764,767,773
+locales/ja-JP.yml
+  s_d8966b8bcf3b74::t_fb487d7c7f5671 2665-2700
+packages/backend/src/server/api/mastodon/MastodonPushSubscriptionService.test.ts
+  s_d8966b8bcf3b74::t_ca8684019b7084 9,108,184-219
+  s_d8966b8bcf3b74::t_9363a9da22e243 7,92-107
+  s_d8966b8bcf3b74::t_378078c5097b31 109
+packages/backend/src/server/api/mastodon/MastodonStreamSession.test.ts
+  s_d8966b8bcf3b74::t_39df4a027dfe35 8,21-22,59,82-83,102
+  s_d8966b8bcf3b74::t_20c529e6595433 380,391-398,400,403-485
+  s_d8966b8bcf3b74::t_3c8325c8f086fb 9,23-24,84-85
+  s_d8966b8bcf3b74::t_a1398e7b9e384e 487-502
+  s_d8966b8bcf3b74::t_6644d66d99a5d6 486
+packages/backend/src/server/api/mastodon/MastodonPaginationService.ts
+  s_d8966b8bcf3b74::t_8feebf3f7712a8 8,17,20,24-27,31-41,43-45,55-56
+packages/backend/src/server/api/mastodon/request-parameters.ts
+  s_d8966b8bcf3b74::t_ca27476049a41d 1-43,54-118
+  s_d8966b8bcf3b74::t_f670551d78e115 44-53
+packages/backend/src/core/PushNotificationService.test.ts
+  s_d8966b8bcf3b74::t_93fe572ec879b4 28
+  s_d8966b8bcf3b74::t_034e6ddd27cb03 43-62
+packages/backend/src/server/api/mastodon/MastodonOAuthService.ts
+  s_d8966b8bcf3b74::t_60855470312046 286
+  s_d8966b8bcf3b74::t_e436233988b5c8 9,179-181
+  s_d8966b8bcf3b74::t_e81af7114b699b 21,35,50-52,58,92,126,160,182,229,237-239,256,407-409,414-416,438-439,441,445-446
+packages/backend/src/server/api/mastodon/MastodonStatusMetadataService.ts
+  s_d8966b8bcf3b74::t_f8fffe822b3a68 1-5,9,11-12,14-17,19-21,27,45-83,86,96-99,102,106-109,118-119,134-141
+  s_d8966b8bcf3b74::t_051bc8b8dba941 13
+  s_d8966b8bcf3b74::t_ccf74a257fa0b9 6-8,10,22-26,29-38
+  s_d8966b8bcf3b74::t_71e16a55a7d3e3 18,84-85,87-95,100-101,110-117,120-133
+  s_d8966b8bcf3b74::t_73356168255b90 28,39-44,103-105
+packages/frontend/src/utility/mastodon-scope-description.ts
+  s_d8966b8bcf3b74::t_fb487d7c7f5671 1-11
+packages/backend/src/server/api/mastodon/MastodonRelationshipService.test.ts
+  s_d8966b8bcf3b74::t_ea18093128c60a 1-13,15-30,32-84,87,135-226
+  s_d8966b8bcf3b74::t_398b67c06cc29a 14
+  s_d8966b8bcf3b74::t_6330a8349714ee 31,85-86,88-134
+packages/frontend/test/unit/oauth-consent.test.ts
+  s_d8966b8bcf3b74::t_fef1d917ab46f7 104-118
+  s_d8966b8bcf3b74::t_5fafed40d5c351 1-103,119
+packages/backend/src/server/api/mastodon/MastodonMediaService.ts
+  s_d8966b8bcf3b74::t_ccf74a257fa0b9 18,33-34,39,60-62,89,93-102
+  s_d8966b8bcf3b74::t_f6c918020972cf 1-17,19-31,35-38,40-54,58-59,63-69,72-88,90-92,103-120
+  s_d8966b8bcf3b74::t_ec967736e742f3 32,55-57,70-71
+packages/frontend/src/pages/oauth.vue
+  s_d8966b8bcf3b74::t_fb487d7c7f5671 14-15,19-28,38-39,49-50
+packages/backend/src/server/api/mastodon/MastodonMediaService.test.ts
+  s_d8966b8bcf3b74::t_087b52d03abe8e 1-88,90-98,154-158,163-167,169-175
+  s_d8966b8bcf3b74::t_10c376d467f58b 89,99-113,153,159-162,168
+  s_d8966b8bcf3b74::t_ec967736e742f3 114-130,147-152
+  s_d8966b8bcf3b74::t_b8da78141fd25f 131-146
+packages/backend/src/server/api/mastodon/MastodonStatusMetadataService.test.ts
+  s_d8966b8bcf3b74::t_10c376d467f58b 6,12-14,43-69,71-72,246,264,267,269-320
+  s_d8966b8bcf3b74::t_087b52d03abe8e 1-5,7-11,15-42,70,73-124,226-245,247-263,265-266,268,321-322
+  s_d8966b8bcf3b74::t_9512b227a3444f 125-225
+packages/backend/src/server/api/mastodon/MastodonFavouriteService.ts
+  s_d8966b8bcf3b74::t_2ba76f41603a50 1-21,23,25,27-96
+  s_d8966b8bcf3b74::t_90f0f1430b1a4c 22,24,26
+packages/backend/src/queue/QueueProcessorModule.ts
+  s_d8966b8bcf3b74::t_c74bfae28ed17d 8,56
+docs/mastodon-compatibility.md
+  s_d8966b8bcf3b74::t_0aa947ec2f8e11 34-35
+  s_d8966b8bcf3b74::t_c854a5da5a3495 1-33,36-60
+packages/backend/src/server/api/mastodon/MastodonQueryService.ts
+  s_d8966b8bcf3b74::t_7a426b1662a6f6 1-155
+packages/backend/src/server/web/views/oauth.tsx
+  s_d8966b8bcf3b74::t_9dd5095e391731 65
+  s_d8966b8bcf3b74::t_e436233988b5c8 14-16,28-30,43-64,66-70
+  s_d8966b8bcf3b74::t_aab3d128e31519 71-72
+packages/backend/src/server/api/mastodon/request-parameters.test.ts
+  s_d8966b8bcf3b74::t_1b826ddf393b34 1-22,42-106
+  s_d8966b8bcf3b74::t_f670551d78e115 23-41
+packages/backend/src/server/api/endpoints/i/apps.ts
+  s_d8966b8bcf3b74::t_fef1d917ab46f7 54
+  s_d8966b8bcf3b74::t_fb487d7c7f5671 51-53,55-57,130
+packages/backend/src/core/ReactionService.ts
+  s_d8966b8bcf3b74::t_2ba76f41603a50 109,197,202,312,319
+packages/backend/src/queue/processors/PostScheduledNoteProcessorService.test.ts
+  s_d8966b8bcf3b74::t_88ad4f2dcce5ed 1-52
+packages/backend/src/server/api/mastodon/MastodonRelationshipService.ts
+  s_d8966b8bcf3b74::t_6330a8349714ee 53-56,58-63
+  s_d8966b8bcf3b74::t_cb0dfad2d379b9 57,189-190,193
+  s_d8966b8bcf3b74::t_ce2738d26c0a2c 1-52,64-188,191-192,194-228
+packages/backend/src/server/api/mastodon/MastodonPaginationService.test.ts
+  s_d8966b8bcf3b74::t_19dea13827bfa0 17,25-64
+packages/backend/src/server/api/mastodon/MastodonPushSubscriptionService.ts
+  s_d8966b8bcf3b74::t_69e9d2a91f0d19 16,136-137,147-148,153-154
+  s_d8966b8bcf3b74::t_ca8684019b7084 216
+  s_d8966b8bcf3b74::t_1fde56edb073d3 155-156
+packages/backend/src/core/MastodonPushNotificationService.ts
+  s_d8966b8bcf3b74::t_69e9d2a91f0d19 23,213
+  s_d8966b8bcf3b74::t_85f4ba6917d5d7 18,120,122-124,127,133,143-146
+  s_d8966b8bcf3b74::t_6ec42a55e46058 147-148
+packages/frontend/test/unit/oauth-language.test.ts
+  s_d8966b8bcf3b74::t_9dd5095e391731 7,34
+  s_d8966b8bcf3b74::t_5fafed40d5c351 1-5,9-28,47-49
+  s_d8966b8bcf3b74::t_92bf5477b174af 6,8,29-33,35-46
+packages/backend/src/server/api/mastodon/MastodonStreamingApiServerService.test.ts
+  s_d8966b8bcf3b74::t_79c022ec9ae012 108-109,120-121,153-159,161,166-167
+  s_d8966b8bcf3b74::t_afd1979b9658f7 122,209,262,328,416,469,548,619,667
+  s_d8966b8bcf3b74::t_e3653296617822 123,210,263,329,417,470,549,620,668
+  s_d8966b8bcf3b74::t_93fe572ec879b4 207-208,260-261,326-327,414-415,467-468,546-547,617-618,665-666
+  s_d8966b8bcf3b74::t_20c529e6595433 41-50
+packages/backend/src/server/api/mastodon/MastodonOAuthService.test.ts
+  s_d8966b8bcf3b74::t_1b826ddf393b34 83,106-113,163-169,287-302,348-359
+packages/backend/src/server/api/mastodon/MastodonApiServerService.ts
+  s_d8966b8bcf3b74::t_4e8beee00ccbf3 1566-1570,1843
+  s_d8966b8bcf3b74::t_026f1bede96b68 1610,1618,1622
+  s_d8966b8bcf3b74::t_74ebb6f4d23818 290-293,297,300-302,1122-1124
+  s_d8966b8bcf3b74::t_2fdbcf9db96dfd 626-629,631-633,2389
+  s_d8966b8bcf3b74::t_5cceffdb540f02 1801,1815,1818,1820,1842,1850
+  s_d8966b8bcf3b74::t_c0412e6984e18b 2372,2377,2386-2388,2390-2392
+  s_d8966b8bcf3b74::t_6a7a560da5e806 624-625,630,634-638
+  s_d8966b8bcf3b74::t_2967306f16a76d 893,1125,1760-1762,1764-1780,1782-1786,1788,1860
+  s_d8966b8bcf3b74::t_78a2c6e4ca9cda 748-751,1816
+  s_d8966b8bcf3b74::t_8d59b3ffcf5b42 1844-1845
+  s_d8966b8bcf3b74::t_338e70042f9ab1 693,753-757,766-770
+  s_d8966b8bcf3b74::t_1138facac011d3 17,48-52,101-104,110-114,120,125-131
+  s_d8966b8bcf3b74::t_28c5d800f1f2a2 258,263-272,557,658,660-661,878,881,884
+  s_d8966b8bcf3b74::t_856f3c7e90a2ac 309,383-388,390,392,735,737,772-773
+  s_d8966b8bcf3b74::t_e3360c7b877056 1539,1543,1553,1558,1563-1565
+  s_d8966b8bcf3b74::t_7610bc22699e99 1991,2456-2457,2466,2487
+  s_d8966b8bcf3b74::t_f7b9946b8ba0be 2013,2027-2028,2033,2035-2036,2078-2083
+  s_d8966b8bcf3b74::t_81ec5d31d9c674 745,747
+  s_d8966b8bcf3b74::t_447d3fc75d5328 53,105,615-616,731-732,785-790
+  s_d8966b8bcf3b74::t_0e347d7e1175cd 746
+  s_d8966b8bcf3b74::t_6ba72f12393b5e 1992
+  s_d8966b8bcf3b74::t_6004287b45b14e 1571-1572
+  s_d8966b8bcf3b74::t_dd94d6a656985b 2393-2394
+packages/backend/src/server/api/endpoints/i/apps.test.ts
+  s_d8966b8bcf3b74::t_b66a1e43eee83b 118,128-134
+  s_d8966b8bcf3b74::t_6fa93ff85b5ada 135-136
+packages/backend/src/server/api/mastodon/MastodonStreamSession.ts
+  s_d8966b8bcf3b74::t_5ab9615b3b188a 45,65-66,79-80,103-104,130-131,177-181,219,416-417,419-429,431,435,438-440,443,445-446,452,457-458,480-481,491,501-503,525-526,529-531,537-538,545-549,552-554,559,563,568-574,578,581-583,586,588,594,600-602,605-614
+  s_d8966b8bcf3b74::t_77137610a6d29c 487,534
+  s_d8966b8bcf3b74::t_ac4ef4d05ee05e 81-82,105-106,132-133,474-476,482-483,504-505
+  s_d8966b8bcf3b74::t_73dc95e9045cf4 296-298,302
+packages/backend/src/server/api/mastodon/MastodonStreamingApiServerService.ts
+  s_d8966b8bcf3b74::t_ac4ef4d05ee05e 25,27,133-134,260-261
+  s_d8966b8bcf3b74::t_73dc95e9045cf4 259
+  s_d8966b8bcf3b74::t_cd67afe5691860 13-14,66,71,131-132,250-258,336
+packages/frontend/public/loader/boot.js
+  s_d8966b8bcf3b74::t_7990f6bae0b7e4 27-28,30,48
+packages/frontend-shared/js/config.ts
+  s_d8966b8bcf3b74::t_aa6b0bd1422eef 17
+  s_d8966b8bcf3b74::t_7990f6bae0b7e4 16
+packages/i18n/src/autogen/locale.ts
+  s_d8966b8bcf3b74::t_7d5dde0bcd8ebd 10149-10290
+packages/backend/src/queue/processors/PostScheduledNoteProcessorService.ts
+  s_d8966b8bcf3b74::t_5d052155faa651 7,14-15,31-32,47-48,68-71,84-85
+packages/backend/src/server/api/mastodon/MastodonFavouriteService.test.ts
+  s_d8966b8bcf3b74::t_a2e54c224cdc7c 1-121
+packages/backend/src/server/api/mastodon/utils.ts
+  s_d8966b8bcf3b74::t_53e13b3e87dc5b 8-11
+packages/backend/src/server/api/mastodon/MastodonEntityService.test.ts
+  s_d8966b8bcf3b74::t_4d6e034d5f96f8 436-440,454-455,821
+packages/backend/src/core/ReactionService.test.ts
+  s_d8966b8bcf3b74::t_a2e54c224cdc7c 1-126
+packages/backend/src/server/api/mastodon/MastodonApiServerService.test.ts
+  s_d8966b8bcf3b74::t_4d6e034d5f96f8 406-407,493
+  s_d8966b8bcf3b74::t_4f39ebe2f33841 605-705
+  s_d8966b8bcf3b74::t_b78df5c9846adf 563
+  s_d8966b8bcf3b74::t_c3b2f337808a1c 65,99,991,1000,1011,1014,1101,1263,1692-1693,1695-1696,1701,1703-1704,1706,1709,1721-1722,1725,1727,1738,1740,1746,1758-1759,1761-1762,1767,1769-1771,1841,1868,1872,3239,3868,4158-4159,4169,4449,4461,4465,4476,4486-4488,4503,4521,4534-4535,4539,4561-4562,4587,4608-4609,4643,4683,4735,4757,4779,4808,5873
+  s_d8966b8bcf3b74::t_da234f9f9078b9 377,389,506-509,554,568,4840-4843,4845-4847
+  s_d8966b8bcf3b74::t_7c7df093a6a08d 1036,1321-1354,3008-3046
+  s_d8966b8bcf3b74::t_6da833bd5b9867 13-16,126,202-203,205,207,405,490-492,494-505,510-520,522-531,533,550-553,564-567
+  s_d8966b8bcf3b74::t_50848f575f9c4f 471,1023-1035
+  s_d8966b8bcf3b74::t_7982cb0a784586 1757,1766,3880
+  s_d8966b8bcf3b74::t_ccaee4ced3fdb3 1037
+  s_d8966b8bcf3b74::t_fd48079cb46b8f 3047
+packages/backend/src/server/api/mastodon/MastodonQueryService.test.ts
+  s_d8966b8bcf3b74::t_398b67c06cc29a 14
+  s_d8966b8bcf3b74::t_cb0dfad2d379b9 1-13,15-122
+packages/backend/src/server/api/mastodon/MastodonApiContract.ts
+  s_d8966b8bcf3b74::t_7356766bdeba05 140
+packages/frontend/src/pages/settings/apps.vue
+  s_d8966b8bcf3b74::t_fb487d7c7f5671 37-42,65
+packages/backend/src/server/ServerModule.ts
+  s_d8966b8bcf3b74::t_b61df4068db8c0 37,135
+  s_d8966b8bcf3b74::t_856f3c7e90a2ac 33-36,131-134
+packages/backend/src/core/PushNotificationService.ts
+  s_d8966b8bcf3b74::t_69e9d2a91f0d19 80
+packages/backend/src/server/oauth/OAuth2ProviderService.test.ts
+  s_d8966b8bcf3b74::t_4f5a2eb8cb2e9e 70,74,233
+  s_d8966b8bcf3b74::t_b66a1e43eee83b 141,146,224,227,229-232,234-308
+  s_d8966b8bcf3b74::t_fef1d917ab46f7 212-213
+packages/misskey-js/src/autogen/types.ts
+  s_d8966b8bcf3b74::t_d969964413ae91 25314
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "dc1ddd402f031695f25a8a14a3037f008373a96a",
+  "prompts": {},
+  "sessions": {
+    "s_d8966b8bcf3b74": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a090c2-cd20-7a83-818f-6997cd6cede6",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "Natsuki-Kaede <i@pari.network>"
+    }
+  }
+}
