@@ -10,6 +10,8 @@ import * as Redis from 'ioredis';
 import * as WebSocket from 'ws';
 import { DI } from '@/di-symbols.js';
 import { bindThis } from '@/decorators.js';
+import { NoteEntityService } from '@/core/entities/NoteEntityService.js';
+import { GetterService } from '@/server/api/GetterService.js';
 import type { MiAccessToken } from '@/models/AccessToken.js';
 import MainStreamConnection, { type ConnectionRequest } from '@/server/api/stream/Connection.js';
 import type * as http from 'node:http';
@@ -20,7 +22,9 @@ import { MastodonConversationService } from './MastodonConversationService.js';
 import { MastodonEntityService } from './MastodonEntityService.js';
 import { MastodonFilterService } from './MastodonFilterService.js';
 import { MastodonNotificationService } from './MastodonNotificationService.js';
+import { MastodonRelationshipService } from './MastodonRelationshipService.js';
 import { MastodonScopeService } from './MastodonScopeService.js';
+import { MastodonStatusMetadataService } from './MastodonStatusMetadataService.js';
 import {
 	MASTODON_STREAMS,
 	MastodonStreamSession,
@@ -59,12 +63,12 @@ export function mastodonStreamEvent(
 	event: string,
 	payload: unknown,
 	stream: string,
-	options: { rawPayload?: boolean; omitPayload?: boolean } = {},
+	options: { rawPayload?: boolean; omitPayload?: boolean; streamParams?: readonly string[] } = {},
 ): string {
 	return JSON.stringify({
 		event,
 		...(options.omitPayload ? {} : { payload: options.rawPayload ? payload : JSON.stringify(payload) }),
-		stream: [stream],
+		stream: [stream, ...(options.streamParams ?? [])],
 	});
 }
 
@@ -124,6 +128,10 @@ export class MastodonStreamingApiServerService {
 		private mastodonNotificationService: MastodonNotificationService,
 		private mastodonUserFeatureService: MastodonUserFeatureService,
 		private mastodonConversationService: MastodonConversationService,
+		private getterService: GetterService,
+		private noteEntityService: NoteEntityService,
+		private mastodonStatusMetadataService: MastodonStatusMetadataService,
+		private mastodonRelationshipService: MastodonRelationshipService,
 	) {}
 
 	@bindThis
@@ -239,6 +247,18 @@ export class MastodonStreamingApiServerService {
 			mastodonNotificationService: this.mastodonNotificationService,
 			mastodonUserFeatureService: this.mastodonUserFeatureService,
 			mastodonConversationService: this.mastodonConversationService,
+			resolveNote: async noteId => {
+				const note = await this.getterService.getNoteWithRelations(noteId).catch((error: unknown) => {
+					if (typeof error === 'object' && error != null && 'id' in error && error.id === '9725d0ce-ba28-4dde-95a7-2cbb2c15de24') return null;
+					throw error;
+				});
+				if (note == null) return null;
+				const packed = await this.noteEntityService.pack(note, auth.user, { detail: true });
+				return packed.isHidden ? null : packed;
+			},
+			decorateStatus: (note, status) => this.mastodonStatusMetadataService.decoratePublished(note, status),
+			filterStatuses: (statuses, context) => this.mastodonRelationshipService.filterStatuses(auth.user.id, statuses, context),
+			filterNotifications: notifications => this.mastodonRelationshipService.filterNotifications(auth.user.id, notifications),
 			send: adapter.send,
 			close: adapter.close,
 		});
@@ -313,6 +333,7 @@ export class MastodonStreamingApiServerService {
 		connection.send(mastodonStreamEvent(output.event, output.payload, output.stream, {
 			rawPayload: output.rawPayload,
 			omitPayload: !Object.hasOwn(output, 'payload'),
+			streamParams: output.streamParams,
 		}));
 	}
 

@@ -9,6 +9,7 @@ import * as htmlParser from 'node-html-parser';
 import httpLinkHeader from 'http-link-header';
 import ipaddr from 'ipaddr.js';
 import fastifyCors from '@fastify/cors';
+import multipart from '@fastify/multipart';
 import { verifyChallenge } from 'pkce-challenge';
 import { permissions as kinds } from 'misskey-js';
 import {
@@ -34,11 +35,12 @@ import { LoggerService } from '@/core/LoggerService.js';
 import Logger from '@/logger.js';
 import { StatusError } from '@/misc/status-error.js';
 import { HtmlTemplateService } from '@/server/web/HtmlTemplateService.js';
-import { OAuthPage } from '@/server/web/views/oauth.js';
+import { OAuthPage, OAuthOobPage } from '@/server/web/views/oauth.js';
 import { MastodonApiError, sendMastodonError } from '@/server/api/mastodon/errors.js';
 import { MastodonAuthenticateService } from '@/server/api/mastodon/MastodonAuthenticateService.js';
 import { MastodonOAuthService } from '@/server/api/mastodon/MastodonOAuthService.js';
 import { MastodonScopeService } from '@/server/api/mastodon/MastodonScopeService.js';
+import { readMastodonRequestBody } from '@/server/api/mastodon/request-parameters.js';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 
 // TODO: Consider migrating to @node-oauth/oauth2-server once
@@ -555,6 +557,7 @@ export class OAuth2ProviderService implements OnApplicationShutdown {
 	@bindThis
 	public async createServer(fastify: FastifyInstance): Promise<void> {
 		registerFormBodyParser(fastify);
+		if (this.config.enableMastodonApi) fastify.register(multipart, { limits: { files: 0, fields: 256, parts: 256, fieldSize: 65536 } });
 
 		fastify.get('/authorize', async (request, reply) => {
 			const clientId = firstValue((request.query as OAuthRequestParameters).client_id);
@@ -567,6 +570,9 @@ export class OAuth2ProviderService implements OnApplicationShutdown {
 						transactionId: authorization.transactionId,
 						clientName: authorization.clientName,
 						scope: authorization.scope,
+						mastodonScopes: authorization.mastodonScopes,
+						forceLogin: authorization.forceLogin,
+						language: authorization.language,
 					}));
 				} catch (error) {
 					sendMastodonError(reply, error);
@@ -616,8 +622,12 @@ export class OAuth2ProviderService implements OnApplicationShutdown {
 
 		fastify.post('/decision', async (request, reply) => {
 			try {
-				const body = toRequestParameters(request.body);
+				const isMultipart = this.config.enableMastodonApi && request.isMultipart();
+				const body = toRequestParameters(isMultipart ? await readMastodonRequestBody(request) : request.body);
 				const transactionId = firstValue(body.transaction_id);
+				if (isMultipart && !transactionId?.startsWith('mastodon:')) {
+					return reply.code(415).send({ error: 'Unsupported Media Type' });
+				}
 				if (!transactionId) {
 					throw new InvalidRequestError('Missing transaction ID');
 				}
@@ -628,6 +638,13 @@ export class OAuth2ProviderService implements OnApplicationShutdown {
 							firstValue(body.login_token),
 							!!firstValue(body.cancel),
 						);
+						if (decision.redirectUri === 'urn:ietf:wg:oauth:2.0:oob') {
+							applyNoStore(reply);
+							return await HtmlTemplateService.replyHtml(reply, OAuthOobPage({
+								code: decision.parameters.code,
+								language: decision.language,
+							}));
+						}
 						redirectWithQuery(reply, decision.redirectUri, appendIssuer(decision.parameters, this.config.url));
 					} catch (error) {
 						sendMastodonError(reply, error);
@@ -684,7 +701,7 @@ export class OAuth2ProviderService implements OnApplicationShutdown {
 				applyNoStore(reply);
 				try {
 					await this.mastodonOAuthService.revoke(
-						toRequestParameters(request.body),
+						toRequestParameters(await readMastodonRequestBody(request)),
 						request.headers.authorization,
 					);
 					reply.code(200).send({});
@@ -735,6 +752,7 @@ export class OAuth2ProviderService implements OnApplicationShutdown {
 	public async createTokenServer(fastify: FastifyInstance): Promise<void> {
 		registerFormBodyParser(fastify);
 		fastify.register(fastifyCors);
+		if (this.config.enableMastodonApi) fastify.register(multipart, { limits: { files: 0, fields: 256, parts: 256, fieldSize: 65536 } });
 
 		fastify.post('', async (request, reply) => {
 			applyNoStore(reply);
@@ -742,15 +760,17 @@ export class OAuth2ProviderService implements OnApplicationShutdown {
 			try {
 				const body = toRequestParameters(request.body);
 				if (this.config.enableMastodonApi) {
-					const dispatchClientId = this.mastodonOAuthService.extractClientId(body, request.headers.authorization);
+					const mastodonBody = request.isMultipart() ? toRequestParameters(await readMastodonRequestBody(request)) : body;
+					const dispatchClientId = this.mastodonOAuthService.extractClientId(mastodonBody, request.headers.authorization);
 					if (this.mastodonOAuthService.isMastodonClientId(dispatchClientId)) {
 						try {
-							reply.send(await this.mastodonOAuthService.exchangeToken(body, request.headers.authorization));
+							reply.send(await this.mastodonOAuthService.exchangeToken(mastodonBody, request.headers.authorization));
 						} catch (error) {
 							sendMastodonError(reply, error);
 						}
 						return;
 					}
+					if (request.isMultipart()) return reply.code(415).send({ error: 'Unsupported Media Type' });
 				}
 				const grantType = firstValue(body.grant_type);
 				if (!grantType) {

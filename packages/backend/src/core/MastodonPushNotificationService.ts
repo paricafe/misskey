@@ -15,10 +15,12 @@ import type { FollowingsRepository, MastodonUserStatesRepository, MiMastodonUser
 import { bindThis } from '@/decorators.js';
 import { CacheService } from '@/core/CacheService.js';
 import { HttpRequestService } from '@/core/HttpRequestService.js';
+import { isMastodonFavourite } from '@/server/api/mastodon/utils.js';
 
 export const MASTODON_PUSH_ALERT_TYPES = [
 	'mention', 'quote', 'status', 'reblog', 'follow', 'follow_request', 'favourite', 'poll', 'update', 'quoted_update', 'admin.sign_up', 'admin.report',
 ] as const;
+export const MASTODON_UNSUPPORTED_PUSH_ALERT_TYPES = ['update', 'quoted_update', 'admin.sign_up', 'admin.report'] as const;
 export const MASTODON_PUSH_POLICIES = ['all', 'none', 'followed', 'follower'] as const;
 export type MastodonPushPolicy = typeof MASTODON_PUSH_POLICIES[number];
 export type MastodonPushAlerts = Record<typeof MASTODON_PUSH_ALERT_TYPES[number], boolean>;
@@ -75,9 +77,7 @@ const notificationTypes = {
 	reply: 'mention',
 	quote: 'quote',
 	reaction: 'favourite',
-	'reaction:grouped': 'favourite',
 	renote: 'reblog',
-	'renote:grouped': 'reblog',
 	follow: 'follow',
 	receiveFollowRequest: 'follow_request',
 	pollEnded: 'poll',
@@ -117,17 +117,20 @@ export class MastodonPushNotificationService {
 	@bindThis
 	public async pushNotification(userId: string, notification: Packed<'Notification'>): Promise<void> {
 		if (!this.available()) return;
+		if (notification.type === 'reaction' && !isMastodonFavourite(notification.reaction)) return;
 		const type = notificationTypes[notification.type as keyof typeof notificationTypes];
-		if (type == null) return;
+		const actorId = notification.user?.id;
+		// Grouped native events cannot identify one Mastodon actor or notification.
+		if (type == null || actorId == null || actorId === '') return;
 		const rows = await this.mastodonUserStatesRepository.find({ where: { userId, kind: 'push_subscription' }, take: 64 });
 		if (rows.length === 0) return;
+		if (await this.notificationsMuted(userId, actorId)) return;
 		const preferredLocale = await this.cacheService.userProfileCache.fetch(userId).then(profile => profile.lang ?? 'en').catch(() => 'en');
 		const policies = new Set(rows.flatMap(row => {
 			const state = parseMastodonPushState(row.value);
 			return state == null ? [] : [state.data.policy];
 		}));
-		const actorId = notification.user?.id;
-		const [followed, follower] = actorId == null ? [false, false] : await Promise.all([
+		const [followed, follower] = await Promise.all([
 			policies.has('followed') ? this.followingsRepository.existsBy({ followerId: userId, followeeId: actorId }) : false,
 			policies.has('follower') ? this.followingsRepository.existsBy({ followerId: actorId, followeeId: userId }) : false,
 		]);
@@ -135,6 +138,12 @@ export class MastodonPushNotificationService {
 		await Promise.all(rows.map(row => limit(async () => {
 			await this.deliver(row, notification, type, preferredLocale, { followed, follower });
 		})));
+	}
+
+	private async notificationsMuted(userId: string, actorId: string): Promise<boolean> {
+		const value = (await this.mastodonUserStatesRepository.findOneBy({ userId, kind: 'relationship_mute', key: actorId }))?.value;
+		if (value == null || typeof value !== 'object' || !('notifications' in value) || value.notifications !== true || !('expiresAt' in value)) return false;
+		return value.expiresAt === null || typeof value.expiresAt === 'number' && Number.isFinite(value.expiresAt) && value.expiresAt > Date.now();
 	}
 
 	private async deliver(row: MiMastodonUserState, notification: Packed<'Notification'>, type: MastodonNotificationType, preferredLocale: string, relations: { followed: boolean; follower: boolean }): Promise<void> {
@@ -201,7 +210,7 @@ export class MastodonPushNotificationService {
 	}
 
 	private available(): boolean {
-		return this.meta.enableServiceWorker && this.meta.swPublicKey != null && this.meta.swPrivateKey != null;
+		return this.config.enableMastodonApi && this.meta.enableServiceWorker && this.meta.swPublicKey != null && this.meta.swPrivateKey != null;
 	}
 
 	private statusCode(error: unknown): number | null {

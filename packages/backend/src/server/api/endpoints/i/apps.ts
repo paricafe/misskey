@@ -48,6 +48,13 @@ export const meta = {
 						type: 'string',
 					},
 				},
+				mastodonScopes: {
+					type: 'array',
+					optional: true,
+					nullable: false,
+					uniqueItems: true,
+					items: { type: 'string' },
+				},
 				iconUrl: {
 					type: 'string',
 					optional: true, nullable: true,
@@ -120,6 +127,7 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				createdAt: token.createdAt.toISOString(),
 				lastUsedAt: token.lastUsedAt?.toISOString(),
 				permission: this.mastodonScopeService.toMisskeyPermissions(token.scopes),
+				mastodonScopes: token.scopes,
 				iconUrl: null,
 				description: token.client.website ?? 'Mastodon API',
 			}));

@@ -137,7 +137,7 @@ export const MASTODON_4_6_USER_ROUTES: readonly MastodonContractRoute[] = [
 	implemented('GET', '/api/v1/timelines/public', 'public', 'read:statuses', 'Status[]'),
 	safeArray('GET', '/api/v1/timelines/link', 'token', 'read:statuses', 'Status[]', '4.3.0'),
 	implemented('GET', '/api/v1/timelines/tag/:tag', 'public', 'read:statuses', 'Status[]'),
-	implemented('GET', '/api/v1/timelines/list/:id', 'user', 'read:statuses', 'Status[]', '2.1.0'),
+	implemented('GET', '/api/v1/timelines/list/:id', 'user', 'read:lists', 'Status[]', '2.1.0'),
 
 	// Media, polls, and scheduled statuses
 	implemented('POST', '/api/v1/media', 'user', 'write:media', 'MediaAttachment'),

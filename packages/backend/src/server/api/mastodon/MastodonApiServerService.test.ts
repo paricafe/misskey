@@ -10,6 +10,10 @@ import UsersNotesEndpoint from '@/server/api/endpoints/users/notes.js';
 import { MastodonApiError } from './errors.js';
 import { MASTODON_4_6_USER_ROUTES } from './MastodonApiContract.js';
 import { MastodonApiServerService } from './MastodonApiServerService.js';
+import { MastodonMediaService } from './MastodonMediaService.js';
+import { MastodonStatusMetadataService } from './MastodonStatusMetadataService.js';
+import { MastodonRelationshipService } from './MastodonRelationshipService.js';
+import { MastodonPaginationService } from './MastodonPaginationService.js';
 import { MastodonFilterService } from './MastodonFilterService.js';
 import { MastodonMarkerService } from './MastodonMarkerService.js';
 import { MastodonNotificationService } from './MastodonNotificationService.js';
@@ -58,7 +62,7 @@ describe(MastodonApiServerService, () => {
 					},
 				}
 				: { id: data.noteId ?? 'note-id' };
-			if (name === 'notes/create') return { createdNote: { id: 'created-note-id' } };
+			if (name === 'notes/create') return { createdNote: { id: 'created-note-id', userId: 'user-id' } };
 			return [];
 		});
 		const publicInvoke = vi.fn((name: string, data: Record<string, unknown>, viewer: unknown, request: unknown) => nativeInvoke(name, data, viewer, request));
@@ -92,7 +96,7 @@ describe(MastodonApiServerService, () => {
 			query: vi.fn().mockResolvedValue([]),
 		};
 		const driveFilesRepository = {
-			findBy: vi.fn().mockResolvedValue([]),
+			findBy: vi.fn(async ({ id }: { id: { value: string[] } }) => id.value.map(fileId => ({ id: fileId, userId: 'user-id', isSensitive: false }))),
 		};
 		const noteFavoritesRepository = { findBy: vi.fn().mockResolvedValue([]) };
 		const userNotePiningsRepository = { findBy: vi.fn().mockResolvedValue([]) };
@@ -119,7 +123,7 @@ describe(MastodonApiServerService, () => {
 		}>();
 		const stateKey = (kind: string, key: string) => `${kind}:${key}`;
 		let pushStateSequence = 0;
-		let stateLockTail = Promise.resolve();
+		const stateLockTails = new Map<string, Promise<void>>();
 		const mastodonApiStateService = {
 			list: vi.fn(async (userId: string, kind: string) => [...stateRows.values()].filter(row => row.userId === userId && row.kind === kind)),
 			get: vi.fn(async (userId: string, kind: string, key: string) => {
@@ -195,11 +199,12 @@ describe(MastodonApiServerService, () => {
 				return row?.userId === userId ? stateRows.delete(mapKey) : false;
 			}),
 			withUserKindLock: vi.fn(async (_userId: string, _kind: string, callback: (service: unknown) => Promise<unknown>) => {
-				const previous = stateLockTail;
+				const lockKey = `${_userId}:${_kind}`;
+				const previous = stateLockTails.get(lockKey) ?? Promise.resolve();
 				let release!: () => void;
-				stateLockTail = new Promise<void>(resolve => {
+				stateLockTails.set(lockKey, new Promise<void>(resolve => {
 					release = resolve;
-				});
+				}));
 				await previous;
 				try {
 					return await callback(mastodonApiStateService);
@@ -369,6 +374,7 @@ describe(MastodonApiServerService, () => {
 			poll?: unknown;
 			renote?: TestNote | null;
 			text?: string | null;
+			myReaction?: string | null;
 			replyId?: string | null;
 		};
 		const serializeStatus = (value: TestNote, voterCounts?: ReadonlyMap<string, number>): Record<string, unknown> => {
@@ -380,6 +386,7 @@ describe(MastodonApiServerService, () => {
 				: (value.poll as { choices?: Array<{ isVoted?: boolean }> }).choices ?? [];
 			return {
 				id: value.id,
+				...(Object.hasOwn(value, 'myReaction') ? { favourited: value.myReaction === '❤' || value.myReaction === '❤️' } : {}),
 				media_attachments: files,
 				poll: value.poll == null ? null : {
 					...value.poll as object,
@@ -395,29 +402,9 @@ describe(MastodonApiServerService, () => {
 					: { quote: { quoted_status: nestedStatus } }),
 			};
 		};
-		const service = new MastodonApiServerService(
-			{ url: 'https://misskey.example/', host: 'misskey.example', version: '2026.7.0', maxFileSize: 10_000_000 } as never,
-			{
-				name: 'Misskey Test',
-				description: 'Test instance',
-				langs: ['en'],
-				bannerUrl: null,
-				iconUrl: null,
-				serverRules: ['Be kind'],
-				policies: { pinLimit: 5 },
-				...meta,
-			} as never,
-			notesRepository as never,
-			driveFilesRepository as never,
-			noteFavoritesRepository as never,
-			userNotePiningsRepository as never,
-			pollVoteService as never,
-			{ registerApplication, getApplication } as never,
-			{ authenticate } as never,
-			{ assert, assertAny } as never,
-			{ invoke: nativeInvoke, invokePublic: publicInvoke } as never,
-			{
-				account: vi.fn(value => ({ id: value.id, username: value.username })),
+		const entities = {
+				attachment: vi.fn(file => ({ id: file.id, description: file.comment, meta: {} })),
+			account: vi.fn(value => ({ id: value.id, username: value.username })),
 				credentialAccount: vi.fn(value => ({ id: value.id, username: value.username })),
 				profile: vi.fn(value => ({ id: value.id, display_name: value.name ?? value.username })),
 				relationship: vi.fn(value => ({ id: value.id, note: value.memo ?? '', endorsed: false })),
@@ -481,7 +468,7 @@ describe(MastodonApiServerService, () => {
 					votes_count: poll.choices.reduce((total: number, choice: { votes: number }) => total + choice.votes, 0),
 					voters_count: poll.multiple ? votersCount ?? null : null,
 				})),
-				scheduledStatus: vi.fn(value => ({ id: value.id, scheduled_at: new Date(value.scheduledAt).toISOString() })),
+				scheduledStatus: vi.fn(value => ({ id: value.id, scheduled_at: new Date(value.scheduledAt).toISOString(), ...(value.files?.length ? { media_attachments: value.files.map(file => ({ id: file.id, description: file.comment, meta: {} })) } : {}) })),
 				announcement: vi.fn(value => ({ id: value.id, content: value.text, read: value.isRead ?? false })),
 				report: vi.fn((report, _createdAt, _targetUser, input) => ({
 					id: report.id,
@@ -500,8 +487,50 @@ describe(MastodonApiServerService, () => {
 					account: { id: value.user.id },
 					...(value.note == null ? {} : { status: { ...serializeStatus(value.note, voterCounts), content: value.renderedContent ?? '' } }),
 				}),
-			} as never,
+			};
+		const callService = { invoke: nativeInvoke, invokePublic: publicInvoke };
+		const mediaService = new MastodonMediaService(mastodonApiStateService as never, callService as never, entities as never, notesRepository as never);
+		const metadataService = new MastodonStatusMetadataService(mastodonApiStateService as never, mediaService, { set: vi.fn().mockResolvedValue('OK'), eval: vi.fn().mockResolvedValue(1) } as never);
+		const relationshipService = new MastodonRelationshipService(mastodonApiStateService as never, callService as never, { limit: vi.fn().mockResolvedValue(false) } as never, { getUserPolicies: vi.fn().mockResolvedValue({ rateLimitFactor: 1 }) } as never);
+		const queryService = {
+			context: vi.fn(async (noteId, auth, request) => ({
+				ancestors: (await publicInvoke('notes/conversation', { noteId }, auth, request) as unknown[]).reverse(),
+				descendants: await publicInvoke('notes/children', { noteId, limit: 100 }, auth, request),
+			})),
+			resolveAccount: vi.fn().mockResolvedValue(null),
+			lookupAccount: vi.fn(async (acct, auth, request) => {
+				const [username, host] = acct.replace(/^@/u, '').split('@');
+				return await publicInvoke('users/show', { username, ...(host == null ? {} : { host }) }, auth, request);
+			}),
+		};
+		const favouriteService = { set: vi.fn(async (noteId, enabled, auth, request) => {
+				await nativeInvoke(enabled ? 'notes/reactions/create' : 'notes/reactions/delete', { noteId, ...(enabled ? { reaction: '❤' } : {}) }, auth, request);
+				return { ...await nativeInvoke('notes/show', { noteId }, auth, request) as object, myReaction: enabled ? '❤' : null };
+			}) };
+		const service = new MastodonApiServerService(
+			{ url: 'https://misskey.example/', host: 'misskey.example', version: '2026.7.0', maxFileSize: 10_000_000 } as never,
 			{
+				name: 'Misskey Test',
+				description: 'Test instance',
+				langs: ['en'],
+				bannerUrl: null,
+				iconUrl: null,
+				serverRules: ['Be kind'],
+				policies: { pinLimit: 5 },
+				...meta,
+			} as never,
+			notesRepository as never,
+			driveFilesRepository as never,
+			noteFavoritesRepository as never,
+			userNotePiningsRepository as never,
+			pollVoteService as never,
+			{ registerApplication, getApplication } as never,
+			{ authenticate } as never,
+			{ assert, assertAny } as never,
+			{ invoke: nativeInvoke, invokePublic: publicInvoke } as never,
+			entities as never,
+			{
+				normalizePage: new MastodonPaginationService().normalizePage.bind(new MastodonPaginationService()),
 				toMisskey,
 				linkHeader,
 				offsetLinkHeader,
@@ -518,6 +547,11 @@ describe(MastodonApiServerService, () => {
 			mastodonApiStateService as never,
 			redis as never,
 			mastodonStreamingApiServerService as never,
+			mediaService,
+			metadataService,
+			queryService as never,
+			relationshipService,
+			favouriteService as never,
 		);
 		const fastify = Fastify();
 		registerBeforeMastodon?.(fastify);
@@ -526,6 +560,12 @@ describe(MastodonApiServerService, () => {
 
 		return {
 			fastify,
+			entities,
+			mediaService,
+			metadataService,
+			queryService,
+			relationshipService,
+			favouriteService,
 			authenticate,
 			assert,
 			assertAny,
@@ -561,6 +601,107 @@ describe(MastodonApiServerService, () => {
 			userFeatureGlobalEventService,
 		};
 	}
+
+	test('allows browser edit/delete preflights and exposes pagination headers', async () => {
+		const { fastify } = createServer();
+		const preflight = await fastify.inject({ method: 'OPTIONS', url: '/api/v1/statuses/note-id', headers: {
+			origin: 'https://client.example', 'access-control-request-method': 'PUT', 'access-control-request-headers': 'authorization,content-type,idempotency-key',
+		} });
+		expect(preflight.statusCode).toBe(204);
+		expect(preflight.headers['access-control-allow-methods']).toContain('PUT');
+		expect(preflight.headers['access-control-allow-methods']).toContain('PATCH');
+		expect(preflight.headers['access-control-allow-methods']).toContain('DELETE');
+		const page = await fastify.inject({ method: 'GET', url: '/api/v1/timelines/home', headers: { origin: 'https://client.example', authorization: 'Bearer token' } });
+		expect(page.statusCode).toBe(200);
+		expect(page.headers['access-control-expose-headers']).toContain('Link');
+	});
+
+	test('registers multipart application fields with the same array parameters as JSON', async () => {
+		const { fastify, registerApplication } = createServer();
+		const boundary = 'application-boundary';
+		const payload = [
+			['client_name', 'Generic client'], ['redirect_uris[]', 'https://client.example/callback'], ['redirect_uris[]', 'my-client://callback'], ['scopes', 'read write'],
+		].map(([key, value]) => `--${boundary}\r\nContent-Disposition: form-data; name="${key}"\r\n\r\n${value}\r\n`).join('') + `--${boundary}--\r\n`;
+		const response = await fastify.inject({ method: 'POST', url: '/api/v1/apps', headers: { 'content-type': `multipart/form-data; boundary=${boundary}` }, payload });
+		expect(response.statusCode).toBe(200);
+		expect(registerApplication).toHaveBeenCalledWith(expect.objectContaining({ client_name: 'Generic client', redirect_uris: ['https://client.example/callback', 'my-client://callback'], scopes: 'read write' }));
+	});
+
+	test('persists posting preferences and uses them for newly created statuses', async () => {
+		const { fastify, nativeInvoke } = createServer();
+		const headers = { authorization: 'Bearer token' };
+		const update = await fastify.inject({ method: 'PATCH', url: '/api/v1/accounts/update_credentials', headers, payload: { source: { privacy: 'private', sensitive: true, language: 'ja' } } });
+		expect(update.statusCode).toBe(200);
+		expect(update.json()).toMatchObject({ source: { privacy: 'private', sensitive: true, language: 'ja' } });
+		const created = await fastify.inject({ method: 'POST', url: '/api/v1/statuses', headers, payload: { status: 'Hello' } });
+		expect(created.statusCode).toBe(200);
+		expect(created.json()).toMatchObject({ language: 'ja', sensitive: true });
+		expect(nativeInvoke.mock.calls.find(([name]) => name === 'notes/create')?.[1]).toMatchObject({ visibility: 'followers' });
+		expect(nativeInvoke.mock.calls.find(([name]) => name === 'i/update')?.[1]).not.toHaveProperty('source');
+		const preferences = await fastify.inject({ method: 'GET', url: '/api/v1/preferences', headers });
+		expect(preferences.json()).toMatchObject({ 'posting:default:visibility': 'private', 'posting:default:language': 'ja', 'posting:default:sensitive': true });
+	});
+
+	test('failed status creation does not mutate a shared file or save status metadata', async () => {
+		const { fastify, nativeInvoke, mastodonApiStateService } = createServer();
+		nativeInvoke.mockRejectedValue(new ApiError({ message: 'No such note.', code: 'NO_SUCH_NOTE', id: 'missing-note', kind: 'client', httpStatusCode: 404 }));
+		const response = await fastify.inject({ method: 'POST', url: '/api/v1/statuses', headers: { authorization: 'Bearer token' }, payload: { status: 'Failed reply', in_reply_to_id: 'missing', media_ids: ['shared-file'], sensitive: false, language: 'en' } });
+		expect(response.statusCode).toBe(404);
+		expect(nativeInvoke.mock.calls.map(([name]) => name)).toEqual(['notes/create']);
+		expect(await mastodonApiStateService.list('user-id', 'status_metadata')).toEqual([]);
+	});
+
+	test('failed status edits leave existing language and sensitive metadata unchanged', async () => {
+		const { fastify, nativeInvoke, metadataService, mastodonApiStateService } = createServer();
+		await metadataService.save('user-id', 'note-id', { language: 'ja', sensitive: true });
+		nativeInvoke.mockImplementation(async name => {
+			if (name === 'notes/show') return { id: 'note-id', userId: 'user-id', text: 'before', fileIds: [] };
+			throw new ApiError({ message: 'Edit rejected.', code: 'EDIT_REJECTED', id: 'edit-rejected', kind: 'client', httpStatusCode: 422 });
+		});
+		const response = await fastify.inject({ method: 'PUT', url: '/api/v1/statuses/note-id', headers: { authorization: 'Bearer token' }, payload: { status: 'after', language: 'en', sensitive: false } });
+		expect(response.statusCode).toBe(422);
+		expect((await mastodonApiStateService.get('user-id', 'status_metadata', 'note-id'))?.value).toEqual({ language: 'ja', sensitive: true });
+	});
+
+	test('uploads a dedicated attachment and consumes description/focus fields after the file', async () => {
+		const { fastify, nativeInvoke } = createServer();
+		nativeInvoke.mockImplementation(async name => name === 'drive/files/create' ? { id: 'new-file', comment: 'Caption' } : []);
+		const boundary = 'media-boundary';
+		const payload = `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="image.png"\r\nContent-Type: image/png\r\n\r\nimage-bytes\r\n--${boundary}\r\nContent-Disposition: form-data; name="description"\r\n\r\nCaption\r\n--${boundary}\r\nContent-Disposition: form-data; name="focus"\r\n\r\n0.5,-0.5\r\n--${boundary}--\r\n`;
+		const response = await fastify.inject({ method: 'POST', url: '/api/v2/media', headers: { authorization: 'Bearer token', 'content-type': `multipart/form-data; boundary=${boundary}` }, payload });
+		expect(response.statusCode).toBe(200);
+		expect(response.json()).toMatchObject({ id: 'new-file', description: 'Caption', meta: { focus: { x: 0.5, y: -0.5 } } });
+		expect(nativeInvoke.mock.calls[0]?.slice(0, 2)).toEqual(['drive/files/create', { name: 'image.png', comment: 'Caption', force: true }]);
+	});
+
+	test('uses read:lists for list timelines and resolves acct searches through the resolver', async () => {
+		const { fastify, assert, queryService } = createServer();
+		const headers = { authorization: 'Bearer token' };
+		const timeline = await fastify.inject({ method: 'GET', url: '/api/v1/timelines/list/list-id', headers });
+		expect(timeline.statusCode).toBe(200);
+		expect(assert).toHaveBeenCalledWith(['read'], 'read:lists');
+		queryService.resolveAccount.mockResolvedValue({ id: 'remote-id', username: 'alice' });
+		const search = await fastify.inject({ method: 'GET', url: '/api/v2/search?q=alice%40remote.example&resolve=true&type=accounts', headers });
+		expect(search.statusCode).toBe(200);
+		expect(search.json().accounts).toEqual([{ id: 'remote-id', username: 'alice' }]);
+		expect(queryService.resolveAccount).toHaveBeenCalledWith('alice@remote.example', expect.any(Object), expect.any(Object));
+	});
+
+	test('distinguishes latest since_id results from the nearest min_id page', async () => {
+		const { fastify, nativeInvoke, toMisskey } = createServer();
+		const pagination = new MastodonPaginationService();
+		toMisskey.mockImplementation(pagination.toMisskey.bind(pagination));
+		nativeInvoke.mockImplementation(async (name, data) => {
+			if (name !== 'notes/timeline') return [];
+			const all = ['001', '002', '003', '004', '005'].map(id => ({ id, userId: 'user-id' }));
+			return data.sinceId == null ? all.slice().reverse().slice(0, data.limit as number) : all.filter(note => note.id > String(data.sinceId)).slice(0, data.limit as number);
+		});
+		const headers = { authorization: 'Bearer token' };
+		const latest = await fastify.inject({ method: 'GET', url: '/api/v1/timelines/home?since_id=001&limit=2', headers });
+		const nearest = await fastify.inject({ method: 'GET', url: '/api/v1/timelines/home?min_id=001&limit=2', headers });
+		expect(latest.json().map((status: { id: string }) => status.id)).toEqual(['005', '004']);
+		expect(nearest.json().map((status: { id: string }) => status.id)).toEqual(['003', '002']);
+	});
 
 	test('exposes the public streaming health response as exact no-store plain text', async () => {
 		const { fastify, authenticate } = createServer();
@@ -847,7 +988,7 @@ describe(MastodonApiServerService, () => {
 
 	test('lists and gets scheduled statuses through Note drafts', async () => {
 		const { fastify, assert, nativeInvoke, toMisskey, getScheduledStatus } = createServer();
-		toMisskey.mockReturnValueOnce({ limit: 21, untilId: 'older' });
+		toMisskey.mockReturnValueOnce({ limit: 21, untilId: 'zzzz' });
 		nativeInvoke.mockImplementation(async name => name === 'notes/drafts/list' ? [{
 			id: 'scheduled-draft-id',
 			isActuallyScheduled: true,
@@ -856,7 +997,7 @@ describe(MastodonApiServerService, () => {
 
 		const list = await fastify.inject({
 			method: 'GET',
-			url: '/api/v1/scheduled_statuses?limit=21&max_id=older',
+			url: '/api/v1/scheduled_statuses?limit=21&max_id=zzzz',
 			headers: { authorization: 'Bearer user-token' },
 		});
 		const show = await fastify.inject({
@@ -867,16 +1008,31 @@ describe(MastodonApiServerService, () => {
 
 		expect(list.statusCode).toBe(200);
 		expect(list.json()).toEqual([{ id: 'scheduled-draft-id', scheduled_at: '2099-01-02T03:04:05.000Z' }]);
-		expect(toMisskey).toHaveBeenCalledWith(expect.objectContaining({ limit: '21', max_id: 'older' }), 100);
+		expect(toMisskey).toHaveBeenCalledWith(expect.objectContaining({ limit: '21', max_id: 'zzzz' }), 100);
 		expect(nativeInvoke).toHaveBeenCalledWith('notes/drafts/list', {
 			limit: 21,
-			untilId: 'older',
+			untilId: 'zzzz',
 			scheduled: true,
 		}, expect.any(Object), expect.any(Object));
 		expect(show.statusCode).toBe(200);
 		expect(show.json()).toEqual({ id: 'scheduled-draft-id', scheduled_at: '2099-01-02T03:04:05.000Z' });
 		expect(getScheduledStatus).toHaveBeenCalledWith(expect.objectContaining({ id: 'user-id' }), 'scheduled-draft-id');
 		expect(assert).toHaveBeenCalledWith(['read'], 'read:statuses');
+	});
+
+	test('returns current attachment metadata for both scheduled creation and readback', async () => {
+		const { fastify, nativeInvoke, getScheduledStatus, mastodonApiStateService } = createServer();
+		const draft = { ...await getScheduledStatus(), files: [{ id: 'media-id', comment: 'Original' }] };
+		getScheduledStatus.mockResolvedValue(draft);
+		await mastodonApiStateService.put({ userId: 'user-id', kind: 'media_attachment', key: 'media-id', value: { description: 'Updated', focus: { x: 0.5, y: -0.5 } } });
+		nativeInvoke.mockImplementation(async name => name === 'notes/drafts/create' ? { createdDraft: draft } : []);
+		const headers = { authorization: 'Bearer token' };
+		const created = await fastify.inject({ method: 'POST', url: '/api/v1/statuses', headers, payload: { status: 'Scheduled', scheduled_at: '2099-01-02T03:04:05.000Z', media_ids: ['media-id'], language: 'ja' } });
+		const read = await fastify.inject({ method: 'GET', url: '/api/v1/scheduled_statuses/scheduled-draft-id', headers });
+		for (const response of [created, read]) {
+			expect(response.statusCode).toBe(200);
+			expect(response.json()).toMatchObject({ params: { language: 'ja' }, media_attachments: [{ id: 'media-id', description: 'Updated', meta: { focus: { x: 0.5, y: -0.5 } } }] });
+		}
 	});
 
 	test('reschedules and deletes only an owned scheduled Note draft', async () => {
@@ -942,7 +1098,7 @@ describe(MastodonApiServerService, () => {
 		});
 
 		expect(response.statusCode).toBe(200);
-		expect(response.json()).toEqual({ id: 'new-scheduled-id', scheduled_at: '2099-01-02T03:04:05.000Z' });
+		expect(response.json()).toEqual({ id: 'new-scheduled-id', scheduled_at: '2099-01-02T03:04:05.000Z', params: { language: 'en' } });
 		expect(nativeInvoke).toHaveBeenCalledWith('notes/drafts/create', {
 			text: 'Scheduled text',
 			cw: 'CW',
@@ -1104,7 +1260,7 @@ describe(MastodonApiServerService, () => {
 		expect([invalidPolicy.statusCode, allowedMentions.statusCode]).toEqual([422, 422]);
 	});
 
-	test('accepts a status language from Mastodon clients when Notes cannot persist it', async () => {
+	test('persists status language in compatibility metadata without changing native parameters', async () => {
 		const { fastify, nativeInvoke } = createServer();
 		const response = await fastify.inject({
 			method: 'POST',
@@ -1160,6 +1316,40 @@ describe(MastodonApiServerService, () => {
 		expect(authenticated.statusCode).toBe(200);
 		expect(authenticate).toHaveBeenCalledWith('user-token');
 		expect(assert).toHaveBeenCalledWith(['read'], 'read:statuses');
+	});
+
+	test('preserves compatibility language and sensitive values across successful edits and history reads', async () => {
+		const { fastify, nativeInvoke, metadataService, entities } = createServer();
+		const createdAt = '2025-01-01T00:00:00.000Z';
+		const updatedAt = '2025-01-02T00:00:00.000Z';
+		const original = { id: 'note-id', userId: 'user-id', createdAt, text: 'old', files: [] };
+		let current: Record<string, unknown> = original;
+		await metadataService.save('user-id', 'note-id', { language: 'ja', sensitive: true });
+		nativeInvoke.mockImplementation(async name => {
+			if (name === 'notes/show') return current;
+			if (name === 'notes/update') {
+				current = { ...original, updatedAt, text: 'new', history: [{ createdAt, text: 'old' }] };
+				return { updatedNote: current };
+			}
+			return [];
+		});
+		entities.statusEdits.mockReturnValue([
+			{ created_at: createdAt, sensitive: false },
+			{ created_at: updatedAt, sensitive: false },
+		] as never);
+		const updated = await fastify.inject({
+			method: 'PUT', url: '/api/v1/statuses/note-id', headers: { authorization: 'Bearer user-token' },
+			payload: { status: 'new', language: 'en', sensitive: false },
+		});
+		expect(updated.statusCode).toBe(200);
+		expect(updated.json()).toMatchObject({ language: 'en', sensitive: false });
+		expect(updated.json()).not.toHaveProperty('revisions');
+		const history = await fastify.inject({ method: 'GET', url: '/api/v1/statuses/note-id/history' });
+		expect(history.statusCode).toBe(200);
+		expect(history.json()).toEqual([
+			{ created_at: createdAt, language: 'ja', sensitive: true },
+			{ created_at: updatedAt, language: 'en', sensitive: false },
+		]);
 	});
 
 	test('enriches current and quoted polls in status history with one recursive query', async () => {
@@ -1499,24 +1689,24 @@ describe(MastodonApiServerService, () => {
 		nativeInvoke.mockImplementation(async (name, data) => {
 			if (name !== 'notes/renotes') return [];
 			if (data.untilId == null) return [
-				{ id: 'quote-newer', renoteId: 'note-id', text: 'Newer', cw: null, files: [], poll: null, replyId: null },
-				{ id: 'quote-older', renoteId: 'note-id', text: 'Older', cw: null, files: [], poll: null, replyId: null },
+				{ id: 'quote-2', renoteId: 'note-id', text: 'Newer', cw: null, files: [], poll: null, replyId: null },
+				{ id: 'quote-1', renoteId: 'note-id', text: 'Older', cw: null, files: [], poll: null, replyId: null },
 			];
-			return data.untilId === 'quote-newer'
-				? [{ id: 'quote-older', renoteId: 'note-id', text: 'Older', cw: null, files: [], poll: null, replyId: null }]
+			return data.untilId === 'quote-2'
+				? [{ id: 'quote-1', renoteId: 'note-id', text: 'Older', cw: null, files: [], poll: null, replyId: null }]
 				: [];
 		});
 
 		const first = await fastify.inject({ method: 'GET', url: '/api/v1/statuses/note-id/quotes?limit=1', headers: { authorization: 'Bearer user-token' } });
-		const second = await fastify.inject({ method: 'GET', url: '/api/v1/statuses/note-id/quotes?limit=1&max_id=quote-newer', headers: { authorization: 'Bearer user-token' } });
+		const second = await fastify.inject({ method: 'GET', url: '/api/v1/statuses/note-id/quotes?limit=1&max_id=quote-2', headers: { authorization: 'Bearer user-token' } });
 
-		expect(first.json()).toEqual([expect.objectContaining({ id: 'quote-newer' })]);
-		expect(second.json()).toEqual([expect.objectContaining({ id: 'quote-older' })]);
+		expect(first.json()).toEqual([expect.objectContaining({ id: 'quote-2' })]);
+		expect(second.json()).toEqual([expect.objectContaining({ id: 'quote-1' })]);
 		expect(toMisskey).toHaveBeenCalledWith(expect.objectContaining({ limit: '1' }), 40);
-		expect(linkHeader).toHaveBeenNthCalledWith(1, expect.any(String), [{ id: 'quote-newer' }]);
+		expect(linkHeader).toHaveBeenNthCalledWith(1, expect.any(String), [{ id: 'quote-2' }]);
 	});
 
-	test('scans newer since_id pages past boosts and keeps Link cursors newest-first', async () => {
+	test('scans newer min_id pages past boosts and keeps Link cursors newest-first', async () => {
 		const { fastify, nativeInvoke, linkHeader, toMisskey } = createServer();
 		const pureBoosts = Array.from({ length: 100 }, (_, index) => ({
 			id: `boost-${index.toString().padStart(3, '0')}`,
@@ -1528,13 +1718,13 @@ describe(MastodonApiServerService, () => {
 			replyId: null,
 		}));
 		const lastBoostId = pureBoosts.at(-1)!.id;
-		toMisskey.mockReturnValue({ limit: 1, sinceId: 'since-id' });
-		linkHeader.mockImplementation((_url, source) => `<max_id=${source.at(-1)?.id}>; rel="next", <since_id=${source[0]?.id}>; rel="prev"`);
+		toMisskey.mockReturnValue({ limit: 1, sinceId: 'aaa-cursor' });
+		linkHeader.mockImplementation((_url, source) => `<max_id=${source.at(-1)?.id}>; rel="next", <min_id=${source[0]?.id}>; rel="prev"`);
 		nativeInvoke.mockImplementation(async (name, data) => {
 			if (name !== 'notes/renotes') return [];
-			if (data.sinceId === 'since-id') return pureBoosts;
+			if (data.sinceId === 'aaa-cursor') return pureBoosts;
 			if (data.sinceId === lastBoostId) return [{
-				id: 'quote-newer',
+				id: 'quote-2',
 				renoteId: 'note-id',
 				text: 'Newer quote',
 				cw: null,
@@ -1545,41 +1735,40 @@ describe(MastodonApiServerService, () => {
 			return [];
 		});
 
-		const response = await fastify.inject({ method: 'GET', url: '/api/v1/statuses/note-id/quotes?limit=1&since_id=since-id', headers: { authorization: 'Bearer user-token' } });
+		const response = await fastify.inject({ method: 'GET', url: '/api/v1/statuses/note-id/quotes?limit=1&min_id=aaa-cursor', headers: { authorization: 'Bearer user-token' } });
 
-		expect(response.json()).toEqual([expect.objectContaining({ id: 'quote-newer' })]);
+		expect(response.json()).toEqual([expect.objectContaining({ id: 'quote-2' })]);
 		expect(nativeInvoke).toHaveBeenNthCalledWith(2, 'notes/renotes', {
 			noteId: 'note-id',
 			limit: 100,
 			sinceId: lastBoostId,
 		}, expect.any(Object), expect.any(Object));
-		expect(response.headers.link).toBe('<max_id=quote-newer>; rel="next", <since_id=quote-newer>; rel="prev"');
+		expect(response.headers.link).toBe('<max_id=quote-2>; rel="next", <min_id=quote-2>; rel="prev"');
 	});
 
 	test('keeps ordinary since_id lookahead newest-first without duplicating or skipping quotes', async () => {
 		const { fastify, nativeInvoke, linkHeader, toMisskey } = createServer();
 		toMisskey.mockImplementation((query: Record<string, unknown>) => ({
 			limit: 1,
-			...(typeof query.since_id === 'string' ? { sinceId: query.since_id } : {}),
 			...(typeof query.max_id === 'string' ? { untilId: query.max_id } : {}),
 		}));
 		nativeInvoke.mockImplementation(async (name, data) => {
 			if (name !== 'notes/renotes') return [];
-			if (data.sinceId === 'since-id') return [
-				{ id: 'quote-older', renoteId: 'note-id', text: 'Older', cw: null, files: [], poll: null, replyId: null },
-				{ id: 'quote-newer', renoteId: 'note-id', text: 'Newer', cw: null, files: [], poll: null, replyId: null },
+			if (data.untilId == null) return [
+				{ id: 'quote-1', renoteId: 'note-id', text: 'Older', cw: null, files: [], poll: null, replyId: null },
+				{ id: 'quote-2', renoteId: 'note-id', text: 'Newer', cw: null, files: [], poll: null, replyId: null },
 			];
-			return data.untilId === 'quote-newer'
-				? [{ id: 'quote-older', renoteId: 'note-id', text: 'Older', cw: null, files: [], poll: null, replyId: null }]
+			return data.untilId === 'quote-2'
+				? [{ id: 'quote-1', renoteId: 'note-id', text: 'Older', cw: null, files: [], poll: null, replyId: null }]
 				: [];
 		});
 
-		const first = await fastify.inject({ method: 'GET', url: '/api/v1/statuses/note-id/quotes?limit=1&since_id=since-id', headers: { authorization: 'Bearer user-token' } });
-		const second = await fastify.inject({ method: 'GET', url: '/api/v1/statuses/note-id/quotes?limit=1&max_id=quote-newer', headers: { authorization: 'Bearer user-token' } });
+		const first = await fastify.inject({ method: 'GET', url: '/api/v1/statuses/note-id/quotes?limit=1&since_id=aaa-cursor', headers: { authorization: 'Bearer user-token' } });
+		const second = await fastify.inject({ method: 'GET', url: '/api/v1/statuses/note-id/quotes?limit=1&max_id=quote-2', headers: { authorization: 'Bearer user-token' } });
 
-		expect(first.json()).toEqual([expect.objectContaining({ id: 'quote-newer' })]);
-		expect(second.json()).toEqual([expect.objectContaining({ id: 'quote-older' })]);
-		expect(linkHeader).toHaveBeenNthCalledWith(1, expect.any(String), [{ id: 'quote-newer' }]);
+		expect(first.json()).toEqual([expect.objectContaining({ id: 'quote-2' })]);
+		expect(second.json()).toEqual([expect.objectContaining({ id: 'quote-1' })]);
+		expect(linkHeader).toHaveBeenNthCalledWith(1, expect.any(String), [{ id: 'quote-2' }]);
 	});
 
 	test('does not create a safety-bound cursor when the tenth native quote page is empty', async () => {
@@ -1649,7 +1838,7 @@ describe(MastodonApiServerService, () => {
 		const { fastify, nativeInvoke } = createServer();
 		nativeInvoke.mockImplementation(async name => {
 			if (name === 'notes/show') return { id: 'note-id', text: 'old', cw: 'Existing CW', fileIds: [] };
-			if (name === 'notes/update') return { updatedNote: { id: 'note-id' } };
+			if (name === 'notes/update') return { updatedNote: { id: 'note-id', userId: 'user-id' } };
 			return [];
 		});
 		const edit = await fastify.inject({
@@ -1676,11 +1865,11 @@ describe(MastodonApiServerService, () => {
 		expect([poll.statusCode, quotePolicy.statusCode]).toEqual([422, 422]);
 	});
 
-	test('accepts a status language on edits when Notes cannot persist it', async () => {
+	test('persists edited status language in compatibility metadata', async () => {
 		const { fastify, nativeInvoke } = createServer();
 		nativeInvoke.mockImplementation(async name => {
 			if (name === 'notes/show') return { id: 'note-id', text: 'old', cw: null, fileIds: [] };
-			if (name === 'notes/update') return { updatedNote: { id: 'note-id' } };
+			if (name === 'notes/update') return { updatedNote: { id: 'note-id', userId: 'user-id' } };
 			return [];
 		});
 		const response = await fastify.inject({
@@ -2816,6 +3005,46 @@ describe(MastodonApiServerService, () => {
 		expect((await fastify.inject({ method: 'GET', url: '/api/v1/notifications/requests', headers })).json()).toEqual([]);
 	});
 
+	test('does not apply notification request cursors to native notification IDs', async () => {
+		const { fastify, nativeInvoke } = createServer();
+		nativeInvoke.mockImplementation(async name => name === 'i/notifications' ? [
+			{ id: '502', type: 'follow', createdAt: '2026-07-17T11:00:00.000Z', user: { id: 'actor-b' } },
+			{ id: '501', type: 'follow', createdAt: '2026-07-17T10:00:00.000Z', user: { id: 'actor-a' } },
+		] : []);
+		const headers = { authorization: 'Bearer user-token' };
+		await fastify.inject({ method: 'PATCH', url: '/api/v2/notifications/policy', headers, payload: { for_not_following: 'filter' } });
+		const first = await fastify.inject({ method: 'GET', url: '/api/v1/notifications/requests', headers });
+		const rows = first.json() as Array<{ id: string; account: { id: string } }>;
+		expect(rows).toHaveLength(2);
+		const oldest = [...rows].sort((left, right) => left.id.localeCompare(right.id))[0]!;
+		const newer = await fastify.inject({ method: 'GET', url: `/api/v1/notifications/requests?min_id=${encodeURIComponent(oldest.id)}`, headers });
+		expect(newer.statusCode).toBe(200);
+		expect(newer.json()).toEqual(rows.filter(row => row.id > oldest.id));
+	});
+
+	test('keeps one native pagination identity for accounts also muted through compatibility state', async () => {
+		const { fastify, nativeInvoke, relationshipService, toMisskey } = createServer();
+		const pagination = new MastodonPaginationService();
+		toMisskey.mockImplementation(query => pagination.toMisskey(query));
+		vi.spyOn(relationshipService, 'listMutes').mockResolvedValue([{ id: '300', accountId: 'actor-a' }]);
+		const mutings = [
+			{ id: '200', mutee: { id: 'actor-b', username: 'b' } },
+			{ id: '100', mutee: { id: 'actor-a', username: 'a' } },
+		];
+		nativeInvoke.mockImplementation(async (name, data) => {
+			if (name === 'mute/list') return mutings.filter(muting => data.untilId == null || muting.id < String(data.untilId)).slice(0, Number(data.limit));
+			if (name === 'users/show') return [{ id: 'actor-a', username: 'a', isMuted: true }];
+			return [];
+		});
+		const headers = { authorization: 'Bearer user-token' };
+		const first = await fastify.inject({ method: 'GET', url: '/api/v1/mutes?limit=1', headers });
+		const second = await fastify.inject({ method: 'GET', url: '/api/v1/mutes?limit=1&max_id=200', headers });
+		const third = await fastify.inject({ method: 'GET', url: '/api/v1/mutes?limit=1&max_id=100', headers });
+		expect(first.json()).toEqual([{ id: 'actor-b', username: 'b' }]);
+		expect(second.json()).toEqual([{ id: 'actor-a', username: 'a' }]);
+		expect(third.json()).toEqual([]);
+	});
+
 	test('registers Mastodon applications from JSON', async () => {
 		const { fastify, registerApplication } = createServer();
 		const response = await fastify.inject({
@@ -3007,7 +3236,7 @@ describe(MastodonApiServerService, () => {
 		});
 
 		expect(response.statusCode).toBe(200);
-		expect(response.json()).toEqual({ id: 'user-id', username: 'alice' });
+		expect(response.json()).toEqual({ id: 'user-id', username: 'alice', source: { privacy: 'public', sensitive: false, language: null } });
 		expect(nativeInvoke).toHaveBeenCalledWith('i/update', {
 			name: 'Alice URL',
 			fields: [
@@ -3018,9 +3247,6 @@ describe(MastodonApiServerService, () => {
 	});
 
 	test.each([
-		[{ source: { privacy: 'private' } }, 'privacy'],
-		[{ source: { sensitive: true } }, 'sensitive'],
-		[{ source: { language: 'ja' } }, 'language'],
 		[{ avatar_description: 'avatar alt' }, 'avatar_description'],
 		[{ header_description: 'header alt' }, 'header_description'],
 		[{ hide_collections: true }, 'hide_collections'],
@@ -3639,7 +3865,7 @@ describe(MastodonApiServerService, () => {
 	test('applies status offset locally after requesting the bounded native result window', async () => {
 		const { fastify, nativeInvoke, publicInvoke } = createServer();
 		nativeInvoke.mockImplementation(async (name, data) => name === 'notes/search'
-			? Array.from({ length: data.limit as number }, (_, index) => ({ id: `note-${index}` }))
+			? Array.from({ length: data.limit as number }, (_, index) => ({ id: `note-${3 - index}` }))
 			: []);
 
 		const response = await fastify.inject({
@@ -3651,7 +3877,7 @@ describe(MastodonApiServerService, () => {
 		expect(response.statusCode).toBe(200);
 		expect(response.json()).toEqual({
 			accounts: [],
-			statuses: [expect.objectContaining({ id: 'note-2' }), expect.objectContaining({ id: 'note-3' })],
+			statuses: [expect.objectContaining({ id: 'note-1' }), expect.objectContaining({ id: 'note-0' })],
 			hashtags: [],
 		});
 		expect(publicInvoke).toHaveBeenCalledWith('notes/search', {
@@ -3929,7 +4155,8 @@ describe(MastodonApiServerService, () => {
 	});
 
 	test('deletes media with a user token', async () => {
-		const { fastify, assert, nativeInvoke } = createServer();
+		const { fastify, assert, nativeInvoke, mastodonApiStateService } = createServer();
+		await mastodonApiStateService.put({ userId: 'user-id', kind: 'media_attachment', key: 'file-id', value: {} });
 		const response = await fastify.inject({
 			method: 'DELETE',
 			url: '/api/v1/media/file-id',
@@ -3939,7 +4166,7 @@ describe(MastodonApiServerService, () => {
 		expect(response.statusCode).toBe(200);
 		expect(response.json()).toEqual({});
 		expect(assert).toHaveBeenCalledWith(['read'], 'write:media');
-		expect(nativeInvoke).toHaveBeenCalledWith('drive/files/delete', { fileId: 'file-id' }, expect.any(Object), expect.any(Object));
+		expect(nativeInvoke).not.toHaveBeenCalledWith('drive/files/delete', { fileId: 'file-id' }, expect.any(Object), expect.any(Object));
 	});
 
 	test('maps public account status media and pinned filters', async () => {
@@ -4219,7 +4446,7 @@ describe(MastodonApiServerService, () => {
 		expect(nativeInvoke).not.toHaveBeenCalledWith('notes/create', expect.anything(), expect.anything(), expect.anything());
 	});
 
-	test('maps account status filters and media sensitivity to native parameters', async () => {
+	test('maps account status filters and isolates status sensitivity from Drive files', async () => {
 		const { fastify, nativeInvoke } = createServer();
 		const headers = { authorization: 'Bearer mastodon-token' };
 		await fastify.inject({ method: 'GET', url: '/api/v1/accounts/user-id/statuses?exclude_replies=true&exclude_reblogs=true', headers });
@@ -4231,11 +4458,11 @@ describe(MastodonApiServerService, () => {
 		});
 
 		expect(nativeInvoke).toHaveBeenCalledWith('users/notes', expect.objectContaining({ withReplies: false, withRenotes: false }), expect.anything(), expect.anything());
-		expect(nativeInvoke).toHaveBeenCalledWith('drive/files/update', { fileId: 'file-id', isSensitive: true }, expect.anything(), expect.anything());
+		expect(nativeInvoke).not.toHaveBeenCalledWith('drive/files/update', { fileId: 'file-id', isSensitive: true }, expect.anything(), expect.anything());
 		expect(nativeInvoke).toHaveBeenCalledWith('notes/create', expect.objectContaining({ visibility: 'followers', fileIds: ['file-id'] }), expect.anything(), expect.anything());
 	});
 
-	test('rejects a media sensitivity change before updating the Note', async () => {
+	test('persists an edited status sensitivity without mutating its Drive files', async () => {
 		const { fastify, nativeInvoke } = createServer();
 		nativeInvoke.mockImplementation(async name => {
 			if (name === 'notes/show') {
@@ -4246,7 +4473,7 @@ describe(MastodonApiServerService, () => {
 					files: [{ id: 'existing-file', isSensitive: true }],
 				};
 			}
-			if (name === 'notes/update') return { updatedNote: { id: 'note-id' } };
+			if (name === 'notes/update') return { updatedNote: { id: 'note-id', userId: 'user-id' } };
 			return [];
 		});
 		const response = await fastify.inject({
@@ -4256,11 +4483,9 @@ describe(MastodonApiServerService, () => {
 			payload: { status: 'edited', sensitive: false },
 		});
 
-		expect(response.statusCode).toBe(422);
-		expect(response.json()).toEqual({
-			error: 'Changing media sensitivity while editing a status is not supported atomically',
-		});
-		expect(nativeInvoke).not.toHaveBeenCalledWith('notes/update', expect.anything(), expect.anything(), expect.anything());
+		expect(response.statusCode).toBe(200);
+		expect(response.json()).toMatchObject({ sensitive: false });
+		expect(nativeInvoke).toHaveBeenCalledWith('notes/update', expect.anything(), expect.anything(), expect.anything());
 		expect(nativeInvoke).not.toHaveBeenCalledWith('drive/files/update', expect.anything(), expect.anything(), expect.anything());
 	});
 
@@ -4275,7 +4500,7 @@ describe(MastodonApiServerService, () => {
 					files: [{ id: 'existing-file', isSensitive: false }],
 				};
 			}
-			if (name === 'notes/update') return { updatedNote: { id: 'note-id' } };
+			if (name === 'notes/update') return { updatedNote: { id: 'note-id', userId: 'user-id' } };
 			return [];
 		});
 
@@ -4293,7 +4518,7 @@ describe(MastodonApiServerService, () => {
 
 	test.each([
 		['a non-sensitive status without files', { fileIds: [], files: [] }, false, 200],
-		['a non-sensitive status without files', { fileIds: [], files: [] }, true, 422],
+		['a non-sensitive status without files', { fileIds: [], files: [] }, true, 200],
 		['a channel-sensitive status', { fileIds: [], files: [], channel: { isSensitive: true } }, true, 200],
 		['a channel-sensitive status', { fileIds: [], files: [], channel: { isSensitive: true } }, false, 422],
 		['a status with mixed-sensitivity files', {
@@ -4306,12 +4531,12 @@ describe(MastodonApiServerService, () => {
 		['a non-sensitive status with files', {
 			fileIds: ['plain-file'],
 			files: [{ id: 'plain-file', isSensitive: false }],
-		}, true, 422],
-	])('compares requested sensitivity with the rendered status-level value for %s', async (_label, current, requested, expectedStatus) => {
+		}, true, 200],
+	])('persists status sensitivity independently while respecting channel policy for %s', async (_label, current, requested, expectedStatus) => {
 		const { fastify, nativeInvoke } = createServer();
 		nativeInvoke.mockImplementation(async name => {
 			if (name === 'notes/show') return { id: 'note-id', text: 'old', ...current };
-			if (name === 'notes/update') return { updatedNote: { id: 'note-id' } };
+			if (name === 'notes/update') return { updatedNote: { id: 'note-id', userId: 'user-id' } };
 			return [];
 		});
 
@@ -4333,8 +4558,8 @@ describe(MastodonApiServerService, () => {
 	});
 
 	test.each([
-		['sensitive old media with non-sensitive replacement and sensitive=true', true, false, true, 422],
-		['non-sensitive old media with sensitive replacement and sensitive=false', false, true, false, 422],
+		['sensitive old media with non-sensitive replacement and sensitive=true', true, false, true, 200],
+		['non-sensitive old media with sensitive replacement and sensitive=false', false, true, false, 200],
 		['sensitive old media with non-sensitive replacement and sensitive=false', true, false, false, 200],
 		['non-sensitive old media with sensitive replacement and sensitive=true', false, true, true, 200],
 	])('validates %s against the effective replacement media', async (
@@ -4359,7 +4584,7 @@ describe(MastodonApiServerService, () => {
 					files: [{ id: 'old-file', isSensitive: oldIsSensitive }],
 				};
 			}
-			if (name === 'notes/update') return { updatedNote: { id: 'note-id' } };
+			if (name === 'notes/update') return { updatedNote: { id: 'note-id', userId: 'user-id' } };
 			return [];
 		});
 
@@ -4380,21 +4605,8 @@ describe(MastodonApiServerService, () => {
 			userId: 'user-id',
 		});
 		expect(nativeInvoke).not.toHaveBeenCalledWith('drive/files/show', expect.anything(), expect.anything(), expect.anything());
-		if (expectedStatus === 422) {
-			expect(response.json()).toEqual({
-				error: 'Changing media sensitivity while editing a status is not supported atomically',
-			});
-			expect(nativeInvoke.mock.calls.map(([name]) => name)).toEqual([
-				'notes/show',
-			]);
-		} else {
-			expect(nativeInvoke).toHaveBeenCalledWith(
-				'notes/update',
-				expect.objectContaining({ fileIds: ['replacement-file'] }),
-				expect.anything(),
-				expect.anything(),
-			);
-		}
+		expect(response.json()).toMatchObject({ sensitive: requested });
+		expect(nativeInvoke).toHaveBeenCalledWith('notes/update', expect.objectContaining({ fileIds: ['replacement-file'] }), expect.anything(), expect.anything());
 		expect(nativeInvoke).not.toHaveBeenCalledWith('drive/files/update', expect.anything(), expect.anything(), expect.anything());
 	});
 
@@ -4428,7 +4640,7 @@ describe(MastodonApiServerService, () => {
 					id: '1370e5b7-d4eb-4b50-a9ac-1898c31d2c1c',
 				});
 			}
-			if (name === 'notes/update') return { updatedNote: { id: 'note-id' } };
+			if (name === 'notes/update') return { updatedNote: { id: 'note-id', userId: 'user-id' } };
 			return [];
 		});
 
@@ -4468,7 +4680,7 @@ describe(MastodonApiServerService, () => {
 		driveFilesRepository.findBy.mockResolvedValue([]);
 		nativeInvoke.mockImplementation(async name => {
 			if (name === 'notes/show') return { id: 'note-id', text: 'old', fileIds: [] };
-			if (name === 'notes/update') return { updatedNote: { id: 'note-id' } };
+			if (name === 'notes/update') return { updatedNote: { id: 'note-id', userId: 'user-id' } };
 			return [];
 		});
 
@@ -4520,7 +4732,7 @@ describe(MastodonApiServerService, () => {
 		const { fastify, nativeInvoke } = createServer();
 		nativeInvoke.mockImplementation(async name => {
 			if (name === 'notes/show') return { id: 'note-id', text: null, fileIds: ['old-file'] };
-			if (name === 'notes/update') return { updatedNote: { id: 'note-id' } };
+			if (name === 'notes/update') return { updatedNote: { id: 'note-id', userId: 'user-id' } };
 			return [];
 		});
 
@@ -4542,7 +4754,7 @@ describe(MastodonApiServerService, () => {
 		const { fastify, nativeInvoke } = createServer();
 		nativeInvoke.mockImplementation(async name => {
 			if (name === 'notes/show') return { id: 'note-id', text: 'old', fileIds: ['file'] };
-			if (name === 'notes/update') return { updatedNote: { id: 'note-id' } };
+			if (name === 'notes/update') return { updatedNote: { id: 'note-id', userId: 'user-id' } };
 			return [];
 		});
 
@@ -4564,7 +4776,7 @@ describe(MastodonApiServerService, () => {
 		const { fastify, nativeInvoke } = createServer();
 		nativeInvoke.mockImplementation(async name => {
 			if (name === 'notes/show') return { id: 'note-id', text: 'old', fileIds: ['existing-file'] };
-			if (name === 'notes/update') return { updatedNote: { id: 'note-id' } };
+			if (name === 'notes/update') return { updatedNote: { id: 'note-id', userId: 'user-id' } };
 			return [];
 		});
 
@@ -4593,7 +4805,7 @@ describe(MastodonApiServerService, () => {
 			payload: { status: 'edited', sensitive: 'invalid' },
 		});
 
-		expect(response.statusCode).toBe(400);
+		expect(response.statusCode).toBe(422);
 		expect(nativeInvoke).not.toHaveBeenCalledWith('drive/files/update', expect.anything(), expect.anything(), expect.anything());
 		expect(nativeInvoke).not.toHaveBeenCalledWith('notes/update', expect.anything(), expect.anything(), expect.anything());
 	});
@@ -4625,49 +4837,14 @@ describe(MastodonApiServerService, () => {
 		expect(response.json()).toEqual({ error: 'Note edit history limit exceeded.' });
 	});
 
-	test('treats an already-favourited status as a successful idempotent mutation', async () => {
-		const { fastify, nativeInvoke } = createServer();
-		nativeInvoke.mockImplementation(async (name, data) => {
-			if (name === 'notes/reactions/create') throw new ApiError({
-				message: 'Already reacted.',
-				code: 'ALREADY_REACTED',
-				id: 'already-reacted',
-			});
-			if (name === 'notes/show') return { id: data.noteId };
-			return [];
-		});
-
-		const response = await fastify.inject({
-			method: 'POST',
-			url: '/api/v1/statuses/note-id/favourite',
-			headers: { authorization: 'Bearer mastodon-token' },
-		});
-
+	test.each([true, false])('serializes the protected favourite service result for enabled=%s', async enabled => {
+		const { fastify, favouriteService, nativeInvoke } = createServer();
+		favouriteService.set.mockResolvedValue({ id: 'note-id', myReaction: enabled ? '❤' : null });
+		const response = await fastify.inject({ method: 'POST', url: `/api/v1/statuses/note-id/${enabled ? 'favourite' : 'unfavourite'}`, headers: { authorization: 'Bearer mastodon-token' } });
 		expect(response.statusCode).toBe(200);
-		expect(response.json()).toMatchObject({ id: 'note-id', favourited: true });
-		expect(nativeInvoke).toHaveBeenCalledWith('notes/show', { noteId: 'note-id' }, expect.anything(), expect.anything());
-	});
-
-	test('treats an already-unfavourited status as a successful idempotent mutation', async () => {
-		const { fastify, nativeInvoke } = createServer();
-		nativeInvoke.mockImplementation(async (name, data) => {
-			if (name === 'notes/reactions/delete') throw new ApiError({
-				message: 'Not reacted.',
-				code: 'NOT_REACTED',
-				id: 'not-reacted',
-			});
-			if (name === 'notes/show') return { id: data.noteId };
-			return [];
-		});
-
-		const response = await fastify.inject({
-			method: 'POST',
-			url: '/api/v1/statuses/note-id/unfavourite',
-			headers: { authorization: 'Bearer mastodon-token' },
-		});
-
-		expect(response.statusCode).toBe(200);
-		expect(response.json()).toMatchObject({ id: 'note-id', favourited: false });
+		expect(response.json()).toMatchObject({ id: 'note-id', favourited: enabled });
+		expect(favouriteService.set).toHaveBeenCalledWith('note-id', enabled, expect.any(Object), expect.any(Object));
+		expect(nativeInvoke).not.toHaveBeenCalled();
 	});
 
 	test('preserves private boost visibility and reuses an existing pure renote', async () => {
@@ -5693,7 +5870,7 @@ describe(MastodonApiServerService, () => {
 		});
 
 		expect(verify.statusCode).toBe(200);
-		expect(verify.json()).toEqual({ id: 'user-id', username: 'alice' });
+		expect(verify.json()).toEqual({ id: 'user-id', username: 'alice', source: { privacy: 'public', sensitive: false, language: null } });
 		expect(timeline.statusCode).toBe(200);
 		expect(timeline.json()).toEqual([expect.objectContaining({ id: 'note-id' })]);
 		expect(timeline.headers.link).toBe('<next>; rel="next"');

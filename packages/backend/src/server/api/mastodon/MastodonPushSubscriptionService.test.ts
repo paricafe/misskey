@@ -4,7 +4,9 @@
  */
 
 import { describe, expect, test, vi } from 'vitest';
+import type { MastodonPushState } from '@/core/MastodonPushNotificationService.js';
 import { MastodonPushSubscriptionService } from './MastodonPushSubscriptionService.js';
+import { parseMastodonForm, readMastodonRequestBody } from './request-parameters.js';
 
 const P256DH = 'BFoYnP6n4Huwsti9ptCZtqxxQTT5KpSdGfB8loT2pXzzZYNhOJ4lzcAmndO7ad8LFftUdmUXIZ3Zg-5JSZiu4f0';
 const AUTH = 'MLACbMpb8aYGL4nf4aiwCA';
@@ -87,6 +89,24 @@ describe(MastodonPushSubscriptionService, () => {
 		expect(response).not.toHaveProperty('policy');
 	});
 
+	test('reports unsupported edit alerts as disabled for new and existing subscriptions', async () => {
+		const { service, getRow } = createService();
+		const auth = { user: { id: 'user-id' }, token: { id: 'token-id' } } as never;
+		const response = await service.create(auth, 'bearer', {
+			subscription: { endpoint: 'https://push.example/edits', keys: { p256dh: P256DH, auth: AUTH } },
+			data: { alerts: { mention: true, update: true, quoted_update: true } },
+		});
+		expect(response.alerts).toMatchObject({ mention: true, update: false, quoted_update: false });
+		const stored = getRow()!.value as MastodonPushState;
+		expect(stored.data.alerts).toMatchObject({ mention: true, update: false, quoted_update: false });
+
+		stored.data.alerts.update = true;
+		stored.data.alerts.quoted_update = true;
+		expect((await service.get(auth)).alerts).toMatchObject({ mention: true, update: false, quoted_update: false });
+		expect((await service.update(auth, { data: { alerts: { update: true, quoted_update: true } } })).alerts)
+			.toMatchObject({ update: false, quoted_update: false });
+	});
+
 	test('returns 422 for unavailable VAPID on every stateful operation and enforces bounded state', async () => {
 		const auth = { user: { id: 'user-id' }, token: { id: 'token-id' } } as never;
 		const unavailable = createService({ enableServiceWorker: false }).service;
@@ -160,5 +180,41 @@ describe(MastodonPushSubscriptionService, () => {
 			'subscription[keys][p256dh]': P256DH,
 			'subscription[keys][auth]': AUTH,
 		})).rejects.toMatchObject({ statusCode: 422 });
+	});
+
+	test('accepts matching aliases produced by the form parser and request-body reader for creation and update', async () => {
+		const { service, getRow } = createService();
+		const auth = { user: { id: 'user-id' }, token: { id: 'token-id' } } as never;
+		const form = new URLSearchParams({
+			'subscription[endpoint]': 'https://push.example/form',
+			'subscription[keys][p256dh]': P256DH,
+			'subscription[keys][auth]': AUTH,
+			'subscription[standard]': 'true',
+			'data[policy]': 'followed',
+			'data[alerts][mention]': 'true',
+		});
+		const body = await readMastodonRequestBody({ body: parseMastodonForm(form.toString()) } as never);
+		expect(body).toMatchObject({
+			subscription: { endpoint: 'https://push.example/form' },
+			'subscription[endpoint]': 'https://push.example/form',
+		});
+		expect(await service.create(auth, 'bearer', body)).toMatchObject({ endpoint: 'https://push.example/form', standard: true, alerts: { mention: true } });
+		expect((getRow()!.value as MastodonPushState).data.policy).toBe('followed');
+
+		const update = await readMastodonRequestBody({ body: parseMastodonForm('data[policy]=all&data[alerts][mention]=false&data[alerts][poll]=true') } as never);
+		expect(await service.update(auth, update)).toMatchObject({ alerts: { mention: false, poll: true } });
+		expect((getRow()!.value as MastodonPushState).data.policy).toBe('all');
+	});
+
+	test('still rejects repeated identical fields after the real form normalization chain', async () => {
+		const { service } = createService();
+		const form = new URLSearchParams({
+			'subscription[endpoint]': 'https://push.example/repeated',
+			'subscription[keys][p256dh]': P256DH,
+			'subscription[keys][auth]': AUTH,
+		});
+		form.append('subscription[endpoint]', 'https://push.example/repeated');
+		const body = await readMastodonRequestBody({ body: parseMastodonForm(form.toString()) } as never);
+		await expect(service.create({ user: { id: 'user-id' }, token: { id: 'token-id' } } as never, 'bearer', body)).rejects.toMatchObject({ statusCode: 422 });
 	});
 });

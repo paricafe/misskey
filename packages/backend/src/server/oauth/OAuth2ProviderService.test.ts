@@ -67,11 +67,11 @@ describe(OAuth2ProviderService, () => {
 		const mastodonOAuthService = {
 			getSupportedScopes: vi.fn().mockReturnValue(scopeService.getSupportedScopes()),
 			getRevocationEndpoint: vi.fn().mockReturnValue(new URL('https://misskey.example/oauth/revoke')),
-			isMastodonClientId: vi.fn().mockReturnValue(false),
+			isMastodonClientId: vi.fn((_clientId: string | undefined) => false),
 			beginAuthorization: vi.fn(),
 			decide: vi.fn(),
 			revoke: vi.fn(),
-			extractClientId: vi.fn((_body: Record<string, unknown>) => undefined),
+			extractClientId: vi.fn((_body: Record<string, unknown>): string | undefined => undefined),
 			exchangeToken: vi.fn(),
 		};
 		const service = new OAuth2ProviderService(
@@ -138,12 +138,12 @@ describe(OAuth2ProviderService, () => {
 		expect(mastodonOAuthService.getRevocationEndpoint).not.toHaveBeenCalled();
 	});
 
-	test('completes native OAuth authorization code flow without Mastodon dispatch when disabled', async () => {
+	test.each([false, true])('preserves the native OAuth authorization code flow with Mastodon enabled=%s', async enableMastodonApi => {
 		const clientId = 'https://client.example/';
 		const redirectUri = 'https://client.example/callback';
 		const verifier = 'native-oauth-verifier-which-is-long-enough-for-pkce';
 		const challenge = createHash('sha256').update(verifier).digest('base64url');
-		const fixture = createService(false);
+		const fixture = createService(enableMastodonApi);
 		fixture.httpRequestService.send.mockResolvedValue({
 			headers: new Headers({ 'content-type': 'application/json' }),
 			url: clientId,
@@ -209,6 +209,8 @@ describe(OAuth2ProviderService, () => {
 				client_id: clientId,
 				redirect_uri: redirectUri,
 				code_verifier: verifier,
+				client_extension: 'native',
+				'client_extension[details]': 'opaque',
 			}).toString(),
 		});
 		expect(token.statusCode).toBe(200);
@@ -219,11 +221,91 @@ describe(OAuth2ProviderService, () => {
 			name: clientId,
 			permission: ['write:notes'],
 		}));
-		expect(fixture.mastodonOAuthService.isMastodonClientId).not.toHaveBeenCalled();
+		if (!enableMastodonApi) expect(fixture.mastodonOAuthService.isMastodonClientId).not.toHaveBeenCalled();
 		expect(fixture.mastodonOAuthService.beginAuthorization).not.toHaveBeenCalled();
 		expect(fixture.mastodonOAuthService.decide).not.toHaveBeenCalled();
-		expect(fixture.mastodonOAuthService.extractClientId).not.toHaveBeenCalled();
+		if (!enableMastodonApi) expect(fixture.mastodonOAuthService.extractClientId).not.toHaveBeenCalled();
 		expect(fixture.mastodonOAuthService.exchangeToken).not.toHaveBeenCalled();
+	});
+
+	test.each(['json', 'urlencoded', 'multipart'])('exchanges Mastodon tokens from %s request bodies', async encoding => {
+		const fixture = createService();
+		fixture.mastodonOAuthService.extractClientId.mockImplementation(body => body.client_id as string | undefined);
+		fixture.mastodonOAuthService.isMastodonClientId.mockImplementation(clientId => clientId === 'mastodon-client');
+		fixture.mastodonOAuthService.exchangeToken.mockResolvedValue({ access_token: 'mastodon-token', token_type: 'Bearer', scope: 'profile' });
+		const fastify = Fastify();
+		fastify.register(fixture.service.createTokenServer, { prefix: '/oauth/token' });
+		servers.push(fastify);
+		const values = { client_id: 'mastodon-client', client_secret: 'client-secret', grant_type: 'authorization_code', code: 'code', redirect_uri: 'app://callback' };
+		let contentType = 'application/json';
+		let payload: string | Buffer = JSON.stringify(values);
+		if (encoding === 'urlencoded') {
+			contentType = 'application/x-www-form-urlencoded';
+			payload = new URLSearchParams(values).toString();
+		} else if (encoding === 'multipart') {
+			const form = new FormData();
+			for (const [key, value] of Object.entries(values)) form.append(key, value);
+			const request = new Request('https://misskey.example/oauth/token', { method: 'POST', body: form });
+			contentType = request.headers.get('content-type')!;
+			payload = Buffer.from(await request.arrayBuffer());
+		}
+		const result = await fastify.inject({ method: 'POST', url: '/oauth/token', headers: { 'content-type': contentType }, payload });
+		expect(result.statusCode, result.body).toBe(200);
+		expect(result.json()).toMatchObject({ access_token: 'mastodon-token' });
+		expect(result.headers['cache-control']).toBe('no-store');
+		expect(fixture.mastodonOAuthService.exchangeToken).toHaveBeenCalledWith(values, undefined);
+	});
+
+	test.each([false, true])('keeps native OAuth multipart token requests unsupported with Mastodon enabled=%s', async enableMastodonApi => {
+		const fixture = createService(enableMastodonApi);
+		const fastify = Fastify();
+		fastify.register(fixture.service.createTokenServer, { prefix: '/oauth/token' });
+		servers.push(fastify);
+		const form = new FormData();
+		form.append('client_id', 'https://native.example/');
+		form.append('grant_type', 'authorization_code');
+		const request = new Request('https://misskey.example/oauth/token', { method: 'POST', body: form });
+		const result = await fastify.inject({ method: 'POST', url: '/oauth/token', headers: { 'content-type': request.headers.get('content-type')! }, payload: Buffer.from(await request.arrayBuffer()) });
+		expect(result.statusCode).toBe(415);
+		expect(fixture.mastodonOAuthService.exchangeToken).not.toHaveBeenCalled();
+		expect(fixture.accessTokensRepository.insert).not.toHaveBeenCalled();
+	});
+
+	test('renders the real Mastodon scopes and presentation hints only on compatibility authorization pages', async () => {
+		const { fastify, mastodonOAuthService } = await createServer();
+		mastodonOAuthService.isMastodonClientId.mockReturnValue(true);
+		mastodonOAuthService.beginAuthorization.mockResolvedValue({ transactionId: 'mastodon:transaction', clientName: 'App', scope: [], mastodonScopes: ['push', 'write:collections'], forceLogin: true, language: 'ja-JP' });
+		const result = await fastify.inject({ method: 'GET', url: '/authorize?client_id=mastodon-client' });
+		expect(result.statusCode).toBe(200);
+		expect(result.body).toContain('name="misskey:oauth:mastodon-scopes" content="push write:collections"');
+		expect(result.body).toContain('name="misskey:oauth:force-login" content="true"');
+		expect(result.body).toContain('name="misskey:oauth:lang" content="ja-JP"');
+	});
+
+	test.each([false, true])('renders an OOB authorization result instead of redirecting to a URN (cancel=%s)', async cancel => {
+		const { fastify, mastodonOAuthService } = await createServer();
+		mastodonOAuthService.decide.mockResolvedValue({ redirectUri: 'urn:ietf:wg:oauth:2.0:oob', language: 'en-US', parameters: cancel ? { error: 'access_denied' } : { code: 'out-of-band-code' } });
+		const result = await fastify.inject({ method: 'POST', url: '/decision', payload: { transaction_id: 'mastodon:transaction', login_token: 'native-token', ...(cancel ? { cancel: 'cancel' } : {}) } });
+		expect(result.statusCode, result.body).toBe(200);
+		expect(result.headers.location).toBeUndefined();
+		expect(result.headers['cache-control']).toBe('no-store');
+		expect(result.headers['content-type']).toContain('text/html');
+		if (cancel) {
+			expect(result.body).not.toContain('id="authorization-code"');
+		} else {
+			expect(result.body).toContain('id="authorization-code" value="out-of-band-code"');
+		}
+	});
+
+	test('accepts multipart token revocation and preserves its fields', async () => {
+		const { fastify, mastodonOAuthService } = await createServer();
+		const values = { client_id: 'mastodon-client', client_secret: 'secret', token: 'token' };
+		const form = new FormData();
+		for (const [key, value] of Object.entries(values)) form.append(key, value);
+		const request = new Request('https://misskey.example/oauth/revoke', { method: 'POST', body: form });
+		const result = await fastify.inject({ method: 'POST', url: '/revoke', headers: { 'content-type': request.headers.get('content-type')! }, payload: Buffer.from(await request.arrayBuffer()) });
+		expect(result.statusCode).toBe(200);
+		expect(mastodonOAuthService.revoke).toHaveBeenCalledWith(values, undefined);
 	});
 
 	test.each(['GET', 'POST'] as const)('serves OAuth userinfo over %s', async method => {

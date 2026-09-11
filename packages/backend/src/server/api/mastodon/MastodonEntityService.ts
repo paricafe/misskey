@@ -14,6 +14,7 @@ import type { MiAbuseUserReport } from '@/models/AbuseUserReport.js';
 import type { NotesRepository } from '@/models/_.js';
 import { extractMentions } from '@/misc/extract-mentions.js';
 import type { MastodonReportInput } from './MastodonReportService.js';
+import { isMastodonFavourite } from './utils.js';
 
 type PackedUser = Packed<'UserLite'> & Partial<Packed<'UserDetailedNotMeOnly'>>;
 
@@ -213,7 +214,7 @@ export class MastodonEntityService {
 			url,
 			replies_count: note.repliesCount,
 			reblogs_count: note.renoteCount,
-			favourites_count: note.reactionCount,
+			favourites_count: Object.entries(note.reactions ?? {}).reduce((count, [reaction, total]) => count + (isMastodonFavourite(reaction) ? Math.max(0, total) : 0), 0),
 			quotes_count: 0,
 			content: this.render(note.text ?? ''),
 			reblog: !shallow && isPure ? this.statusEntity(note.renote!, true, voterCounts) : null,
@@ -232,7 +233,7 @@ export class MastodonEntityService {
 			emojis: this.emojis(note.emojis),
 			card: null,
 			poll: note.poll == null ? null : this.poll(note.id, note.poll, voterCounts?.get(note.id)),
-			favourited: note.myReaction != null,
+			favourited: isMastodonFavourite(note.myReaction),
 			reblogged: false,
 			muted: false,
 			bookmarked: false,
@@ -416,6 +417,7 @@ export class MastodonEntityService {
 	}
 
 	public notification(notification: Packed<'Notification'>, voterCounts?: ReadonlyMap<string, number>) {
+		if (notification.type === 'reaction' && !isMastodonFavourite(notification.reaction)) return null;
 		const type = this.notificationType(notification.type);
 		if (type == null || !('user' in notification) || notification.user == null) return null;
 

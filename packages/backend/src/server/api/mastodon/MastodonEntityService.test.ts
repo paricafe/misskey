@@ -433,6 +433,11 @@ describe(MastodonEntityService, () => {
 		]);
 	});
 
+	test('counts only heart reactions as favourites and leaves other emoji distinct', () => {
+		const status = service.status({ ...note, reactions: { '❤': 2, '❤️': 3, '👍': 10 }, myReaction: '❤️' } as never);
+		expect(status).toMatchObject({ favourites_count: 5, favourited: true });
+		expect(service.notification({ type: 'reaction', reaction: '👍', user, note } as never)).toBeNull();
+	});
 	test('converts a Misskey note, attachment, and poll to a Mastodon status', () => {
 		const status = service.status(note as never);
 
@@ -446,8 +451,8 @@ describe(MastodonEntityService, () => {
 			url: 'https://misskey.example/notes/note-id',
 			replies_count: 2,
 			reblogs_count: 4,
-			favourites_count: 5,
-			favourited: true,
+			favourites_count: 0,
+			favourited: false,
 		});
 		expect(status.media_attachments).toEqual([expect.objectContaining({
 			id: 'file-id', type: 'image', description: 'alt text', width: 800, height: 600,
@@ -813,6 +818,7 @@ describe(MastodonEntityService, () => {
 			id: 'notification-id',
 			createdAt: '2025-02-03T06:00:00.000Z',
 			type: 'reaction',
+			reaction: '❤',
 			user,
 			note,
 		} as never)).toMatchObject({ id: 'notification-id', type: 'favourite', status: { id: 'note-id' } });

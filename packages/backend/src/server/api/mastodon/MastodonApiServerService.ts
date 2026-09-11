@@ -14,7 +14,7 @@ import * as fs from 'node:fs';
 import { MAX_NOTE_FILES, MAX_NOTE_TEXT_LENGTH } from '@/const.js';
 import type { Config } from '@/config.js';
 import { DI } from '@/di-symbols.js';
-import type { DriveFilesRepository, MiDriveFile, MiMeta, NoteFavoritesRepository, NotesRepository, UserNotePiningsRepository } from '@/models/_.js';
+import type { DriveFilesRepository, MiMeta, NoteFavoritesRepository, NotesRepository, UserNotePiningsRepository } from '@/models/_.js';
 import { createTemp } from '@/misc/create-temp.js';
 import type { Packed } from '@/misc/json-schema.js';
 import { extractMentions } from '@/misc/extract-mentions.js';
@@ -45,6 +45,12 @@ import { MastodonApiError, sendMastodonError } from './errors.js';
 import type { MastodonAuth, MastodonUserAuth } from './types.js';
 import type { MastodonApplicationRegistration } from './types.js';
 import { digestCredential } from './utils.js';
+import { normalizeMastodonParameters, parseMastodonForm, readMastodonRequestBody } from './request-parameters.js';
+import { MastodonMediaService } from './MastodonMediaService.js';
+import { MastodonStatusMetadataService } from './MastodonStatusMetadataService.js';
+import { MastodonQueryService } from './MastodonQueryService.js';
+import { MastodonRelationshipService } from './MastodonRelationshipService.js';
+import { MastodonFavouriteService, isMastodonFavourite } from './MastodonFavouriteService.js';
 
 type Dictionary = Record<string, unknown>;
 type MastodonRequest = FastifyRequest;
@@ -92,25 +98,36 @@ export class MastodonApiServerService {
 		private redis: Redis.Redis,
 
 		private mastodonStreamingApiServerService: MastodonStreamingApiServerService,
+		private mastodonMediaService: MastodonMediaService,
+		private mastodonStatusMetadataService: MastodonStatusMetadataService,
+		private mastodonQueryService: MastodonQueryService,
+		private mastodonRelationshipService: MastodonRelationshipService,
+		private mastodonFavouriteService: MastodonFavouriteService,
 	) {}
 
 	@bindThis
 	public createServer(fastify: FastifyInstance, _options: FastifyPluginOptions, done: (error?: Error) => void): void {
-		fastify.register(cors, { origin: '*' });
+		fastify.register(cors, {
+			origin: '*',
+			methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+			exposedHeaders: ['Link', 'X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-RateLimit-Reset', 'Retry-After'],
+		});
 		fastify.register(multipart, {
 			limits: { fileSize: this.config.maxFileSize, files: 2 },
 		});
 		fastify.addContentTypeParser('application/x-www-form-urlencoded', { parseAs: 'string' }, (_request, body, parserDone) => {
 			try {
-				const parsed: Dictionary = {};
-				for (const [key, value] of new URLSearchParams(body.toString())) {
-					const current = parsed[key];
-					parsed[key] = current == null ? value : Array.isArray(current) ? [...current, value] : [current, value];
-				}
-				parserDone(null, parsed);
+				parserDone(null, parseMastodonForm(body.toString()));
 			} catch (error) {
 				parserDone(error as Error);
 			}
+		});
+		fastify.addHook('preValidation', async request => {
+			request.query = normalizeMastodonParameters(request.query);
+			const route = request.routeOptions.url;
+			const uploads = ['/api/v1/media', '/api/v2/media', '/api/v1/accounts/update_credentials', '/api/v1/profile'];
+			if (request.isMultipart() && uploads.includes(route ?? '') && request.method !== 'GET') return;
+			request.body = await readMastodonRequestBody(request);
 		});
 		fastify.addHook('onRequest', (_request, reply, hookDone) => {
 			reply.header('Cache-Control', 'private, max-age=0, must-revalidate');
@@ -238,18 +255,21 @@ export class MastodonApiServerService {
 
 		fastify.get('/api/v1/accounts/verify_credentials', request => this.withAuth(request, ['profile', 'read:accounts'], async auth => {
 			const user = await this.invoke('i', {}, auth, request);
-			return this.mastodonEntityService.credentialAccount(user as Packed<'MeDetailed'>);
+			return await this.mastodonStatusMetadataService.credentialAccount(auth.user.id, this.mastodonEntityService.credentialAccount(user as Packed<'MeDetailed'>));
 		}));
 		fastify.get('/api/v1/apps/verify_credentials', request => this.withAnyToken(request, async auth => {
 			return { ...await this.mastodonOAuthService.getApplication(auth.token.clientId), vapid_key: this.mastodonPushSubscriptionService.vapidPublicKey() };
 		}));
-		fastify.get('/api/v1/preferences', request => this.withAuth(request, 'read:accounts', async () => ({
-			'posting:default:visibility': 'public',
-			'posting:default:sensitive': false,
-			'posting:default:language': null,
-			'reading:expand:media': 'default',
-			'reading:expand:spoilers': false,
-		} as Dictionary)));
+		fastify.get('/api/v1/preferences', request => this.withAuth(request, 'read:accounts', async auth => {
+			const preferences = await this.mastodonStatusMetadataService.preferences(auth.user.id);
+			return {
+				'posting:default:visibility': preferences.privacy,
+				'posting:default:sensitive': preferences.sensitive,
+				'posting:default:language': preferences.language,
+				'reading:expand:media': 'default',
+				'reading:expand:spoilers': false,
+			};
+		}));
 		this.registerProfile(fastify);
 		fastify.get('/api/v1/accounts', request => this.withOptionalUser(request, 'read:accounts', async auth => {
 			const users = await this.invokePublicBatch(
@@ -267,22 +287,26 @@ export class MastodonApiServerService {
 			if (q == null || q === '') throw new MastodonApiError(400, 'invalid_request', 'q is required');
 			const limit = this.integer(query.limit, 40, 1, 40);
 			const offset = this.integer(query.offset, 0, 0);
+			if (this.boolean(query.resolve)) {
+				const resolved = await this.mastodonQueryService.resolveAccount(q, auth, request);
+				if (resolved != null) return offset === 0 ? [this.mastodonEntityService.account(resolved)] : [];
+			}
 			const users = await this.invoke('users/search', { query: q, limit, offset }, auth, request) as Packed<'UserDetailed'>[];
 			return users.map(user => this.mastodonEntityService.account(user));
 		}));
-		fastify.get('/api/v1/accounts/lookup', request => this.withAuth(request, 'read:accounts', async auth => {
+		fastify.get('/api/v1/accounts/lookup', request => this.withOptionalUser(request, 'read:accounts', async auth => {
 			const acct = this.string((request.query as Dictionary).acct);
 			if (acct == null) throw new MastodonApiError(400, 'invalid_request', 'acct is required');
-			const [username, ...hostParts] = acct.replace(/^@/u, '').split('@');
-			const user = await this.invoke('users/show', { username, ...(hostParts.length > 0 ? { host: hostParts.join('@') } : {}) }, auth, request);
-			return this.mastodonEntityService.account(user as Packed<'UserDetailed'>);
+			const user = await this.mastodonQueryService.lookupAccount(acct, auth, request);
+			if (user == null) throw new MastodonApiError(404, 'not_found', 'Record not found');
+			return this.mastodonEntityService.account(user);
 		}));
 		fastify.get('/api/v1/accounts/relationships', request => this.withAuth(request, 'read:follows', async auth => {
 			const ids = this.strings((request.query as Dictionary)['id[]'] ?? (request.query as Dictionary).id);
 			const endorsedIds = new Set(await this.mastodonUserFeatureService.listEndorsementIds(auth.user.id));
 			return await Promise.all(ids.map(async id => {
 				const user = await this.invoke('users/show', { userId: id }, auth, request);
-				return { ...this.mastodonEntityService.relationship(user as Packed<'UserDetailed'>), endorsed: endorsedIds.has(id) };
+				return { ...await this.mastodonRelationshipService.relationship(auth.user.id, user as Packed<'UserDetailed'>, this.mastodonEntityService.relationship(user as Packed<'UserDetailed'>)), endorsed: endorsedIds.has(id) };
 			}));
 		}));
 		fastify.get<{ Params: { id: string } }>('/api/v1/accounts/:id', request => this.account(request, request.params.id));
@@ -356,25 +380,16 @@ export class MastodonApiServerService {
 	}
 
 	private registerRelationshipActions(fastify: FastifyInstance): void {
-		const actions: Array<[string, string, string, string]> = [
-			['follow', 'following/create', 'write:follows', 'userId'],
-			['unfollow', 'following/delete', 'write:follows', 'userId'],
-			['block', 'blocking/create', 'write:blocks', 'userId'],
-			['unblock', 'blocking/delete', 'write:blocks', 'userId'],
-			['mute', 'mute/create', 'write:mutes', 'userId'],
-			['unmute', 'mute/delete', 'write:mutes', 'userId'],
-		];
-		for (const [action, endpoint, scope, idKey] of actions) {
+		const actions = [
+			['follow', 'write:follows'], ['unfollow', 'write:follows'],
+			['block', 'write:blocks'], ['unblock', 'write:blocks'],
+			['mute', 'write:mutes'], ['unmute', 'write:mutes'],
+		] as const;
+		for (const [action, scope] of actions) {
 			fastify.post<{ Params: { id: string }; Body: Dictionary }>(`/api/v1/accounts/:id/${action}`, request => this.withAuth(request, scope, async auth => {
-				const data: Dictionary = { [idKey]: request.params.id };
-				if (action === 'mute') {
-					const duration = Number(this.string(request.body?.duration));
-					if (Number.isFinite(duration) && duration > 0) data.expiresAt = Date.now() + duration * 1000;
-				}
-				await this.invoke(endpoint, data, auth, request);
+				const user = await this.mastodonRelationshipService.action(action, request.params.id, request.body ?? {}, auth, request);
 				if (action === 'unfollow') await this.mastodonUserFeatureService.unendorse(auth.user.id, request.params.id);
-				const user = await this.invoke('users/show', { userId: request.params.id }, auth, request);
-				return this.mastodonEntityService.relationship(user as Packed<'UserDetailed'>);
+				return await this.mastodonRelationshipService.relationship(auth.user.id, user, this.mastodonEntityService.relationship(user));
 			}));
 		}
 		fastify.post<{ Params: { id: string }; Body: Dictionary }>('/api/v1/accounts/:id/note', request => this.withAuth(request, 'write:accounts', async auth => {
@@ -539,7 +554,7 @@ export class MastodonApiServerService {
 				withFiles: this.boolean(query.only_media),
 				localHostOnly: this.boolean(query.local),
 			})],
-			['/api/v1/timelines/list/:id', 'notes/user-list-timeline', 'read:statuses', (query, params) => ({ ...this.mastodonPaginationService.toMisskey(query), listId: params.id })],
+			['/api/v1/timelines/list/:id', 'notes/user-list-timeline', 'read:lists', (query, params) => ({ ...this.mastodonPaginationService.toMisskey(query), listId: params.id })],
 		];
 		fastify.get('/api/v1/timelines/home', (request, reply) => this.withAuth(request, 'read:statuses', async auth => {
 			const pagination = this.mastodonPaginationService.toMisskey(request.query as Dictionary);
@@ -597,8 +612,8 @@ export class MastodonApiServerService {
 			const reactions = await this.invoke('users/reactions', {
 				userId: auth.user.id,
 				...this.mastodonPaginationService.toMisskey(request.query as Dictionary, 100),
-			}, auth, request) as Array<{ id: string; note: Packed<'Note'> }>;
-			return this.page(request, reply, reactions, await this.statusesWithState(reactions.map(reaction => reaction.note), auth, 'home'));
+			}, auth, request) as Array<{ id: string; type: string; note: Packed<'Note'> }>;
+			return this.page(request, reply, reactions, await this.statusesWithState(reactions.filter(reaction => isMastodonFavourite(reaction.type)).map(reaction => reaction.note), auth, 'home'));
 		}));
 		fastify.get('/api/v1/blocks', (request, reply) => this.withAuth(request, 'read:blocks', async auth => {
 			const blockings = await this.invoke('blocking/list', this.mastodonPaginationService.toMisskey(request.query as Dictionary, 100), auth, request) as Packed<'Blocking'>[];
@@ -606,7 +621,21 @@ export class MastodonApiServerService {
 		}));
 		fastify.get('/api/v1/mutes', (request, reply) => this.withAuth(request, 'read:mutes', async auth => {
 			const mutings = await this.invoke('mute/list', this.mastodonPaginationService.toMisskey(request.query as Dictionary, 100), auth, request) as Packed<'Muting'>[];
-			return this.page(request, reply, mutings, mutings.map(muting => this.mastodonEntityService.account(muting.mutee)));
+			const compatibility = await this.mastodonRelationshipService.listMutes(auth.user.id);
+			const nativeUserIds = new Set(mutings.map(muting => muting.mutee.id));
+			const users: Packed<'UserDetailed'>[] = [];
+			for (let offset = 0; offset < compatibility.length; offset += 100) {
+				users.push(...await this.invoke('users/show', { userIds: compatibility.slice(offset, offset + 100).map(muting => muting.accountId) }, auth, request) as Packed<'UserDetailed'>[]);
+			}
+			const byId = new Map(users.map(user => [user.id, user]));
+			// A native mute always owns the pagination identity, even when its row
+			// falls on another page. Page-local deduplication would repeat accounts.
+			const extra = compatibility.filter(muting => !nativeUserIds.has(muting.accountId) && !byId.get(muting.accountId)?.isMuted);
+			const page = this.mastodonPaginationService.normalizePage([
+				...mutings.map(muting => ({ id: muting.id, user: muting.mutee })),
+				...extra.flatMap(muting => byId.has(muting.accountId) ? [{ id: muting.id, user: byId.get(muting.accountId)! }] : []),
+			], request.query as Dictionary, 80);
+			return this.page(request, reply, page, page.map(muting => this.mastodonEntityService.account(muting.user)));
 		}));
 	}
 
@@ -626,14 +655,10 @@ export class MastodonApiServerService {
 			return await this.statusWithState(note, auth, 'thread');
 		}));
 		fastify.get<{ Params: { id: string } }>('/api/v1/statuses/:id/context', request => this.withOptionalUser(request, 'read:statuses', async auth => {
-			const [ancestors, descendants] = await Promise.all([
-				this.invokePublic('notes/conversation', { noteId: request.params.id }, auth, request),
-				this.invokePublic('notes/children', { noteId: request.params.id, limit: 100 }, auth, request),
-			]);
-			const orderedAncestors = (ancestors as Packed<'Note'>[]).reverse();
+			const { ancestors, descendants } = await this.mastodonQueryService.context(request.params.id, auth, request);
 			return {
-				ancestors: await this.statusesWithState(orderedAncestors, auth, 'thread'),
-				descendants: await this.statusesWithState(descendants as Packed<'Note'>[], auth, 'thread'),
+				ancestors: await this.statusesWithState(ancestors, auth, 'thread'),
+				descendants: await this.statusesWithState(descendants, auth, 'thread'),
 			};
 		}));
 		fastify.get<{ Params: { id: string } }>('/api/v1/statuses/:id/source', request => this.withAuth(request, 'read:statuses', async auth => {
@@ -665,7 +690,7 @@ export class MastodonApiServerService {
 				renote: null,
 			}));
 			const voterCounts = await this.pollVoterCounts([note, ...historicalPollNotes]);
-			return this.mastodonEntityService.statusEdits(note, voterCounts, historicalRenotesById);
+			return await this.mastodonStatusMetadataService.decorateHistory(note.userId, note.id, this.mastodonEntityService.statusEdits(note, voterCounts, historicalRenotesById));
 		}));
 		fastify.post<{ Params: { id: string }; Body: Dictionary }>('/api/v1/statuses/:id/translate', request => this.withAuth(request, 'read:statuses', async auth => {
 			const query = request.query as Dictionary;
@@ -703,13 +728,13 @@ export class MastodonApiServerService {
 			return this.page(request, reply, renotes, reblogs.map(note => this.mastodonEntityService.account(note.user)));
 		}));
 		fastify.get<{ Params: { id: string } }>('/api/v1/statuses/:id/favourited_by', (request, reply) => this.withOptionalUser(request, 'read:statuses', async auth => {
-			const reactions = await this.invokePublic('notes/reactions', { noteId: request.params.id, ...this.mastodonPaginationService.toMisskey(request.query as Dictionary, 80) }, auth, request) as Array<{ id: string; user: Packed<'UserLite'> }>;
-			return this.page(request, reply, reactions, reactions.map(reaction => this.mastodonEntityService.account(reaction.user)));
+			const reactions = await this.invokePublic('notes/reactions', { noteId: request.params.id, ...this.mastodonPaginationService.toMisskey(request.query as Dictionary, 80) }, auth, request) as Array<{ id: string; type: string; user: Packed<'UserLite'> }>;
+			return this.page(request, reply, reactions, reactions.filter(reaction => isMastodonFavourite(reaction.type)).map(reaction => this.mastodonEntityService.account(reaction.user)));
 		}));
 		fastify.post<{ Body: Dictionary }>('/api/v1/statuses', request => this.withAuth(request, 'write:statuses', async auth => {
-			return await this.createStatus(request, auth);
+			return await this.mastodonStatusMetadataService.withWrite(auth.user.id, () => this.createStatus(request, auth));
 		}));
-		fastify.put<{ Params: { id: string }; Body: Dictionary }>('/api/v1/statuses/:id', request => this.withAuth(request, 'write:statuses', async auth => {
+		fastify.put<{ Params: { id: string }; Body: Dictionary }>('/api/v1/statuses/:id', request => this.withAuth(request, 'write:statuses', async auth => this.mastodonStatusMetadataService.withWrite(auth.user.id, async () => {
 			this.validateStatusUpdateSemantics(request.body ?? {});
 			const hasMediaIds = Object.hasOwn(request.body ?? {}, 'media_ids') || Object.hasOwn(request.body ?? {}, 'media_ids[]');
 			const fileIds = this.strings(request.body?.['media_ids[]'] ?? request.body?.media_ids);
@@ -717,11 +742,19 @@ export class MastodonApiServerService {
 			const current = await this.invoke('notes/show', { noteId: request.params.id }, auth, request) as Packed<'Note'>;
 			const effectiveFileIds = hasMediaIds ? fileIds : current.fileIds ?? [];
 			if (!hasMediaIds) this.validateStatusUpdateFileIds(effectiveFileIds);
-			const rawSensitive = request.body?.sensitive;
-			const isSensitive = rawSensitive == null ? null : this.profileBoolean(rawSensitive, 'sensitive');
-			if (isSensitive != null) {
-				await this.assertStatusUpdateMediaSensitivity(effectiveFileIds, isSensitive, current, auth);
+			const metadata = this.mastodonStatusMetadataService.parse(request.body ?? {});
+			if (current.channel?.isSensitive && metadata.sensitive === false) throw new MastodonApiError(422, 'unprocessable_entity', 'This channel requires sensitive statuses');
+			await this.mastodonMediaService.assertAvailable(effectiveFileIds, auth.user.id);
+			const newFileIds = effectiveFileIds.filter(id => !current.fileIds?.includes(id));
+			if (newFileIds.length > 0) {
+				const files = await this.driveFilesRepository.findBy({ id: In(newFileIds), userId: auth.user.id });
+				if (files.length !== newFileIds.length) throw new MastodonApiError(422, 'unprocessable_entity', 'One or more media attachments were not found');
 			}
+			const previous = await this.mastodonStatusMetadataService.decorate(current, {
+				language: null,
+				sensitive: current.channel?.isSensitive === true || current.files?.some(file => file.isSensitive) === true,
+			});
+			const previousCreatedAt = current.updatedAt ?? current.createdAt;
 			const result = await this.invoke('notes/update', {
 				noteId: request.params.id,
 				text: Object.hasOwn(request.body ?? {}, 'status')
@@ -730,8 +763,14 @@ export class MastodonApiServerService {
 				cw: Object.hasOwn(request.body ?? {}, 'spoiler_text') ? this.string(request.body?.spoiler_text) || null : current.cw ?? null,
 				...(hasMediaIds || effectiveFileIds.length > 0 ? { fileIds: effectiveFileIds } : {}),
 			}, auth, request) as { updatedNote: Packed<'Note'> };
+			await this.mastodonStatusMetadataService.save(auth.user.id, result.updatedNote.id, metadata, typeof previousCreatedAt === 'string' ? {
+				createdAt: previousCreatedAt,
+				language: previous.language as string | null,
+				sensitive: previous.sensitive === true,
+			} : undefined);
 			return await this.statusWithState(result.updatedNote, auth, 'thread');
-		}));
+		})));
+
 		fastify.delete<{ Params: { id: string } }>('/api/v1/statuses/:id', request => this.withAuth(request, 'write:statuses', async auth => {
 			const note = await this.invoke('notes/show', { noteId: request.params.id }, auth, request) as Packed<'Note'>;
 			const status = await this.statusWithState(note, auth, 'thread');
@@ -740,19 +779,21 @@ export class MastodonApiServerService {
 		}));
 
 		const actions: Array<[string, string, string, Dictionary]> = [
-			['favourite', 'notes/reactions/create', 'write:favourites', { reaction: '❤️' }],
-			['unfavourite', 'notes/reactions/delete', 'write:favourites', {}],
 			['bookmark', 'notes/favorites/create', 'write:bookmarks', {}],
 			['unbookmark', 'notes/favorites/delete', 'write:bookmarks', {}],
 		];
+		for (const action of ['favourite', 'unfavourite'] as const) {
+			fastify.post<{ Params: { id: string } }>(`/api/v1/statuses/:id/${action}`, request => this.withAuth(request, 'write:favourites', async auth => {
+				const note = await this.mastodonFavouriteService.set(request.params.id, action === 'favourite', auth, request);
+				return await this.statusWithState(note, auth, 'thread');
+			}));
+		}
 		for (const [action, endpoint, scope, extra] of actions) {
 			fastify.post<{ Params: { id: string } }>(`/api/v1/statuses/:id/${action}`, request => this.withAuth(request, scope, async auth => {
 				try {
 					await this.invoke(endpoint, { noteId: request.params.id, ...extra }, auth, request);
 				} catch (error) {
 					const isIdempotentActionError = error instanceof ApiError && (
-						(action === 'favourite' && error.code === 'ALREADY_REACTED') ||
-						(action === 'unfavourite' && error.code === 'NOT_REACTED') ||
 						(action === 'bookmark' && error.code === 'ALREADY_FAVORITED') ||
 						(action === 'unbookmark' && error.code === 'NOT_FAVORITED')
 					);
@@ -760,7 +801,6 @@ export class MastodonApiServerService {
 				}
 				const note = await this.invoke('notes/show', { noteId: request.params.id }, auth, request);
 				const status = await this.statusWithState(note as Packed<'Note'>, auth, 'thread');
-				if (action === 'favourite' || action === 'unfavourite') status.favourited = action === 'favourite';
 				if (action === 'bookmark' || action === 'unbookmark') status.bookmarked = action === 'bookmark';
 				return status;
 			}));
@@ -835,15 +875,13 @@ export class MastodonApiServerService {
 		fastify.post('/api/v1/media', request => this.upload(request));
 		fastify.post('/api/v2/media', request => this.upload(request));
 		fastify.get<{ Params: { id: string } }>('/api/v1/media/:id', request => this.withAuth(request, 'write:media', async auth => {
-			const file = await this.invoke('drive/files/show', { fileId: request.params.id }, auth, request);
-			return this.mastodonEntityService.attachment(file as Packed<'DriveFile'>);
+			return await this.mastodonMediaService.show(request.params.id, auth, request);
 		}));
 		fastify.put<{ Params: { id: string }; Body: Dictionary }>('/api/v1/media/:id', request => this.withAuth(request, 'write:media', async auth => {
-			const file = await this.invoke('drive/files/update', { fileId: request.params.id, comment: this.string(request.body?.description) ?? null }, auth, request);
-			return this.mastodonEntityService.attachment(file as Packed<'DriveFile'>);
+			return await this.mastodonMediaService.update(request.params.id, request.body ?? {}, auth, request);
 		}));
 		fastify.delete<{ Params: { id: string } }>('/api/v1/media/:id', request => this.withAuth(request, 'write:media', async auth => {
-			await this.invoke('drive/files/delete', { fileId: request.params.id }, auth, request);
+			await this.mastodonMediaService.remove(request.params.id, auth);
 			return {};
 		}));
 	}
@@ -852,7 +890,7 @@ export class MastodonApiServerService {
 		if (Object.keys(body).some(key => key === 'poll' || key.startsWith('poll['))) {
 			throw new MastodonApiError(422, 'unprocessable_entity', 'Poll changes cannot be persisted by this server');
 		}
-		// Mastodon clients commonly send language by default. Notes cannot persist it, so accept and ignore it.
+		this.mastodonStatusMetadataService.parse(body);
 		const quoteApprovalPolicy = this.string(body.quote_approval_policy);
 		if (quoteApprovalPolicy != null && quoteApprovalPolicy !== '' && quoteApprovalPolicy !== 'public') {
 			throw new MastodonApiError(422, 'unprocessable_entity', `Unsupported quote approval policy: ${quoteApprovalPolicy}`);
@@ -1080,6 +1118,10 @@ export class MastodonApiServerService {
 							: [],
 						hashtags: [],
 					};
+				}
+				if (resolve && auth != null && accountsInScope) {
+					const account = await this.mastodonQueryService.resolveAccount(q, auth, request);
+					if (account != null) return { accounts: offset === 0 ? [this.mastodonEntityService.account(account)] : [], statuses: [], hashtags: [] };
 				}
 
 				const accountId = this.string(query.account_id);
@@ -1494,11 +1536,11 @@ export class MastodonApiServerService {
 				...this.mastodonPaginationService.toMisskey(request.query as Dictionary, 100),
 				scheduled: true,
 			}, auth, request) as Packed<'NoteDraft'>[];
-			return this.page(request, reply, drafts, drafts.map(draft => this.mastodonEntityService.scheduledStatus(draft)));
+			return this.page(request, reply, drafts, await Promise.all(drafts.map(draft => this.scheduledStatus(draft, auth.user.id))));
 		}));
 		fastify.get<{ Params: { id: string } }>('/api/v1/scheduled_statuses/:id', request => this.withAuth(request, 'read:statuses', async auth => {
 			const draft = await this.mastodonScheduledStatusService.get(auth.user, request.params.id);
-			return this.mastodonEntityService.scheduledStatus(draft);
+			return await this.scheduledStatus(draft, auth.user.id);
 		}));
 		fastify.put<{ Params: { id: string }; Body: Dictionary }>('/api/v1/scheduled_statuses/:id', request => this.withAuth(request, 'write:statuses', async auth => {
 			await this.mastodonScheduledStatusService.get(auth.user, request.params.id);
@@ -1508,13 +1550,24 @@ export class MastodonApiServerService {
 				scheduledAt: scheduledAt.getTime(),
 				isActuallyScheduled: true,
 			}, auth, request) as { updatedDraft: Packed<'NoteDraft'> };
-			return this.mastodonEntityService.scheduledStatus(result.updatedDraft);
+			return await this.scheduledStatus(result.updatedDraft, auth.user.id);
 		}));
 		fastify.delete<{ Params: { id: string } }>('/api/v1/scheduled_statuses/:id', request => this.withAuth(request, 'write:statuses', async auth => {
 			await this.mastodonScheduledStatusService.get(auth.user, request.params.id);
 			await this.invoke('notes/drafts/delete', { draftId: request.params.id }, auth, request);
+			await this.mastodonApiStateService.delete(auth.user.id, 'status_metadata', request.params.id);
 			return {};
 		}));
+	}
+
+	private async scheduledStatus(draft: Packed<'NoteDraft'>, userId: string): Promise<Dictionary> {
+		const status = this.mastodonEntityService.scheduledStatus(draft);
+		const row = await this.mastodonApiStateService.get(userId, 'status_metadata', draft.id);
+		return {
+			...status,
+			...(row == null ? {} : { params: { ...status.params, ...row.value as Dictionary } }),
+			...(Array.isArray(status.media_attachments) ? { media_attachments: await Promise.all(status.media_attachments.map(attachment => this.mastodonMediaService.decorate(userId, attachment))) } : {}),
+		};
 	}
 
 	private async updateProfile(request: MastodonRequest, response: 'profile' | 'credential-account'): Promise<Dictionary> {
@@ -1554,6 +1607,7 @@ export class MastodonApiServerService {
 				}
 
 				const update = this.profileUpdateData(body);
+				const preferences = this.mastodonStatusMetadataService.parsePreferences(body);
 				for (const upload of uploads) {
 					const file = await this.mastodonApiCallService.invoke('drive/files/create', {
 						name: upload.filename,
@@ -1561,10 +1615,11 @@ export class MastodonApiServerService {
 					update[upload.fieldname === 'avatar' ? 'avatarId' : 'bannerId'] = file.id;
 				}
 				await this.invoke('i/update', update, auth, request);
+				await this.mastodonStatusMetadataService.savePreferences(auth.user.id, preferences);
 				const user = await this.invoke('i', {}, auth, request) as Packed<'MeDetailed'>;
 				return response === 'profile'
 					? this.mastodonEntityService.profile(user)
-					: this.mastodonEntityService.credentialAccount(user);
+					: await this.mastodonStatusMetadataService.credentialAccount(auth.user.id, this.mastodonEntityService.credentialAccount(user));
 			} finally {
 				for (const cleanup of cleanups) cleanup();
 			}
@@ -1596,24 +1651,9 @@ export class MastodonApiServerService {
 		const fields = this.profileFields(body);
 		if (fields != null) update.fields = fields;
 
-		const source = body.source != null && typeof body.source === 'object' && !Array.isArray(body.source)
-			? body.source as Dictionary
-			: {};
-		const nested = (name: string): { present: boolean; value: unknown } => {
-			const flat = `source[${name}]`;
-			if (Object.hasOwn(body, flat)) return { present: true, value: body[flat] };
-			return Object.hasOwn(source, name) ? { present: true, value: source[name] } : { present: false, value: undefined };
-		};
 		const unsupported = (name: string) => {
 			throw new MastodonApiError(422, 'unprocessable_entity', `${name} is not supported by this server`);
 		};
-
-		const privacy = nested('privacy');
-		if (privacy.present && privacy.value !== 'public') unsupported('source[privacy]');
-		const sensitive = nested('sensitive');
-		if (sensitive.present && this.profileBoolean(sensitive.value, 'source[sensitive]') !== false) unsupported('source[sensitive]');
-		const language = nested('language');
-		if (language.present && language.value != null && language.value !== '') unsupported('source[language]');
 
 		for (const name of ['avatar_description', 'header_description'] as const) {
 			if (!Object.hasOwn(body, name)) continue;
@@ -1717,20 +1757,35 @@ export class MastodonApiServerService {
 
 	private async upload(request: MastodonRequest) {
 		return await this.withAuth(request, 'write:media', async auth => {
-			const multipartData = await request.file().catch(() => null);
-			if (multipartData == null) throw new MastodonApiError(400, 'invalid_request', 'file is required');
-			const [path, cleanup] = await createTemp();
+			const body: Dictionary = {};
+			const cleanups: Array<() => void> = [];
+			let upload: { name: string; path: string } | undefined;
 			try {
-				await pipeline(multipartData.file, fs.createWriteStream(path));
-				if (multipartData.file.truncated) throw new MastodonApiError(413, 'file_too_large', 'File is too large');
-				const fields = multipartData.fields as Record<string, { value?: unknown }>;
+				for await (const part of request.parts()) {
+					if (part.type === 'field') {
+						body[part.fieldname] = part.value;
+						continue;
+					}
+					if (part.fieldname !== 'file' || upload != null) {
+						part.file.resume();
+						throw new MastodonApiError(422, 'unprocessable_entity', 'Exactly one file upload is supported');
+					}
+					const [path, cleanup] = await createTemp();
+					cleanups.push(cleanup);
+					await pipeline(part.file, fs.createWriteStream(path));
+					if (part.file.truncated) throw new MastodonApiError(413, 'file_too_large', 'File is too large');
+					upload = { name: part.filename, path };
+				}
+				if (upload == null) throw new MastodonApiError(400, 'invalid_request', 'file is required');
+				const metadata = this.mastodonMediaService.validate(body);
 				const file = await this.mastodonApiCallService.invoke('drive/files/create', {
-					name: multipartData.filename,
-					comment: this.string(fields.description?.value) ?? null,
-				}, auth, request, { name: multipartData.filename, path });
-				return this.mastodonEntityService.attachment(file as Packed<'DriveFile'>);
+					name: upload.name,
+					comment: this.string(body.description) ?? null,
+					force: true,
+				}, auth, request, upload) as Packed<'DriveFile'>;
+				return await this.mastodonMediaService.register(file, auth.user.id, metadata);
 			} finally {
-				cleanup();
+				for (const cleanup of cleanups) cleanup();
 			}
 		});
 	}
@@ -1743,6 +1798,7 @@ export class MastodonApiServerService {
 		}
 		const scheduledAt = this.parseScheduledAt(body.scheduled_at, false);
 		const fileIds = this.strings(body['media_ids[]'] ?? body.media_ids);
+		this.validateStatusUpdateFileIds(fileIds);
 		const poll = this.parseStatusPoll(body, fileIds);
 		const idempotencyKey = this.string(request.headers['idempotency-key']);
 		const cacheKey = idempotencyKey == null || idempotencyKey === ''
@@ -1756,10 +1812,12 @@ export class MastodonApiServerService {
 		}
 
 		try {
+			const preferences = await this.mastodonStatusMetadataService.preferences(auth.user.id);
+			const metadata = { language: preferences.language, ...(preferences.sensitive ? { sensitive: true } : {}), ...this.mastodonStatusMetadataService.parse(body) };
 			const text = this.string(body.status) ?? null;
-			const visibility = this.string(body.visibility) ?? 'public';
+			const visibility = this.string(body.visibility) ?? preferences.privacy;
 			const misskeyVisibility = this.toMisskeyVisibility(visibility);
-			await this.updateMediaSensitivity(fileIds, body.sensitive, auth, request);
+			await this.mastodonMediaService.assertAvailable(fileIds, auth.user.id);
 			const replyId = this.string(body.in_reply_to_id) ?? null;
 			const renoteId = this.string(body.quoted_status_id) ?? null;
 			const visibleUserIds = misskeyVisibility === 'specified'
@@ -1781,13 +1839,15 @@ export class MastodonApiServerService {
 					scheduledAt: scheduledAt.getTime(),
 					isActuallyScheduled: true,
 				}, auth, request) as { createdDraft: Packed<'NoteDraft'> };
-				const scheduledStatus = this.mastodonEntityService.scheduledStatus(result.createdDraft);
-				if (cacheKey != null) await this.redis.set(cacheKey, JSON.stringify(scheduledStatus), 'EX', 86400);
-				return scheduledStatus;
+				await this.mastodonStatusMetadataService.save(auth.user.id, result.createdDraft.id, metadata);
+				const decorated = await this.scheduledStatus(result.createdDraft, auth.user.id);
+				if (cacheKey != null) await this.redis.set(cacheKey, JSON.stringify(decorated), 'EX', 86400);
+				return decorated;
 			}
 			const result = await this.invoke('notes/create', {
 				...common,
 			}, auth, request) as { createdNote: Packed<'Note'> };
+			await this.mastodonStatusMetadataService.save(auth.user.id, result.createdNote.id, metadata);
 			const status = await this.statusWithState(result.createdNote, auth, 'thread');
 			if (cacheKey != null) await this.redis.set(cacheKey, JSON.stringify(status), 'EX', 86400);
 			return status;
@@ -1797,7 +1857,7 @@ export class MastodonApiServerService {
 	}
 
 	private validateStatusCreateSemantics(body: Dictionary): void {
-		// Mastodon clients commonly send language by default. Notes cannot persist it, so accept and ignore it.
+		this.mastodonStatusMetadataService.parse(body);
 		if (Object.keys(body).some(key => key === 'allowed_mentions' || key.startsWith('allowed_mentions['))) {
 			throw new MastodonApiError(422, 'unprocessable_entity', 'Allowed mention constraints cannot be enforced by this server');
 		}
@@ -1928,10 +1988,8 @@ export class MastodonApiServerService {
 			...query,
 			limit: typeof rawLimit === 'string' || typeof rawLimit === 'number' ? rawLimit : defaultLimit,
 		}, maximum);
-		return items
-			.filter(item => pagination.untilId == null || item.id < pagination.untilId)
-			.filter(item => pagination.sinceId == null || item.id > pagination.sinceId)
-			.slice(0, pagination.limit);
+		if (!['max_id', 'min_id', 'since_id'].some(key => query[key] != null)) return items.slice(0, pagination.limit);
+		return this.mastodonPaginationService.normalizePage(items, { ...query, limit: pagination.limit }, maximum);
 	}
 
 	private normalizedHashtag(value: string): string {
@@ -1952,7 +2010,7 @@ export class MastodonApiServerService {
 		const voterCountsPromise = this.pollVoterCounts(notes);
 		if (auth == null) {
 			const voterCounts = await voterCountsPromise;
-			return notes.map(note => this.mastodonEntityService.status(note, voterCounts));
+			return await Promise.all(notes.map(note => this.mastodonStatusMetadataService.decorate(note, this.mastodonEntityService.status(note, voterCounts))));
 		}
 		const rootNoteIds = [...new Set(notes.map(note => note.id))];
 		const noteIds = this.collectNoteIds(notes);
@@ -1966,15 +2024,16 @@ export class MastodonApiServerService {
 		const renotedIds = new Set(renotes.flatMap(renote => renote.renoteId == null || !this.isPureRenote(renote) ? [] : [renote.renoteId]));
 		const bookmarkedIds = new Set(favorites.map(favorite => favorite.noteId));
 		const pinnedIds = new Set(pinings.map(pining => pining.noteId));
-		const statuses = notes.map(note => ({
-			...this.applyMutedState(this.mastodonEntityService.status(note, voterCounts), mutedNoteIds),
+		const statuses = await Promise.all(notes.map(async note => ({
+			...this.applyMutedState(await this.mastodonStatusMetadataService.decorate(note, this.mastodonEntityService.status(note, voterCounts)), mutedNoteIds),
 			reblogged: renotedIds.has(note.id),
 			bookmarked: bookmarkedIds.has(note.id),
 			pinned: pinnedIds.has(note.id),
 			muted: mutedNoteIds.has(note.id),
-		}));
+		})));
 		const corpora = new Map(notes.map(note => [note.id, this.filterCorpus(note)]));
-		return await this.mastodonFilterService.apply(auth.user.id, context, statuses, { ...options, corpora });
+		const visibleStatuses = options.preserveHidden ? statuses : await this.mastodonRelationshipService.filterStatuses(auth.user.id, statuses, context);
+		return await this.mastodonFilterService.apply(auth.user.id, context, visibleStatuses, { ...options, corpora });
 	}
 
 	private async pollVoterCounts(notes: Packed<'Note'>[]): Promise<ReadonlyMap<string, number>> {
@@ -2016,7 +2075,12 @@ export class MastodonApiServerService {
 		const converted = notifications
 			.map(notification => this.mastodonEntityService.notification(notification, voterCounts))
 			.filter(value => value != null) as Dictionary[];
-		const filtered = await this.notificationFilters(auth.user.id, converted, notifications);
+		const related = await this.mastodonRelationshipService.filterNotifications(auth.user.id, converted);
+		for (const notification of related) {
+			const source = notifications.find(item => item.id === notification.id);
+			if (source?.note != null && notification.status != null) notification.status = await this.mastodonStatusMetadataService.decorate(source.note, notification.status as Dictionary);
+		}
+		const filtered = await this.notificationFilters(auth.user.id, related, notifications);
 		const entitiesById = new Map(filtered.flatMap(entity => {
 			const id = this.string(entity.id);
 			return id == null ? [] : [[id, entity] as const];
@@ -2188,46 +2252,6 @@ export class MastodonApiServerService {
 		return [...users];
 	}
 
-	private async updateMediaSensitivity(fileIds: string[], rawSensitive: unknown, auth: MastodonUserAuth, request: MastodonRequest): Promise<void> {
-		if (rawSensitive == null) return;
-		const isSensitive = this.profileBoolean(rawSensitive, 'sensitive');
-		for (const fileId of fileIds) {
-			await this.invoke('drive/files/update', { fileId, isSensitive }, auth, request);
-		}
-	}
-
-	private async assertStatusUpdateMediaSensitivity(
-		fileIds: string[],
-		isSensitive: boolean,
-		current: Packed<'Note'>,
-		auth: MastodonUserAuth,
-	): Promise<void> {
-		const currentFilesById = new Map<string, Pick<MiDriveFile, 'id' | 'isSensitive'>>(
-			(current.files ?? []).map(file => [file.id, file]),
-		);
-		const unresolvedFileIds = fileIds.filter(fileId => !currentFilesById.has(fileId));
-		if (unresolvedFileIds.length > 0) {
-			const resolvedFiles = await this.driveFilesRepository.findBy({
-				id: In(unresolvedFileIds),
-				userId: auth.user.id,
-			});
-			for (const file of resolvedFiles) currentFilesById.set(file.id, file);
-			if (resolvedFiles.length !== unresolvedFileIds.length) {
-				throw new MastodonApiError(422, 'unprocessable_entity', 'One or more media attachments were not found');
-			}
-		}
-		const effectiveFiles = fileIds.map(fileId => currentFilesById.get(fileId)!);
-		const effectiveSensitive = current.channel?.isSensitive === true ||
-			effectiveFiles.some(file => file.isSensitive);
-		if (effectiveSensitive !== isSensitive) {
-			throw new MastodonApiError(
-				422,
-				'unprocessable_entity',
-				'Changing media sensitivity while editing a status is not supported atomically',
-			);
-		}
-	}
-
 	private sanitizeHistoricalQuote(note: Packed<'Note'>, depth = 1): Packed<'Note'> {
 		return {
 			...note,
@@ -2345,18 +2369,27 @@ export class MastodonApiServerService {
 	}
 
 	private async invoke(name: string, data: Dictionary, auth: MastodonUserAuth, request: MastodonRequest): Promise<unknown> {
-		return await this.mastodonApiCallService.invoke(name, data, auth, request);
+		return this.normalizeNativePage(await this.mastodonApiCallService.invoke(name, data, auth, request), name, data, request);
 	}
 
 	private async invokePublic(name: string, data: Dictionary, auth: MastodonUserAuth | null, request: MastodonRequest): Promise<unknown> {
 		try {
-			return await this.mastodonApiCallService.invokePublic(name, data, auth, request);
+			return this.normalizeNativePage(await this.mastodonApiCallService.invokePublic(name, data, auth, request), name, data, request);
 		} catch (error) {
 			if (this.isPublicRecordUnavailableError(error)) {
 				throw new MastodonApiError(404, 'not_found', 'Record not found');
 			}
 			throw error;
 		}
+	}
+
+	private normalizeNativePage(result: unknown, name: string, data: Dictionary, request: MastodonRequest): unknown {
+		const query = (request.query ?? {}) as Dictionary;
+		if (typeof data.limit !== 'number' || !['max_id', 'min_id', 'since_id'].some(key => query[key] != null)) return result;
+		if (request.routeOptions.url?.startsWith('/api/v1/notifications/requests')) return result;
+		if (request.routeOptions.url === '/api/v2/search' && name !== 'notes/search') return result;
+		if (!Array.isArray(result) || !result.every(item => item != null && typeof item.id === 'string')) return result;
+		return this.mastodonPaginationService.normalizePage(result, { ...query, limit: data.limit }, data.limit);
 	}
 
 	private isPublicRecordUnavailableError(error: unknown): boolean {
@@ -2420,7 +2453,8 @@ export class MastodonApiServerService {
 	private async quotePage(noteId: string, request: MastodonRequest, auth: MastodonUserAuth | null): Promise<{ quotes: Packed<'Note'>[]; source: { id: string }[] }> {
 		const nativeBatchLimit = 100;
 		const pagination = this.mastodonPaginationService.toMisskey(request.query as Dictionary, 40);
-		const newerTraversal = pagination.sinceId != null && pagination.untilId == null;
+		const query = request.query as Dictionary;
+		const newerTraversal = typeof query.min_id === 'string' && query.min_id !== '';
 		const quotes: Packed<'Note'>[] = [];
 		let untilId = pagination.untilId;
 		let sinceId = pagination.sinceId;
@@ -2429,7 +2463,7 @@ export class MastodonApiServerService {
 		let nativeExhausted = false;
 
 		while (!nativeExhausted && pagesScanned < 10 && quotes.length < pagination.limit + 1) {
-			const renotes = await this.invokePublic('notes/renotes', {
+			const renotes = await this.mastodonApiCallService.invokePublic('notes/renotes', {
 				noteId,
 				...(newerTraversal ? {} : pagination),
 				limit: nativeBatchLimit,
@@ -2450,7 +2484,7 @@ export class MastodonApiServerService {
 			nativeExhausted = renotes.length < nativeBatchLimit;
 		}
 
-		const page = (newerTraversal ? [...quotes].reverse() : quotes).slice(0, pagination.limit);
+		const page = this.mastodonPaginationService.normalizePage(quotes, { ...query, limit: pagination.limit }, 40);
 		const source = page.flatMap(note => note.id == null ? [] : [{ id: note.id }]);
 		if (!nativeExhausted && pagesScanned === 10 && quotes.length < pagination.limit + 1 && lastSourceId != null) {
 			if (newerTraversal) {

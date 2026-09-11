@@ -10146,6 +10146,148 @@ export interface Locale extends ILocale {
          * このアプリケーションは既にアクセスが許可されています。
          */
         "alreadyAuthorized": string;
+        /**
+         * 認証コード
+         */
+        "authorizationCode": string;
+        /**
+         * この認証コードをコピーし、アプリケーションに貼り付けてください。
+         */
+        "copyAuthorizationCode": string;
+        /**
+         * 認証したアカウントが選択したアカウントと一致しません。選択したアカウントでログインしてください。
+         */
+        "accountMismatch": string;
+        /**
+         * Mastodon API の権限
+         */
+        "mastodonPermissions": string;
+        "_mastodonScopes": {
+            /**
+             * 自分のプロフィールを読み取る
+             */
+            "profile": string;
+            /**
+             * アカウント、投稿、通知などの情報を読み取る
+             */
+            "read": string;
+            /**
+             * アカウント、投稿、設定などを変更する
+             */
+            "write": string;
+            /**
+             * フォロー、ブロック、ミュートを読み取り、変更する
+             */
+            "follow": string;
+            /**
+             * プッシュ通知を受信する
+             */
+            "push": string;
+            /**
+             * アカウントの情報を読み取る
+             */
+            "read:accounts": string;
+            /**
+             * ブロックを読み取る
+             */
+            "read:blocks": string;
+            /**
+             * ブックマークを読み取る
+             */
+            "read:bookmarks": string;
+            /**
+             * おすすめユーザーのコレクションを読み取る
+             */
+            "read:collections": string;
+            /**
+             * お気に入りにした投稿を読み取る
+             */
+            "read:favourites": string;
+            /**
+             * フィルターを読み取る
+             */
+            "read:filters": string;
+            /**
+             * フォローを読み取る
+             */
+            "read:follows": string;
+            /**
+             * リストとリストのタイムラインを読み取る
+             */
+            "read:lists": string;
+            /**
+             * ミュートを読み取る
+             */
+            "read:mutes": string;
+            /**
+             * 通知を読み取る
+             */
+            "read:notifications": string;
+            /**
+             * 検索する
+             */
+            "read:search": string;
+            /**
+             * 投稿を読み取る
+             */
+            "read:statuses": string;
+            /**
+             * アカウントの情報を変更する
+             */
+            "write:accounts": string;
+            /**
+             * ブロックを変更する
+             */
+            "write:blocks": string;
+            /**
+             * ブックマークを変更する
+             */
+            "write:bookmarks": string;
+            /**
+             * おすすめユーザーのコレクションを作成、変更、削除する
+             */
+            "write:collections": string;
+            /**
+             * 会話を変更する
+             */
+            "write:conversations": string;
+            /**
+             * 投稿のお気に入りを変更する
+             */
+            "write:favourites": string;
+            /**
+             * フィルターを変更する
+             */
+            "write:filters": string;
+            /**
+             * フォローを変更する
+             */
+            "write:follows": string;
+            /**
+             * リストを変更する
+             */
+            "write:lists": string;
+            /**
+             * メディアをアップロード、変更する
+             */
+            "write:media": string;
+            /**
+             * ミュートを変更する
+             */
+            "write:mutes": string;
+            /**
+             * 通知を変更する
+             */
+            "write:notifications": string;
+            /**
+             * 通報する
+             */
+            "write:reports": string;
+            /**
+             * 投稿を作成、変更、削除する
+             */
+            "write:statuses": string;
+        };
     };
     "_antennaSources": {
         /**

@@ -115,6 +115,7 @@ describe('api:i/apps', () => {
 			createdAt: '2026-07-15T00:00:00.000Z',
 			lastUsedAt: '2026-07-15T01:00:00.000Z',
 			permission: expect.arrayContaining(['read:account', 'write:notes']),
+			mastodonScopes: ['read:accounts', 'write:statuses'],
 			iconUrl: null,
 			description: 'https://tusky.app/',
 		});
@@ -122,6 +123,15 @@ describe('api:i/apps', () => {
 			where: { userId: 'user-id' },
 			relations: { client: true },
 		});
+	});
+
+	test('keeps compatibility-only scopes visible without creating native permissions', async () => {
+		const { endpoint } = createEndpoint({ mastodonTokens: [createMastodonToken({ scopes: ['push', 'write:collections'] })] });
+		await expect(endpoint.exec({}, me, null)).resolves.toContainEqual(expect.objectContaining({
+			id: 'mastodon-token-id',
+			permission: [],
+			mastodonScopes: ['push', 'write:collections'],
+		}));
 	});
 
 	test('preserves the native token projection', async () => {

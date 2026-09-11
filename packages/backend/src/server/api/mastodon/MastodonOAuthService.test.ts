@@ -80,7 +80,7 @@ describe(MastodonOAuthService, () => {
 			name: 'Elk',
 			client_id: 'client-id',
 			client_secret_expires_at: 0,
-			redirect_uri: 'https://elk.example/callback',
+			redirect_uri: 'https://elk.example/callback\nmyapp://oauth',
 			redirect_uris: ['https://elk.example/callback', 'myapp://oauth'],
 			scopes: ['read', 'write', 'follow', 'push'],
 			website: 'https://elk.example/',
@@ -101,6 +101,14 @@ describe(MastodonOAuthService, () => {
 		await expect(service.registerApplication({ client_name: '', redirect_uris: 'https://client.example/cb' })).rejects.toMatchObject({ statusCode: 422 });
 		await expect(service.registerApplication({ client_name: 'Client', redirect_uris: 'http://client.example/cb' })).rejects.toMatchObject({ statusCode: 422 });
 		await expect(service.registerApplication({ client_name: 'Client', redirect_uris: 'https://client.example/cb', scopes: 'unknown' })).rejects.toMatchObject({ statusCode: 422 });
+	});
+
+	test('accepts registered redirect arrays from bracket-encoded forms', async () => {
+		const { service } = createService();
+		const application = await service.registerApplication({ client_name: 'App', 'redirect_uris[]': ['https://app.example/callback', 'app://callback'] } as never);
+		expect(application.redirect_uris).toEqual(['https://app.example/callback', 'app://callback']);
+		expect(application.redirect_uri).toBe('https://app.example/callback\napp://callback');
+		await expect(service.registerApplication(undefined as never)).rejects.toMatchObject({ statusCode: 422 });
 	});
 
 	test('returns array-valued scopes from a registered application', async () => {
@@ -150,6 +158,13 @@ describe(MastodonOAuthService, () => {
 			scopes: ['read'],
 			tokenHash: digestCredential(token.access_token),
 		}));
+	});
+
+	test('accepts case-insensitive Basic authentication with form-encoded credentials', async () => {
+		const clientSecret = 'secret + : value';
+		const { service } = createService({ clients: { findOneBy: vi.fn().mockResolvedValue({ id: 'client-id', secretHash: digestCredential(clientSecret), scopes: ['read'], redirectUris: ['app://callback'] }) } });
+		const formSecret = new URLSearchParams({ secret: clientSecret }).toString().slice('secret='.length);
+		await expect(service.exchangeToken({ grant_type: 'client_credentials' }, `bAsIc ${Buffer.from(`client-id:${formSecret}`).toString('base64')}`)).resolves.toMatchObject({ scope: 'read' });
 	});
 
 	test('rejects application-token scopes outside the registered grant', async () => {
@@ -269,6 +284,22 @@ describe(MastodonOAuthService, () => {
 		})).resolves.toMatchObject({ token_type: 'Bearer', scope: 'read:accounts' });
 	});
 
+	test('preserves compatibility scopes and OAuth presentation options through OOB authorization', async () => {
+		const { service } = createService({
+			clients: { findOneBy: vi.fn().mockResolvedValue({ id: 'client-id', name: 'App', scopes: ['push', 'read:collections', 'write:collections'], redirectUris: ['urn:ietf:wg:oauth:2.0:oob'] }) },
+			redis: new FakeRedis(),
+			cache: { localUserByNativeTokenCache: { fetch: vi.fn().mockResolvedValue({ id: 'user-id' }) } },
+		});
+		const authorization = await service.beginAuthorization({ client_id: 'client-id', response_type: 'code', redirect_uri: 'urn:ietf:wg:oauth:2.0:oob', scope: 'push read:collections write:collections', force_login: 'true', lang: 'ja' });
+		expect(authorization).toMatchObject({ mastodonScopes: ['push', 'read:collections', 'write:collections'], forceLogin: true, language: 'ja-JP' });
+		expect(await service.decide(authorization.transactionId, 'native-token', false)).toMatchObject({ redirectUri: 'urn:ietf:wg:oauth:2.0:oob', language: 'ja-JP', parameters: { code: expect.any(String) } });
+	});
+
+	test.each(['0', 'f', 'FALSE', 'off', ''])('does not force login for the OAuth false value %s', async forceLogin => {
+		const { service } = createService({ clients: { findOneBy: vi.fn().mockResolvedValue({ id: 'client-id', name: 'App', scopes: ['read'], redirectUris: ['app://callback'] }) } });
+		expect(await service.beginAuthorization({ client_id: 'client-id', response_type: 'code', redirect_uri: 'app://callback', force_login: forceLogin, lang: 'unknown' })).toMatchObject({ forceLogin: false, language: undefined });
+	});
+
 	test('revokes a token when an authorization code is replayed concurrently', async () => {
 		const redis = new FakeRedis();
 		const clientSecret = 'client-secret';
@@ -313,5 +344,17 @@ describe(MastodonOAuthService, () => {
 
 		await expect(service.revoke({ client_id: 'client-id', client_secret: clientSecret, token: 'raw-token' })).resolves.toBeUndefined();
 		expect(tokenDelete).toHaveBeenCalledWith({ id: 'token-id', clientId: 'client-id' });
+	});
+
+	test('rejects missing and other-client tokens while preserving idempotent revocation', async () => {
+		const clientSecret = 'client-secret';
+		const findOneBy = vi.fn().mockResolvedValue({ id: 'token-id', clientId: 'other-client' });
+		const { service, tokenDelete } = createService({ clients: { findOneBy: vi.fn().mockResolvedValue({ id: 'client-id', secretHash: digestCredential(clientSecret) }) }, tokens: { findOneBy } });
+		const credentials = { client_id: 'client-id', client_secret: clientSecret };
+		await expect(service.revoke(credentials)).rejects.toMatchObject({ statusCode: 403, error: 'unauthorized_client' });
+		await expect(service.revoke({ ...credentials, token: 'other-token' })).rejects.toMatchObject({ statusCode: 403, error: 'unauthorized_client' });
+		expect(tokenDelete).not.toHaveBeenCalled();
+		findOneBy.mockResolvedValueOnce(null);
+		await expect(service.revoke({ ...credentials, token: 'already-revoked' })).resolves.toBeUndefined();
 	});
 });

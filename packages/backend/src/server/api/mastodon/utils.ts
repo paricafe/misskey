@@ -5,6 +5,10 @@
 
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 
+export function isMastodonFavourite(reaction: string | null | undefined): boolean {
+	return reaction?.replace(/\ufe0f/gu, '') === '\u2764';
+}
+
 const OOB_REDIRECT_URI = 'urn:ietf:wg:oauth:2.0:oob';
 const FORBIDDEN_REDIRECT_PROTOCOLS = new Set([
 	'data:',

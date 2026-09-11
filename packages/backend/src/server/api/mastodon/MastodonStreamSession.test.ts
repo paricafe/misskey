@@ -5,6 +5,8 @@
 
 import { EventEmitter } from 'node:events';
 import { describe, expect, test, vi } from 'vitest';
+import type { Packed } from '@/misc/json-schema.js';
+import type { MastodonFilterContext } from './MastodonFilterService.js';
 import { MastodonStreamSession, type MastodonStreamOutput } from './MastodonStreamSession.js';
 
 function createSession(options: {
@@ -16,6 +18,10 @@ function createSession(options: {
 	refreshConversation?: (conversationId: string) => Promise<Record<string, unknown> | null>;
 	scopes?: string[];
 	allows?: (scope: string) => boolean;
+	resolveNote?: (noteId: string) => Promise<Packed<'Note'> | null>;
+	decorateStatus?: (note: Packed<'Note'>, status: Record<string, unknown>) => Promise<Record<string, unknown>>;
+	filterStatuses?: (statuses: Record<string, unknown>[], context: MastodonFilterContext) => Promise<Record<string, unknown>[]>;
+	filterNotifications?: (notifications: Record<string, unknown>[]) => Promise<Record<string, unknown>[]>;
 } = {}) {
 	const subscriber = new EventEmitter();
 	let nativeSocket: { send: (data: string | Buffer) => void; emit: (event: string, data: Buffer) => boolean } | undefined;
@@ -50,6 +56,7 @@ function createSession(options: {
 		lastStatus: note(noteId, { visibility: 'specified' }),
 	}));
 	const refreshLive = vi.fn(async (_user, conversationId: string) => options.refreshConversation?.(conversationId) ?? null);
+	const resolveNote = vi.fn(async (noteId: string) => options.resolveNote ? await options.resolveNote(noteId) : note(noteId) as unknown as Packed<'Note'>);
 	const session = new MastodonStreamSession({
 		auth: {
 			kind: 'user',
@@ -72,6 +79,10 @@ function createSession(options: {
 			listFollowedTags: vi.fn(async () => (options.followedTags ?? []).map((name, index) => ({ id: `${index}`, name }))),
 		} as never,
 		mastodonConversationService: { upsertLive, refreshLive } as never,
+		resolveNote,
+		decorateStatus: options.decorateStatus,
+		filterStatuses: options.filterStatuses,
+		filterNotifications: options.filterNotifications,
 		send: output => { outputs.push(output); },
 		close,
 	});
@@ -88,6 +99,7 @@ function createSession(options: {
 		filterApply,
 		upsertLive,
 		refreshLive,
+		resolveNote,
 		frame(value: unknown) {
 			if (nativeSocket == null) throw new Error('session has not started');
 			nativeSocket.send(JSON.stringify(value));
@@ -365,7 +377,7 @@ describe(MastodonStreamSession, () => {
 	});
 
 	test('keeps hashtag and list multiplex identities independent and duplicate subscribe idempotent', async () => {
-		const { session, nativeStream } = createSession();
+		const { session, nativeStream, outputs } = createSession();
 		await session.start();
 		await session.subscribe({ stream: 'hashtag', tags: ['alpha'] });
 		await session.subscribe({ stream: 'hashtag', tags: ['beta'] });
@@ -376,9 +388,118 @@ describe(MastodonStreamSession, () => {
 
 		const alphaId = nativeStream.connectChannel.mock.calls.find(([, params]) => JSON.stringify(params) === JSON.stringify({ q: [['alpha']] }))?.[0];
 		const betaId = nativeStream.connectChannel.mock.calls.find(([, params]) => JSON.stringify(params) === JSON.stringify({ q: [['beta']] }))?.[0];
+		for (const [id] of nativeStream.connectChannel.mock.calls) {
+			await session.handleNativeFrame(JSON.stringify({ type: 'channel', body: { id, type: 'note', body: note('shared') } }));
+		}
+		await session.handleNativeFrame(JSON.stringify({ type: 'channel', body: { id: alphaId, type: 'note', body: note('shared') } }));
+		expect(outputs.map(output => [output.stream, output.streamParams])).toEqual([
+			['hashtag', ['alpha']], ['hashtag', ['beta']], ['list', ['list-a']], ['list', ['list-b']],
+		]);
+
 		await session.unsubscribe({ stream: 'hashtag', tags: ['alpha'] });
+		await session.unsubscribe({ stream: 'list', listId: 'list-a' });
 		expect(nativeStream.disconnectChannel).toHaveBeenCalledWith(alphaId);
 		expect(nativeStream.disconnectChannel).not.toHaveBeenCalledWith(betaId);
+		await session.handleRedisEvent({ channel: 'noteStream:shared', message: { type: 'updated', body: { body: { text: 'edited' } } } });
+		await session.handleRedisEvent({ channel: 'noteStream:shared', message: { type: 'deleted' } });
+		expect(outputs.slice(4).map(output => [output.event, output.stream, output.streamParams])).toEqual([
+			['status.update', 'hashtag', ['beta']], ['status.update', 'list', ['list-b']],
+			['delete', 'hashtag', ['beta']], ['delete', 'list', ['list-b']],
+		]);
+	});
+
+	test.each(['missing', 'hidden'] as const)('does not emit a followers-only edit after its current viewer projection becomes %s', async state => {
+		const resolveNote = vi.fn(async () => state === 'missing' ? null : { ...note('private'), isHidden: true } as unknown as Packed<'Note'>);
+		const { session, outputs } = createSession({ resolveNote });
+		await session.start();
+		await session.subscribe({ stream: 'user' });
+		await session.handleNativeFrame(JSON.stringify({
+			type: 'channel', body: { id: 'mastodon-1', type: 'note', body: note('private', { visibility: 'followers', text: 'visible before unfollow' }) },
+		}));
+		expect(outputs).toHaveLength(1);
+
+		const event = {
+			channel: 'noteStream:private',
+			message: { type: 'updated', body: { id: 'private', userId: 'author', visibility: 'followers', visibleUserIds: [], body: { text: 'private edit after unfollow' } } },
+		};
+		await session.handleRedisEvent(event);
+		await session.handleRedisEvent(event);
+		expect(resolveNote).toHaveBeenCalledOnce();
+		expect(resolveNote).toHaveBeenCalledWith('private');
+		expect(outputs).toHaveLength(1);
+	});
+
+	test('uses the current viewer projection for edits instead of the global Redis body', async () => {
+		const { session, outputs } = createSession({
+			resolveNote: async id => note(id, { text: 'current visible edit' }) as unknown as Packed<'Note'>,
+		});
+		await session.start();
+		await session.subscribe({ stream: 'public' });
+		await session.handleNativeFrame(JSON.stringify({ type: 'channel', body: { id: 'mastodon-0', type: 'note', body: note('edited') } }));
+		await session.handleRedisEvent({ channel: 'noteStream:edited', message: { type: 'updated', body: { body: { text: 'global payload' } } } });
+		expect(outputs.at(-1)).toEqual({ event: 'status.update', stream: 'public', payload: { id: 'edited', text: 'current visible edit' } });
+	});
+
+	test('discards an edit resolving after unsubscribe and stops later lookups for that subscription', async () => {
+		let release!: (value: Packed<'Note'>) => void;
+		const pending = new Promise<Packed<'Note'>>(resolve => { release = resolve; });
+		const { session, outputs, resolveNote } = createSession({ resolveNote: async () => pending });
+		await session.start();
+		await session.subscribe({ stream: 'user' });
+		await session.handleNativeFrame(JSON.stringify({ type: 'channel', body: { id: 'mastodon-1', type: 'note', body: note('edited') } }));
+		const event = { channel: 'noteStream:edited', message: { type: 'updated', body: { body: { text: 'edited' } } } };
+		const updating = session.handleRedisEvent(event);
+		await vi.waitFor(() => expect(resolveNote).toHaveBeenCalledOnce());
+		await session.unsubscribe({ stream: 'user' });
+		release(note('edited', { text: 'new body' }) as unknown as Packed<'Note'>);
+		await updating;
+		await session.handleRedisEvent(event);
+		expect(outputs).toHaveLength(1);
+		expect(resolveNote).toHaveBeenCalledOnce();
+	});
+
+	test('decorates live statuses and notifications before applying relationship and keyword filters', async () => {
+		const contexts: MastodonFilterContext[] = [];
+		const { session, outputs, filterApply } = createSession({
+			decorateStatus: async (_note, status) => ({ ...status, language: 'ja', sensitive: true }),
+			filterStatuses: async (statuses, context) => {
+				contexts.push(context);
+				return statuses.filter(status => status.id !== 'muted');
+			},
+			filterNotifications: async notifications => notifications.filter(notification => notification.id !== 'muted-notification'),
+		});
+		await session.start();
+		await session.subscribe({ stream: 'public' });
+		await session.subscribe({ stream: 'user:notification' });
+		for (const id of ['muted', 'visible']) {
+			await session.handleNativeFrame(JSON.stringify({ type: 'channel', body: { id: 'mastodon-0', type: 'note', body: note(id) } }));
+		}
+		for (const id of ['muted-notification', 'visible-notification']) {
+			await session.handleNativeFrame(JSON.stringify({ type: 'channel', body: { id: 'mastodon-1', type: 'notification', body: { id, note: note('notified') } } }));
+		}
+		expect(outputs).toHaveLength(2);
+		expect(outputs[0]?.payload).toEqual({ id: 'visible', language: 'ja', sensitive: true });
+		expect(outputs[1]?.payload).toMatchObject({ id: 'visible-notification', status: { id: 'notified', language: 'ja', sensitive: true } });
+		expect(contexts).toEqual(['public', 'public', 'notifications']);
+		expect(filterApply.mock.calls[0]?.[2]).toEqual([]);
+	});
+
+	test('waits for committed metadata before publishing a status', async () => {
+		let commit!: () => void;
+		const committed = new Promise<void>(resolve => { commit = resolve; });
+		const decorateStatus = vi.fn(async (_note: Packed<'Note'>, status: Record<string, unknown>) => {
+			await committed;
+			return { ...status, language: 'ja', sensitive: true };
+		});
+		const { session, outputs } = createSession({ decorateStatus });
+		await session.start();
+		await session.subscribe({ stream: 'public' });
+		const publishing = session.handleNativeFrame(JSON.stringify({ type: 'channel', body: { id: 'mastodon-0', type: 'note', body: note('new-note') } }));
+		await vi.waitFor(() => expect(decorateStatus).toHaveBeenCalledOnce());
+		expect(outputs).toEqual([]);
+		commit();
+		await publishing;
+		expect(outputs).toEqual([{ event: 'update', stream: 'public', payload: { id: 'new-note', language: 'ja', sensitive: true } }]);
 	});
 
 	test('rejects subscriptions before the native 32-channel cap, including followed-tag channels', async () => {

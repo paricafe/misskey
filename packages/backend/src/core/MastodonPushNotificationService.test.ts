@@ -25,8 +25,124 @@ const alerts = (overrides: Partial<MastodonPushAlerts> = {}): MastodonPushAlerts
 describe(MastodonPushNotificationService, () => {
 	beforeEach(() => vi.mocked(push.sendNotification).mockReset().mockResolvedValue({} as never));
 
+	function createService(mute: unknown = null) {
+		const value = {
+			endpoint: 'https://push.example/subscription',
+			keys: { p256dh: PUBLIC_KEY, auth: 'MLACbMpb8aYGL4nf4aiwCA' },
+			standard: true,
+			data: { policy: 'all' as const, alerts: alerts({ favourite: true, mention: true, reblog: true }) },
+			bearer: encryptMastodonPushBearer('raw-bearer', 'user-id', 'token-id', 'state-id', PRIVATE_KEY),
+		};
+		const repository = {
+			find: vi.fn().mockResolvedValue([{ id: 'state-id', userId: 'user-id', tokenId: 'token-id', value }]),
+			findOneBy: vi.fn().mockResolvedValue(mute == null ? null : { value: mute }),
+			delete: vi.fn(),
+		};
+		const followings = { existsBy: vi.fn() };
+		const profileFetch = vi.fn().mockResolvedValue({ lang: 'en' });
+		const service = new MastodonPushNotificationService(
+			{ enableMastodonApi: true, url: 'https://misskey.example/', host: 'misskey.example' } as never,
+			{ enableServiceWorker: true, swPublicKey: PUBLIC_KEY, swPrivateKey: PRIVATE_KEY } as never,
+			repository as never, followings as never,
+			{ userProfileCache: { fetch: profileFetch } } as never,
+			{ getAgentForHttps: vi.fn().mockReturnValue({}) } as never,
+		);
+		const notification = {
+			id: 'notification-id', type: 'reaction', reaction: '❤️',
+			user: { id: 'actor-id', username: 'alice', name: 'Alice' },
+			note: { id: 'note-id', cw: 'Post content', text: 'Post content' },
+		};
+		return { service, repository, followings, profileFetch, notification };
+	}
+
 	test('provides the queue-only Mastodon push delivery entry point', () => {
 		expect(MastodonPushNotificationService.prototype.pushNotification).toBeTypeOf('function');
+	});
+
+	test('does not query subscriptions or send when the Mastodon API is disabled', async () => {
+		const repository = { find: vi.fn(), findOneBy: vi.fn(), delete: vi.fn() };
+		const followings = { existsBy: vi.fn() };
+		const profileFetch = vi.fn();
+		const getAgentForHttps = vi.fn();
+		const service = new MastodonPushNotificationService(
+			{ enableMastodonApi: false, url: 'https://misskey.example/', host: 'misskey.example' } as never,
+			{ enableServiceWorker: true, swPublicKey: PUBLIC_KEY, swPrivateKey: PRIVATE_KEY } as never,
+			repository as never,
+			followings as never,
+			{ userProfileCache: { fetch: profileFetch } } as never,
+			{ getAgentForHttps } as never,
+		);
+
+		await service.pushNotification('user-id', {
+			id: 'notification-id', type: 'mention',
+			user: { id: 'actor-id', username: 'alice' }, note: { id: 'note-id', cw: 'Post content' },
+		} as never);
+
+		expect(repository.find).not.toHaveBeenCalled();
+		expect(repository.findOneBy).not.toHaveBeenCalled();
+		expect(repository.delete).not.toHaveBeenCalled();
+		expect(followings.existsBy).not.toHaveBeenCalled();
+		expect(profileFetch).not.toHaveBeenCalled();
+		expect(getAgentForHttps).not.toHaveBeenCalled();
+		expect(push.sendNotification).not.toHaveBeenCalled();
+	});
+
+	test.each(['❤', '❤️'])('sends the canonical heart reaction %s as a favourite', async reaction => {
+		const { service, notification } = createService();
+		await service.pushNotification('user-id', { ...notification, reaction } as never);
+		expect(push.sendNotification).toHaveBeenCalledTimes(1);
+		const payload = JSON.parse(vi.mocked(push.sendNotification).mock.calls[0]![1]!.toString());
+		expect(payload).toMatchObject({ notification_type: 'favourite', title: 'Alice favorited your post' });
+	});
+
+	test.each(['👍', '❤︎', ':heart:', ':heart@local:', undefined])('does not turn the native reaction %s into a favourite or perform extra queries', async reaction => {
+		const { service, repository, profileFetch, notification } = createService();
+		await service.pushNotification('user-id', { ...notification, reaction } as never);
+		expect(repository.find).not.toHaveBeenCalled();
+		expect(repository.findOneBy).not.toHaveBeenCalled();
+		expect(profileFetch).not.toHaveBeenCalled();
+		expect(push.sendNotification).not.toHaveBeenCalled();
+	});
+
+	test.each([
+		{ type: 'reaction', user: undefined },
+		{ type: 'reaction', user: { username: 'missing-id' } },
+		{ type: 'reaction:grouped', user: undefined, reactions: [{ user: { id: 'actor-id' }, reaction: '❤️' }] },
+		{ type: 'reaction:grouped', user: { id: 'actor-id' }, reactions: [{ user: { id: 'actor-id' }, reaction: '❤️' }] },
+		{ type: 'renote:grouped', user: undefined, users: [{ id: 'actor-id' }] },
+	])('does not invent a single actor for an incomplete or grouped notification: %j', async overrides => {
+		const { service, repository, notification } = createService();
+		await service.pushNotification('user-id', { ...notification, ...overrides } as never);
+		expect(repository.find).not.toHaveBeenCalled();
+		expect(repository.findOneBy).not.toHaveBeenCalled();
+		expect(push.sendNotification).not.toHaveBeenCalled();
+	});
+
+	test.each([
+		['permanent notification mute', true, null, false],
+		['active notification mute', true, 60_000, false],
+		['expired notification mute', true, -1, true],
+		['timeline-only mute', false, null, true],
+	] as const)('honors the %s without changing the subscription', async (_label, notifications, expiresIn, shouldSend) => {
+		const { service, repository, followings, profileFetch, notification } = createService({
+			notifications, expiresAt: expiresIn == null ? null : Date.now() + expiresIn,
+		});
+		await service.pushNotification('user-id', notification as never);
+
+		expect(repository.findOneBy).toHaveBeenCalledExactlyOnceWith({ userId: 'user-id', kind: 'relationship_mute', key: 'actor-id' });
+		expect(push.sendNotification).toHaveBeenCalledTimes(shouldSend ? 1 : 0);
+		expect(profileFetch).toHaveBeenCalledTimes(shouldSend ? 1 : 0);
+		expect(followings.existsBy).not.toHaveBeenCalled();
+		expect(repository.delete).not.toHaveBeenCalled();
+	});
+
+	test('does not query mute state or profiles without a push subscription', async () => {
+		const { service, repository, profileFetch, notification } = createService();
+		repository.find.mockResolvedValue([]);
+		await service.pushNotification('user-id', notification as never);
+		expect(repository.findOneBy).not.toHaveBeenCalled();
+		expect(profileFetch).not.toHaveBeenCalled();
+		expect(push.sendNotification).not.toHaveBeenCalled();
 	});
 
 	test('sends an exact seven-field Mastodon payload with isolated VAPID and SSRF-safe transport options', async () => {
@@ -37,10 +153,10 @@ describe(MastodonPushNotificationService, () => {
 			data: { policy: 'all' as const, alerts: alerts({ mention: true }) },
 			bearer: encryptMastodonPushBearer('raw-bearer', 'user-id', 'token-id', 'state-id', PRIVATE_KEY),
 		};
-		const repository = { find: vi.fn().mockResolvedValue([{ id: 'state-id', userId: 'user-id', tokenId: 'token-id', value }]), delete: vi.fn() };
+		const repository = { find: vi.fn().mockResolvedValue([{ id: 'state-id', userId: 'user-id', tokenId: 'token-id', value }]), findOneBy: vi.fn().mockResolvedValue(null), delete: vi.fn() };
 		const agent = {};
 		const service = new MastodonPushNotificationService(
-			{ url: 'https://misskey.example/', host: 'misskey.example' } as never,
+			{ enableMastodonApi: true, url: 'https://misskey.example/', host: 'misskey.example' } as never,
 			{ enableServiceWorker: true, swPublicKey: PUBLIC_KEY, swPrivateKey: PRIVATE_KEY, iconUrl: null } as never,
 			repository as never,
 			{ existsBy: vi.fn() } as never,
@@ -90,10 +206,10 @@ describe(MastodonPushNotificationService, () => {
 				bearer: encryptMastodonPushBearer('bearer', 'user-id', `token-${id}`, id, PRIVATE_KEY),
 			},
 		});
-		const repository = { find: vi.fn().mockResolvedValue([makeRow('one'), makeRow('two')]), delete: vi.fn() };
+		const repository = { find: vi.fn().mockResolvedValue([makeRow('one'), makeRow('two')]), findOneBy: vi.fn().mockResolvedValue(null), delete: vi.fn() };
 		const followings = { existsBy: vi.fn().mockResolvedValue(true) };
 		const service = new MastodonPushNotificationService(
-			{ url: 'https://misskey.example/', host: 'misskey.example' } as never,
+			{ enableMastodonApi: true, url: 'https://misskey.example/', host: 'misskey.example' } as never,
 			{ enableServiceWorker: true, swPublicKey: PUBLIC_KEY, swPrivateKey: PRIVATE_KEY } as never,
 			repository as never, followings as never,
 			{ userProfileCache: { fetch: vi.fn().mockResolvedValue({ lang: null }) } } as never,
@@ -126,10 +242,10 @@ describe(MastodonPushNotificationService, () => {
 			data: { policy: 'all' as const, alerts: alerts({ mention: true }) },
 			bearer: encryptMastodonPushBearer('bearer', 'user-id', tokenId, id, PRIVATE_KEY),
 		};
-		const repository = { find: vi.fn().mockResolvedValue([{ id, userId: 'user-id', tokenId, value }]), delete: vi.fn() };
+		const repository = { find: vi.fn().mockResolvedValue([{ id, userId: 'user-id', tokenId, value }]), findOneBy: vi.fn().mockResolvedValue(null), delete: vi.fn() };
 		vi.mocked(push.sendNotification).mockRejectedValueOnce({ statusCode });
 		const service = new MastodonPushNotificationService(
-			{ url: 'https://misskey.example/', host: 'misskey.example' } as never,
+			{ enableMastodonApi: true, url: 'https://misskey.example/', host: 'misskey.example' } as never,
 			{ enableServiceWorker: true, swPublicKey: PUBLIC_KEY, swPrivateKey: PRIVATE_KEY } as never,
 			repository as never, { existsBy: vi.fn() } as never,
 			{ userProfileCache: { fetch: vi.fn().mockResolvedValue({ lang: 'en' }) } } as never,
@@ -146,9 +262,9 @@ describe(MastodonPushNotificationService, () => {
 			endpoint: 'https://push.example/tampered', keys: { p256dh: PUBLIC_KEY, auth: 'MLACbMpb8aYGL4nf4aiwCA' }, standard: true,
 			data: { policy: 'all' as const, alerts: alerts({ mention: true }) }, bearer,
 		};
-		const repository = { find: vi.fn().mockResolvedValue([{ id: 'state-id', userId: 'user-id', tokenId: 'token-id', value }]), delete: vi.fn() };
+		const repository = { find: vi.fn().mockResolvedValue([{ id: 'state-id', userId: 'user-id', tokenId: 'token-id', value }]), findOneBy: vi.fn().mockResolvedValue(null), delete: vi.fn() };
 		const service = new MastodonPushNotificationService(
-			{ url: 'https://misskey.example/', host: 'misskey.example' } as never,
+			{ enableMastodonApi: true, url: 'https://misskey.example/', host: 'misskey.example' } as never,
 			{ enableServiceWorker: true, swPublicKey: PUBLIC_KEY, swPrivateKey: PRIVATE_KEY } as never,
 			repository as never, { existsBy: vi.fn() } as never,
 			{ userProfileCache: { fetch: vi.fn().mockResolvedValue({ lang: 'en' }) } } as never,
@@ -182,9 +298,9 @@ describe(MastodonPushNotificationService, () => {
 			return {} as never;
 		});
 		const service = new MastodonPushNotificationService(
-			{ url: 'https://misskey.example/', host: 'misskey.example' } as never,
+			{ enableMastodonApi: true, url: 'https://misskey.example/', host: 'misskey.example' } as never,
 			{ enableServiceWorker: true, swPublicKey: PUBLIC_KEY, swPrivateKey: PRIVATE_KEY } as never,
-			{ find: vi.fn().mockResolvedValue(rows), delete: vi.fn() } as never, { existsBy: vi.fn() } as never,
+			{ find: vi.fn().mockResolvedValue(rows), findOneBy: vi.fn().mockResolvedValue(null), delete: vi.fn() } as never, { existsBy: vi.fn() } as never,
 			{ userProfileCache: { fetch: vi.fn().mockResolvedValue({ lang: 'en' }) } } as never,
 			{ getAgentForHttps: vi.fn().mockReturnValue({}) } as never,
 		);

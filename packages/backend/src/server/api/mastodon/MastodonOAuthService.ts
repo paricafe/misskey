@@ -6,6 +6,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import * as Redis from 'ioredis';
 import { verifyChallenge } from 'pkce-challenge';
+import { languages } from 'i18n/const';
 import { CacheService } from '@/core/CacheService.js';
 import { IdService } from '@/core/IdService.js';
 import type { Config } from '@/config.js';
@@ -17,6 +18,7 @@ import type {
 } from '@/models/_.js';
 import { MastodonApiError } from './errors.js';
 import { MastodonScopeService } from './MastodonScopeService.js';
+import { normalizeMastodonParameters } from './request-parameters.js';
 import type { MastodonApplicationRegistration, MastodonCredentialApplication } from './types.js';
 import type { MiLocalUser } from '@/models/User.js';
 import { digestCredential, generateCredential, parseRedirectUris, timingSafeDigestEqual } from './utils.js';
@@ -30,6 +32,7 @@ type AuthorizationTransaction = {
 	state?: string;
 	scopes: string[];
 	codeChallenge?: string;
+	language?: string;
 };
 
 type AuthorizationGrant = {
@@ -44,11 +47,15 @@ export type MastodonAuthorizationPage = {
 	transactionId: string;
 	clientName: string;
 	scope: string[];
+	mastodonScopes: string[];
+	forceLogin: boolean;
+	language?: string;
 };
 
 export type MastodonAuthorizationDecision = {
 	redirectUri: string;
 	parameters: Record<string, string>;
+	language?: string;
 };
 
 export type MastodonTokenResponse = {
@@ -82,6 +89,7 @@ export class MastodonOAuthService {
 	) {}
 
 	public async registerApplication(input: MastodonApplicationRegistration): Promise<MastodonCredentialApplication> {
+		input = normalizeMastodonParameters(input) as MastodonApplicationRegistration;
 		const name = typeof input.client_name === 'string' ? input.client_name.trim() : '';
 		if (name.length === 0 || name.length > 256) {
 			throw this.registrationError('client_name must contain between 1 and 256 characters');
@@ -115,7 +123,7 @@ export class MastodonOAuthService {
 			id,
 			name,
 			website,
-			redirect_uri: redirectUris[0],
+			redirect_uri: redirectUris.join('\n'),
 			redirect_uris: redirectUris,
 			scopes,
 			client_id: id,
@@ -149,7 +157,7 @@ export class MastodonOAuthService {
 			id: client.id,
 			name: client.name,
 			website: client.website,
-			redirect_uri: client.redirectUris[0],
+			redirect_uri: client.redirectUris.join('\n'),
 			redirect_uris: client.redirectUris,
 			client_id: client.id,
 			scopes: client.scopes,
@@ -168,6 +176,10 @@ export class MastodonOAuthService {
 		const state = this.firstValue(parameters.state);
 		const codeChallenge = this.firstValue(parameters.code_challenge);
 		const codeChallengeMethod = this.firstValue(parameters.code_challenge_method);
+		const requestedLanguage = this.firstValue(parameters.lang)?.toLowerCase();
+		const language = languages.find(value => value.toLowerCase() === requestedLanguage)
+			?? languages.find(value => value.split('-')[0] === requestedLanguage);
+		const forceLogin = this.firstValue(parameters.force_login);
 
 		if (responseType !== 'code') {
 			throw this.oauthError(400, 'unsupported_response_type', 'response_type must be code');
@@ -214,6 +226,7 @@ export class MastodonOAuthService {
 			state,
 			scopes,
 			codeChallenge,
+			language,
 		};
 		await this.redis.set(this.transactionKey(transactionId), JSON.stringify(transaction), 'EX', 300);
 
@@ -221,6 +234,9 @@ export class MastodonOAuthService {
 			transactionId,
 			clientName: client.name,
 			scope: this.mastodonScopeService.toMisskeyPermissions(scopes),
+			mastodonScopes: scopes,
+			forceLogin: forceLogin != null && forceLogin !== '' && !['0', 'f', 'false', 'off'].includes(forceLogin.toLowerCase()),
+			language,
 		};
 	}
 
@@ -237,6 +253,7 @@ export class MastodonOAuthService {
 		if (cancel) {
 			return {
 				redirectUri: transaction.redirectUri,
+				language: transaction.language,
 				parameters: {
 					error: 'access_denied',
 					...(transaction.state != null ? { state: transaction.state } : {}),
@@ -266,6 +283,7 @@ export class MastodonOAuthService {
 
 		return {
 			redirectUri: transaction.redirectUri,
+			language: transaction.language,
 			parameters: {
 				code,
 				...(transaction.state != null ? { state: transaction.state } : {}),
@@ -386,12 +404,16 @@ export class MastodonOAuthService {
 	public async revoke(parameters: OAuthParameters, authorizationHeader?: string): Promise<void> {
 		const client = await this.authenticateClient(parameters, authorizationHeader);
 		const rawToken = this.firstValue(parameters.token);
-		if (rawToken == null) return;
+		if (rawToken == null || rawToken === '') {
+			throw this.oauthError(403, 'unauthorized_client', 'You are not authorized to revoke this token');
+		}
 
 		const token = await this.mastodonOAuthTokensRepository.findOneBy({
 			tokenHash: digestCredential(rawToken),
-			clientId: client.id,
 		});
+		if (token != null && token.clientId !== client.id) {
+			throw this.oauthError(403, 'unauthorized_client', 'You are not authorized to revoke this token');
+		}
 		if (token != null) {
 			await this.mastodonOAuthTokensRepository.delete({ id: token.id, clientId: client.id });
 			await this.publishTokenRevoked(token.id);
@@ -413,14 +435,15 @@ export class MastodonOAuthService {
 	}
 
 	private readClientCredentials(parameters: OAuthParameters, authorizationHeader?: string): { clientId?: string; clientSecret?: string } {
-		if (authorizationHeader?.startsWith('Basic ')) {
+		const basic = authorizationHeader == null ? null : /^Basic\s+(.+)$/iu.exec(authorizationHeader.trim());
+		if (basic != null) {
 			try {
-				const decoded = Buffer.from(authorizationHeader.slice(6), 'base64').toString('utf8');
+				const decoded = Buffer.from(basic[1], 'base64').toString('utf8');
 				const separator = decoded.indexOf(':');
 				if (separator >= 0) {
 					return {
-						clientId: decodeURIComponent(decoded.slice(0, separator)),
-						clientSecret: decodeURIComponent(decoded.slice(separator + 1)),
+						clientId: decodeURIComponent(decoded.slice(0, separator).replace(/\+/gu, ' ')),
+						clientSecret: decodeURIComponent(decoded.slice(separator + 1).replace(/\+/gu, ' ')),
 					};
 				}
 			} catch {

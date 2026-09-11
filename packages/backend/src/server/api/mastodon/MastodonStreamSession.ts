@@ -42,6 +42,7 @@ export type MastodonStreamOutput = {
 	event: string;
 	payload?: unknown;
 	stream: MastodonStreamName;
+	streamParams?: readonly string[];
 	rawPayload?: true;
 };
 
@@ -61,9 +62,8 @@ type NativeChannel = {
 };
 
 type DeliveredNote = {
-	note: Packed<'Note'>;
-	streams: Set<MastodonStreamName>;
-	conversationIds: Map<MastodonStreamName, string>;
+	subscriptions: Map<string, MastodonStreamSubscription>;
+	conversationIds: Map<string, string>;
 };
 
 type SessionOptions = {
@@ -76,6 +76,10 @@ type SessionOptions = {
 	mastodonNotificationService: MastodonNotificationService;
 	mastodonUserFeatureService: MastodonUserFeatureService;
 	mastodonConversationService: MastodonConversationService;
+	resolveNote: (noteId: string) => Promise<Packed<'Note'> | null>;
+	decorateStatus?: (note: Packed<'Note'>, status: Record<string, unknown>) => Promise<Record<string, unknown>>;
+	filterStatuses?: (statuses: Record<string, unknown>[], context: MastodonFilterContext) => Promise<Record<string, unknown>[]>;
+	filterNotifications?: (notifications: Record<string, unknown>[]) => Promise<Record<string, unknown>[]>;
 	send: (output: MastodonStreamOutput) => void;
 	close: () => void;
 };
@@ -96,6 +100,10 @@ export class MastodonStreamSession {
 	readonly #notificationService: MastodonNotificationService;
 	readonly #userFeatureService: MastodonUserFeatureService;
 	readonly #conversationService: MastodonConversationService;
+	readonly #resolveNote: SessionOptions['resolveNote'];
+	readonly #decorateStatus: SessionOptions['decorateStatus'];
+	readonly #filterStatuses: SessionOptions['filterStatuses'];
+	readonly #filterNotifications: SessionOptions['filterNotifications'];
 	readonly #send: SessionOptions['send'];
 	readonly #close: SessionOptions['close'];
 	readonly #subscriptions = new Map<string, MastodonStreamSubscription>();
@@ -119,6 +127,10 @@ export class MastodonStreamSession {
 		this.#notificationService = options.mastodonNotificationService;
 		this.#userFeatureService = options.mastodonUserFeatureService;
 		this.#conversationService = options.mastodonConversationService;
+		this.#resolveNote = options.resolveNote;
+		this.#decorateStatus = options.decorateStatus;
+		this.#filterStatuses = options.filterStatuses;
+		this.#filterNotifications = options.filterNotifications;
 		this.#send = options.send;
 		this.#close = options.close;
 	}
@@ -162,6 +174,11 @@ export class MastodonStreamSession {
 		const subscription = this.normalize(input);
 		const key = this.subscriptionKey(subscription);
 		if (!this.#subscriptions.delete(key)) return;
+		for (const [noteId, delivered] of this.#delivered) {
+			delivered.subscriptions.delete(key);
+			delivered.conversationIds.delete(key);
+			if (delivered.subscriptions.size === 0) this.#delivered.delete(noteId);
+		}
 		await this.removeTarget(key);
 		if (subscription.stream === 'user' && ![...this.#subscriptions.values()].some(value => value.stream === 'user')) {
 			for (const tag of [...this.#followedTags]) await this.removeFollowedTag(tag);
@@ -199,7 +216,7 @@ export class MastodonStreamSession {
 				const body = frame.body.body as { announcement?: unknown };
 				const announcement = this.#entityService.announcement((body.announcement ?? body) as Packed<'Announcement'>);
 				for (const subscription of channel.targets.values()) {
-					if (subscription.stream === 'user') this.#send({ event: 'announcement', payload: announcement, stream: 'user' });
+					if (subscription.stream === 'user') this.sendTo(subscription, { event: 'announcement', payload: announcement });
 				}
 				return;
 			}
@@ -276,11 +293,13 @@ export class MastodonStreamSession {
 
 	private normalize(input: MastodonStreamSubscription): MastodonStreamSubscription {
 		if (!MASTODON_STREAMS.includes(input.stream)) throw new TypeError(`Unsupported stream: ${input.stream}`);
-		const tags = [...new Set((input.tags ?? []).map(tag => tag.normalize('NFKC').trim().replace(/^#+/u, '').toLowerCase()).filter(Boolean))].sort();
+		const tags = input.stream.startsWith('hashtag')
+			? [...new Set((input.tags ?? []).map(tag => tag.normalize('NFKC').trim().replace(/^#+/u, '').toLowerCase()).filter(Boolean))].sort()
+			: [];
 		if (input.stream.startsWith('hashtag') && tags.length === 0) throw new TypeError('tag is required for hashtag streams');
 		if (tags.length > FOLLOWED_TAG_LIMIT) throw new TypeError(`tag must contain at most ${FOLLOWED_TAG_LIMIT} values`);
 		if (tags.some(tag => [...tag].length > 100 || !/^[\p{L}\p{M}\p{N}_]+$/u.test(tag))) throw new TypeError('Invalid hashtag name');
-		const listId = input.listId?.trim();
+		const listId = input.stream === 'list' ? input.listId?.trim() : undefined;
 		if (input.stream === 'list' && !listId) throw new TypeError('list is required for list streams');
 		return {
 			stream: input.stream,
@@ -394,47 +413,49 @@ export class MastodonStreamSession {
 	}
 
 	private async handleNote(channel: NativeChannel, note: Packed<'Note'>): Promise<void> {
-		const streams = [...channel.targets.values()].flatMap(subscription => {
+		const targets = new Map<string, MastodonStreamSubscription>();
+		for (const subscription of channel.targets.values()) {
 			const stream = subscription.stream;
-			if (stream === 'user:notification') return [];
-			if (stream === 'user' && !this.#scopeService.allows(this.#auth.token.scopes, 'read:statuses')) return [];
-			if ((stream === 'hashtag:local' || stream.startsWith('public:local')) && note.user.host != null) return [];
-			if (stream.startsWith('public:remote') && note.user.host == null) return [];
-			if (stream === 'direct' && note.visibility !== 'specified') return [];
-			if (stream.endsWith(':media') && (note.files?.length ?? 0) === 0) return [];
-			if (this.wasDelivered(stream, note.id)) return [];
-			return [stream];
-		});
-		if (streams.length === 0) return;
+			if (!this.isSubscribed(subscription) || stream === 'user:notification') continue;
+			if (stream === 'user' && !this.#scopeService.allows(this.#auth.token.scopes, 'read:statuses')) continue;
+			if ((stream === 'hashtag:local' || stream.startsWith('public:local')) && note.user.host != null) continue;
+			if (stream.startsWith('public:remote') && note.user.host == null) continue;
+			if (stream === 'direct' && note.visibility !== 'specified') continue;
+			if (stream.endsWith(':media') && (note.files?.length ?? 0) === 0) continue;
+			if (this.wasDelivered(subscription, note.id)) continue;
+			targets.set(this.subscriptionKey(subscription), subscription);
+		}
+		const subscriptions = [...targets.values()];
+		if (subscriptions.length === 0) return;
 
-		const directConversation = streams.includes('direct')
+		const directConversation = subscriptions.some(subscription => subscription.stream === 'direct')
 			? await this.#conversationService.upsertLive(this.#auth.user, note.id)
 			: null;
 		const voterCounts = await this.#entityService.pollVoterCounts([
-			...(streams.some(stream => stream !== 'direct') ? [note] : []),
+			...(subscriptions.some(subscription => subscription.stream !== 'direct') ? [note] : []),
 			...(directConversation == null ? [] : [directConversation.lastStatus]),
 		]);
-		for (const stream of streams) {
-			if (stream === 'direct') {
-				if (directConversation != null) await this.emitPackedConversation(directConversation, stream, voterCounts);
+		for (const subscription of subscriptions) {
+			if (subscription.stream === 'direct') {
+				if (directConversation != null) await this.emitPackedConversation(directConversation, subscription, voterCounts);
 				continue;
 			}
-			const status = await this.filteredStatus(note, this.filterContext(stream), voterCounts);
+			const status = await this.filteredStatus(note, this.filterContext(subscription.stream), voterCounts);
 			if (status == null) continue;
-			this.remember(stream, note);
-			this.#send({ event: 'update', payload: status, stream });
+			this.remember(subscription, note);
+			this.sendTo(subscription, { event: 'update', payload: status });
 		}
 	}
 
 	private async emitPackedConversation(
 		conversation: MastodonConversation,
-		stream: MastodonStreamName,
+		subscription: MastodonStreamSubscription,
 		voterCounts: ReadonlyMap<string, number>,
 	): Promise<void> {
 		const lastStatus = await this.filteredStatus(conversation.lastStatus, 'home', voterCounts);
 		if (lastStatus == null) return;
-		this.remember(stream, conversation.lastStatus, conversation.id);
-		this.#send({
+		this.remember(subscription, conversation.lastStatus, conversation.id);
+		this.sendTo(subscription, {
 			event: 'conversation',
 			payload: {
 				id: conversation.id,
@@ -442,7 +463,6 @@ export class MastodonStreamSession {
 				accounts: conversation.accounts,
 				last_status: lastStatus,
 			},
-			stream,
 		});
 	}
 
@@ -451,19 +471,24 @@ export class MastodonStreamSession {
 		const voterCounts = await this.#entityService.pollVoterCounts(native.note == null ? [] : [native.note]);
 		const entity = this.#entityService.notification(native, voterCounts);
 		if (entity == null) return;
-		const source: MastodonNotificationSource = { native: native as MastodonNotificationSource['native'], entity: entity as MastodonNotificationSource['entity'] };
+		const [allowed] = await this.#filterNotifications?.([entity]) ?? [entity];
+		if (allowed == null) return;
+		const source: MastodonNotificationSource = { native: native as MastodonNotificationSource['native'], entity: allowed as MastodonNotificationSource['entity'] };
 		const [visible] = await this.#notificationService.list(this.#auth.user.id, [source], { includeFiltered: false });
 		if (visible == null) return;
 		if (visible.entity.status != null && native.note != null) {
-			const [status] = await this.#filterService.apply(this.#auth.user.id, 'notifications', [visible.entity.status], {
+			if (native.note.isHidden) return;
+			const decorated = await this.#decorateStatus?.(native.note, visible.entity.status) ?? visible.entity.status;
+			const allowedStatuses = await this.#filterStatuses?.([decorated], 'notifications') ?? [decorated];
+			const [status] = await this.#filterService.apply(this.#auth.user.id, 'notifications', allowedStatuses, {
 				corpora: new Map([[visible.entity.status.id, this.filterCorpus(native.note)]]),
 			});
 			if (status == null) return;
-			visible.entity = { ...visible.entity, status };
+			visible.entity = { ...visible.entity, status: status as NonNullable<MastodonNotificationSource['entity']['status']> };
 		}
 		for (const subscription of channel.targets.values()) {
 			if (subscription.stream === 'user' || subscription.stream === 'user:notification') {
-				this.#send({ event: 'notification', payload: visible.entity, stream: subscription.stream });
+				this.sendTo(subscription, { event: 'notification', payload: visible.entity });
 			}
 		}
 	}
@@ -473,8 +498,11 @@ export class MastodonStreamSession {
 		context: MastodonFilterContext,
 		voterCounts: ReadonlyMap<string, number>,
 	): Promise<Record<string, unknown> | null> {
-		const status = this.#entityService.status(note, voterCounts) as Record<string, unknown>;
-		const [filtered] = await this.#filterService.apply(this.#auth.user.id, context, [status], {
+		if (note.isHidden) return null;
+		const entity = this.#entityService.status(note, voterCounts) as Record<string, unknown>;
+		const status = await this.#decorateStatus?.(note, entity) ?? entity;
+		const allowed = await this.#filterStatuses?.([status], context) ?? [status];
+		const [filtered] = await this.#filterService.apply(this.#auth.user.id, context, allowed, {
 			corpora: new Map([[note.id, this.filterCorpus(note)]]),
 		});
 		return filtered ?? null;
@@ -494,80 +522,94 @@ export class MastodonStreamSession {
 		return stream.startsWith('public') || stream.startsWith('hashtag') ? 'public' : 'home';
 	}
 
-	private wasDelivered(stream: MastodonStreamName, noteId: string): boolean {
-		return this.#delivered.get(noteId)?.streams.has(stream) ?? false;
+	private wasDelivered(subscription: MastodonStreamSubscription, noteId: string): boolean {
+		return this.#delivered.get(noteId)?.subscriptions.has(this.subscriptionKey(subscription)) ?? false;
 	}
 
-	private remember(stream: MastodonStreamName, note: Packed<'Note'>, conversationId?: string): void {
+	private remember(subscription: MastodonStreamSubscription, note: Packed<'Note'>, conversationId?: string): void {
+		if (!this.isSubscribed(subscription)) return;
+		const key = this.subscriptionKey(subscription);
 		let delivered = this.#delivered.get(note.id);
 		if (delivered == null) {
-			delivered = { note, streams: new Set(), conversationIds: new Map() };
+			delivered = { subscriptions: new Map(), conversationIds: new Map() };
 			this.#delivered.set(note.id, delivered);
-		} else {
-			delivered.note = note;
 		}
-		delivered.streams.add(stream);
-		if (conversationId != null) delivered.conversationIds.set(stream, conversationId);
+		delivered.subscriptions.set(key, subscription);
+		if (conversationId != null) delivered.conversationIds.set(key, conversationId);
 		if (this.#delivered.size > DELIVERED_NOTE_LIMIT) this.#delivered.delete(this.#delivered.keys().next().value!);
 	}
 
 	private async handleNoteEvent(noteId: string, event: { type?: string; body?: unknown }): Promise<void> {
 		const delivered = this.#delivered.get(noteId);
 		if (delivered == null) return;
-		const streams = [...delivered.streams];
+		const subscriptions = [...delivered.subscriptions.values()].filter(subscription => this.isSubscribed(subscription));
+		if (subscriptions.length === 0) {
+			this.#delivered.delete(noteId);
+			return;
+		}
 		if (event.type === 'deleted') {
 			this.#delivered.delete(noteId);
-			for (const stream of streams) {
-				if (stream === 'direct') {
-					const conversationId = delivered.conversationIds.get(stream);
+			for (const subscription of subscriptions) {
+				if (subscription.stream === 'direct') {
+					const conversationId = delivered.conversationIds.get(this.subscriptionKey(subscription));
 					if (conversationId == null) continue;
 					const conversation = await this.#conversationService.refreshLive(this.#auth.user, conversationId);
 					if (conversation != null) {
 						const voterCounts = await this.#entityService.pollVoterCounts([conversation.lastStatus]);
-						await this.emitPackedConversation(conversation, stream, voterCounts);
+						await this.emitPackedConversation(conversation, subscription, voterCounts);
 					}
 					continue;
 				}
-				this.#send({ event: 'delete', payload: noteId, stream, rawPayload: true });
+				this.sendTo(subscription, { event: 'delete', payload: noteId, rawPayload: true });
 			}
 			return;
 		}
 		if (event.type !== 'updated') return;
-		const outer = event.body as { body?: Partial<Packed<'Note'>> } | undefined;
-		const changes = outer?.body ?? event.body as Partial<Packed<'Note'>> | undefined;
-		const updated = { ...delivered.note, ...(changes ?? {}) } as Packed<'Note'>;
-		delivered.note = updated;
-		const directConversation = streams.includes('direct')
+		// Redis note events are global. Repack for this viewer instead of reusing access granted before an unfollow or block.
+		const updated = await this.#resolveNote(noteId);
+		if (updated == null || updated.isHidden) {
+			this.#delivered.delete(noteId);
+			return;
+		}
+		const directConversation = subscriptions.some(subscription => subscription.stream === 'direct')
 			? await this.#conversationService.upsertLive(this.#auth.user, updated.id)
 			: null;
 		const voterCounts = await this.#entityService.pollVoterCounts([
-			...(streams.some(stream => stream !== 'direct') ? [updated] : []),
+			...(subscriptions.some(subscription => subscription.stream !== 'direct') ? [updated] : []),
 			...(directConversation == null ? [] : [directConversation.lastStatus]),
 		]);
-		for (const stream of streams) {
-			if (stream === 'direct') {
-				if (directConversation != null) await this.emitPackedConversation(directConversation, stream, voterCounts);
+		for (const subscription of subscriptions) {
+			if (subscription.stream === 'direct') {
+				if (directConversation != null) await this.emitPackedConversation(directConversation, subscription, voterCounts);
 				continue;
 			}
-			const status = await this.filteredStatus(updated, this.filterContext(stream), voterCounts);
+			const status = await this.filteredStatus(updated, this.filterContext(subscription.stream), voterCounts);
 			if (status == null) continue;
-			this.#send({ event: 'status.update', payload: status, stream });
+			this.sendTo(subscription, { event: 'status.update', payload: status });
 		}
 	}
 
 	private emitForTargets(channel: NativeChannel, event: string, payload?: unknown, rawPayload?: true): void {
 		for (const subscription of channel.targets.values()) {
-			this.#send({ event, ...(arguments.length < 3 ? {} : { payload }), stream: subscription.stream, ...(rawPayload ? { rawPayload } : {}) });
+			this.sendTo(subscription, { event, ...(arguments.length < 3 ? {} : { payload }), ...(rawPayload ? { rawPayload } : {}) });
 		}
 	}
 
 	private emitForUserStreams(event: string, payload?: unknown, rawPayload?: true): void {
-		const streams = new Set<MastodonStreamName>();
 		for (const subscription of this.#subscriptions.values()) {
-			if (subscription.stream === 'user' || subscription.stream === 'user:notification') streams.add(subscription.stream);
+			if (subscription.stream === 'user' || subscription.stream === 'user:notification') {
+				this.sendTo(subscription, { event, ...(arguments.length < 2 ? {} : { payload }), ...(rawPayload ? { rawPayload } : {}) });
+			}
 		}
-		for (const stream of streams) {
-			this.#send({ event, ...(arguments.length < 2 ? {} : { payload }), stream, ...(rawPayload ? { rawPayload } : {}) });
-		}
+	}
+
+	private isSubscribed(subscription: MastodonStreamSubscription): boolean {
+		return !this.#disposed && this.#subscriptions.has(this.subscriptionKey(subscription));
+	}
+
+	private sendTo(subscription: MastodonStreamSubscription, output: Omit<MastodonStreamOutput, 'stream' | 'streamParams'>): void {
+		if (!this.isSubscribed(subscription)) return;
+		const streamParams = subscription.stream === 'list' ? [subscription.listId!] : subscription.stream.startsWith('hashtag') ? subscription.tags : undefined;
+		this.#send({ ...output, stream: subscription.stream, ...(streamParams == null ? {} : { streamParams }) });
 	}
 }

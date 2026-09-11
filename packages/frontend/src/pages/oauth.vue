@@ -11,11 +11,21 @@ SPDX-License-Identifier: AGPL-3.0-only
 				ref="authRoot"
 				:name="name"
 				:icon="logo"
-				:permissions="permissions"
+				:permissions="mastodonScopes == null ? permissions : []"
+				:requireSignin="forceLogin"
 				:waitOnDeny="true"
 				@accept="onAccept"
 				@deny="onDeny"
-			/>
+			>
+				<template v-if="mastodonScopes != null" #consentAdditionalInfo>
+					<div>
+						<div>{{ i18n.ts._auth.mastodonPermissions }}</div>
+						<ul>
+							<li v-for="scope in mastodonScopes" :key="scope">{{ mastodonScopeDescription(scope) }}</li>
+						</ul>
+					</div>
+				</template>
+			</MkAuthConfirm>
 		</div>
 	</div>
 </PageWithAnimBg>
@@ -25,6 +35,8 @@ SPDX-License-Identifier: AGPL-3.0-only
 import * as Misskey from 'misskey-js';
 import { definePage } from '@/page.js';
 import MkAuthConfirm from '@/components/MkAuthConfirm.vue';
+import { i18n } from '@/i18n.js';
+import { mastodonScopeDescription } from '@/utility/mastodon-scope-description.js';
 
 const transactionIdMeta = window.document.querySelector<HTMLMetaElement>('meta[name="misskey:oauth:transaction-id"]');
 if (transactionIdMeta) {
@@ -34,6 +46,8 @@ if (transactionIdMeta) {
 const name = window.document.querySelector<HTMLMetaElement>('meta[name="misskey:oauth:client-name"]')?.content;
 const logo = window.document.querySelector<HTMLMetaElement>('meta[name="misskey:oauth:client-logo"]')?.content;
 const permissions = window.document.querySelector<HTMLMetaElement>('meta[name="misskey:oauth:scope"]')?.content.split(' ').filter((p): p is typeof Misskey.permissions[number] => (Misskey.permissions as readonly string[]).includes(p)) ?? [];
+const mastodonScopes = window.document.querySelector<HTMLMetaElement>('meta[name="misskey:oauth:mastodon-scopes"]')?.content.split(' ').filter(Boolean);
+const forceLogin = mastodonScopes != null && window.document.querySelector<HTMLMetaElement>('meta[name="misskey:oauth:force-login"]')?.content === 'true';
 
 function doPost(token: string, decision: 'accept' | 'deny') {
 	const form = window.document.createElement('form');

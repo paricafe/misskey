@@ -5,6 +5,7 @@
 
 import { Module } from '@nestjs/common';
 import { CoreModule } from '@/core/CoreModule.js';
+import { MastodonApiStateService } from '@/server/api/mastodon/MastodonApiStateService.js';
 import { GlobalModule } from '@/GlobalModule.js';
 import { QueueLoggerService } from './QueueLoggerService.js';
 import { QueueProcessorService } from './QueueProcessorService.js';
@@ -52,6 +53,7 @@ import { RelationshipProcessorService } from './processors/RelationshipProcessor
 		CoreModule,
 	],
 	providers: [
+		MastodonApiStateService,
 		QueueLoggerService,
 		TickChartsProcessorService,
 		ResyncChartsProcessorService,

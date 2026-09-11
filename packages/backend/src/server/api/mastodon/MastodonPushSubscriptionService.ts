@@ -13,6 +13,7 @@ import {
 	encryptMastodonPushBearer,
 	MASTODON_PUSH_ALERT_TYPES,
 	MASTODON_PUSH_POLICIES,
+	MASTODON_UNSUPPORTED_PUSH_ALERT_TYPES,
 	parseMastodonPushState,
 	type MastodonPushAlerts,
 	type MastodonPushPolicy,
@@ -132,7 +133,8 @@ export class MastodonPushSubscriptionService {
 		if (typeof policy !== 'string' || !MASTODON_PUSH_POLICIES.includes(policy as MastodonPushPolicy)) throw this.invalid('data.policy is invalid');
 		const parsedAlerts = Object.fromEntries(MASTODON_PUSH_ALERT_TYPES.map(type => {
 			const value = this.read(body, alerts, `data[alerts][${type}]`, type);
-			return [type, type.startsWith('admin.') ? false : value == null ? false : this.parseBoolean(value)];
+			const enabled = value == null ? false : this.parseBoolean(value);
+			return [type, this.supportsAlert(type) && enabled];
 		})) as MastodonPushAlerts;
 		return { policy: policy as MastodonPushPolicy, alerts: parsedAlerts };
 	}
@@ -142,9 +144,14 @@ export class MastodonPushSubscriptionService {
 			id,
 			endpoint: value.endpoint,
 			standard: value.standard,
-			alerts: value.data.alerts,
+			// Older subscriptions may contain enabled alerts which this server cannot deliver.
+			alerts: Object.fromEntries(MASTODON_PUSH_ALERT_TYPES.map(type => [type, this.supportsAlert(type) && value.data.alerts[type]])),
 			server_key: this.vapidPublicKey(),
 		};
+	}
+
+	private supportsAlert(type: typeof MASTODON_PUSH_ALERT_TYPES[number]): boolean {
+		return !(MASTODON_UNSUPPORTED_PUSH_ALERT_TYPES as readonly string[]).includes(type);
 	}
 
 	private validateEndpoint(value: string): void {
@@ -206,7 +213,7 @@ export class MastodonPushSubscriptionService {
 	private read(body: Dictionary, nested: Dictionary | null, bracketKey: string, nestedKey: string): unknown {
 		const hasBracket = Object.hasOwn(body, bracketKey);
 		const hasNested = nested != null && Object.hasOwn(nested, nestedKey);
-		if (hasBracket && hasNested) throw this.invalid(`Conflicting values for ${bracketKey}`);
+		if (hasBracket && hasNested && body[bracketKey] !== nested![nestedKey]) throw this.invalid(`Conflicting values for ${bracketKey}`);
 		const value = hasBracket ? body[bracketKey] : hasNested ? nested![nestedKey] : undefined;
 		if (Array.isArray(value)) throw this.invalid(`Repeated values for ${bracketKey}`);
 		return value;

@@ -30,6 +30,11 @@ import { UrlPreviewService } from './web/UrlPreviewService.js';
 import { ClientLoggerService } from './web/ClientLoggerService.js';
 import { OAuth2ProviderService } from './oauth/OAuth2ProviderService.js';
 import { MastodonApiCallService } from './api/mastodon/MastodonApiCallService.js';
+import { MastodonMediaService } from './api/mastodon/MastodonMediaService.js';
+import { MastodonStatusMetadataService } from './api/mastodon/MastodonStatusMetadataService.js';
+import { MastodonQueryService } from './api/mastodon/MastodonQueryService.js';
+import { MastodonRelationshipService } from './api/mastodon/MastodonRelationshipService.js';
+import { MastodonFavouriteService } from './api/mastodon/MastodonFavouriteService.js';
 import { MastodonApiStateService } from './api/mastodon/MastodonApiStateService.js';
 import { MastodonCollectionService } from './api/mastodon/MastodonCollectionService.js';
 import { MastodonConversationService } from './api/mastodon/MastodonConversationService.js';
@@ -123,6 +128,11 @@ import { SigninWithPasskeyApiService } from './api/SigninWithPasskeyApiService.j
 		OpenApiServerService,
 		OAuth2ProviderService,
 		MastodonApiCallService,
+		MastodonMediaService,
+		MastodonStatusMetadataService,
+		MastodonQueryService,
+		MastodonRelationshipService,
+		MastodonFavouriteService,
 		MastodonApiStateService,
 		MastodonCollectionService,
 		MastodonConversationService,

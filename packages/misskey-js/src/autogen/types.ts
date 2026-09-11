@@ -25311,6 +25311,7 @@ export interface operations {
                         /** Format: date-time */
                         lastUsedAt?: string;
                         permission: string[];
+                        mastodonScopes?: string[];
                         iconUrl?: string | null;
                         description?: string | null;
                     }[];

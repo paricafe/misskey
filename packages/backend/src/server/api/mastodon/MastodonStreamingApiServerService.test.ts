@@ -38,6 +38,16 @@ describe('Mastodon streaming compatibility', () => {
 		});
 	});
 
+	test.each([
+		['list', 'list-id'], ['hashtag', 'alpha'], ['hashtag:local', 'beta'],
+	])('encodes the complete %s subscription identity', (stream, parameter) => {
+		expect(JSON.parse(mastodonStreamEvent('update', { id: 'note-id' }, stream, { streamParams: [parameter] }))).toEqual({
+			event: 'update', payload: '{"id":"note-id"}', stream: [stream, parameter],
+		});
+		expect(JSON.parse(mastodonStreamEvent('delete', 'note-id', stream, { streamParams: [parameter], rawPayload: true })).stream)
+			.toEqual([stream, parameter]);
+	});
+
 	test('encodes raw deletes, payload-less filter invalidations, and exact SSE frames', () => {
 		expect(JSON.parse(mastodonStreamEvent('delete', 'note-id', 'user', { rawPayload: true }))).toEqual({
 			event: 'delete',
@@ -95,6 +105,8 @@ describe('Mastodon streaming compatibility', () => {
 			dispose: vi.fn(),
 		};
 		const isActiveUserToken = vi.fn().mockResolvedValue(true);
+		const getNoteWithRelations = vi.fn(async id => ({ id }));
+		const pack = vi.fn(async note => ({ ...note, isHidden: true }));
 		const service = new MastodonStreamingApiServerService(
 			redis as never,
 			{ registerRequestByContextId: vi.fn(), create: vi.fn().mockResolvedValue(nativeStream) } as never,
@@ -105,6 +117,10 @@ describe('Mastodon streaming compatibility', () => {
 			{ list: vi.fn(async (_userId, sources) => sources) } as never,
 			{ listFollowedTags: vi.fn(async () => []) } as never,
 			{ upsertLive: vi.fn() } as never,
+			{ getNoteWithRelations } as never,
+			{ pack } as never,
+			{ decoratePublished: vi.fn(async (_note, status) => status) } as never,
+			{ filterStatuses: vi.fn(async (_userId, statuses) => statuses), filterNotifications: vi.fn(async (_userId, notifications) => notifications) } as never,
 		);
 		const server = http.createServer();
 		service.attach(server);
@@ -134,11 +150,21 @@ describe('Mastodon streaming compatibility', () => {
 			const [deleteData] = await deleteMessage;
 			expect(JSON.parse(deleteData.toString())).toMatchObject({ event: 'delete', payload: 'note-id', stream: ['public'] });
 
+			const refillMessage = once(client, 'message');
+			nativeSocket!.send(JSON.stringify({
+				type: 'channel',
+				body: { id: 'mastodon-0', type: 'note', body: { id: 'note-id', user: { host: null }, files: [], visibility: 'public' } },
+			}));
+			await refillMessage;
+
 			const notificationMessage = once(client, 'message');
+			redis.emit('message', 'misskey', JSON.stringify({ channel: 'noteStream:note-id', message: { type: 'updated', body: { body: { text: 'now inaccessible' } } } }));
 			nativeSocket!.send(JSON.stringify({ type: 'channel', body: { id: 'mastodon-1', type: 'mention', body: { id: 'private-note' } } }));
 			nativeSocket!.send(JSON.stringify({ type: 'channel', body: { id: 'mastodon-1', type: 'notification', body: { id: 'notification-id' } } }));
 			const [notificationData] = await notificationMessage;
 			expect(JSON.parse(notificationData.toString())).toMatchObject({ event: 'notification', stream: ['user:notification'] });
+			expect(getNoteWithRelations).toHaveBeenCalledWith('note-id');
+			expect(pack).toHaveBeenCalledWith({ id: 'note-id' }, { id: 'user-id' }, { detail: true });
 
 			const closed = once(client, 'close');
 			redis.emit('message', 'misskey', JSON.stringify({ channel: 'mastodonTokenRevoked:token-id', message: null }));
@@ -178,6 +204,10 @@ describe('Mastodon streaming compatibility', () => {
 			{ list: vi.fn(async (_userId, sources) => sources) } as never,
 			{ listFollowedTags: vi.fn(async () => []) } as never,
 			{ upsertLive: vi.fn() } as never,
+			{ getNoteWithRelations: vi.fn() } as never,
+			{ pack: vi.fn() } as never,
+			{ decoratePublished: vi.fn(async (_note, status) => status) } as never,
+			{ filterStatuses: vi.fn(async (_userId, statuses) => statuses), filterNotifications: vi.fn(async (_userId, notifications) => notifications) } as never,
 		);
 		const server = http.createServer();
 		service.attach(server);
@@ -227,6 +257,10 @@ describe('Mastodon streaming compatibility', () => {
 			{ list: vi.fn(async (_userId, sources) => sources) } as never,
 			{ listFollowedTags: vi.fn(async () => []) } as never,
 			{ upsertLive: vi.fn() } as never,
+			{ getNoteWithRelations: vi.fn() } as never,
+			{ pack: vi.fn() } as never,
+			{ decoratePublished: vi.fn(async (_note, status) => status) } as never,
+			{ filterStatuses: vi.fn(async (_userId, statuses) => statuses), filterNotifications: vi.fn(async (_userId, notifications) => notifications) } as never,
 		);
 		const server = http.createServer();
 		service.attach(server);
@@ -289,6 +323,10 @@ describe('Mastodon streaming compatibility', () => {
 			{ list: vi.fn(async (_userId, sources) => sources) } as never,
 			{ listFollowedTags: vi.fn(async () => []) } as never,
 			{ upsertLive: vi.fn() } as never,
+			{ getNoteWithRelations: vi.fn() } as never,
+			{ pack: vi.fn() } as never,
+			{ decoratePublished: vi.fn(async (_note, status) => status) } as never,
+			{ filterStatuses: vi.fn(async (_userId, statuses) => statuses), filterNotifications: vi.fn(async (_userId, notifications) => notifications) } as never,
 		);
 		const server = http.createServer();
 		service.attach(server);
@@ -373,6 +411,10 @@ describe('Mastodon streaming compatibility', () => {
 			{ list: vi.fn() } as never,
 			{ listFollowedTags: vi.fn().mockResolvedValue([]) } as never,
 			{ upsertLive: vi.fn() } as never,
+			{ getNoteWithRelations: vi.fn() } as never,
+			{ pack: vi.fn() } as never,
+			{ decoratePublished: vi.fn(async (_note, status) => status) } as never,
+			{ filterStatuses: vi.fn(async (_userId, statuses) => statuses), filterNotifications: vi.fn(async (_userId, notifications) => notifications) } as never,
 		);
 		const server = http.createServer();
 		service.attach(server);
@@ -422,6 +464,10 @@ describe('Mastodon streaming compatibility', () => {
 			{ list: vi.fn(async (_userId, sources) => sources) } as never,
 			{ listFollowedTags: vi.fn(async () => []) } as never,
 			{ upsertLive: vi.fn() } as never,
+			{ getNoteWithRelations: vi.fn() } as never,
+			{ pack: vi.fn() } as never,
+			{ decoratePublished: vi.fn(async (_note, status) => status) } as never,
+			{ filterStatuses: vi.fn(async (_userId, statuses) => statuses), filterNotifications: vi.fn(async (_userId, notifications) => notifications) } as never,
 		);
 		const requestRaw = Object.assign(new EventEmitter(), { url: '/api/v1/streaming/public?access_token=sse-token' });
 		const writes: string[] = [];
@@ -497,6 +543,10 @@ describe('Mastodon streaming compatibility', () => {
 			{ list: vi.fn() } as never,
 			{ listFollowedTags: vi.fn().mockResolvedValue([]) } as never,
 			{ upsertLive: vi.fn(), refreshLive: vi.fn() } as never,
+			{ getNoteWithRelations: vi.fn() } as never,
+			{ pack: vi.fn() } as never,
+			{ decoratePublished: vi.fn(async (_note, status) => status) } as never,
+			{ filterStatuses: vi.fn(async (_userId, statuses) => statuses), filterNotifications: vi.fn(async (_userId, notifications) => notifications) } as never,
 		);
 		const server = http.createServer();
 		service.attach(server);
@@ -564,6 +614,10 @@ describe('Mastodon streaming compatibility', () => {
 			{ list: vi.fn() } as never,
 			{ listFollowedTags: vi.fn().mockResolvedValue([]) } as never,
 			{ upsertLive: vi.fn(), refreshLive: vi.fn() } as never,
+			{ getNoteWithRelations: vi.fn() } as never,
+			{ pack: vi.fn() } as never,
+			{ decoratePublished: vi.fn(async (_note, status) => status) } as never,
+			{ filterStatuses: vi.fn(async (_userId, statuses) => statuses), filterNotifications: vi.fn(async (_userId, notifications) => notifications) } as never,
 		);
 		const requestRaw = Object.assign(new EventEmitter(), { url: '/api/v1/streaming/public?access_token=token' });
 		const responseRaw = Object.assign(new EventEmitter(), {
@@ -608,6 +662,10 @@ describe('Mastodon streaming compatibility', () => {
 			{ list: vi.fn(async (_userId, sources) => sources) } as never,
 			{ listFollowedTags: vi.fn(async () => []) } as never,
 			{ upsertLive: vi.fn() } as never,
+			{ getNoteWithRelations: vi.fn() } as never,
+			{ pack: vi.fn() } as never,
+			{ decoratePublished: vi.fn(async (_note, status) => status) } as never,
+			{ filterStatuses: vi.fn(async (_userId, statuses) => statuses), filterNotifications: vi.fn(async (_userId, notifications) => notifications) } as never,
 		);
 		const requestRaw = Object.assign(new EventEmitter(), { url: '/api/v1/streaming/user?access_token=token' });
 		const responseRaw = Object.assign(new EventEmitter(), {

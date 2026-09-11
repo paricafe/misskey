@@ -5,7 +5,7 @@
 
 import { Injectable } from '@nestjs/common';
 
-type PaginationQuery = {
+export type MastodonPaginationQuery = {
 	limit?: string | number;
 	max_id?: string;
 	min_id?: string;
@@ -14,22 +14,35 @@ type PaginationQuery = {
 
 @Injectable()
 export class MastodonPaginationService {
-	public toMisskey(query: PaginationQuery, maximum = 40): { limit: number; untilId?: string; sinceId?: string } {
+	public toMisskey(query: MastodonPaginationQuery, maximum = 40): { limit: number; untilId?: string; sinceId?: string } {
 		const parsedLimit = typeof query.limit === 'number' ? query.limit : Number.parseInt(query.limit ?? '', 10);
 		const limit = Number.isFinite(parsedLimit) ? Math.min(maximum, Math.max(1, parsedLimit)) : 20;
+		const minId = query.min_id || undefined;
 
 		return {
 			limit,
-			...(query.max_id != null && query.max_id !== '' ? { untilId: query.max_id } : {}),
-		...((query.min_id ?? query.since_id) != null && (query.min_id ?? query.since_id) !== ''
-				? { sinceId: query.min_id ?? query.since_id }
-				: {}),
+			// Misskey's single sinceId cursor selects the immediately newer page in ascending order.
+			// Mastodon's since_id is only a lower bound on the latest descending page. Keep that
+			// bound for normalizePage rather than accidentally selecting the oldest unseen items.
+			...(minId != null ? { sinceId: minId } : query.max_id ? { untilId: query.max_id } : {}),
 		};
 	}
 
+	public normalizePage<T extends { id: string }>(items: readonly T[], query: MastodonPaginationQuery, maximum = 40): T[] {
+		const { limit } = this.toMisskey(query, maximum);
+		const minId = query.min_id || undefined;
+		const lowerBound = minId ?? (query.since_id || undefined);
+		const upperBound = query.max_id || undefined;
+		const ordered = [...new Map(items.map(item => [item.id, item])).values()]
+			.filter(item => (lowerBound == null || item.id > lowerBound) && (upperBound == null || item.id < upperBound))
+			.sort((left, right) => left.id < right.id ? -1 : left.id > right.id ? 1 : 0);
+		return (minId != null ? ordered.slice(0, limit) : ordered.slice(-limit)).reverse();
+	}
+
 	public linkHeader(requestUrl: string, items: readonly { id: string }[]): string | null {
-		const newest = items[0]?.id;
-		const oldest = items.at(-1)?.id;
+		const ids = items.map(item => item.id).sort();
+		const newest = ids.at(-1);
+		const oldest = ids[0];
 		if (newest == null || oldest == null) return null;
 
 		const next = new URL(requestUrl);
@@ -39,8 +52,8 @@ export class MastodonPaginationService {
 
 		const previous = new URL(requestUrl);
 		previous.searchParams.delete('max_id');
-		previous.searchParams.delete('min_id');
-		previous.searchParams.set('since_id', newest);
+		previous.searchParams.delete('since_id');
+		previous.searchParams.set('min_id', newest);
 
 		return `<${next.toString()}>; rel="next", <${previous.toString()}>; rel="prev"`;
 	}

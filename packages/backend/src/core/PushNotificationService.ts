@@ -77,7 +77,7 @@ export class PushNotificationService implements OnApplicationShutdown {
 
 	@bindThis
 	public async pushNotification<T extends keyof PushNotificationsTypes>(userId: string, type: T, body: PushNotificationsTypes[T]) {
-		if (type === 'notification') {
+		if (this.config.enableMastodonApi && type === 'notification') {
 			void this.mastodonPushNotificationService.pushNotification(userId, body as Packed<'Notification'>).catch(() => undefined);
 		}
 		if (!this.meta.enableServiceWorker || this.meta.swPublicKey == null || this.meta.swPrivateKey == null) return;

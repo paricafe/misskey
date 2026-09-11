@@ -34,9 +34,12 @@ SPDX-License-Identifier: AGPL-3.0-only
 							</MkKeyValue>
 						</div>
 						<MkFolder>
-							<template #label>{{ i18n.ts.permission }}</template>
-							<template #suffix>{{ Object.keys(token.permission).length === 0 ? i18n.ts.none : Object.keys(token.permission).length }}</template>
-							<ul>
+							<template #label>{{ token.mastodonScopes != null ? i18n.ts._auth.mastodonPermissions : i18n.ts.permission }}</template>
+							<template #suffix>{{ (token.mastodonScopes ?? token.permission).length || i18n.ts.none }}</template>
+							<ul v-if="token.mastodonScopes != null">
+								<li v-for="scope in token.mastodonScopes" :key="scope">{{ mastodonScopeDescription(scope) }}</li>
+							</ul>
+							<ul v-else>
 								<li v-for="p in token.permission" :key="p">{{ (i18n.ts._permissions as any)[p] ?? p }}</li>
 							</ul>
 						</MkFolder>
@@ -59,6 +62,7 @@ import MkKeyValue from '@/components/MkKeyValue.vue';
 import MkButton from '@/components/MkButton.vue';
 import MkFolder from '@/components/MkFolder.vue';
 import { Paginator } from '@/utility/paginator.js';
+import { mastodonScopeDescription } from '@/utility/mastodon-scope-description.js';
 
 const paginator = markRaw(new Paginator('i/apps', {
 	limit: 100,
