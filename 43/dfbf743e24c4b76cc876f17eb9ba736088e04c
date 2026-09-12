@@ -1,0 +1,27 @@
+compose_example.yml
+  s_d8966b8bcf3b74::t_7696fa187581c5 25,96-97
+  s_d8966b8bcf3b74::t_8bcb528b3a6bc3 98
+docs/mastodon-compatibility.md
+  s_d8966b8bcf3b74::t_47885c862ec5cd 142-145
+  s_d8966b8bcf3b74::t_465b3808172269 36-63
+Dockerfile
+  s_d8966b8bcf3b74::t_7696fa187581c5 113-117
+packages/mastodon-compat/test/oauth-persistence.test.ts
+  s_d8966b8bcf3b74::t_973e49e8e50143 1-127
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "43dfbf743e24c4b76cc876f17eb9ba736088e04c",
+  "prompts": {},
+  "sessions": {
+    "s_d8966b8bcf3b74": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a090c2-cd20-7a83-818f-6997cd6cede6",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "Natsuki-Kaede <i@pari.network>"
+    }
+  }
+}
