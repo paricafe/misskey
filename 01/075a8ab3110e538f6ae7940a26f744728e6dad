@@ -1,0 +1,35 @@
+packages/mastodon-compat/src/routes.ts
+  s_d8966b8bcf3b74::t_4e6b7ba2697ee5 169-171,297-304,322-324,326,331
+  s_d8966b8bcf3b74::t_a2b1aae0245216 168,231-242,249,254-258,287,308,325,327
+packages/backend/test/e2e/mastodon-api.ts
+  s_d8966b8bcf3b74::t_313087a801f438 116-123
+  s_d8966b8bcf3b74::t_5d95b37661b7a4 86,92,94,105-115,124-128
+  s_d8966b8bcf3b74::t_7c4714b1060ada 129-130
+package.json
+  s_d8966b8bcf3b74::t_4bfef3d983c310 3
+packages/mastodon-compat/test/routes.test.ts
+  s_d8966b8bcf3b74::t_e3f008dfd23307 52,204-225,227-240,246,251,267-278
+  s_d8966b8bcf3b74::t_3cf9362d5e03a2 123-129,132-133
+  s_d8966b8bcf3b74::t_9e30525f2b985c 226,241-245,247-250,252-266
+  s_d8966b8bcf3b74::t_518c1e330a3cd0 130-131
+  s_d8966b8bcf3b74::t_c23039c862fc30 279
+docs/mastodon-compatibility.md
+  s_d8966b8bcf3b74::t_de2d3479bb68f4 61,72-73,79
+  s_d8966b8bcf3b74::t_ce6452b62a4eb8 112-113
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "01075a8ab3110e538f6ae7940a26f744728e6dad",
+  "prompts": {},
+  "sessions": {
+    "s_d8966b8bcf3b74": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a090c2-cd20-7a83-818f-6997cd6cede6",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "Natsuki-Kaede <i@pari.network>"
+    }
+  }
+}
