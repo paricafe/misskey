@@ -248,12 +248,15 @@ function prepareStatusInput(input: Json, defaults: Json = {}, editing = false): 
 		if (typeof value !== 'string') throw new HttpError(422, `${name} must be a string`);
 		return value;
 	};
-	for (const name of ['scheduled_at', 'quote_id', 'media_attributes']) {
+	for (const name of ['scheduled_at', 'media_attributes']) {
 		if (input[name] != null && input[name] !== '' && (!Array.isArray(input[name]) || input[name].length)) throw new HttpError(422, `${name} is unavailable through this gateway`);
 	}
 	if (editing && ['visibility', 'in_reply_to_id', 'poll', 'local_only'].some(name => input[name] !== undefined)) throw new HttpError(422, 'This status property cannot be edited');
 	const native: Json = { text: text(input.status, 'status'), cw: text(input.spoiler_text, 'spoiler_text') };
-	const quotedId = text(input.quoted_status_id, 'quoted_status_id');
+	const quotedStatusId = text(input.quoted_status_id, 'quoted_status_id');
+	const quoteId = text(input.quote_id, 'quote_id');
+	if (quotedStatusId && quoteId && quotedStatusId !== quoteId) throw new HttpError(422, 'quote_id and quoted_status_id must refer to the same status');
+	const quotedId = quotedStatusId ?? quoteId;
 	if (quotedId) {
 		if (editing) throw new HttpError(422, 'The quoted status cannot be changed');
 		native.renoteId = quotedId;

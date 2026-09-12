@@ -68,7 +68,7 @@ Favourites map to heart reactions (`❤`/`❤️`). Creating a favourite returns
 
 Status language/sensitivity, attachment focus, OAuth state, filters, and markers live in the gateway store. Compatibility metadata does not add fields to native notes or change the federated ActivityPub representation. Native media descriptions still use the native Drive update semantics. A sensitive compatibility status does not rewrite a shared file's sensitivity.
 
-`quote_approval_policy: public` is accepted for ordinary posts and quotes. For private/direct posts, all three standard policy values are accepted because native visibility already prevents other users from quoting them. Restrictive `followers`/`nobody` policies on public or unlisted posts are rejected because the native server cannot enforce them. `quoted_status_id` creates a native quote; quotes without a comment use the quoted post's canonical URL as visible fallback text. Native visibility, block and channel checks still apply.
+`quote_approval_policy: public` is accepted for ordinary posts and quotes. For private/direct posts, all three standard policy values are accepted because native visibility already prevents other users from quoting them. Restrictive `followers`/`nobody` policies on public or unlisted posts are rejected because the native server cannot enforce them. Both `quoted_status_id` and the compatibility alias `quote_id` create a native quote; supplying different IDs in both fields returns 422. Quotes without a comment use the quoted post's canonical URL as visible fallback text. Native visibility, block and channel checks still apply. Editing quote text is supported, but changing the quoted target is not.
 
 ## Explicit limits
 
@@ -100,8 +100,8 @@ Local validation on 2026-09-12:
 
 | Check | Result |
 | --- | --- |
-| Gateway protocol, HTTP/WebSocket, memory and real PostgreSQL storage tests | PASS: 121 tests, no skips |
-| Real Misskey HTTP/WebSocket with PostgreSQL and Redis | PASS: 13 e2e tests |
+| Gateway protocol, HTTP/WebSocket, memory and real PostgreSQL storage tests | PASS: 123 tests, no skips |
+| Real Misskey HTTP/WebSocket with PostgreSQL and Redis | PASS: 15 e2e tests |
 | Gateway and backend TypeScript; production backend build | PASS |
 | New migration up/down/up and actual migration-created table vs entity schema | PASS: zero pending DDL |
 | Historical application-token migration unit test | PASS: 1 test |
@@ -113,8 +113,10 @@ The PostgreSQL HTTP lifecycle test starts separate gateway processes, forcibly t
 
 Migration regressions cover an empty compatibility migration history and a populated legacy database. They compare rollback columns, indexes, and foreign keys with the actual historical migration result, verify that deleted credentials are not restored, and check that an external dependency blocking the last table deletion rolls back the entire transaction. The retired entities and repository registrations are removed so schema checks do not propose recreating the old tables.
 
-The native e2e harness retains its existing controller-server exit warning (`close timed out after 10000ms`); all 13 tests pass and the runner exits with code 0. This warning is separate from the active-stream gateway shutdown tests.
+Quote alias regressions cover `quote_id` in JSON, URL-encoded forms, and multipart requests, confirm the persisted native `renoteId` and quote response, and check bare quotes, idempotency, conflicting aliases, and hidden-target rejection before publishing.
 
-Changelog candidate: Fix: Store Mastodon compatibility state in PostgreSQL and remove obsolete compatibility tables.
+The native e2e harness retains its existing controller-server exit warning (`close timed out after 10000ms`); all 15 tests pass and the runner exits with code 0. This warning is separate from the active-stream gateway shutdown tests.
+
+Changelog candidate: Fix: Accept quote_id when creating native Misskey quotes through the Mastodon API.
 
 References: [Mastodon API guidelines](https://docs.joinmastodon.org/api/guidelines/), [OAuth](https://docs.joinmastodon.org/methods/oauth/), [Mastodon entities](https://docs.joinmastodon.org/entities/), [MiAuth](https://misskey-hub.net/en/docs/for-developers/api/token/miauth/). The package follows the HTTP-adapter architecture used by Megalodon; it is implemented against the current public native APIs rather than importing an obsolete Misskey SDK or native backend internals.

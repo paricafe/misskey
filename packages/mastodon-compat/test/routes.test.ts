@@ -86,7 +86,7 @@ test('all compatibility status inputs validate before creation, editing, metadat
 		{ sensitive: 'invalid' }, { language: {} }, { language: 'not a language' }, { status: {} }, { spoiler_text: 'x'.repeat(101) },
 		{ poll: { options: ['One'], expires_in: 300 } }, { poll: { options: ['One', 'Two'], expires_in: 1 } },
 		{ poll: { options: ['One', 'Two'], expires_in: 300, multiple: 'invalid' } }, { poll: { options: ['One', 'Two'], expires_in: 300, hide_totals: true } },
-		{ poll: { options: ['One', 'Two'] } }, { media_ids: ['file', 'file'] }, { scheduled_at: '2027-01-01' }, { quote_id: '100' }, { media_attributes: [{ id: 'file' }] },
+		{ poll: { options: ['One', 'Two'] } }, { media_ids: ['file', 'file'] }, { scheduled_at: '2027-01-01' }, { quote_id: {} }, { media_attributes: [{ id: 'file' }] },
 	];
 	for (const patch of invalid) {
 		const result = await f.request('POST', '/api/v1/statuses', { status: 'Valid text', ...patch }, undefined, 'invalid');
@@ -279,11 +279,47 @@ test('quotes map to native renotes, preserve empty-comment quotes and replay ide
 	assert.equal((await f.request('PUT', `/api/v1/statuses/${quoted.json().id}`, { quoted_status_id: 'other' })).statusCode, 422);
 });
 
+test('quote_id aliases the native quote flow, including bare quotes and idempotent retries', async t => {
+	const f = await fixture(t);
+	f.notes.push(note('100', { userId: 'bob', user: user('bob'), text: 'Original' }));
+	f.notes.push(note('101', { text: null, renoteId: '100', renote: f.notes[0] }));
+	const payload = { status: 'Alias quote', quote_id: '100' };
+	const first = await f.request('POST', '/api/v1/statuses', payload, undefined, 'quote-alias');
+	assert.equal(first.statusCode, 200, first.body);
+	assert.equal(first.json().quote.quoted_status.id, '100');
+	assert.equal(first.json().reblog, null);
+	assert.equal((await f.request('POST', '/api/v1/statuses', payload, undefined, 'quote-alias')).json().id, first.json().id);
+	assert.equal(f.calls.filter(call => call.endpoint === 'notes/create').length, 1);
+	assert.equal(f.notes.at(-1)?.text, 'Alias quote');
+	assert.equal(f.notes.at(-1)?.renoteId, '100');
+	for (const input of [{ quote_id: '101' }, { quote_id: '100', quoted_status_id: '100' }, { quote_id: '100', quoted_status_id: '' }, { quote_id: null, quoted_status_id: '100' }]) {
+		const bare = await f.request('POST', '/api/v1/statuses', input);
+		assert.equal(bare.statusCode, 200, bare.body);
+		assert.equal(bare.json().quote.quoted_status.id, '100');
+		assert.equal(bare.json().reblog, null);
+		assert.equal(f.notes.at(-1)?.renoteId, '100');
+		assert.equal(f.notes.at(-1)?.text, 'https://social.test/notes/100');
+	}
+	assert.equal((await f.request('PUT', `/api/v1/statuses/${first.json().id}`, { status: 'Cannot change target', quote_id: '101' })).statusCode, 422);
+	assert.equal(f.calls.some(call => call.endpoint === 'notes/update'), false);
+});
+
+test('invalid or conflicting quote aliases fail before writing or claiming idempotency', async t => {
+	const f = await fixture(t);
+	f.notes.push(note('100'), note('101'));
+	for (const input of [{ quote_id: {} }, { quote_id: ['100'] }, { quote_id: 100 }, { quote_id: '100', quoted_status_id: {} }, { quote_id: '100', quoted_status_id: '101' }]) {
+		const result = await f.request('POST', '/api/v1/statuses', { status: 'Must not publish', ...input }, undefined, 'invalid-alias');
+		assert.equal(result.statusCode, 422, result.body);
+		assert.equal(await f.store.get('idempotency', 'alice', 'invalid-alias'), undefined);
+	}
+	assert.equal(f.calls.some(call => call.endpoint === 'notes/create'), false);
+});
+
 test('direct quotes require an explicit author mention, including when a reply supplies a recipient', async t => {
 	const f = await fixture(t);
 	f.notes.push(note('100', { userId: 'bob', user: user('bob') }), note('own'));
-	for (const input of [{ status: '@carol Comment' }, { status: '@carol Comment', in_reply_to_id: '100' }]) {
-		const rejected = await f.request('POST', '/api/v1/statuses', { ...input, quoted_status_id: '100', visibility: 'direct', quote_approval_policy: 'nobody' });
+	for (const field of ['quoted_status_id', 'quote_id']) for (const input of [{ status: '@carol Comment' }, { status: '@carol Comment', in_reply_to_id: '100' }]) {
+		const rejected = await f.request('POST', '/api/v1/statuses', { ...input, [field]: '100', visibility: 'direct', quote_approval_policy: 'nobody' });
 		assert.equal(rejected.statusCode, 422, rejected.body);
 	}
 	assert.equal(f.calls.some(call => call.endpoint === 'notes/create'), false);
@@ -297,8 +333,8 @@ test('direct quotes require an explicit author mention, including when a reply s
 test('hidden, missing and invalid quote targets are rejected before creating a native note', async t => {
 	const f = await fixture(t);
 	f.notes.push(note('hidden', { isHidden: true }));
-	for (const quoted_status_id of ['hidden', 'missing', {}]) {
-		const result = await f.request('POST', '/api/v1/statuses', { status: 'Must not publish', quoted_status_id, quote_approval_policy: 'public' }, undefined, 'invalid-quote');
+	for (const field of ['quoted_status_id', 'quote_id']) for (const target of ['hidden', 'missing', {}]) {
+		const result = await f.request('POST', '/api/v1/statuses', { status: 'Must not publish', [field]: target, quote_approval_policy: 'public' }, undefined, 'invalid-quote');
 		assert.ok([404, 422].includes(result.statusCode), result.body);
 	}
 	assert.equal(f.calls.some(call => call.endpoint === 'notes/create'), false);

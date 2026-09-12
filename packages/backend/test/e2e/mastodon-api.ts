@@ -126,6 +126,37 @@ describe('Mastodon gateway against real Misskey HTTP and streaming APIs', () => 
 		assert.ok(!notes.body.some(note => note.text === 'Cannot enforce restrictive public policy'));
 	});
 
+	test('accepts quote_id in JSON, form and multipart as a native Misskey quote', async () => {
+		const original = await ok('/api/v1/statuses', aliceToken, 'POST', { status: 'quote_id target', quote_approval_policy: 'public' });
+		const quoted = await ok('/api/v1/statuses', bobToken, 'POST', { status: 'JSON quote_id comment', quote_id: original.id, quote_approval_policy: 'public' });
+		const form = new URLSearchParams({ status: 'Form quote_id comment', quote_id: original.id, quote_approval_policy: 'public' });
+		const formQuote = await ok('/api/v1/statuses', bobToken, 'POST', form.toString(), { 'content-type': 'application/x-www-form-urlencoded' });
+		const parts = new FormData(); parts.append('status', 'Multipart quote_id comment'); parts.append('quote_id', original.id); parts.append('quote_approval_policy', 'public');
+		const multipart = await relativeFetch('/api/v1/statuses', { method: 'POST', headers: { authorization: `Bearer ${bobToken}` }, body: parts });
+		assert.equal(multipart.status, 200, await multipart.clone().text());
+		const multipartQuote = await multipart.json() as Json;
+		const bare = await ok('/api/v1/statuses', bobToken, 'POST', { quote_id: original.id, quote_approval_policy: 'public' });
+		const matchingAliases = await ok('/api/v1/statuses', bobToken, 'POST', { status: 'Matching quote aliases', quote_id: original.id, quoted_status_id: original.id, quote_approval_policy: 'public' });
+		for (const [note, text] of [[quoted, 'JSON quote_id comment'], [formQuote, 'Form quote_id comment'], [multipartQuote, 'Multipart quote_id comment'], [bare, original.url], [matchingAliases, 'Matching quote aliases']]) {
+			assert.equal(note.quote.quoted_status.id, original.id); assert.equal(note.quote.state, 'accepted'); assert.equal(note.reblog, null);
+			const native = await api('notes/show', { noteId: note.id }, bob);
+			assert.equal(native.status, 200); assert.equal(native.body.renoteId, original.id); assert.equal(native.body.text, text);
+			assert.equal((await ok(`/api/v1/statuses/${note.id}`, bobToken)).quote.quoted_status.id, original.id);
+		}
+	});
+
+	test('rejects hidden quote_id targets and conflicting aliases before publishing', async () => {
+		const hidden = await ok('/api/v1/statuses', aliceToken, 'POST', { status: 'Hidden quote_id target', visibility: 'private', quote_approval_policy: 'nobody' });
+		const hiddenText = 'Must never publish a hidden quote_id target';
+		assert.equal((await request('/api/v1/statuses', bobToken, 'POST', { status: hiddenText, quote_id: hidden.id, quote_approval_policy: 'public' })).status, 404);
+		const original = await ok('/api/v1/statuses', aliceToken, 'POST', { status: 'First quote alias target' });
+		const other = await ok('/api/v1/statuses', aliceToken, 'POST', { status: 'Second quote alias target' });
+		const conflictText = 'Must never publish conflicting quote aliases';
+		assert.equal((await request('/api/v1/statuses', bobToken, 'POST', { status: conflictText, quote_id: original.id, quoted_status_id: other.id, quote_approval_policy: 'public' })).status, 422);
+		const notes = await api('users/notes', { userId: bob.id, limit: 100 }, bob);
+		assert.equal(notes.status, 200); assert.ok(!notes.body.some(note => [hiddenText, conflictText].includes(note.text ?? '')));
+	});
+
 	test('loads paginated timelines and does not expose follower-only or direct notes', async () => {
 		const a = await ok('/api/v1/statuses', aliceToken, 'POST', { status: 'timeline older', visibility: 'public' });
 		const b = await ok('/api/v1/statuses', aliceToken, 'POST', { status: 'timeline newer', visibility: 'public' });
