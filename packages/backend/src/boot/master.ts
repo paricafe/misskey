@@ -20,6 +20,7 @@ import { initExtraThreadPool, jobQueue, server } from './common.js';
 import { installShutdownSignalHandlers, isShutdownInProgress } from './shutdown-handler.js';
 import { shutdownApplications } from './application-lifecycle.js';
 import { forceStopClusterWorkers, shutdownClusterWorkers } from './cluster-shutdown.js';
+import { prepareUnixSocket } from './unix-socket.js';
 
 const logger = new Logger('core', 'cyan');
 const bootLogger = logger.createSubLogger('boot', 'magenta');
@@ -109,6 +110,7 @@ export async function masterMain() {
 		// clusterモジュール有効時
 
 		if (envOption.onlyServer) {
+			if (config.socket) await prepareUnixSocket(config.socket);
 			// onlyServer かつ enableCluster な場合、メインプロセスはforkのみに制限する(listenしない)。
 			// ワーカープロセス側でlistenすると、メインプロセスでポートへの着信を受け入れてワーカープロセスへの分配を行う動作をする。
 			// そのため、メインプロセスでも直接listenするとポートの競合が発生して起動に失敗してしまう。

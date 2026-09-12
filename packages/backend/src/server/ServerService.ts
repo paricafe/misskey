@@ -35,6 +35,7 @@ import { OpenApiServerService } from './api/openapi/OpenApiServerService.js';
 import { OAuth2ProviderService } from './oauth/OAuth2ProviderService.js';
 import { makeHstsHook } from './hsts.js';
 import { registerHttpAccessLog } from './http-access-log.js';
+import { listenOnUnixSocket } from '@/boot/unix-socket.js';
 
 const _dirname = fileURLToPath(new URL('.', import.meta.url));
 
@@ -300,10 +301,7 @@ export class ServerService implements OnApplicationShutdown {
 
 		try {
 			if (this.config.socket) {
-				if (fs.existsSync(this.config.socket)) {
-					fs.unlinkSync(this.config.socket);
-				}
-				await fastify.listen({ path: this.config.socket });
+				await listenOnUnixSocket(this.config.socket, socketPath => fastify.listen({ path: socketPath }));
 				if (this.config.chmodSocket) {
 					fs.chmodSync(this.config.socket, this.config.chmodSocket);
 				}
