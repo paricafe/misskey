@@ -15,6 +15,8 @@ import { LoggerService } from '@/core/LoggerService.js';
 import { HttpRequestService } from '@/core/HttpRequestService.js';
 import { bindThis } from '@/decorators.js';
 import { FederatedInstanceService } from '@/core/FederatedInstanceService.js';
+import { acquireDistributedLock, DistributedLockNotAcquiredError } from '@/misc/distributed-lock.js';
+import type { DistributedLock } from '@/misc/distributed-lock.js';
 
 type NodeInfo = {
 	openRegistrations?: unknown;
@@ -51,36 +53,25 @@ export class FetchInstanceMetadataService {
 
 	@bindThis
 	// public for test
-	public async tryLock(host: string): Promise<string | null> {
-		// TODO: マイグレーションなのであとで消す (2024.3.1)
-		this.redisClient.del(`fetchInstanceMetadata:mutex:${host}`);
-
-		return await this.redisClient.set(
-			`fetchInstanceMetadata:mutex:v2:${host}`, '1',
-			'EX', 30, // 30秒したら自動でロック解除 https://github.com/misskey-dev/misskey/issues/13506#issuecomment-1975375395
-			'GET', // 古い値を返す（なかったらnull）
-		);
-	}
-
-	@bindThis
-	// public for test
-	public unlock(host: string): Promise<number> {
-		return this.redisClient.del(`fetchInstanceMetadata:mutex:v2:${host}`);
+	public async tryLock(host: string): Promise<DistributedLock | null> {
+		try {
+			return await acquireDistributedLock(this.redisClient, `fetch-instance-metadata:${host}`, 30_000, 1, 0);
+		} catch (error) {
+			if (error instanceof DistributedLockNotAcquiredError) return null;
+			throw error;
+		}
 	}
 
 	@bindThis
 	public async fetchInstanceMetadata(instance: MiInstance, force = false): Promise<void> {
 		const host = instance.host;
-
-		// finallyでunlockされてしまうのでtry内でロックチェックをしない
-		// （returnであってもfinallyは実行される）
-		if (!force && await this.tryLock(host) === '1') {
-			// 1が返ってきていたらロックされているという意味なので、何もしない
-			return;
-		}
+		let lock: DistributedLock | null = null;
 
 		try {
 			if (!force) {
+				lock = await this.tryLock(host);
+				if (lock == null) return;
+
 				const _instance = await this.federatedInstanceService.fetchOrRegister(host);
 				const now = Date.now();
 				if (_instance && _instance.infoUpdatedAt && (now - _instance.infoUpdatedAt.getTime() < 1000 * 60 * 60 * 24)) {
@@ -125,13 +116,16 @@ export class FetchInstanceMetadataService {
 			if (favicon) updates.faviconUrl = favicon;
 			if (themeColor) updates.themeColor = themeColor;
 
+			await lock?.assertOwned();
 			await this.federatedInstanceService.update(instance.id, updates);
 
 			this.logger.succ(`Successfuly updated metadata of ${instance.host}`);
 		} catch (e) {
 			this.logger.error(`Failed to update metadata of ${instance.host}: ${e}`);
 		} finally {
-			await this.unlock(host);
+			if (lock != null) {
+				await lock().catch(error => this.logger.error(`Failed to release metadata lock for ${host}: ${error}`));
+			}
 		}
 	}
 

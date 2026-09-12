@@ -78,7 +78,7 @@ describe('ReactionService conditional writes', () => {
 		await service.create(actor, note, '❤');
 		expect(remove).toHaveBeenCalledWith(actor, note);
 		expect(repository.insert).toHaveBeenCalledTimes(2);
-		expect(buffering.create).toHaveBeenCalledWith('note', 'actor', '❤', []);
+		expect(buffering.create).toHaveBeenCalledWith('note', 'actor', '❤');
 	});
 
 	test('a guarded new favourite still emits the native notification and federated Like', async () => {

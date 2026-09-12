@@ -152,6 +152,12 @@ export class MiNote {
 	})
 	public reactions: Record<string, number>;
 
+	// Identifies the Redis batch committed with reactions, so an interrupted bake can be retried.
+	@Column('uuid', {
+		nullable: true,
+	})
+	public lastReactionsBufferId: string | null;
+
 	/**
 	 * public ... 公開
 	 * home ... ホームタイムライン(ユーザーページのタイムライン含む)のみに流す

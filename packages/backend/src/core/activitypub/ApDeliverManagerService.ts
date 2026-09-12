@@ -4,7 +4,6 @@
  */
 
 import { Inject, Injectable } from '@nestjs/common';
-import { IsNull, Not } from 'typeorm';
 import { DI } from '@/di-symbols.js';
 import type { FollowingsRepository } from '@/models/_.js';
 import type { MiLocalUser, MiRemoteUser, MiUser } from '@/models/User.js';
@@ -112,24 +111,20 @@ class DeliverManager {
 		// build inbox list
 		// Process follower recipes first to avoid duplication when processing direct recipes later.
 		if (this.recipes.some(r => isFollowers(r))) {
-			// followers deliver
-			// TODO: SELECT DISTINCT ON ("followerSharedInbox") "followerSharedInbox" みたいな問い合わせにすればよりパフォーマンス向上できそう
-			// ただ、sharedInboxがnullなリモートユーザーも稀におり、その対応ができなさそう？
-			const followers = await this.followingsRepository.find({
-				where: {
-					followeeId: this.actor.id,
-					followerHost: Not(IsNull()),
-				},
-				select: {
-					followerSharedInbox: true,
-					followerInbox: true,
-				},
-			});
+			const inbox = 'COALESCE(following."followerSharedInbox", following."followerInbox")';
+			const followers = await this.followingsRepository.createQueryBuilder('following')
+				.select(inbox, 'inbox')
+				// If any follower identifies this URL as shared, keep that information
+				// regardless of row order (it determines how HTTP 410 is handled).
+				.addSelect('BOOL_OR(following."followerSharedInbox" IS NOT NULL)', 'isSharedInbox')
+				.where('following."followeeId" = :followeeId', { followeeId: this.actor.id })
+				.andWhere('following."followerHost" IS NOT NULL')
+				.groupBy(inbox)
+				.getRawMany<{ inbox: string | null; isSharedInbox: boolean }>();
 
 			for (const following of followers) {
-				const inbox = following.followerSharedInbox ?? following.followerInbox;
-				if (inbox === null) throw new Error('inbox is null');
-				inboxes.set(inbox, following.followerSharedInbox != null);
+				if (following.inbox === null) throw new Error('inbox is null');
+				inboxes.set(following.inbox, following.isSharedInbox);
 			}
 		}
 

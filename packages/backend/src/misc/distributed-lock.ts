@@ -26,6 +26,13 @@ export class DistributedLockLostError extends Error {
 	}
 }
 
+export class DistributedLockNotAcquiredError extends Error {
+	constructor(name: string) {
+		super(`Failed to acquire lock ${name}`);
+		this.name = 'DistributedLockNotAcquiredError';
+	}
+}
+
 export type DistributedLock = (() => Promise<void>) & {
 	assertOwned(): Promise<void>;
 };
@@ -104,7 +111,7 @@ export async function acquireDistributedLock(
 		retries++;
 	}
 
-	throw new Error(`Failed to acquire lock ${name}`);
+	throw new DistributedLockNotAcquiredError(name);
 }
 
 export function acquireApObjectLock(

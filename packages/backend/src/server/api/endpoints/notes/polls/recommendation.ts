@@ -112,6 +112,7 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 
 			return await this.noteEntityService.packMany(notes, me, {
 				detail: true,
+				polls,
 			});
 		});
 	}

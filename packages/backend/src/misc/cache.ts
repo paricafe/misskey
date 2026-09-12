@@ -12,6 +12,7 @@ export class RedisKVCache<T> {
 	private readonly fetcher: (key: string) => Promise<T>;
 	private readonly toRedisConverter: (value: T) => string;
 	private readonly fromRedisConverter: (value: string) => T | undefined;
+	private readonly pendingFetches = new Map<string, Promise<T>>();
 
 	constructor(
 		private redisClient: Redis.Redis,
@@ -33,6 +34,7 @@ export class RedisKVCache<T> {
 
 	@bindThis
 	public async set(key: string, value: T): Promise<void> {
+		this.pendingFetches.delete(key);
 		this.memoryCache.set(key, value);
 		if (this.lifetime === Infinity) {
 			await this.redisClient.set(
@@ -50,22 +52,15 @@ export class RedisKVCache<T> {
 
 	@bindThis
 	public async get(key: string): Promise<T | undefined> {
-		const memoryCached = this.memoryCache.get(key);
-		if (memoryCached !== undefined) return memoryCached;
-
-		const cached = await this.redisClient.get(`kvcache:${this.name}:${key}`);
-		if (cached == null) return undefined;
-
-		const value = this.fromRedisConverter(cached);
-		if (value !== undefined) {
-			this.memoryCache.set(key, value);
-		}
-
-		return value;
+		return this.memoryCache.fetchMaybe(key, async () => {
+			const cached = await this.redisClient.get(`kvcache:${this.name}:${key}`);
+			return cached == null ? undefined : this.fromRedisConverter(cached);
+		});
 	}
 
 	@bindThis
 	public async delete(key: string): Promise<void> {
+		this.pendingFetches.delete(key);
 		this.memoryCache.delete(key);
 		await this.redisClient.del(`kvcache:${this.name}:${key}`);
 	}
@@ -79,22 +74,46 @@ export class RedisKVCache<T> {
 	 */
 	@bindThis
 	public async fetch(key: string): Promise<T> {
-		const cachedValue = await this.get(key);
-		if (cachedValue !== undefined) {
-			// Cache HIT
-			return cachedValue;
-		}
+		const memoryCached = this.memoryCache.get(key);
+		if (memoryCached !== undefined) return memoryCached;
 
-		// Cache MISS
-		const value = await this.fetcher(key);
-		await this.set(key, value);
-		return value;
+		const pendingFetch = this.pendingFetches.get(key);
+		if (pendingFetch !== undefined) return pendingFetch;
+
+		return this.fetchAndCache(key);
+	}
+
+	@bindThis
+	private async fetchAndCache(key: string, refresh = false): Promise<T> {
+		const pendingFetch = Promise.resolve().then(async () => {
+			if (!refresh) {
+				const cachedValue = await this.get(key);
+				if (cachedValue !== undefined) return cachedValue;
+			}
+
+			const value = await this.fetcher(key);
+			// A set, delete, or newer refresh supersedes this load.
+			if (this.pendingFetches.get(key) === pendingFetch) {
+				await this.set(key, value);
+			}
+			return value;
+		});
+		this.pendingFetches.set(key, pendingFetch);
+
+		try {
+			return await pendingFetch;
+		} finally {
+			if (this.pendingFetches.get(key) === pendingFetch) {
+				this.pendingFetches.delete(key);
+			}
+		}
 	}
 
 	@bindThis
 	public async refresh(key: string) {
-		const value = await this.fetcher(key);
-		await this.set(key, value);
+		this.pendingFetches.delete(key);
+		this.memoryCache.delete(key);
+		await this.fetchAndCache(key, true);
 
 		// TODO: イベント発行して他プロセスのメモリキャッシュも更新できるようにする
 	}
@@ -227,6 +246,7 @@ export class RedisSingleCache<T> {
 
 export class MemoryKVCache<T> {
 	private readonly cache = new Map<string, { date: number; value: T; }>();
+	private readonly pendingFetches = new Map<string, Promise<T | undefined>>();
 	private readonly gcIntervalHandle = setInterval(() => this.gc(), 1000 * 60 * 3); // 3m
 
 	constructor(
@@ -243,6 +263,7 @@ export class MemoryKVCache<T> {
 		if (this.limit <= 0) {
 			throw new Error('Limit must be greater than 0');
 		}
+		this.pendingFetches.delete(key);
 
 		if (this.limit !== Infinity) {
 			this.gc();
@@ -283,6 +304,7 @@ export class MemoryKVCache<T> {
 
 	@bindThis
 	public delete(key: string): void {
+		this.pendingFetches.delete(key);
 		this.cache.delete(key);
 	}
 
@@ -305,10 +327,15 @@ export class MemoryKVCache<T> {
 			}
 		}
 
-		// Cache MISS
-		const value = await fetcher();
-		this.set(key, value);
-		return value;
+		const pendingFetch = this.pendingFetches.get(key);
+		if (pendingFetch !== undefined) {
+			const value = await pendingFetch;
+			if (value !== undefined) return value;
+			// An optional load may not satisfy a caller that requires a value.
+			return this.fetch(key, fetcher, validator);
+		}
+
+		return this.fetchAndCache(key, fetcher);
 	}
 
 	/**
@@ -330,12 +357,29 @@ export class MemoryKVCache<T> {
 			}
 		}
 
-		// Cache MISS
-		const value = await fetcher();
-		if (value !== undefined) {
-			this.set(key, value);
+		const pendingFetch = this.pendingFetches.get(key);
+		if (pendingFetch !== undefined) return pendingFetch;
+
+		return this.fetchAndCache(key, fetcher);
+	}
+
+	@bindThis
+	private async fetchAndCache<V extends T | undefined>(key: string, fetcher: () => Promise<V>): Promise<V> {
+		const pendingFetch = Promise.resolve().then(fetcher).then(value => {
+			if (value !== undefined && this.pendingFetches.get(key) === pendingFetch) {
+				this.set(key, value);
+			}
+			return value;
+		});
+		this.pendingFetches.set(key, pendingFetch);
+
+		try {
+			return await pendingFetch;
+		} finally {
+			if (this.pendingFetches.get(key) === pendingFetch) {
+				this.pendingFetches.delete(key);
+			}
 		}
-		return value;
 	}
 
 	@bindThis

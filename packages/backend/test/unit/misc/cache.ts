@@ -4,7 +4,184 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { MemoryKVCache, MemorySingleCache, RedisSingleCache } from '@/misc/cache.js';
+import { MemoryKVCache, MemorySingleCache, RedisKVCache, RedisSingleCache } from '@/misc/cache.js';
+
+function deferred<T>() {
+	let resolve!: (value: T) => void;
+	let reject!: (reason: Error) => void;
+	const promise = new Promise<T>((res, rej) => {
+		resolve = res;
+		reject = rej;
+	});
+	return { promise, resolve, reject };
+}
+
+describe('misc:RedisKVCache', () => {
+	const caches: RedisKVCache<string | null>[] = [];
+	const createCache = (fetcher: (key: string) => Promise<string | null>) => {
+		const values = new Map<string, string>();
+		const redisClient = {
+			get: vi.fn(async (key: string) => values.get(key) ?? null),
+			set: vi.fn(async (key: string, value: string) => {
+				values.set(key, value);
+				return 'OK';
+			}),
+			del: vi.fn(async (key: string) => Number(values.delete(key))),
+		};
+		const cache = new RedisKVCache<string | null>(redisClient as never, 'test', {
+			lifetime: 10000,
+			memoryCacheLifetime: 1000,
+			fetcher,
+			toRedisConverter: value => JSON.stringify(value),
+			fromRedisConverter: value => JSON.parse(value),
+		});
+		caches.push(cache);
+		return { cache, redisClient, values };
+	};
+
+	beforeEach(() => {
+		vi.useFakeTimers();
+	});
+
+	afterEach(() => {
+		for (const cache of caches.splice(0)) cache.dispose();
+		vi.useRealTimers();
+	});
+
+	test('deduplicates misses per key while different keys load in parallel', async () => {
+		const a = deferred<string>();
+		const b = deferred<string>();
+		const fetcher = vi.fn((key: string) => key === 'a' ? a.promise : b.promise);
+		const { cache, redisClient } = createCache(fetcher);
+		const requests = [cache.fetch('a'), cache.fetch('a'), cache.fetch('b')];
+		await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(2));
+		expect(redisClient.get).toHaveBeenCalledTimes(2);
+
+		b.resolve('B');
+		await expect(requests[2]).resolves.toBe('B');
+		a.resolve('A');
+		await expect(Promise.all(requests)).resolves.toEqual(['A', 'A', 'B']);
+		expect(redisClient.set).toHaveBeenCalledTimes(2);
+		await expect(cache.fetch('a')).resolves.toBe('A');
+		expect(redisClient.get).toHaveBeenCalledTimes(2);
+	});
+
+	test('deduplicates Redis reads after memory expiry without refetching or rewriting', async () => {
+		const fetcher = vi.fn().mockResolvedValue('fetched');
+		const { cache, redisClient } = createCache(fetcher);
+		await cache.set('key', 'cached');
+		vi.advanceTimersByTime(1001);
+
+		await expect(Promise.all([cache.fetch('key'), cache.fetch('key')])).resolves.toEqual(['cached', 'cached']);
+		expect(redisClient.get).toHaveBeenCalledOnce();
+		expect(redisClient.set).toHaveBeenCalledOnce();
+		expect(fetcher).not.toHaveBeenCalled();
+	});
+
+	test('shares a rejected load and allows the next request to retry', async () => {
+		const failed = deferred<string>();
+		const fetcher = vi.fn().mockReturnValueOnce(failed.promise).mockResolvedValueOnce('retried');
+		const { cache } = createCache(fetcher);
+		const first = cache.fetch('key');
+		const second = cache.fetch('key');
+		const results = Promise.allSettled([first, second]);
+		await vi.waitFor(() => expect(fetcher).toHaveBeenCalledOnce());
+		failed.reject(new Error('fetch failed'));
+		expect((await results).map(result => result.status)).toEqual(['rejected', 'rejected']);
+		await expect(cache.fetch('key')).resolves.toBe('retried');
+		expect(fetcher).toHaveBeenCalledTimes(2);
+	});
+
+	test('retries after a shared Redis read fails', async () => {
+		const read = deferred<string | null>();
+		const fetcher = vi.fn().mockResolvedValue('retried');
+		const { cache, redisClient } = createCache(fetcher);
+		redisClient.get.mockReturnValueOnce(read.promise);
+		const results = Promise.allSettled([cache.fetch('key'), cache.fetch('key')]);
+		await vi.waitFor(() => expect(redisClient.get).toHaveBeenCalledOnce());
+		read.reject(new Error('Redis unavailable'));
+		expect((await results).map(result => result.status)).toEqual(['rejected', 'rejected']);
+		expect(fetcher).not.toHaveBeenCalled();
+		await expect(cache.fetch('key')).resolves.toBe('retried');
+		expect(redisClient.get).toHaveBeenCalledTimes(2);
+		expect(fetcher).toHaveBeenCalledOnce();
+	});
+
+	test('preserves null as a cached value', async () => {
+		const fetcher = vi.fn().mockResolvedValue(null);
+		const { cache, redisClient } = createCache(fetcher);
+		await expect(Promise.all([cache.fetch('key'), cache.fetch('key')])).resolves.toEqual([null, null]);
+		await expect(cache.fetch('key')).resolves.toBeNull();
+		expect(fetcher).toHaveBeenCalledOnce();
+		expect(redisClient.get).toHaveBeenCalledOnce();
+	});
+
+	test.each(['set', 'delete', 'refresh'] as const)('%s supersedes a pending source fetch', async (mutation) => {
+		const old = deferred<string>();
+		const fetcher = vi.fn().mockReturnValueOnce(old.promise).mockResolvedValue('new');
+		const { cache, redisClient } = createCache(fetcher);
+		const pending = cache.fetch('key');
+		await vi.waitFor(() => expect(fetcher).toHaveBeenCalledOnce());
+
+		if (mutation === 'set') await cache.set('key', 'new');
+		if (mutation === 'delete') await cache.delete('key');
+		if (mutation === 'refresh') await cache.refresh('key');
+		old.resolve('old');
+		await expect(pending).resolves.toBe('old');
+
+		await expect(cache.get('key')).resolves.toBe(mutation === 'delete' ? undefined : 'new');
+		expect(redisClient.set.mock.calls.some(([, value]) => value === '"old"')).toBe(false);
+		await expect(cache.fetch('key')).resolves.toBe('new');
+	});
+
+	test.each(['set', 'delete', 'refresh'] as const)('%s prevents a pending Redis read from repopulating memory', async (mutation) => {
+		const read = deferred<string | null>();
+		const { cache, redisClient } = createCache(vi.fn().mockResolvedValue('new'));
+		redisClient.get.mockReturnValueOnce(read.promise);
+		const pending = cache.fetch('key');
+		await vi.waitFor(() => expect(redisClient.get).toHaveBeenCalledOnce());
+
+		if (mutation === 'set') await cache.set('key', 'new');
+		if (mutation === 'delete') await cache.delete('key');
+		if (mutation === 'refresh') await cache.refresh('key');
+		read.resolve('"old"');
+		await expect(pending).resolves.toBe('old');
+		await expect(cache.get('key')).resolves.toBe(mutation === 'delete' ? undefined : 'new');
+	});
+
+	test('a superseded load cannot clear the replacement pending fetch', async () => {
+		const old = deferred<string>();
+		const replacement = deferred<string>();
+		const fetcher = vi.fn().mockReturnValueOnce(old.promise).mockReturnValueOnce(replacement.promise);
+		const { cache } = createCache(fetcher);
+		const first = cache.fetch('key');
+		await vi.waitFor(() => expect(fetcher).toHaveBeenCalledOnce());
+		await cache.delete('key');
+		const second = cache.fetch('key');
+		await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(2));
+		old.resolve('old');
+		await first;
+		const third = cache.fetch('key');
+		replacement.resolve('new');
+		await expect(Promise.all([second, third])).resolves.toEqual(['new', 'new']);
+		expect(fetcher).toHaveBeenCalledTimes(2);
+	});
+
+	test.each(['set', 'delete', 'refresh'] as const)('%s supersedes a pending refresh', async (mutation) => {
+		const old = deferred<string>();
+		const fetcher = vi.fn().mockReturnValueOnce(old.promise).mockResolvedValueOnce('new');
+		const { cache, redisClient } = createCache(fetcher);
+		const pending = cache.refresh('key');
+		await vi.waitFor(() => expect(fetcher).toHaveBeenCalledOnce());
+		if (mutation === 'set') await cache.set('key', 'new');
+		if (mutation === 'delete') await cache.delete('key');
+		if (mutation === 'refresh') await cache.refresh('key');
+		old.resolve('old');
+		await pending;
+		await expect(cache.get('key')).resolves.toBe(mutation === 'delete' ? undefined : 'new');
+		expect(redisClient.set.mock.calls.some(([, value]) => value === '"old"')).toBe(false);
+	});
+});
 
 describe('misc:RedisSingleCache', () => {
 	test('deduplicates concurrent cache misses', async () => {
@@ -108,6 +285,131 @@ describe('misc:MemoryKVCache', () => {
 		expect(cache.get('a')).toBe(1);
 		expect(cache.get('b')).toBeUndefined();
 		expect(cache.get('c')).toBe(3);
+		cache.dispose();
+	});
+
+	describe.each(['fetch', 'fetchMaybe'] as const)('%s concurrency', (method) => {
+		test('shares misses per key, including after expiry, while other keys load independently', async () => {
+			const cache = new MemoryKVCache<string>(1000);
+			cache.set('a', 'expired');
+			vi.advanceTimersByTime(1001);
+			const a = deferred<string>();
+			const b = deferred<string>();
+			const loadA = vi.fn(() => a.promise);
+			const loadB = vi.fn(() => b.promise);
+			const requests = [cache[method]('a', loadA), cache[method]('a', loadA), cache[method]('b', loadB)];
+			await vi.waitFor(() => {
+				expect(loadA).toHaveBeenCalledOnce();
+				expect(loadB).toHaveBeenCalledOnce();
+			});
+			b.resolve('B');
+			await expect(requests[2]).resolves.toBe('B');
+			a.resolve('A');
+			await expect(Promise.all(requests)).resolves.toEqual(['A', 'A', 'B']);
+			expect(cache.get('a')).toBe('A');
+			cache.dispose();
+		});
+
+		test('shares errors but permits retries', async () => {
+			const cache = new MemoryKVCache<string>(1000);
+			const failed = deferred<string>();
+			const fetcher = vi.fn().mockReturnValueOnce(failed.promise).mockResolvedValueOnce('retried');
+			const results = Promise.allSettled([cache[method]('key', fetcher), cache[method]('key', fetcher)]);
+			await vi.waitFor(() => expect(fetcher).toHaveBeenCalledOnce());
+			failed.reject(new Error('fetch failed'));
+			expect((await results).map(result => result.status)).toEqual(['rejected', 'rejected']);
+			await expect(cache[method]('key', fetcher)).resolves.toBe('retried');
+			expect(fetcher).toHaveBeenCalledTimes(2);
+			cache.dispose();
+		});
+
+		test.each(['set', 'delete'] as const)('%s prevents old loads from restoring stale data', async (mutation) => {
+			const cache = new MemoryKVCache<string>(1000);
+			const old = deferred<string>();
+			const fetcher = vi.fn(() => old.promise);
+			const pending = cache[method]('key', fetcher);
+			await vi.waitFor(() => expect(fetcher).toHaveBeenCalledOnce());
+			if (mutation === 'set') cache.set('key', 'new');
+			if (mutation === 'delete') cache.delete('key');
+			old.resolve('old');
+			await expect(pending).resolves.toBe('old');
+			expect(cache.get('key')).toBe(mutation === 'delete' ? undefined : 'new');
+			cache.dispose();
+		});
+
+		test('an invalidated load does not clear a newer pending load', async () => {
+			const cache = new MemoryKVCache<string>(1000);
+			const old = deferred<string>();
+			const replacement = deferred<string>();
+			const fetcher = vi.fn().mockReturnValueOnce(old.promise).mockReturnValueOnce(replacement.promise);
+			const first = cache[method]('key', fetcher);
+			await vi.waitFor(() => expect(fetcher).toHaveBeenCalledOnce());
+			cache.delete('key');
+			const second = cache[method]('key', fetcher);
+			await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(2));
+			old.resolve('old');
+			await first;
+			const third = cache[method]('key', fetcher);
+			replacement.resolve('new');
+			await expect(Promise.all([second, third])).resolves.toEqual(['new', 'new']);
+			expect(fetcher).toHaveBeenCalledTimes(2);
+			expect(cache.get('key')).toBe('new');
+			cache.dispose();
+		});
+
+		test('shares fresh negative results but still validates them on the next cache lookup', async () => {
+			const cache = new MemoryKVCache<string | null>(1000);
+			cache.set('key', null);
+			const missing = deferred<string | null>();
+			const fetcher = vi.fn().mockReturnValueOnce(missing.promise).mockResolvedValueOnce('found');
+			const validator = (value: string | null) => value !== null;
+			const requests = [cache[method]('key', fetcher, validator), cache[method]('key', fetcher, validator)];
+			await vi.waitFor(() => expect(fetcher).toHaveBeenCalledOnce());
+			missing.resolve(null);
+			await expect(Promise.all(requests)).resolves.toEqual([null, null]);
+			await expect(cache[method]('key', fetcher, validator)).resolves.toBe('found');
+			expect(fetcher).toHaveBeenCalledTimes(2);
+			cache.dispose();
+		});
+
+		test('keeps valid cache hits available while another caller refreshes rejected data', async () => {
+			const cache = new MemoryKVCache<string>(1000);
+			cache.set('key', 'cached');
+			const refresh = deferred<string>();
+			const pending = cache[method]('key', () => refresh.promise, () => false);
+			const fetcher = vi.fn().mockResolvedValue('unused');
+			await expect(cache[method]('key', fetcher, value => value === 'cached')).resolves.toBe('cached');
+			expect(fetcher).not.toHaveBeenCalled();
+			refresh.resolve('new');
+			await expect(pending).resolves.toBe('new');
+			cache.dispose();
+		});
+	});
+
+	test('shares optional misses without caching undefined', async () => {
+		const cache = new MemoryKVCache<string>(1000);
+		const missing = deferred<string | undefined>();
+		const fetcher = vi.fn().mockReturnValueOnce(missing.promise).mockResolvedValueOnce(undefined);
+		const requests = [cache.fetchMaybe('key', fetcher), cache.fetchMaybe('key', fetcher)];
+		await vi.waitFor(() => expect(fetcher).toHaveBeenCalledOnce());
+		missing.resolve(undefined);
+		await expect(Promise.all(requests)).resolves.toEqual([undefined, undefined]);
+		expect([...cache.entries]).toEqual([]);
+		await expect(cache.fetchMaybe('key', fetcher)).resolves.toBeUndefined();
+		expect(fetcher).toHaveBeenCalledTimes(2);
+		cache.dispose();
+	});
+
+	test('a required fetch retries instead of returning an optional undefined result', async () => {
+		const cache = new MemoryKVCache<string>(1000);
+		const missing = deferred<string | undefined>();
+		const optional = cache.fetchMaybe('key', () => missing.promise);
+		const fetcher = vi.fn().mockResolvedValue('required');
+		const required = cache.fetch('key', fetcher);
+		missing.resolve(undefined);
+		await expect(optional).resolves.toBeUndefined();
+		await expect(required).resolves.toBe('required');
+		expect(fetcher).toHaveBeenCalledOnce();
 		cache.dispose();
 	});
 

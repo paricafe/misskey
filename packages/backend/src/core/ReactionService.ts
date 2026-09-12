@@ -209,7 +209,7 @@ export class ReactionService {
 
 		// Increment reactions count
 		if (this.meta.enableReactionsBuffering) {
-			await this.reactionsBufferingService.create(note.id, user.id, reaction, note.reactionAndUserPairCache);
+			await this.reactionsBufferingService.create(note.id, user.id, reaction);
 		} else {
 			const sql = `jsonb_set("reactions", '{${reaction}}', (COALESCE("reactions"->>'${reaction}', '0')::int + 1)::text::jsonb)`;
 			await this.notesRepository.createQueryBuilder().update()
