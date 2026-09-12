@@ -1,0 +1,19 @@
+package.json
+  s_c57eee1bc5c2d3::t_13d2f3232892d6 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "532975b4f6116a3af68ffd699aaddab73119d756",
+  "prompts": {},
+  "sessions": {
+    "s_c57eee1bc5c2d3": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a09420-6a42-7f41-90db-4823cddf27ee",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "Natsuki-Kaede <i@pari.network>"
+    }
+  }
+}
