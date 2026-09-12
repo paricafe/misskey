@@ -4,7 +4,7 @@
  */
 
 import { Inject, Injectable } from '@nestjs/common';
-import { In } from 'typeorm';
+import type { SelectQueryBuilder } from 'typeorm';
 import { DI } from '@/di-symbols.js';
 import { type Config, FulltextSearchProvider } from '@/config.js';
 import { bindThis } from '@/decorators.js';
@@ -231,18 +231,19 @@ export class SearchService {
 			query.andWhere('note.id < :rangeEndAt', { rangeEndAt: date });
 		}
 
+		let matches: SelectQueryBuilder<MiNote> | undefined;
 		if (this.provider === 'sqlPgroonga') {
+			const textMatch = 'note_search_text(note.text, note.replyId) &@~ (:q, NULL, \'"IDX_note_search_text"\')::pgroonga_full_text_search_condition';
 			// Keep ORDER BY / LIMIT out of the full-text query: otherwise the planner can
 			// scan the primary key backwards and evaluate PGroonga on every visited row.
-			// Retain the range/scope filters, but never cap matches before visibility filtering.
-			const matches = query.clone()
+			// Retain the range/scope filters inside the full-text query.
+			matches = query.clone()
 				.select('note.id', 'id')
 				.orderBy()
-				.andWhere('note_search_text(note.text, note.replyId) &@~ :q', { q });
-
-			query
-				.addCommonTableExpression(matches, 'matched_note', { materialized: true })
-				.innerJoin('matched_note', 'matched_note', 'matched_note.id = note.id');
+				.andWhere(textMatch, { q });
+			// Recheck edits between candidate retrieval and hydration. The index name
+			// also preserves its tokenizer/normalizers when checking individual rows.
+			query.andWhere(textMatch, { q });
 		} else {
 			query.andWhere('LOWER(note_search_text(note.text, note.replyId)) LIKE :q', { q: `%${ sqlLikeEscape(q.toLowerCase()) }%` });
 		}
@@ -257,7 +258,51 @@ export class SearchService {
 		this.queryService.generateVisibilityQuery(query, me);
 		this.queryService.generateBaseNoteFilteringQuery(query, me);
 
+		if (matches) return this.fetchPgroongaNotes(matches, query, pagination);
 		return query.limit(pagination.limit).getMany();
+	}
+
+	@bindThis
+	private async fetchPgroongaNotes(
+		matches: SelectQueryBuilder<MiNote>,
+		query: SelectQueryBuilder<MiNote>,
+		pagination: SearchPagination,
+	): Promise<MiNote[]> {
+		const ascending = Boolean(pagination.sinceId && !pagination.untilId);
+		const batchSize = Math.max(100, pagination.limit);
+		const notes: MiNote[] = [];
+		let cursor: MiNote['id'] | undefined;
+
+		while (notes.length < pagination.limit) {
+			const batchMatches = matches.clone();
+			if (cursor != null) {
+				batchMatches.andWhere(`note.id ${ascending ? '>' : '<'} :searchCursor`, { searchCursor: cursor });
+			}
+
+			// Do not join the candidate CTE back to note. Its estimated cardinality can
+			// make PostgreSQL merge-join against a backward scan of the entire note PK.
+			const candidates = await this.notesRepository.manager.createQueryBuilder()
+				.addCommonTableExpression(batchMatches, 'matched_note', { materialized: true })
+				.select('matched_note.id', 'id')
+				.from('matched_note', 'matched_note')
+				.orderBy('matched_note.id', ascending ? 'ASC' : 'DESC')
+				.limit(batchSize)
+				.getRawMany<{ id: MiNote['id'] }>();
+			if (candidates.length === 0) break;
+
+			const batch = await query.clone()
+				.andWhere('note.id IN (:...searchResultIds)', { searchResultIds: candidates.map(note => note.id) })
+				.limit(pagination.limit - notes.length)
+				.getMany();
+			notes.push(...batch);
+
+			// Advance past every examined candidate, including invisible or deleted
+			// notes, and keep fetching until the page is full or the matches are exhausted.
+			if (candidates.length < batchSize) break;
+			cursor = candidates[candidates.length - 1].id;
+		}
+
+		return notes;
 	}
 
 	@bindThis
