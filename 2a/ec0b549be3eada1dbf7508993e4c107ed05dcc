@@ -1,0 +1,26 @@
+packages/frontend/test/unit/drive-upload.test.ts
+  s_d32bac5aaa6ca1::t_5874b027e026e1 1-63,65-87,98-139
+  s_d32bac5aaa6ca1::t_934890821ca1f2 88-97
+  s_d32bac5aaa6ca1::t_4f703c993ea0b1 64
+packages/frontend/src/utility/drive.ts
+  s_d32bac5aaa6ca1::t_0a1fc49cbb453d 76-84,88,90-96,98-100,109,149-150,152
+  s_d32bac5aaa6ca1::t_4f703c993ea0b1 86-87,97,147-148
+  s_d32bac5aaa6ca1::t_5874b027e026e1 108
+  s_d32bac5aaa6ca1::t_10822fa9b0aef7 151
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "2aec0b549be3eada1dbf7508993e4c107ed05dcc",
+  "prompts": {},
+  "sessions": {
+    "s_d32bac5aaa6ca1": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a09430-b6ee-7310-ac0a-9dee4efe823d",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "Natsuki-Kaede <i@pari.network>"
+    }
+  }
+}
