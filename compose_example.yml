@@ -22,6 +22,7 @@ services:
     volumes:
       - ./files:/misskey/files
       - ./.config:/misskey/.config:ro
+      - mastodon_compat:/misskey/.mastodon-compat
 
   redis:
     restart: always
@@ -91,6 +92,9 @@ services:
 #      - internal_network
 #    volumes:
 #      - ./meili_data:/meili_data
+
+volumes:
+  mastodon_compat:
 
 networks:
   internal_network:
