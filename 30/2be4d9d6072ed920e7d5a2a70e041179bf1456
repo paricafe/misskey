@@ -1,0 +1,85 @@
+package.json
+  s_5f67346fdc5593::t_85b4c2228fc8d6 3
+packages/backend/src/server/api/endpoints/notes/polls/recommendation.ts
+  s_5f67346fdc5593::t_f0fb1bb2ed928e 115
+packages/backend/test/unit/misc/is-renote.ts
+  s_5f67346fdc5593::t_03921e0630a4ec 30
+packages/backend/src/core/ReactionService.test.ts
+  s_5f67346fdc5593::t_b1ecc4d8853851 81
+packages/backend/src/core/ReactionsBufferingService.ts
+  s_5f67346fdc5593::t_56bac0c2249d80 29-39,146,153,217-219,224
+  s_5f67346fdc5593::t_0f99cf5b1ed375 6,16-17,22-28,40-106,110-112,121,125-126,128,135-138,143-145,151-152,156-159,161-162,164-167,172-175,177-180,182-183,186-192,194-201,203-208,210-213,215-216,220-223,225-228,233-239,241-254,258-287,292,303,305
+packages/backend/test/unit/misc/cache.ts
+  s_5f67346fdc5593::t_6b64d2c550326a 7-94,110-184
+  s_5f67346fdc5593::t_bf5c3f0c43021d 95-109
+  s_5f67346fdc5593::t_1f31450d6ddcd7 291-359,372-415
+  s_5f67346fdc5593::t_014fa4891b5b6b 360-371
+packages/backend/src/queue/processors/AggregateRetentionProcessorService.ts
+  s_5f67346fdc5593::t_655fb74aeb3eeb 48-53,75-80,82,85
+packages/backend/test/unit/entities/NoteEntityService.ts
+  s_5f67346fdc5593::t_994ba9cf29a51f 11-12,41,55-56,77,82,183-218
+  s_5f67346fdc5593::t_25c0da1a03b4bc 72-76
+  s_5f67346fdc5593::t_645f39673d504b 1-10,13-40,42-54,61-71,78-81,83-182,219-220
+  s_5f67346fdc5593::t_b609c522fafc36 57-60
+packages/backend/src/misc/distributed-lock.ts
+  s_5f67346fdc5593::t_c230d393a717b2 29-35,114
+packages/backend/test/unit/notes-polls-recommendation.ts
+  s_5f67346fdc5593::t_09899a93457a59 1-43
+packages/backend/src/queue/processors/BakeBufferedReactionsProcessorService.ts
+  s_5f67346fdc5593::t_9384ffecaf361f 32-34
+packages/backend/src/core/activitypub/ApDeliverManagerService.ts
+  s_5f67346fdc5593::t_cce24cd31bb197 114-123,126-127
+packages/backend/test/unit/NoteCreateService.ts
+  s_5f67346fdc5593::t_03921e0630a4ec 47
+packages/backend/src/queue/processors/AggregateRetentionProcessorService.test.ts
+  s_5f67346fdc5593::t_d6ac36a46ae79d 1-88
+packages/backend/test/unit/FetchInstanceMetadataService.ts
+  s_5f67346fdc5593::t_34a1e472ac3e06 8-17,20-73,75-77,80-82,84-88,91-94,96-99,102-115,118-127,130-151,154-170,173-208
+packages/backend/src/core/activitypub/ApDeliverManagerService.test.ts
+  s_5f67346fdc5593::t_c7a6c29b564e85 1-112
+packages/backend/src/core/entities/NoteEntityService.ts
+  s_5f67346fdc5593::t_9f4a504f60565a 44,51
+  s_5f67346fdc5593::t_f0fb1bb2ed928e 14-15,200-205,207,212-217,376-377,475,503,511-538,595-596
+  s_5f67346fdc5593::t_b1ecc4d8853851 22,43,45-49,52-53,250,372,391-397,547-560,562,649,660-661
+packages/backend/src/models/Note.ts
+  s_5f67346fdc5593::t_a3f13eb242326f 155-160
+packages/backend/src/core/ReactionService.ts
+  s_5f67346fdc5593::t_b1ecc4d8853851 212
+packages/backend/migration/1789188448879-reactions-buffer-checkpoint.js
+  s_5f67346fdc5593::t_a3f13eb242326f 1-16
+packages/backend/src/misc/cache.ts
+  s_5f67346fdc5593::t_ba2f090c65939e 333-334,361
+  s_5f67346fdc5593::t_816568a12f168a 15,37,55-58,63,77-78,80-109,114-116,249,266,307,330-332,335-338,360,362-381
+packages/backend/src/core/ReactionsBufferingService.test.ts
+  s_5f67346fdc5593::t_8f2752f3f545e4 1-11,13-48,56-301,329-368
+  s_5f67346fdc5593::t_9e739fff851a42 12,49-55,302-328
+packages/backend/src/core/FetchInstanceMetadataService.ts
+  s_5f67346fdc5593::t_c230d393a717b2 18-19,56-62,68,72-74,119,126-128
+packages/backend/src/core/entities/UserEntityService.ts
+  s_5f67346fdc5593::t_4ad85d8f1f51a7 247-248,259,264,266,270,272,276,278,282,284,288,290,294,296,300,302,315-321,429,431-433,706-707,709,729,735
+  s_5f67346fdc5593::t_655fb74aeb3eeb 742-760
+  s_5f67346fdc5593::t_c392e9da14842d 708
+  s_5f67346fdc5593::t_bb3c5ae741a35d 761
+packages/backend/src/core/entities/UserEntityService.test.ts
+  s_5f67346fdc5593::t_e953313869e136 1-8,11-49,51-57,59,61-80,82-93,95-155,219-279
+  s_5f67346fdc5593::t_5c99557fb7d9ba 94
+  s_5f67346fdc5593::t_d6ac36a46ae79d 9-10,50,58,60,81,156-218
+packages/backend/src/core/WebhookTestService.ts
+  s_5f67346fdc5593::t_01fc62d2591a11 75
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "302be4d9d6072ed920e7d5a2a70e041179bf1456",
+  "prompts": {},
+  "sessions": {
+    "s_5f67346fdc5593": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a093e4-2043-78e3-9a79-4cd5a00bf66e",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "Natsuki-Kaede <i@pari.network>"
+    }
+  }
+}
