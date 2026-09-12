@@ -19,6 +19,58 @@ function deferred() {
 
 const postgresOnly = { skip: !process.env.MASTODON_TEST_DATABASE_URL };
 
+test('PostgreSQL idempotency uses the indexed TTL and reads legacy TTLs without a migration', postgresOnly, async t => {
+	const connectionString = await postgresFixture(t);
+	const store = await createPostgresStore({ connectionString });
+	const inspection = new Pool({ connectionString });
+	try {
+		await store.putIdempotency('alice', 'new', { digest: 'request', id: 'note', expiresAt: 100 });
+		const row = (await inspection.query('SELECT "expiresAt", "value" FROM "mastodon_compat_entry" WHERE "key" = $1', ['new'])).rows[0];
+		assert.equal(row.expiresAt, '100');
+		assert.equal(row.value.expiresAt, 100);
+		// The column, not stale JSON left by an older process, decides expiration.
+		await inspection.query('UPDATE "mastodon_compat_entry" SET "value" = jsonb_set("value", \'{expiresAt}\', \'200\') WHERE "key" = $1', ['new']);
+		assert.equal(await store.getIdempotency('alice', 'new', 100), undefined);
+		await store.put('idempotency', 'alice', 'legacy', { digest: 'legacy', expiresAt: 100 });
+		assert.equal((await store.getIdempotency('alice', 'legacy', 99))?.digest, 'legacy');
+		assert.equal(await store.getIdempotency('alice', 'legacy', 100), undefined);
+		await store.putIdempotency('alice', 'live', { digest: 'pending', expiresAt: 200 });
+		await inspection.query('UPDATE "mastodon_compat_entry" SET "value" = jsonb_set("value", \'{expiresAt}\', \'1\') WHERE "key" = $1', ['live']);
+		assert.equal((await store.getIdempotency('alice', 'live', 100))?.expiresAt, 200);
+		await store.prune(100);
+		assert.equal(await store.get('idempotency', 'alice', 'new'), undefined);
+		assert.equal(await store.get('idempotency', 'alice', 'legacy'), undefined);
+		assert.ok(await store.getIdempotency('alice', 'live', 100));
+	} finally { await store.close(); await inspection.end(); }
+});
+
+test('PostgreSQL repairs and prunes bounded batches without deleting active or unrelated state', postgresOnly, async t => {
+	const connectionString = await postgresFixture(t);
+	const store = await createPostgresStore({ connectionString });
+	const inspection = new Pool({ connectionString });
+	try {
+		const { client } = await store.createClient({ name: 'App', scopes: ['read'], redirectUris: ['app://callback'] });
+		const { token } = await store.createGrant({ clientId: client.id, kind: 'user', userId: 'alice', nativeToken: 'native', scopes: ['read'] });
+		for (let index = 0; index < 3; index++) await store.put('idempotency', 'alice', `a-expired-${index}`, { digest: 'old', expiresAt: 100 });
+		await store.put('idempotency', 'alice', 'b-live-legacy', { digest: 'pending', expiresAt: 200 });
+		await store.putIdempotency('alice', 'live', { digest: 'pending', expiresAt: 200 });
+		await store.put('status', 'alice', 'note', { sensitive: true, expiresAt: 1 });
+		await store.put('idempotency', 'alice', 'invalid-legacy', { digest: 'invalid', expiresAt: 'invalid' });
+		await store.put('idempotency', 'alice', 'large-legacy', { digest: 'invalid', expiresAt: 1e100 });
+		await store.prune(100, 2);
+		assert.equal((await inspection.query('SELECT COUNT(*) AS count FROM "mastodon_compat_entry" WHERE "namespace" = $1 AND "expiresAt" IS NULL', ['kv:idempotency'])).rows[0].count, '4');
+		assert.equal((await store.list('idempotency', 'alice')).length, 5);
+		await store.prune(100, 2);
+		const legacy = (await inspection.query('SELECT "expiresAt" FROM "mastodon_compat_entry" WHERE "key" = $1', ['b-live-legacy'])).rows[0];
+		assert.equal(legacy.expiresAt, '200');
+		assert.equal((await store.list('idempotency', 'alice')).length, 4);
+		assert.ok(await store.getIdempotency('alice', 'live', 100));
+		assert.ok(await store.getIdempotency('alice', 'b-live-legacy', 100));
+		assert.ok(await store.getGrant(token));
+		assert.deepEqual(await store.get('status', 'alice', 'note'), { sensitive: true, expiresAt: 1 });
+	} finally { await store.close(); await inspection.end(); }
+});
+
 test('PostgreSQL batch metadata lookup uses complete keys and excludes missing or unrelated values', postgresOnly, async t => {
 	const connectionString = await postgresFixture(t);
 	const store = await createPostgresStore({ connectionString });
@@ -36,6 +88,30 @@ test('PostgreSQL batch metadata lookup uses complete keys and excludes missing o
 	assert.deepEqual(entries.find(entry => entry.namespace === 'media')?.value, { focus: { x: 0, y: 1 } });
 	assert.ok(entries.every(entry => entry.owner === 'alice'));
 	assert.deepEqual(await store.getMany([]), []);
+});
+
+test('PostgreSQL pruning cannot remove a concurrently renewed idempotency claim', postgresOnly, async t => {
+	const connectionString = await postgresFixture(t);
+	const first = await createPostgresStore({ connectionString });
+	const second = await createPostgresStore({ connectionString });
+	const renewed = deferred();
+	const finish = deferred();
+	try {
+		await first.putIdempotency('alice', 'request', { digest: 'expired', expiresAt: 99 });
+		const renewal = first.transaction(async () => {
+			await first.putIdempotency('alice', 'request', { digest: 'active', expiresAt: 101 });
+			renewed.resolve();
+			await finish.promise;
+		});
+		await renewed.promise;
+		let pruned = false;
+		const cleanup = second.prune(100).then(() => { pruned = true; });
+		await setImmediate();
+		assert.equal(pruned, false);
+		finish.resolve();
+		await Promise.all([renewal, cleanup]);
+		assert.equal((await second.getIdempotency('alice', 'request', 100))?.digest, 'active');
+	} finally { finish.resolve(); await first.close(); await second.close(); }
 });
 
 test('an idle PostgreSQL connection failure is recoverable and close is idempotent', postgresOnly, async t => {

@@ -91,6 +91,40 @@ test('expired codes and operations are unusable and concurrent operation consump
 	assert.equal(await store.deleteOperation('state', 'b'), false);
 });
 
+test('idempotency expiration is stored separately and legacy records expire before cleanup', async t => {
+	const store = new CompatStore(':memory:');
+	t.after(() => store.close());
+	await store.putIdempotency('alice', 'new', { digest: 'request', expiresAt: 100 });
+	const [entry] = await store.getMany([{ namespace: 'idempotency', owner: 'alice', key: 'new' }]);
+	assert.equal(entry.expiresAt, 100);
+	assert.equal((await store.getIdempotency('alice', 'new', 99))?.digest, 'request');
+	assert.equal(await store.getIdempotency('alice', 'new', 100), undefined);
+	await store.put('idempotency', 'alice', 'legacy', { digest: 'old-request', id: 'note', expiresAt: 100 });
+	assert.equal((await store.getIdempotency('alice', 'legacy', 99))?.id, 'note');
+	assert.equal(await store.getIdempotency('alice', 'legacy', 100), undefined);
+	await assert.rejects(store.putIdempotency('alice', 'invalid', { digest: 'request', expiresAt: NaN }), /Invalid idempotency expiration/u);
+});
+
+test('bounded pruning repairs legacy TTLs and retains live claims, grants and durable metadata', async t => {
+	const store = new CompatStore(':memory:');
+	t.after(() => store.close());
+	const { client } = await store.createClient({ name: 'App', scopes: ['read'], redirectUris: ['app://callback'] });
+	const { token } = await store.createGrant({ clientId: client.id, kind: 'user', userId: 'alice', nativeToken: 'native', scopes: ['read'] });
+	for (let index = 0; index < 3; index++) await store.put('idempotency', 'alice', `expired-${index}`, { digest: 'old', expiresAt: 100 });
+	await store.put('idempotency', 'alice', 'live-legacy', { digest: 'pending', expiresAt: 101 });
+	await store.putIdempotency('alice', 'live', { digest: 'pending', expiresAt: 101 });
+	await store.put('status', 'alice', 'note', { sensitive: true, expiresAt: 1 });
+	await store.prune(100, 2);
+	assert.equal((await store.list('idempotency', 'alice')).length, 3);
+	await store.prune(100, 2);
+	assert.deepEqual((await store.list('idempotency', 'alice')).map(item => item.key), ['live', 'live-legacy']);
+	const [repaired] = await store.getMany([{ namespace: 'idempotency', owner: 'alice', key: 'live-legacy' }]);
+	assert.equal(repaired.expiresAt, 101);
+	assert.equal((await store.getIdempotency('alice', 'live', 100))?.digest, 'pending');
+	assert.ok(await store.getGrant(token));
+	assert.deepEqual(await store.get('status', 'alice', 'note'), { sensitive: true, expiresAt: 1 });
+});
+
 test('awaited and nested transactions roll back together without leaking state or overwriting concurrent writes', async t => {
 	const store = new CompatStore(':memory:');
 	t.after(() => store.close());

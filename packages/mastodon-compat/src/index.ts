@@ -37,6 +37,30 @@ function dependencies(options: GatewayOptions) {
 	return { store, native, entities: new EntityConverter(options.publicUrl), publicUrl: options.publicUrl, nativeUrl: options.nativeUrl };
 }
 
+function registerPruning(app: FastifyInstance, store: CompatStore): () => Promise<void> {
+	let stopped = false;
+	let timer: NodeJS.Timeout | undefined;
+	let pending: Promise<void> | undefined;
+	const prune = (): Promise<void> => {
+		if (stopped) return Promise.resolve();
+		pending = store.prune().catch(error => {
+			app.log.warn({ err: error }, 'Failed to prune expired compatibility state');
+		}).finally(() => {
+			if (!stopped) {
+				timer = setTimeout(() => { void prune(); }, 60000);
+				timer.unref();
+			}
+		});
+		return pending;
+	};
+	app.addHook('onReady', async () => { await prune(); });
+	return async () => {
+		stopped = true;
+		clearTimeout(timer);
+		await pending;
+	};
+}
+
 async function setup(app: FastifyInstance, options: GatewayOptions, deps: ReturnType<typeof dependencies>, embedded: boolean): Promise<void> {
 	await app.register(cors, { origin: '*', methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'], exposedHeaders: ['Link', 'X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-RateLimit-Reset', 'Retry-After'] });
 	await app.register(multipart, { limits: { fileSize: options.maxFileSize ?? 32 * 1024 * 1024, files: 2, fields: 128, fieldSize: 65536 } });
@@ -90,7 +114,8 @@ export async function createGateway(options: GatewayOptions): Promise<FastifyIns
 	const deps = dependencies(options);
 	try { await setup(app, options, deps, false); } catch (error) { await deps.store.close(); throw error; }
 	const streaming = attachStreaming(app.server, deps);
-	app.addHook('preClose', async () => { await streaming.close(); });
+	const stopPruning = registerPruning(app, deps.store);
+	app.addHook('preClose', async () => { await Promise.all([stopPruning(), streaming.close()]); });
 	app.addHook('onClose', async () => { await deps.store.close(); });
 	return app;
 }
@@ -119,7 +144,8 @@ export function installGateway(app: FastifyInstance, options: GatewayOptions): {
 	});
 	app.register(async scope => setup(scope, options, deps, true));
 	const streaming = attachStreaming(app.server, deps);
-	app.addHook('preClose', async () => { await streaming.close(); });
+	const stopPruning = registerPruning(app, deps.store);
+	app.addHook('preClose', async () => { await Promise.all([stopPruning(), streaming.close()]); });
 	app.addHook('onClose', async () => { await deps.store.close(); });
-	return { close: () => streaming.close() };
+	return { close: async () => { await Promise.all([stopPruning(), streaming.close()]); } };
 }

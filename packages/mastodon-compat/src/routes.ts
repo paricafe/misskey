@@ -369,8 +369,8 @@ async function createStatus(routes: Routes, c: RequestContext): Promise<Json> {
 	if (Array.isArray(key) || (key !== undefined && (!key || key.length > 256))) throw new HttpError(422, 'Invalid idempotency key');
 	const digest = createHash('sha256').update(canonicalJson(c.body)).digest('hex');
 	const existing = async (): Promise<string | undefined> => {
-		const stored = key ? await store.get<Json>('idempotency', c.userId, key) : undefined;
-		if (!stored || stored.expiresAt <= Date.now()) return undefined;
+		const stored = key ? await store.getIdempotency(c.userId, key) : undefined;
+		if (!stored) return undefined;
 		if (stored.digest !== digest) throw new HttpError(422, 'Idempotency key was used for a different request');
 		if (!stored.id) throw new HttpError(409, 'This request is already being processed; check the timeline before retrying');
 		return string(stored.id);
@@ -397,7 +397,7 @@ async function createStatus(routes: Routes, c: RequestContext): Promise<Json> {
 	const claimedReplay = key ? await store.transaction(async () => {
 		const id = await existing();
 		if (id) return id;
-		await store.put('idempotency', c.userId, key, { digest, expiresAt: Date.now() + 86400000 });
+		await store.putIdempotency(c.userId, key, { digest, expiresAt: Date.now() + 86400000 });
 		return undefined;
 	}) : undefined;
 	if (claimedReplay) return routes.status(await routes.note(c, claimedReplay), c);
@@ -410,7 +410,7 @@ async function createStatus(routes: Routes, c: RequestContext): Promise<Json> {
 	if (!note || typeof note.id !== 'string' || !note.id) throw new NativeError(502, 'INVALID_NATIVE_RESPONSE', 'The native API did not return the created status');
 	await store.transaction(async () => {
 		await store.put('status', c.userId, note.id, prepared.metadata);
-		if (key) await store.put('idempotency', c.userId, key, { id: note.id, digest, expiresAt: Date.now() + 86400000 });
+		if (key) await store.putIdempotency(c.userId, key, { id: note.id, digest, expiresAt: Date.now() + 86400000 });
 	});
 	return routes.status(note, c);
 }

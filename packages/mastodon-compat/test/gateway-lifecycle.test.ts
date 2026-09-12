@@ -7,9 +7,11 @@ import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
+import { setImmediate } from 'node:timers/promises';
 import { test } from 'node:test';
+import Fastify from 'fastify';
 import WebSocket, { WebSocketServer } from 'ws';
-import { CompatStore, createGateway } from '../src/index.js';
+import { CompatStore, createGateway, installGateway } from '../src/index.js';
 
 async function within<T>(promise: Promise<T>, milliseconds: number): Promise<T> {
 	let timer: NodeJS.Timeout | undefined;
@@ -19,6 +21,56 @@ async function within<T>(promise: Promise<T>, milliseconds: number): Promise<T> 
 		})]);
 	} finally { clearTimeout(timer); }
 }
+
+for (const embedded of [false, true]) test(`${embedded ? 'embedded' : 'standalone'} gateway prunes on startup and periodically without OAuth traffic`, async t => {
+	t.mock.timers.enable({ apis: ['setTimeout'] });
+	const store = new CompatStore(':memory:');
+	const prunes = t.mock.method(store, 'prune');
+	const options = { publicUrl: 'https://social.example', nativeUrl: 'https://native.example', store };
+	await store.put('idempotency', 'alice', 'startup', { digest: 'old', expiresAt: Date.now() - 1 });
+	const app = embedded ? Fastify() : await createGateway(options);
+	if (embedded) installGateway(app, options);
+	t.after(() => app.close());
+	await app.ready();
+	assert.equal(await store.get('idempotency', 'alice', 'startup'), undefined);
+	assert.equal(prunes.mock.callCount(), 1);
+	await store.putIdempotency('alice', 'periodic', { digest: 'old', expiresAt: Date.now() - 1 });
+	t.mock.timers.tick(60000);
+	await setImmediate();
+	assert.equal(await store.get('idempotency', 'alice', 'periodic'), undefined);
+	assert.equal(prunes.mock.callCount(), 2);
+	await app.close();
+	t.mock.timers.tick(120000);
+	await setImmediate();
+	assert.equal(prunes.mock.callCount(), 2);
+});
+
+test('pruning retries after a storage error and shutdown waits for the active batch', async t => {
+	t.mock.timers.enable({ apis: ['setTimeout'] });
+	const store = new CompatStore(':memory:');
+	let release!: () => void;
+	const pending = new Promise<void>(resolve => { release = resolve; });
+	let calls = 0;
+	t.mock.method(store, 'prune', async () => {
+		if (++calls === 1) throw new Error('Storage temporarily unavailable');
+		await pending;
+	});
+	const app = await createGateway({ publicUrl: 'https://social.example', nativeUrl: 'https://native.example', store });
+	t.after(async () => { release(); await app.close(); });
+	await app.ready();
+	t.mock.timers.tick(60000);
+	await setImmediate();
+	assert.equal(calls, 2);
+	let closed = false;
+	const closing = app.close().then(() => { closed = true; });
+	await setImmediate();
+	assert.equal(closed, false);
+	release();
+	await closing;
+	t.mock.timers.tick(120000);
+	await setImmediate();
+	assert.equal(calls, 2);
+});
 
 test('standalone shutdown closes active client and native WebSockets before waiting for HTTP close', async t => {
 	const upstream = createServer((request, response) => {

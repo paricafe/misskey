@@ -238,13 +238,33 @@ test('direct status idempotency is claimed atomically across routes sharing a st
 	assert.equal(replay.statusCode, 200);
 	assert.equal(replay.json().id, '500');
 	assert.equal(writes, 1);
+	const [stored] = await store.getMany([{ namespace: 'idempotency', owner: 'alice', key: 'same' }]);
+	assert.equal(stored.expiresAt, (stored.value as Json).expiresAt);
+	assert.ok(stored.expiresAt! > Date.now());
 	assert.equal((await f.request('POST', '/api/v1/statuses', { ...payload, status: '@bob Different' }, undefined, 'same')).statusCode, 422);
+});
+
+test('an expired legacy idempotency key can be reused and the new receipt receives a column TTL', async t => {
+	const f = await fixture(t);
+	await f.store.put('idempotency', 'alice', 'expired', { id: 'old-note', digest: 'old-request', expiresAt: Date.now() - 1 });
+	const result = await f.request('POST', '/api/v1/statuses', { status: 'New request' }, undefined, 'expired');
+	assert.equal(result.statusCode, 200, result.body);
+	const [stored] = await f.store.getMany([{ namespace: 'idempotency', owner: 'alice', key: 'expired' }]);
+	assert.equal((stored.value as Json).id, result.json().id);
+	assert.equal(stored.expiresAt, (stored.value as Json).expiresAt);
+	assert.ok(stored.expiresAt! > Date.now());
+	assert.equal((await f.request('POST', '/api/v1/statuses', { status: 'New request' }, undefined, 'expired')).json().id, result.json().id);
+	assert.equal(f.calls.filter(call => call.endpoint === 'notes/create').length, 1);
 });
 
 test('ambiguous native write failures retain the idempotency reservation', async t => {
 	let writes = 0;
 	const f = await fixture(t, { handler: async endpoint => { if (endpoint === 'notes/create') { writes++; throw new Error('Connection lost after commit'); } return undefined; } });
 	assert.equal((await f.request('POST', '/api/v1/statuses', { status: 'Once' }, undefined, 'ambiguous')).statusCode, 502);
+	const [claim] = await f.store.getMany([{ namespace: 'idempotency', owner: 'alice', key: 'ambiguous' }]);
+	assert.ok(claim.expiresAt! > Date.now());
+	assert.equal((claim.value as Json).id, undefined);
+	await f.store.prune();
 	assert.equal((await f.request('POST', '/api/v1/statuses', { status: 'Once' }, undefined, 'ambiguous')).statusCode, 409);
 	assert.equal(writes, 1);
 });

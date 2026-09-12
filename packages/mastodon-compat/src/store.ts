@@ -36,6 +36,12 @@ export interface AuthorizationCode {
 	codeChallenge?: string;
 }
 
+export interface IdempotencyRecord {
+	id?: string;
+	digest: string;
+	expiresAt: number;
+}
+
 export interface StoreEntry {
 	namespace: string;
 	owner: string;
@@ -56,7 +62,7 @@ export interface StoreAdapter {
 	delete(namespace: string, owner: string, key: string): Promise<boolean>;
 	take(namespace: string, owner: string, key: string): Promise<StoreEntry | undefined>;
 	list(namespace: string, owner: string): Promise<StoreEntry[]>;
-	prune(now: number): Promise<void>;
+	prune(now: number, limit: number): Promise<void>;
 }
 
 export const hashCredential = (value: string): string => createHash('sha256').update(value).digest('hex');
@@ -68,6 +74,13 @@ const clone = <T>(value: T): T => {
 	return JSON.parse(json) as T;
 };
 const entryKey = (namespace: string, owner: string, key: string): string => JSON.stringify([namespace, owner, key]);
+
+function entryExpiration(entry: StoreEntry): number | null {
+	if (entry.expiresAt != null) return entry.expiresAt;
+	if (entry.namespace !== 'kv:idempotency' || entry.value == null || typeof entry.value !== 'object') return null;
+	const legacy = (entry.value as Partial<IdempotencyRecord>).expiresAt;
+	return typeof legacy === 'number' && Number.isSafeInteger(legacy) && legacy >= 0 ? legacy : null;
+}
 
 interface MemoryTransaction { entries: Map<string, StoreEntry>; active: boolean; }
 
@@ -152,10 +165,22 @@ class MemoryAdapter implements StoreAdapter {
 		return this.locked(() => [...this.data().values()].filter(entry => entry.namespace === namespace && entry.owner === owner).sort((a, b) => a.key < b.key ? -1 : a.key > b.key ? 1 : 0).map(clone));
 	}
 
-	async prune(now: number): Promise<void> {
+	async prune(now: number, limit: number): Promise<void> {
 		await this.locked(() => {
+			let repaired = 0;
 			for (const [key, entry] of this.data()) {
-				if (['codes', 'operations'].includes(entry.namespace) && entry.expiresAt != null && entry.expiresAt <= now) this.data().delete(key);
+				const expiresAt = entryExpiration(entry);
+				if (entry.expiresAt == null && expiresAt != null) {
+					this.data().set(key, { ...entry, expiresAt });
+					if (++repaired >= limit) break;
+				}
+			}
+			let removed = 0;
+			for (const [key, entry] of this.data()) {
+				if (['codes', 'operations', 'kv:idempotency'].includes(entry.namespace) && entry.expiresAt != null && entry.expiresAt <= now) {
+					this.data().delete(key);
+					if (++removed >= limit) break;
+				}
 			}
 		});
 	}
@@ -246,6 +271,18 @@ export class CompatStore {
 
 	async delete(namespace: string, ownerId: string, key: string): Promise<boolean> { return this.adapter.delete(`kv:${namespace}`, ownerId, key); }
 
+	async getIdempotency(ownerId: string, key: string, now = Date.now()): Promise<IdempotencyRecord | undefined> {
+		const entry = await this.adapter.get('kv:idempotency', ownerId, key);
+		if (!entry) return undefined;
+		const expiresAt = entryExpiration(entry);
+		return expiresAt != null && expiresAt > now ? { ...entry.value as IdempotencyRecord, expiresAt } : undefined;
+	}
+
+	async putIdempotency(ownerId: string, key: string, value: IdempotencyRecord): Promise<void> {
+		if (!Number.isSafeInteger(value.expiresAt) || value.expiresAt < 0) throw new RangeError('Invalid idempotency expiration');
+		await this.adapter.put({ namespace: 'kv:idempotency', owner: ownerId, key, value, expiresAt: value.expiresAt });
+	}
+
 	async putOperation(kind: string, id: string, value: unknown, expiresAt: number): Promise<void> {
 		await this.adapter.put({ namespace: 'operations', owner: kind, key: id, value, expiresAt });
 	}
@@ -261,5 +298,8 @@ export class CompatStore {
 	}
 
 	async deleteOperation(kind: string, id: string): Promise<boolean> { return this.adapter.delete('operations', kind, id); }
-	async prune(now = Date.now()): Promise<void> { await this.adapter.prune(now); }
+	async prune(now = Date.now(), limit = 1000): Promise<void> {
+		if (!Number.isInteger(limit) || limit < 1 || limit > 1000) throw new RangeError('Prune batch size must be between 1 and 1000');
+		await this.adapter.prune(now, limit);
+	}
 }
