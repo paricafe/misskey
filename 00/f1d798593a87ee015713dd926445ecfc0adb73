@@ -1,0 +1,23 @@
+packages/backend/test/unit/boot/worker-supervisor.ts
+  s_d32bac5aaa6ca1::t_2e354a75b22976 1-179
+packages/backend/src/boot/worker-supervisor.ts
+  s_d32bac5aaa6ca1::t_3f3d6859ca5a14 1-69
+packages/backend/src/boot/master.ts
+  s_d32bac5aaa6ca1::t_3f3d6859ca5a14 23,212-219
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "00f1d798593a87ee015713dd926445ecfc0adb73",
+  "prompts": {},
+  "sessions": {
+    "s_d32bac5aaa6ca1": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a09430-b6ee-7310-ac0a-9dee4efe823d",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "Natsuki-Kaede <i@pari.network>"
+    }
+  }
+}
