@@ -165,7 +165,10 @@ export function registerRoutes(app: FastifyInstance, deps: RouteDependencies): R
 		const prepared = prepareStatusInput(c.body, undefined, true);
 		const note = await routes.note(c);
 		if (note.userId !== c.userId) throw new HttpError(403, 'You do not own this status');
-		await c.call('notes/update', { noteId: note.id, text: c.body.status === undefined ? note.text : prepared.native.text, cw: c.body.spoiler_text === undefined ? note.cw : prepared.native.cw, ...(c.body.media_ids !== undefined ? { fileIds: prepared.native.fileIds ?? [] } : {}) });
+		validateQuoteApprovalPolicy(c.body.quote_approval_policy, note.visibility);
+		const body = { noteId: note.id, text: c.body.status === undefined ? note.text : prepared.native.text, cw: c.body.spoiler_text === undefined ? note.cw : prepared.native.cw, ...(c.body.media_ids !== undefined ? { fileIds: prepared.native.fileIds ?? [] } : {}) };
+		if (note.renoteId && !body.text?.trim() && !(body.fileIds ?? note.files)?.length && !note.poll) body.text = (await quoteTarget(routes, c, note.renoteId)).url;
+		await c.call('notes/update', body);
 		store.put('status', c.userId, note.id, { ...store.get<Json>('status', c.userId, note.id), ...prepared.metadata });
 		return routes.status(await routes.note(c), c);
 	});
@@ -225,17 +228,34 @@ function visibility(value: unknown): string {
 	return result;
 }
 
+function validateQuoteApprovalPolicy(value: unknown, nativeVisibility: string): void {
+	if (value == null) return;
+	if (typeof value !== 'string') throw new HttpError(422, 'Invalid quote_approval_policy');
+	const policy = value.trim();
+	if (!policy) return;
+	if (!['public', 'followers', 'nobody'].includes(policy)) throw new HttpError(422, 'Invalid quote_approval_policy');
+	// Mastodon forces private/direct posts to nobody regardless of this input.
+	// Native visibility already prevents other users quoting those posts. Public
+	// notes have no native mechanism for enforcing a more restrictive policy.
+	if (policy !== 'public' && !['followers', 'specified'].includes(nativeVisibility)) throw new HttpError(422, 'Only public quote approval is supported for public or unlisted statuses');
+}
+
 function prepareStatusInput(input: Json, defaults: Json = {}, editing = false): { native: Json; metadata: Json } {
 	const text = (value: unknown, name: string): string | null => {
 		if (value == null || value === '') return null;
 		if (typeof value !== 'string') throw new HttpError(422, `${name} must be a string`);
 		return value;
 	};
-	for (const name of ['scheduled_at', 'quote_id', 'quoted_status_id', 'quote_approval_policy', 'media_attributes']) {
+	for (const name of ['scheduled_at', 'quote_id', 'media_attributes']) {
 		if (input[name] != null && input[name] !== '' && (!Array.isArray(input[name]) || input[name].length)) throw new HttpError(422, `${name} is unavailable through this gateway`);
 	}
 	if (editing && ['visibility', 'in_reply_to_id', 'poll', 'local_only'].some(name => input[name] !== undefined)) throw new HttpError(422, 'This status property cannot be edited');
 	const native: Json = { text: text(input.status, 'status'), cw: text(input.spoiler_text, 'spoiler_text') };
+	const quotedId = text(input.quoted_status_id, 'quoted_status_id');
+	if (quotedId) {
+		if (editing) throw new HttpError(422, 'The quoted status cannot be changed');
+		native.renoteId = quotedId;
+	}
 	if (native.cw && native.cw.length > 100) throw new HttpError(422, 'spoiler_text is too long');
 	const metadata: Json = {};
 	if (!editing || input.sensitive !== undefined) metadata.sensitive = boolean(input.sensitive, boolean(defaults.sensitive));
@@ -264,7 +284,7 @@ function prepareStatusInput(input: Json, defaults: Json = {}, editing = false): 
 		native.poll = { choices, multiple: boolean(poll.multiple), expiredAfter: integer(poll.expires_in, 86400, 300, 2629746) * 1000 };
 		if (native.fileIds?.length) throw new HttpError(422, 'A poll cannot be combined with media');
 	}
-	if (!editing && !native.text && !native.fileIds?.length && !native.poll) throw new HttpError(422, 'A status needs text, media, or a poll');
+	if (!editing && !native.text && !native.fileIds?.length && !native.poll && !native.renoteId) throw new HttpError(422, 'A status needs text, media, a poll, or a quote');
 	return { native, metadata };
 }
 
@@ -274,9 +294,18 @@ function canonicalJson(value: unknown): string {
 	return JSON.stringify(value) ?? 'null';
 }
 
+async function quoteTarget(routes: Routes, context: RequestContext, id: string): Promise<Json> {
+	const read = async (noteId: string) => routes.deps.entities.status(await routes.note(context, noteId), { viewerId: context.userId, allowLocalOnly: true });
+	let status = await read(id);
+	if (status?.reblog) status = await read(status.reblog.id);
+	if (!status) throw new HttpError(404, 'Record not found');
+	return status;
+}
+
 async function createStatus(routes: Routes, c: RequestContext): Promise<Json> {
 	const { store } = routes.deps;
 	const prepared = prepareStatusInput(c.body, store.get<Json>('account-source', c.userId, 'defaults'));
+	validateQuoteApprovalPolicy(c.body.quote_approval_policy, prepared.native.visibility);
 	const key = c.request.headers['idempotency-key'];
 	if (Array.isArray(key) || (key !== undefined && (!key || key.length > 256))) throw new HttpError(422, 'Invalid idempotency key');
 	const digest = createHash('sha256').update(canonicalJson(c.body)).digest('hex');
@@ -290,9 +319,16 @@ async function createStatus(routes: Routes, c: RequestContext): Promise<Json> {
 	const replay = existing();
 	if (replay) return routes.status(await routes.note(c, replay), c);
 	const body = prepared.native;
+	const quoted = body.renoteId ? await quoteTarget(routes, c, body.renoteId) : undefined;
+	if (quoted) {
+		body.renoteId = quoted.id;
+		// Misskey needs content to distinguish a quote from a pure renote.
+		if (!body.text?.trim() && !body.cw && !body.fileIds?.length && !body.poll && !body.replyId) body.text = quoted.url;
+	}
 	if (body.visibility === 'specified') {
 		const mentions = [...string(body.text).matchAll(/(?:^|\s)@([a-zA-Z0-9_]+)(?:@([a-zA-Z0-9.-]+))?/gu)];
 		const ids = await Promise.all(mentions.map(async match => (await c.call('users/show', { username: match[1], host: match[2] ?? null })).id));
+		if (quoted && quoted.account.id !== c.userId && !ids.includes(quoted.account.id)) throw new HttpError(422, 'A direct quote must explicitly mention the quoted author');
 		if (body.replyId) { const reply = await routes.note(c, body.replyId); ids.push(reply.userId); }
 		body.visibleUserIds = [...new Set(ids)].filter(id => id !== c.userId);
 		if (!body.visibleUserIds.length) throw new HttpError(422, 'A direct status needs a recipient mention');

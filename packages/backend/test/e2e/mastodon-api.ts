@@ -83,15 +83,15 @@ describe('Mastodon gateway against real Misskey HTTP and streaming APIs', () => 
 	});
 
 	test('posts JSON/form/multipart, preserves idempotency, edits, and returns real history', async () => {
-		const body = { status: 'JSON gateway text <script>alert(1)</script>', visibility: 'public', language: 'zh' };
+		const body = { status: 'JSON gateway text <script>alert(1)</script>', visibility: 'public', language: 'zh', quote_approval_policy: 'public' };
 		const first = await ok('/api/v1/statuses', aliceToken, 'POST', body, { 'idempotency-key': 'test-post-once' });
 		const replay = await ok('/api/v1/statuses', aliceToken, 'POST', body, { 'idempotency-key': 'test-post-once' });
 		assert.equal(replay.id, first.id); assert.ok(!first.content.includes('<script>'));
 		assert.equal(first.language, 'zh');
 		assert.equal((await api('notes/show', { noteId: first.id }, alice)).body.text, body.status);
-		const form = await ok('/api/v1/statuses', aliceToken, 'POST', 'status=URL+encoded+post&visibility=unlisted', { 'content-type': 'application/x-www-form-urlencoded' });
+		const form = await ok('/api/v1/statuses', aliceToken, 'POST', 'status=URL+encoded+post&visibility=unlisted&quote_approval_policy=public', { 'content-type': 'application/x-www-form-urlencoded' });
 		assert.equal(form.visibility, 'unlisted');
-		const parts = new FormData(); parts.append('status', 'multipart post'); parts.append('visibility', 'public');
+		const parts = new FormData(); parts.append('status', 'multipart post'); parts.append('visibility', 'public'); parts.append('quote_approval_policy', 'public');
 		const multipart = await relativeFetch('/api/v1/statuses', { method: 'POST', headers: { authorization: `Bearer ${aliceToken}` }, body: parts });
 		assert.equal(multipart.status, 200, await multipart.clone().text());
 		const edited = await ok(`/api/v1/statuses/${first.id}`, aliceToken, 'PUT', { status: 'edited through gateway', spoiler_text: 'CW' });
@@ -100,6 +100,32 @@ describe('Mastodon gateway against real Misskey HTTP and streaming APIs', () => 
 		const source = await ok(`/api/v1/statuses/${first.id}/source`, aliceToken); assert.equal(source.text, 'edited through gateway');
 		await ok(`/api/v1/statuses/${first.id}`, aliceToken, 'DELETE');
 		assert.equal((await request(`/api/v1/statuses/${first.id}`, aliceToken)).status, 404);
+	});
+
+	test('creates native quotes with and without comments and preserves visibility restrictions', async () => {
+		const original = await ok('/api/v1/statuses', aliceToken, 'POST', { status: 'Quote target', quote_approval_policy: 'public' });
+		const payload = { status: 'Quoted comment', quoted_status_id: original.id, quote_approval_policy: 'public' };
+		const quoted = await ok('/api/v1/statuses', bobToken, 'POST', payload, { 'idempotency-key': 'quoted-comment' });
+		assert.equal(quoted.quote.quoted_status.id, original.id); assert.equal(quoted.quote.state, 'accepted'); assert.equal(quoted.reblog, null);
+		const native = await api('notes/show', { noteId: quoted.id }, bob);
+		assert.equal(native.body.renoteId, original.id); assert.equal(native.body.text, payload.status);
+		assert.equal((await ok('/api/v1/statuses', bobToken, 'POST', payload, { 'idempotency-key': 'quoted-comment' })).id, quoted.id);
+		const bare = await ok('/api/v1/statuses', bobToken, 'POST', { quoted_status_id: original.id, quote_approval_policy: 'public' });
+		assert.equal(bare.quote.quoted_status.id, original.id); assert.equal(bare.reblog, null);
+		assert.equal((await api('notes/show', { noteId: bare.id }, bob)).body.text, original.url);
+		const boost = await api('notes/create', { renoteId: original.id }, bob); assert.equal(boost.status, 200);
+		const unwrapped = await ok('/api/v1/statuses', bobToken, 'POST', { quoted_status_id: boost.body.createdNote.id, quote_approval_policy: 'public' });
+		assert.equal(unwrapped.quote.quoted_status.id, original.id);
+		const cleared = await ok(`/api/v1/statuses/${quoted.id}`, bobToken, 'PUT', { status: '', quote_approval_policy: 'public' });
+		assert.equal(cleared.quote.quoted_status.id, original.id);
+		assert.equal((await api('notes/show', { noteId: quoted.id }, bob)).body.text, original.url);
+		const direct = await ok('/api/v1/statuses', bobToken, 'POST', { status: '@gateway_alice Direct quote', quoted_status_id: original.id, visibility: 'direct', quote_approval_policy: 'nobody' });
+		assert.equal(direct.visibility, 'direct'); assert.equal((await ok(`/api/v1/statuses/${direct.id}`, aliceToken)).quote.quoted_status.id, original.id);
+		const privateNote = await ok('/api/v1/statuses', aliceToken, 'POST', { status: 'Private quote target', visibility: 'private', quote_approval_policy: 'nobody' });
+		assert.equal((await request('/api/v1/statuses', bobToken, 'POST', { status: 'Cannot quote private target', quoted_status_id: privateNote.id, quote_approval_policy: 'public' })).status, 404);
+		assert.equal((await request('/api/v1/statuses', aliceToken, 'POST', { status: 'Cannot enforce restrictive public policy', quote_approval_policy: 'nobody' })).status, 422);
+		const notes = await api('users/notes', { userId: alice.id, limit: 100 }, alice);
+		assert.ok(!notes.body.some(note => note.text === 'Cannot enforce restrictive public policy'));
 	});
 
 	test('loads paginated timelines and does not expose follower-only or direct notes', async () => {
@@ -268,5 +294,4 @@ describe('Mastodon gateway against real Misskey HTTP and streaming APIs', () => 
 		// starts. Persistence is exercised above without resetting the upstream.
 		assert.ok((await ok('/api/v1/instance')).version);
 	});
-
 });

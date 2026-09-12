@@ -49,7 +49,7 @@ async function fixture(t: TestContext, options: { filename?: string; handler?: (
 			return found ? response(found) : response({ error: { code: 'NO_SUCH_NOTE', message: 'Missing' } }, 404);
 		}
 		if (endpoint === 'notes/create') {
-			const created = note(String(++sequence), { ...body, files: (body.fileIds ?? []).map((id: string) => ({ id, type: 'image/png' })) });
+			const created = note(String(++sequence), { ...body, ...(body.renoteId ? { renote: notes.find(item => item.id === body.renoteId) } : {}), files: (body.fileIds ?? []).map((id: string) => ({ id, type: 'image/png' })) });
 			notes.push(created);
 			return response({ createdNote: created });
 		}
@@ -120,6 +120,17 @@ test('posting applies saved source defaults, supports explicit overrides and kee
 	assert.equal(second.json().language, null);
 });
 
+test('ordinary status creation accepts the public quote policy sent by generic clients', async t => {
+	const f = await fixture(t);
+	const created = await f.request('POST', '/api/v1/statuses', { status: 'A normal post', quote_approval_policy: 'public' });
+	assert.equal(created.statusCode, 200, created.body);
+	assert.equal(created.json().content, '<p>A normal post</p>');
+	assert.equal(f.calls.filter(call => call.endpoint === 'notes/create').length, 1);
+	assert.equal(f.calls.find(call => call.endpoint === 'notes/create')?.body.renoteId, undefined);
+	const edited = await f.request('PUT', `/api/v1/statuses/${created.json().id}`, { status: 'Edited normal post', quote_approval_policy: 'public' });
+	assert.equal(edited.statusCode, 200, edited.body);
+});
+
 test('direct status idempotency is claimed atomically across SQLite connections after recipient lookup', async t => {
 	const directory = mkdtempSync(join(tmpdir(), 'mastodon-routes-'));
 	t.after(() => rmSync(directory, { recursive: true, force: true }));
@@ -188,6 +199,82 @@ test('native state overrides stale compatibility booleans and stale reblog hints
 	f.store.put('reblog', 'alice', '100', 'another-deleted-renote');
 	assert.equal((await f.request('POST', '/api/v1/statuses/100/reblog', {})).statusCode, 200);
 	assert.equal(f.calls.filter(call => call.endpoint === 'notes/create').length, 1);
+});
+
+test('quote policies retain native visibility guarantees and reject unsupported restrictions before writing', async t => {
+	const f = await fixture(t);
+	for (const policy of [null, '', '  ', 'public']) {
+		assert.equal((await f.request('POST', '/api/v1/statuses', { status: 'Default policy', quote_approval_policy: policy })).statusCode, 200);
+	}
+	for (const visibility of ['private', 'direct']) for (const policy of ['public', 'followers', 'nobody']) {
+		const created = await f.request('POST', '/api/v1/statuses', { status: '@bob Restricted visibility', visibility, quote_approval_policy: policy });
+		assert.equal(created.statusCode, 200, created.body);
+		assert.equal(created.json().visibility, visibility);
+		assert.equal((await f.request('PUT', `/api/v1/statuses/${created.json().id}`, { status: 'Edited', quote_approval_policy: policy })).statusCode, 200);
+	}
+	const writes = f.calls.filter(call => ['notes/create', 'notes/update'].includes(call.endpoint)).length;
+	for (const visibility of ['public', 'unlisted']) for (const policy of ['followers', 'nobody', 'invalid', true, {}]) {
+		assert.equal((await f.request('POST', '/api/v1/statuses', { status: 'Must not publish', visibility, quote_approval_policy: policy }, undefined, 'invalid-policy')).statusCode, 422);
+	}
+	assert.equal(f.calls.filter(call => ['notes/create', 'notes/update'].includes(call.endpoint)).length, writes);
+	assert.equal(f.store.get('idempotency', 'alice', 'invalid-policy'), undefined);
+});
+
+test('quotes map to native renotes, preserve empty-comment quotes and replay idempotently', async t => {
+	const f = await fixture(t);
+	f.notes.push(note('100', { userId: 'bob', user: user('bob'), text: 'Original' }));
+	f.notes.push(note('101', { text: null, renoteId: '100', renote: f.notes[0] }));
+	const payload = { status: 'Comment', quoted_status_id: '100', quote_approval_policy: 'public' };
+	const quoted = await f.request('POST', '/api/v1/statuses', payload, undefined, 'quote-once');
+	assert.equal(quoted.statusCode, 200, quoted.body);
+	assert.equal(quoted.json().quote.state, 'accepted');
+	assert.equal(quoted.json().quote.quoted_status.id, '100');
+	assert.equal(quoted.json().reblog, null);
+	assert.equal(f.calls.find(call => call.endpoint === 'notes/create')?.body.renoteId, '100');
+	assert.equal((await f.request('POST', '/api/v1/statuses', payload, undefined, 'quote-once')).json().id, quoted.json().id);
+	assert.equal(f.calls.filter(call => call.endpoint === 'notes/create').length, 1);
+	const bare = await f.request('POST', '/api/v1/statuses', { quoted_status_id: '100', quote_approval_policy: 'public' });
+	assert.equal(bare.statusCode, 200, bare.body);
+	assert.equal(bare.json().quote.quoted_status.id, '100');
+	assert.equal(bare.json().reblog, null);
+	assert.equal(f.calls.filter(call => call.endpoint === 'notes/create').at(-1)?.body.text, 'https://social.test/notes/100');
+	const boostedTarget = await f.request('POST', '/api/v1/statuses', { quoted_status_id: '101', quote_approval_policy: 'public' });
+	assert.equal(boostedTarget.statusCode, 200, boostedTarget.body);
+	assert.equal(boostedTarget.json().quote.quoted_status.id, '100');
+	assert.equal(f.calls.filter(call => call.endpoint === 'notes/create').at(-1)?.body.renoteId, '100');
+	assert.equal(f.calls.filter(call => call.endpoint === 'notes/create').at(-1)?.body.text, 'https://social.test/notes/100');
+	assert.equal((await f.request('PUT', `/api/v1/statuses/${quoted.json().id}`, { status: 'Edited comment', quote_approval_policy: 'public' })).json().quote.quoted_status.id, '100');
+	const cleared = await f.request('PUT', `/api/v1/statuses/${quoted.json().id}`, { status: '', quote_approval_policy: 'public' });
+	assert.equal(cleared.statusCode, 200, cleared.body);
+	assert.equal(cleared.json().quote.quoted_status.id, '100');
+	assert.equal(f.calls.filter(call => call.endpoint === 'notes/update').at(-1)?.body.text, 'https://social.test/notes/100');
+	assert.equal((await f.request('PUT', `/api/v1/statuses/${quoted.json().id}`, { quoted_status_id: 'other' })).statusCode, 422);
+});
+
+test('direct quotes require an explicit author mention, including when a reply supplies a recipient', async t => {
+	const f = await fixture(t);
+	f.notes.push(note('100', { userId: 'bob', user: user('bob') }), note('own'));
+	for (const input of [{ status: '@carol Comment' }, { status: '@carol Comment', in_reply_to_id: '100' }]) {
+		const rejected = await f.request('POST', '/api/v1/statuses', { ...input, quoted_status_id: '100', visibility: 'direct', quote_approval_policy: 'nobody' });
+		assert.equal(rejected.statusCode, 422, rejected.body);
+	}
+	assert.equal(f.calls.some(call => call.endpoint === 'notes/create'), false);
+	for (const input of [{ status: '@bob Comment', quoted_status_id: '100' }, { status: '@carol My own quote', quoted_status_id: 'own' }]) {
+		const created = await f.request('POST', '/api/v1/statuses', { ...input, visibility: 'direct', quote_approval_policy: 'nobody' });
+		assert.equal(created.statusCode, 200, created.body);
+		assert.equal(created.json().visibility, 'direct');
+	}
+});
+
+test('hidden, missing and invalid quote targets are rejected before creating a native note', async t => {
+	const f = await fixture(t);
+	f.notes.push(note('hidden', { isHidden: true }));
+	for (const quoted_status_id of ['hidden', 'missing', {}]) {
+		const result = await f.request('POST', '/api/v1/statuses', { status: 'Must not publish', quoted_status_id, quote_approval_policy: 'public' }, undefined, 'invalid-quote');
+		assert.ok([404, 422].includes(result.statusCode), result.body);
+	}
+	assert.equal(f.calls.some(call => call.endpoint === 'notes/create'), false);
+	assert.equal(f.store.get('idempotency', 'alice', 'invalid-quote'), undefined);
 });
 
 test('narrow write grants cover native mutations without unauthorized viewer-state reads', async t => {

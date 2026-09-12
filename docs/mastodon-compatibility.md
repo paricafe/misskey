@@ -58,7 +58,7 @@ The standalone service uses real HTTP and WebSocket connections to the fixed nat
 | Encoding and errors | JSON, URL-encoded bracket parameters, and multipart forms; CORS; Mastodon-shaped errors; native rate-limit response headers. |
 | OAuth | Registration, authorization code, PKCE, client-credentials token, own-client revoke, application verification, native grant revocation. |
 | Accounts | Credential verification and updates, avatars/headers, lookup/search, relationships, following/followers, requests, blocks/mutes, lists. |
-| Statuses | Creation, replies/direct recipients, deletion, editing and native revision history, context, favourites, bookmarks, boosts, pins, thread mute, public/home/tag/list timelines. |
+| Statuses | Creation, replies/direct recipients, quotes, deletion, editing and native revision history, context, favourites, bookmarks, boosts, pins, thread mute, public/home/tag/list timelines. |
 | Media and polls | Native Drive uploads and ownership checks, descriptions and focus metadata, attached files, polls and atomic multi-choice voting. |
 | Notifications | v1 notifications and v2 stable singleton groups, cross-page lookups, shared dismiss/clear state, and marker-based unread counts. |
 | Discovery | Instance metadata/rules/peers, custom emoji, directory, suggestions, tags/trending notes, search via public native APIs. |
@@ -69,12 +69,14 @@ Favourites map to heart reactions (`❤`/`❤️`). Creating a favourite returns
 
 Status language/sensitivity, attachment focus, OAuth state, filters, and markers live in the gateway store. Compatibility metadata does not add fields to native notes or change the federated ActivityPub representation. Native media descriptions still use the native Drive update semantics. A sensitive compatibility status does not rewrite a shared file's sensitivity.
 
+`quote_approval_policy: public` is accepted for ordinary posts and quotes. For private/direct posts, all three standard policy values are accepted because native visibility already prevents other users from quoting them. Restrictive `followers`/`nobody` policies on public or unlisted posts are rejected because the native server cannot enforce them. `quoted_status_id` creates a native quote; quotes without a comment use the quoted post's canonical URL as visible fallback text. Native visibility, block and channel checks still apply.
+
 ## Explicit limits
 
 This is a practical compatibility implementation, not a claim of complete Mastodon 4.6 conformance. Unsupported writes return errors rather than reporting that work was performed.
 
 - Push delivery and scheduled publishing are not implemented by this gateway. Existing native Misskey push/scheduled-note features keep their own behavior.
-- Poll editing, custom replacement thumbnails, quote approval policies, and Mastodon Collections are not implemented.
+- Poll editing, custom replacement thumbnails, restrictive quote approval for public/unlisted posts, and Mastodon Collections are not implemented. Native quotes do not implement Mastodon's cross-server quote approval and revocation protocol.
 - Conversation discovery scans at most the latest 1,000 native entries per incoming/outgoing source. It does not provide a full historical conversation index.
 - Reply context traversal returns at most 100 visible descendants and performs at most 200 native child-page reads.
 - Remote search, translation, public timelines and uploads remain subject to native server configuration, connectivity, and permissions.
@@ -106,5 +108,7 @@ Local rewrite validation on 2026-09-12:
 | Docker image and individual third-party client UI | Not executed |
 
 The native e2e harness retains its existing controller-server exit warning (`close timed out after 10000ms`); all 12 assertions pass and the runner exits with code 0. This warning is separate from the active-stream gateway shutdown tests.
+
+The quote-policy follow-up on 2026-09-12 passed 102 gateway tests and 13 real-service e2e tests, including ordinary posts with `quote_approval_policy`, quoted posts, empty-comment quotes, quoting boosts, clearing quote comments, and native visibility restrictions. Changed-file lint, TypeScript, SPDX and locale safety also passed; the existing e2e exit warning remains.
 
 References: [Mastodon API guidelines](https://docs.joinmastodon.org/api/guidelines/), [OAuth](https://docs.joinmastodon.org/methods/oauth/), [Mastodon entities](https://docs.joinmastodon.org/entities/), [MiAuth](https://misskey-hub.net/en/docs/for-developers/api/token/miauth/). The package follows the HTTP-adapter architecture used by Megalodon; it is implemented against the current public native APIs rather than importing an obsolete Misskey SDK or native backend internals.
