@@ -1,0 +1,31 @@
+packages/mastodon-compat/src/native-client.ts
+  s_d32bac5aaa6ca1::t_16529231840aac 51,57
+packages/backend/src/server/ServerService.ts
+  s_d32bac5aaa6ca1::t_16529231840aac 177
+packages/mastodon-compat/src/index.ts
+  s_d32bac5aaa6ca1::t_16529231840aac 29,37
+packages/mastodon-compat/src/types.ts
+  s_d32bac5aaa6ca1::t_16529231840aac 35-36
+packages/mastodon-compat/test/streaming-transport.test.ts
+  s_d32bac5aaa6ca1::t_c581066f3785e7 1-96,98-107
+  s_d32bac5aaa6ca1::t_9175213090bacb 97
+packages/mastodon-compat/src/streaming.ts
+  s_d32bac5aaa6ca1::t_16529231840aac 7,20,110-113,115
+  s_d32bac5aaa6ca1::t_9175213090bacb 114
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "46a5c23bd705a9c3f29ef5c2abde2ff6a5aa0fe6",
+  "prompts": {},
+  "sessions": {
+    "s_d32bac5aaa6ca1": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a09430-b6ee-7310-ac0a-9dee4efe823d",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "Natsuki-Kaede <i@pari.network>"
+    }
+  }
+}

@@ -24,3 +24,23 @@ packages/backend/test/unit/boot/unix-socket.ts
     }
   }
 }
+
+packages/backend/test/unit/boot/unix-socket.ts
+  s_d32bac5aaa6ca1::t_2a3d402ee8e631 102
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "d2b598b2b1e6e7bae5c57cbb2d06b8082c2323fe",
+  "prompts": {},
+  "sessions": {
+    "s_d32bac5aaa6ca1": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a09430-b6ee-7310-ac0a-9dee4efe823d",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "Natsuki-Kaede <i@pari.network>"
+    }
+  }
+}
