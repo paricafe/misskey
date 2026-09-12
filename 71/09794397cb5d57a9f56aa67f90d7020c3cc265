@@ -1,0 +1,37 @@
+packages/mastodon-compat/test/gateway-lifecycle.test.ts
+  s_d32bac5aaa6ca1::t_e283c5a07e516a 10,12,14,25-73
+  s_d32bac5aaa6ca1::t_c16dce0b6469f8 74
+packages/mastodon-compat/src/routes.ts
+  s_d32bac5aaa6ca1::t_4ea8ea753c04a4 372-373,400,413
+packages/mastodon-compat/src/store.ts
+  s_d32bac5aaa6ca1::t_4ea8ea753c04a4 39-44,65,78-84,168,170-178,180-183,274-285,301-304
+packages/mastodon-compat/src/postgres-store.ts
+  s_d32bac5aaa6ca1::t_4ea8ea753c04a4 92-112
+packages/mastodon-compat/test/postgres-store.test.ts
+  s_d32bac5aaa6ca1::t_e283c5a07e516a 93-114
+  s_d32bac5aaa6ca1::t_b3cec088c3ea4d 22-73,115
+  s_d32bac5aaa6ca1::t_ecc6c436974f09 116
+packages/mastodon-compat/test/routes.test.ts
+  s_d32bac5aaa6ca1::t_4102fe28f2d635 241-243,247-259,264-267
+packages/mastodon-compat/test/store.test.ts
+  s_d32bac5aaa6ca1::t_b3cec088c3ea4d 94-127
+packages/mastodon-compat/src/index.ts
+  s_d32bac5aaa6ca1::t_30ea46b45a0fdc 40-63,117,147
+  s_d32bac5aaa6ca1::t_07a5ada29f3b83 118,148,150
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "7109794397cb5d57a9f56aa67f90d7020c3cc265",
+  "prompts": {},
+  "sessions": {
+    "s_d32bac5aaa6ca1": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a09430-b6ee-7310-ac0a-9dee4efe823d",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "Natsuki-Kaede <i@pari.network>"
+    }
+  }
+}
