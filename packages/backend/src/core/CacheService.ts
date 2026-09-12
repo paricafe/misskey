@@ -196,6 +196,14 @@ export class CacheService implements OnApplicationShutdown {
 		if (obj.channel === 'internal') {
 			const { type, body } = obj.message as GlobalEvents['internal']['payload'];
 			switch (type) {
+				case 'blockingCreated':
+				case 'blockingDeleted': {
+					await Promise.all([
+						this.userBlockingCache.delete(body.blockerId),
+						this.userBlockedCache.delete(body.blockeeId),
+					]);
+					break;
+				}
 				case 'userChangeSuspendedState':
 				case 'userChangeDeletedState':
 				case 'remoteUserUpdated':
