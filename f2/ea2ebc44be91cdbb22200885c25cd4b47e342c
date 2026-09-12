@@ -1,0 +1,21 @@
+packages/backend/src/core/SearchService.ts
+  s_c57eee1bc5c2d3::t_d084e251f3831c 7,234,236,239-240,243-246,261,265-307
+packages/backend/test/unit/SearchService.ts
+  s_c57eee1bc5c2d3::t_929dd20b3acaba 630-705,721-726
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "f2ea2ebc44be91cdbb22200885c25cd4b47e342c",
+  "prompts": {},
+  "sessions": {
+    "s_c57eee1bc5c2d3": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a09420-6a42-7f41-90db-4823cddf27ee",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "Natsuki-Kaede <i@pari.network>"
+    }
+  }
+}
