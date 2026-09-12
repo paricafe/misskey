@@ -117,7 +117,7 @@ process.on('message', msg => {
 	}
 });
 
-readyRef.value = true;
+readyRef.value = !isShutdownInProgress();
 
 // ユニットテスト時にMisskeyが子プロセスで起動された時のため
 // それ以外のときは process.send は使えないので弾く

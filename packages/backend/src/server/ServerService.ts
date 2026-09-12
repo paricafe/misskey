@@ -11,6 +11,7 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import fastifyStatic from '@fastify/static';
 import fastifyRawBody from 'fastify-raw-body';
 import { IsNull } from 'typeorm';
+import { createPostgresStore, installGateway } from '@pari/mastodon-compat';
 import { GlobalEventService } from '@/core/GlobalEventService.js';
 import type { Config } from '@/config.js';
 import type { EmojisRepository, MiMeta, UserProfilesRepository, UsersRepository } from '@/models/_.js';
@@ -33,7 +34,6 @@ import { ClientServerService } from './web/ClientServerService.js';
 import { OpenApiServerService } from './api/openapi/OpenApiServerService.js';
 import { OAuth2ProviderService } from './oauth/OAuth2ProviderService.js';
 import { makeHstsHook } from './hsts.js';
-import { createPostgresStore, installGateway } from '@pari/mastodon-compat';
 import { registerHttpAccessLog } from './http-access-log.js';
 
 const _dirname = fileURLToPath(new URL('.', import.meta.url));
@@ -42,7 +42,7 @@ const _dirname = fileURLToPath(new URL('.', import.meta.url));
 export class ServerService implements OnApplicationShutdown {
 	private logger: Logger;
 	#fastify: FastifyInstance;
-	#mastodonGateway?: { close(): Promise<void> };
+	#disposePromise?: Promise<void>;
 
 	constructor(
 		@Inject(DI.config)
@@ -170,7 +170,7 @@ export class ServerService implements OnApplicationShutdown {
 				statement_timeout: 10000,
 				...this.config.db.extra,
 			});
-			this.#mastodonGateway = installGateway(fastify, {
+			installGateway(fastify, {
 				publicUrl: this.config.url,
 				nativeUrl: `http://127.0.0.1:${this.config.port}`,
 				store,
@@ -319,18 +319,14 @@ export class ServerService implements OnApplicationShutdown {
 
 	@bindThis
 	public async dispose(): Promise<void> {
-		// Gateway subscriptions own native upstream sockets; release those first.
-		await this.#mastodonGateway?.close();
-		await this.streamingApiServerService.detach();
-		// fastify@5 close() waits for upgraded WebSocket connections to drain.
-		// streamingApiServerService.attach() adds raw ws.Server upgrades that
-		// fastify does not track in its connection registry, so close() can hang
-		// forever during OnApplicationShutdown. Cap at 5s so PM2/systemd/k8s
-		// shutdown timeouts aren't held hostage.
-		await Promise.race([
+		// Start closing HTTP immediately; its preClose hook shuts down the gateway.
+		// Keep dependencies alive until existing HTTP requests have actually drained.
+		// Boot bounds the entire sequence, including queues and dependency cleanup.
+		this.#disposePromise ??= Promise.all([
 			this.#fastify.close(),
-			new Promise<void>(resolve => setTimeout(resolve, 5_000)),
-		]).catch(err => this.logger.error('fastify.close() failed', err as Error));
+			this.streamingApiServerService.detach(),
+		]).then(() => undefined);
+		await this.#disposePromise;
 	}
 
 	/**

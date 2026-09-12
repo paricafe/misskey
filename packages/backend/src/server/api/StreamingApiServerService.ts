@@ -7,6 +7,7 @@ import { EventEmitter } from 'events';
 import { Inject, Injectable } from '@nestjs/common';
 import * as Redis from 'ioredis';
 import * as WebSocket from 'ws';
+import { ContextIdFactory, ModuleRef } from '@nestjs/core';
 import { DI } from '@/di-symbols.js';
 import type { MiAccessToken } from '@/models/_.js';
 import { bindThis } from '@/decorators.js';
@@ -15,7 +16,7 @@ import { UserService } from '@/core/UserService.js';
 import { AuthenticateService, AuthenticationError } from './AuthenticateService.js';
 import MainStreamConnection, { ConnectionRequest } from './stream/Connection.js';
 import type * as http from 'node:http';
-import { ContextIdFactory, ModuleRef } from '@nestjs/core';
+import type { Duplex } from 'node:stream';
 
 export function isNativeStreamingPath(url: string): boolean {
 	try {
@@ -30,6 +31,13 @@ export class StreamingApiServerService {
 	#wss: WebSocket.WebSocketServer;
 	#connections = new Map<WebSocket.WebSocket, number>();
 	#cleanConnectionsIntervalId: NodeJS.Timeout | null = null;
+	#server?: http.Server;
+	#upgradeListener?: (request: http.IncomingMessage, socket: Duplex, head: Buffer) => void;
+	#redisListener?: (channel: string, data: string) => void;
+	#pendingUpgrades = new Set<Duplex>();
+	#pendingInitializations = new Set<Promise<void>>();
+	#detaching = false;
+	#detachPromise?: Promise<void>;
 
 	constructor(
 		@Inject(DI.redisForSub)
@@ -43,11 +51,12 @@ export class StreamingApiServerService {
 
 	@bindThis
 	public attach(server: http.Server): void {
+		this.#server = server;
 		this.#wss = new WebSocket.WebSocketServer({
 			noServer: true,
 		});
 
-		server.on('upgrade', async (request, socket, head) => {
+		const handleUpgrade = async (request: http.IncomingMessage, socket: Duplex, head: Buffer) => {
 			if (request.url == null) {
 				socket.write('HTTP/1.1 400 Bad Request\r\n\r\n');
 				socket.destroy();
@@ -99,21 +108,39 @@ export class StreamingApiServerService {
 			}, contextId);
 			const stream = await this.moduleRef.create(MainStreamConnection, contextId);
 
-			await stream.init();
-
-			this.#wss.handleUpgrade(request, socket, head, (ws) => {
-				this.#wss.emit('connection', ws, request, {
-					stream, user, app,
+			let adopted = false;
+			try {
+				await stream.init();
+				if (this.#detaching || socket.destroyed) return;
+				this.#wss.handleUpgrade(request, socket, head, (ws) => {
+					adopted = true;
+					this.#wss.emit('connection', ws, request, {
+						stream, user, app,
+					});
 				});
+			} finally {
+				if (!adopted) stream.dispose();
+			}
+		};
+		this.#upgradeListener = (request, socket, head) => {
+			if (request.url != null && !isNativeStreamingPath(request.url)) return;
+			if (this.#detaching) { socket.destroy(); return; }
+			this.#pendingUpgrades.add(socket);
+			const initialization = handleUpgrade(request, socket, head).catch(() => socket.destroy()).then(() => undefined).finally(() => {
+				this.#pendingUpgrades.delete(socket);
+				this.#pendingInitializations.delete(initialization);
 			});
-		});
+			this.#pendingInitializations.add(initialization);
+		};
+		server.on('upgrade', this.#upgradeListener);
 
 		const globalEv = new EventEmitter();
 
-		this.redisForSub.on('message', (_: string, data: string) => {
+		this.#redisListener = (_: string, data: string) => {
 			const parsed = JSON.parse(data);
 			globalEv.emit('message', parsed);
-		});
+		};
+		this.redisForSub.on('message', this.#redisListener);
 
 		this.#wss.on('connection', async (connection: WebSocket.WebSocket, request: http.IncomingMessage, ctx: {
 			stream: MainStreamConnection,
@@ -129,8 +156,6 @@ export class StreamingApiServerService {
 			}
 
 			globalEv.on('message', onRedisMessage);
-
-			await stream.listen(ev, connection);
 
 			this.#connections.set(connection, Date.now());
 
@@ -152,6 +177,7 @@ export class StreamingApiServerService {
 			connection.on('pong', () => {
 				this.#connections.set(connection, Date.now());
 			});
+			await stream.listen(ev, connection);
 		});
 
 		// 一定期間通信が無いコネクションは実際には切断されている可能性があるため定期的にterminateする
@@ -170,12 +196,26 @@ export class StreamingApiServerService {
 
 	@bindThis
 	public detach(): Promise<void> {
+		if (this.#detachPromise) return this.#detachPromise;
+		this.#detaching = true;
+		if (this.#upgradeListener) this.#server?.off('upgrade', this.#upgradeListener);
+		if (this.#redisListener) this.redisForSub.off('message', this.#redisListener);
 		if (this.#cleanConnectionsIntervalId) {
 			clearInterval(this.#cleanConnectionsIntervalId);
 			this.#cleanConnectionsIntervalId = null;
 		}
-		return new Promise((resolve) => {
-			this.#wss.close(() => resolve());
+		for (const socket of this.#pendingUpgrades) socket.destroy();
+		const close = new Promise<void>(resolve => {
+			const timeout = setTimeout(() => {
+				for (const connection of this.#wss.clients) connection.terminate();
+			}, 1_000);
+			this.#wss.close(() => {
+				clearTimeout(timeout);
+				resolve();
+			});
+			for (const connection of this.#wss.clients) connection.close(1001, 'Server shutting down');
 		});
+		this.#detachPromise = Promise.all([close, Promise.allSettled(this.#pendingInitializations)]).then(() => undefined);
+		return this.#detachPromise;
 	}
 }

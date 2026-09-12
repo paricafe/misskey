@@ -12,6 +12,7 @@ import { configureLogging, shutdownLogging } from '@/logging/logging-runtime.js'
 import { initTelemetry, shutdownTelemetry } from '@/core/telemetry/telemetry-registry.js';
 import { initExtraThreadPool, jobQueue, server } from './common.js';
 import { installShutdownSignalHandlers } from './shutdown-handler.js';
+import { shutdownApplications } from './application-lifecycle.js';
 
 const logger = new Logger('core', 'cyan');
 const bootLogger = logger.createSubLogger('boot', 'magenta');
@@ -40,7 +41,9 @@ export async function workerMain() {
 		process.exit(1);
 	}
 	installShutdownSignalHandlers({
-		shutdownTasks: [shutdownTelemetry, shutdownLogging],
+		shutdownTasks: [shutdownApplications],
+		finalizeTasks: [shutdownTelemetry, shutdownLogging],
+		timeoutMs: 7_000,
 		onRegistered: message => bootLogger.info(message),
 	});
 

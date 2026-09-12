@@ -17,7 +17,9 @@ import { showMachineInfo } from '@/misc/show-machine-info.js';
 import { envOption } from '@/env.js';
 import { initTelemetry, shutdownTelemetry } from '@/core/telemetry/telemetry-registry.js';
 import { initExtraThreadPool, jobQueue, server } from './common.js';
-import { installShutdownSignalHandlers } from './shutdown-handler.js';
+import { installShutdownSignalHandlers, isShutdownInProgress } from './shutdown-handler.js';
+import { shutdownApplications } from './application-lifecycle.js';
+import { forceStopClusterWorkers, shutdownClusterWorkers } from './cluster-shutdown.js';
 
 const logger = new Logger('core', 'cyan');
 const bootLogger = logger.createSubLogger('boot', 'magenta');
@@ -89,7 +91,13 @@ export async function masterMain() {
 		process.exit(1);
 	}
 	installShutdownSignalHandlers({
-		shutdownTasks: [shutdownTelemetry, shutdownLogging],
+		shutdownTasks: [async () => {
+			const results = await Promise.allSettled([shutdownApplications(), shutdownClusterWorkers()]);
+			const errors = results.flatMap(result => result.status === 'rejected' ? [result.reason] : []);
+			if (errors.length > 0) throw new AggregateError(errors, 'Application shutdown failed');
+		}],
+		finalizeTasks: [shutdownTelemetry, shutdownLogging],
+		onTimeout: forceStopClusterWorkers,
 		onRegistered: message => bootLogger.info(message),
 	});
 
@@ -190,6 +198,7 @@ async function connectDb(): Promise<void> {
 */
 
 async function spawnWorkers(limit = 1) {
+	if (isShutdownInProgress()) return;
 	const workers = Math.min(limit, os.cpus().length);
 	bootLogger.info(`Starting ${workers} worker${workers === 1 ? '' : 's'}...`);
 	await Promise.all([...Array(workers)].map(spawnWorker));
