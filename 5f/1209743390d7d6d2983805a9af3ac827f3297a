@@ -1,0 +1,77 @@
+packages/frontend/test/unit/widget-activity.test.ts
+  s_3872b862902054::t_d7c752a49c9c67 1-46
+packages/frontend/test/unit/use-uploader.test.ts
+  s_3872b862902054::t_772930e3551afe 1-11,22-23,25-27,53-88,91-95,97-110,116-143,147,149,151-155,157-172,174,176-182,234-235
+  s_3872b862902054::t_763d686854fa2e 37-46,216-233
+  s_3872b862902054::t_b2faf024820da6 12,14-20,24,28-36,47-52,89-90,96,112-115,144-145,156,183-215
+  s_3872b862902054::t_10b877e02634e1 13,21,111,146,148,150,173,175
+packages/frontend/src/composables/use-uploader.ts
+  s_3872b862902054::t_a367bec3a85594 10,188-190,192,290,317
+  s_3872b862902054::t_b2faf024820da6 830,832-833,848
+  s_3872b862902054::t_8ae06c6a1b7590 640-653,657-665,668-681,684,686-695,698,700-714,716-720,722-723,725-744,746-751,753-754,758-788,790-793,796,803,810-814,816-828,831,834-847,849-852,858
+packages/frontend/test/unit/custom-emoji-render.test.ts
+  s_3872b862902054::t_a0abadb58ae6d2 1-34,36-62
+  s_3872b862902054::t_a61f373c6b240d 35
+packages/frontend/src/utility/paginator.ts
+  s_3872b862902054::t_2b24606e662840 37-52,77,126,128,213,219-223,244-245,248-249,289,308-309,342-346,348-354,356,373,381-382,387,409-411,417-419,431-437
+  s_3872b862902054::t_cd5953b4003116 127,214-215,243,304,369
+packages/frontend-shared/js/use-interval.ts
+  s_3872b862902054::t_2817ebe8097044 6-7,10,16,19-21,24,29,42,50,55,60,71-74
+  s_3872b862902054::t_eb301762600113 64-69
+  s_3872b862902054::t_4b7bb2f146b70e 70
+packages/frontend/src/components/MkStreamingNotesTimeline.vue
+  s_3872b862902054::t_2b24606e662840 256-257,266-267
+packages/frontend/src/components/global/MkMfm.ts
+  s_3872b862902054::t_aa4dbb7c4d243c 92,94-97,119,123,129,197,202,207,224,230,239,241,310,324,339,343,347,354,360,365,374,378,382,384-385,393,402,410,419,423,430,445,460,477,483
+packages/frontend/test/unit/use-interval.test.ts
+  s_3872b862902054::t_d7c752a49c9c67 1-102
+packages/frontend/src/custom-emojis.ts
+  s_3872b862902054::t_db4446b13ea156 6,23,63-66
+  s_3872b862902054::t_7216d5353c8bb2 67-68
+packages/frontend/src/components/global/MkCustomEmoji.vue
+  s_3872b862902054::t_db4446b13ea156 40,107-109
+  s_3872b862902054::t_9612d8355f5d35 110
+packages/frontend/test/unit/rss.test.ts
+  s_3872b862902054::t_b2faf024820da6 28
+  s_3872b862902054::t_d7c752a49c9c67 1-27,29-49
+package.json
+  s_3872b862902054::t_3376d29ec8b8fe 3
+packages/frontend/test/unit/pizzax.test.ts
+  s_3872b862902054::t_a08748824db019 1-74
+packages/frontend/src/widgets/WidgetRss.vue
+  s_3872b862902054::t_2817ebe8097044 94-97
+packages/frontend/src/widgets/WidgetRssTicker.vue
+  s_3872b862902054::t_2817ebe8097044 135-138
+packages/frontend/test/unit/paginator.test.ts
+  s_3872b862902054::t_e52f900170b08e 1-18,20-47,50-53,87-242
+  s_3872b862902054::t_cd5953b4003116 19,48-49,54-86
+packages/frontend/test/unit/mfm-render.test.ts
+  s_3872b862902054::t_102a5fc2ff641b 1-57,59-62,64-97,99-104,112-184
+  s_3872b862902054::t_09230409a180cb 58,63
+  s_3872b862902054::t_fcb4f2f1c6d707 98,105-111
+packages/frontend/test/unit/custom-emojis.test.ts
+  s_3872b862902054::t_a61f373c6b240d 24
+  s_3872b862902054::t_a08748824db019 1-23,25-90
+packages/frontend/src/widgets/WidgetActivity.chart.vue
+  s_3872b862902054::t_2817ebe8097044 37,55,58-65,67-68,71-72
+packages/frontend/src/lib/pizzax.ts
+  s_3872b862902054::t_db4446b13ea156 133
+packages/frontend/src/boot/common.ts
+  s_3872b862902054::t_db4446b13ea156 29,259,274
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "5f1209743390d7d6d2983805a9af3ac827f3297a",
+  "prompts": {},
+  "sessions": {
+    "s_3872b862902054": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0940d-309e-7740-a7d8-fe45ee16cf15",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "Natsuki-Kaede <i@pari.network>"
+    }
+  }
+}
