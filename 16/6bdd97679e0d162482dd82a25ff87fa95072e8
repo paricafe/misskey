@@ -1,0 +1,24 @@
+packages/backend/src/core/UserBlockingService.ts
+  s_d32bac5aaa6ca1::t_de4f44cda704a0 83-88,177-181
+  s_d32bac5aaa6ca1::t_4f34bda826b69a 80-82,174-176
+packages/backend/test/unit/CacheService.ts
+  s_d32bac5aaa6ca1::t_4f34bda826b69a 1-59
+packages/backend/src/core/CacheService.ts
+  s_d32bac5aaa6ca1::t_4f34bda826b69a 199-206
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "166bdd97679e0d162482dd82a25ff87fa95072e8",
+  "prompts": {},
+  "sessions": {
+    "s_d32bac5aaa6ca1": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a09430-b6ee-7310-ac0a-9dee4efe823d",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "Natsuki-Kaede <i@pari.network>"
+    }
+  }
+}
