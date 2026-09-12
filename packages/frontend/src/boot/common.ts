@@ -26,7 +26,7 @@ import { getAccountFromId } from '@/utility/get-account-from-id.js';
 import { deckStore } from '@/ui/deck/deck-store.js';
 import { analytics, initAnalytics } from '@/analytics.js';
 import { miLocalStorage } from '@/local-storage.js';
-import { fetchCustomEmojis } from '@/custom-emojis.js';
+import { fetchCustomEmojisForBoot } from '@/custom-emojis.js';
 import { loadFontStyle } from '@/utility/load-font.js';
 import { applyTextAutospacePreference } from '@/utility/text-autospace.js';
 import { prefer } from '@/preferences.js';
@@ -256,9 +256,7 @@ export async function common(createVue: () => Promise<App<Element>>) {
 	}
 	//#endregion
 
-	try {
-		await fetchCustomEmojis();
-	} catch (err) { /* empty */ }
+	const customEmojisReady = fetchCustomEmojisForBoot();
 
 	// analytics
 	fetchInstanceMetaPromise.then(async () => {
@@ -273,7 +271,7 @@ export async function common(createVue: () => Promise<App<Element>>) {
 		});
 	});
 
-	const app = await createVue();
+	const [app] = await Promise.all([createVue(), customEmojisReady]);
 
 	if (_DEV_) {
 		app.config.performance = true;

@@ -34,6 +34,22 @@ export type PaginatorCompatibleEndpoints = {
 
 export type ExtractorFunction<P extends IPaginator, T> = (item: UnwrapRef<P['items']>[number]) => T;
 
+type FetchNewerOptions = {
+	// 閲覧位置がリクエスト中に変わる場合は、レスポンス受信時に評価する
+	toQueue?: boolean | (() => boolean);
+	// タイムライン先頭の自動更新でのみ有効にする。通常のページングでは切り詰めない
+	trim?: boolean;
+};
+
+function getNewItems<T extends MisskeyEntity>(items: T[], existingItems: readonly Pick<MisskeyEntity, 'id'>[]): T[] {
+	const ids = new Set(existingItems.map(item => item.id));
+	return items.filter(item => {
+		if (ids.has(item.id)) return false;
+		ids.add(item.id);
+		return true;
+	});
+}
+
 export interface IPaginator<T = unknown, _T = T & MisskeyEntity> {
 	/**
 	 * 外部から直接操作しないでください
@@ -58,7 +74,7 @@ export interface IPaginator<T = unknown, _T = T & MisskeyEntity> {
 	init(): Promise<void>;
 	reload(): Promise<void>;
 	fetchOlder(): Promise<void>;
-	fetchNewer(options?: { toQueue?: boolean }): Promise<void>;
+	fetchNewer(options?: FetchNewerOptions): Promise<void>;
 	trim(trigger?: boolean): void;
 	unshiftItems(newItems: (_T)[]): void;
 	pushItems(oldItems: (_T)[]): void;
@@ -107,6 +123,9 @@ export class Paginator<
 	private canFetchDetection: 'safe' | 'limit' | null = null;
 	private aheadQueue: T[] = [];
 	private useShallowRef: SRef;
+	private requestGeneration = 0;
+	private requestController = new AbortController();
+	private fetchNewerPromise: Promise<void> | null = null;
 
 	// 配列内の要素をどのような順序で並べるか
 	// newest: 新しいものが先頭 (default)
@@ -191,9 +210,17 @@ export class Paginator<
 	}
 
 	public async init(): Promise<void> {
+		const generation = ++this.requestGeneration;
+		this.requestController.abort();
+		this.requestController = new AbortController();
 		this.items.value = [];
 		this.aheadQueue = [];
 		this.queuedAheadItemsCount.value = 0;
+		this.fetchNewerPromise = null;
+		this.fetchingOlder.value = false;
+		this.fetchingNewer.value = false;
+		this.canFetchOlder.value = false;
+		this.canFetchNewer.value = false;
 		this.fetching.value = true;
 
 		const data: E['req'] = {
@@ -213,13 +240,13 @@ export class Paginator<
 			} : {}),
 		};
 
-		const apiRes = (await misskeyApi(this.endpoint, data).catch(_ => {
-			this.error.value = true;
-			this.fetching.value = false;
-			return null;
-		})) as T[] | null;
+		const apiRes = (await misskeyApi(this.endpoint, data, undefined, this.requestController.signal).catch(() => null)) as T[] | null;
+
+		if (generation !== this.requestGeneration) return;
 
 		if (apiRes == null) {
+			this.error.value = true;
+			this.fetching.value = false;
 			return;
 		}
 
@@ -259,6 +286,7 @@ export class Paginator<
 
 	public async fetchOlder(): Promise<void> {
 		if (!this.canFetchOlder.value || this.fetching.value || this.fetchingOlder.value || this.items.value.length === 0) return;
+		const generation = this.requestGeneration;
 		this.fetchingOlder.value = true;
 
 		const data: E['req'] = {
@@ -273,9 +301,11 @@ export class Paginator<
 			}),
 		};
 
-		const apiRes = (await misskeyApi<T[]>(this.endpoint, data).catch(_ => {
+		const apiRes = (await misskeyApi<T[]>(this.endpoint, data, undefined, this.requestController.signal).catch(_ => {
 			return null;
 		})) as T[] | null;
+
+		if (generation !== this.requestGeneration) return;
 
 		this.fetchingOlder.value = false;
 
@@ -309,11 +339,21 @@ export class Paginator<
 		}
 	}
 
-	public async fetchNewer(options: {
-		toQueue?: boolean;
-	} = {}): Promise<void> {
-		this.fetchingNewer.value = true;
+	public fetchNewer(options: FetchNewerOptions = {}): Promise<void> {
+		if (this.fetching.value) return Promise.resolve();
+		if (this.fetchNewerPromise != null) return this.fetchNewerPromise;
 
+		const generation = this.requestGeneration;
+		this.fetchingNewer.value = true;
+		this.fetchNewerPromise = this.fetchNewerPage(options, generation).finally(() => {
+			if (generation !== this.requestGeneration) return;
+			this.fetchNewerPromise = null;
+			this.fetchingNewer.value = false;
+		});
+		return this.fetchNewerPromise;
+	}
+
+	private async fetchNewerPage(options: FetchNewerOptions, generation: number): Promise<void> {
 		const data: E['req'] = {
 			...(typeof this.params === 'function' ? this.params() : this.params),
 			...(this.computedParams ? this.computedParams.value : {}),
@@ -326,11 +366,11 @@ export class Paginator<
 			}),
 		};
 
-		const apiRes = (await misskeyApi<T[]>(this.endpoint, data).catch(_ => {
+		const apiRes = (await misskeyApi<T[]>(this.endpoint, data, undefined, this.requestController.signal).catch(_ => {
 			return null;
 		})) as T[] | null;
 
-		this.fetchingNewer.value = false;
+		if (generation !== this.requestGeneration) return;
 
 		if (apiRes == null || apiRes.length === 0) {
 			this.canFetchNewer.value = false;
@@ -338,17 +378,13 @@ export class Paginator<
 			return;
 		}
 
-		if (options.toQueue) {
-			this.aheadQueue.unshift(...apiRes.toReversed());
-			if (this.aheadQueue.length > MAX_QUEUE_ITEMS) {
-				this.aheadQueue = this.aheadQueue.slice(0, MAX_QUEUE_ITEMS);
-			}
-			this.queuedAheadItemsCount.value = this.aheadQueue.length;
+		if (typeof options.toQueue === 'function' ? options.toQueue() : options.toQueue) {
+			this.enqueueItems(apiRes.toReversed());
 		} else {
 			if (this.order.value === 'oldest') {
 				this.pushItems(apiRes);
 			} else {
-				this.unshiftItems(apiRes.toReversed(), false);
+				this.unshiftItems(apiRes.toReversed(), options.trim ?? false);
 			}
 		}
 
@@ -370,15 +406,17 @@ export class Paginator<
 	}
 
 	public unshiftItems(newItems: T[], trim = true): void {
-		if (newItems.length === 0) return; // これやらないと余計なre-renderが走る
-		this.items.value.unshift(...newItems.filter(x => !this.items.value.some(y => y.id === x.id))); // ストリーミングやポーリングのタイミングによっては重複することがあるため
+		const uniqueItems = getNewItems(newItems, this.items.value);
+		if (uniqueItems.length === 0) return; // これやらないと余計なre-renderが走る
+		this.items.value.unshift(...uniqueItems);
 		if (trim) this.trim(true);
 		if (this.useShallowRef) triggerRef(this.items);
 	}
 
 	public pushItems(oldItems: T[]): void {
-		if (oldItems.length === 0) return; // これやらないと余計なre-renderが走る
-		this.items.value.push(...oldItems);
+		const uniqueItems = getNewItems(oldItems, this.items.value);
+		if (uniqueItems.length === 0) return; // これやらないと余計なre-renderが走る
+		this.items.value.push(...uniqueItems);
 		if (this.useShallowRef) triggerRef(this.items);
 	}
 
@@ -390,10 +428,13 @@ export class Paginator<
 	}
 
 	public enqueue(item: T): void {
-		this.aheadQueue.unshift(item);
-		if (this.aheadQueue.length > MAX_QUEUE_ITEMS) {
-			this.aheadQueue.pop();
-		}
+		this.enqueueItems([item]);
+	}
+
+	private enqueueItems(items: T[]): void {
+		const uniqueItems = getNewItems(items, [...this.items.value, ...this.aheadQueue]);
+		if (uniqueItems.length === 0) return;
+		this.aheadQueue = [...uniqueItems, ...this.aheadQueue].slice(0, MAX_QUEUE_ITEMS);
 		this.queuedAheadItemsCount.value = this.aheadQueue.length;
 	}
 

@@ -7,7 +7,7 @@ import * as Misskey from 'misskey-js';
 import { readAndCompressImage } from '@misskey-dev/browser-image-resizer';
 import isAnimated from 'is-file-animated';
 import { EventEmitter } from 'eventemitter3';
-import { computed, markRaw, onMounted, onUnmounted, ref, triggerRef } from 'vue';
+import { computed, markRaw, onUnmounted, ref, triggerRef } from 'vue';
 import type { MenuItem } from '@/types/menu.js';
 import type { WatermarkLayers, WatermarkPreset } from '@/utility/watermark/WatermarkRenderer.js';
 import type { ImageFrameParams, ImageFramePreset } from '@/utility/image-frame-renderer/ImageFrameRenderer.js';
@@ -185,8 +185,11 @@ export function useUploader(options: {
 	}
 
 	function removeItem(item: UploaderItem) {
+		const index = items.value.indexOf(item);
+		if (index === -1) return;
+		item.abortPreprocess?.();
 		revokeItemObjectUrls(item);
-		items.value.splice(items.value.indexOf(item), 1);
+		items.value.splice(index, 1);
 	}
 
 	function getMenu(item: UploaderItem): MenuItem[] {
@@ -284,6 +287,7 @@ export function useUploader(options: {
 					text: i18n.ts.cropImage,
 					action: async () => {
 						const cropped = await os.cropImageFile(item.file, { aspectRatio: null });
+						if (!items.value.includes(item)) return;
 						const newObjectUrl = createItemObjectUrl(item, cropped);
 						items.value.splice(items.value.indexOf(item), 1, {
 							...item,
@@ -310,6 +314,7 @@ export function useUploader(options: {
 							image: item.file,
 						}, {
 							ok: (file) => {
+								if (!items.value.includes(item)) return;
 									const newObjectUrl = createItemObjectUrl(item, file);
 								items.value.splice(items.value.indexOf(item), 1, {
 									...item,
@@ -632,180 +637,225 @@ export function useUploader(options: {
 	}
 
 	async function preprocess(item: UploaderItem): Promise<void> {
+		if (!items.value.includes(item)) return;
+		item.abortPreprocess?.();
+
+		const controller = new AbortController();
+		const { signal } = controller;
+		const abort = () => {
+			controller.abort();
+			if (item.abortPreprocess === abort) {
+				item.abortPreprocess = null;
+				item.preprocessing = false;
+				item.preprocessProgress = null;
+			}
+		};
+		item.abortPreprocess = abort;
 		item.preprocessing = true;
 		item.preprocessProgress = null;
 
-		if (IMAGE_PREPROCESS_NEEDED_TYPES.includes(item.file.type)) {
-			try {
-				await preprocessForImage(item);
-			} catch (err) {
-				console.error('Failed to preprocess image', err);
+		// Each run owns its result until it is still current and ready to commit.
+		const processingItem = { ...item };
+		try {
+			if (IMAGE_PREPROCESS_NEEDED_TYPES.includes(processingItem.file.type)) {
+				await preprocessForImage(processingItem, signal);
+			} else if (VIDEO_PREPROCESS_NEEDED_TYPES.includes(processingItem.file.type)) {
+				await preprocessForVideo(processingItem, signal, progress => {
+					if (!signal.aborted) item.preprocessProgress = progress;
+				});
+			}
 
-			// nop
+			if (signal.aborted || !items.value.includes(item)) return;
+			if (processingItem.preprocessedFile != null) {
+				updateItemObjectUrls(item, processingItem.preprocessedFile);
+				item.preprocessedFile = markRaw(processingItem.preprocessedFile);
+				item.compressedSize = processingItem.compressedSize;
+				item.suffix = processingItem.suffix;
+			}
+		} catch (err) {
+			if (!signal.aborted) console.error('Failed to preprocess file', err);
+		} finally {
+			if (item.abortPreprocess === abort) {
+				item.abortPreprocess = null;
+				item.preprocessing = false;
+				item.preprocessProgress = null;
 			}
 		}
-
-		if (VIDEO_PREPROCESS_NEEDED_TYPES.includes(item.file.type)) {
-			try {
-				await preprocessForVideo(item);
-			} catch (err) {
-				console.error('Failed to preprocess video', err);
-
-				// nop
-			}
-		}
-
-		item.preprocessing = false;
-		item.preprocessProgress = null;
 	}
 
-	async function preprocessForImage(item: UploaderItem): Promise<void> {
-		const imageBitmap = await window.createImageBitmap(item.file);
-
-		let preprocessedFile: Blob | File = item.file;
-
-		const needsWatermark = item.watermarkLayers != null && IMAGE_EDITING_SUPPORTED_TYPES.includes(preprocessedFile.type) && $i.policies.watermarkAvailable;
-		if (needsWatermark && item.watermarkLayers != null) {
-			const canvas = window.document.createElement('canvas');
-			const WatermarkRenderer = await import('@/utility/watermark/WatermarkRenderer.js').then(x => x.WatermarkRenderer);
-			const renderer = new WatermarkRenderer({
-				canvas: canvas,
-				renderWidth: imageBitmap.width,
-				renderHeight: imageBitmap.height,
-				image: imageBitmap,
-			});
-
-			await renderer.render(item.watermarkLayers);
-
-			preprocessedFile = await new Promise<Blob>((resolve) => {
-				canvas.toBlob((blob) => {
-					if (blob == null) {
-						throw new Error('Failed to convert canvas to blob');
-					}
+	function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob> {
+		return new Promise((resolve, reject) => {
+			canvas.toBlob(blob => {
+				if (blob == null) {
+					reject(new Error('Failed to convert canvas to blob'));
+				} else {
 					resolve(blob);
-					renderer.destroy();
-				}, 'image/png');
-			});
-		}
-
-		const needsImageFrame = item.imageFrameParams != null && IMAGE_EDITING_SUPPORTED_TYPES.includes(preprocessedFile.type);
-		if (needsImageFrame && item.imageFrameParams != null) {
-			const canvas = window.document.createElement('canvas');
-			const ExifReader = await import('exifreader');
-			const exif = await ExifReader.load(await item.file.arrayBuffer());
-			const ImageFrameRenderer = await import('@/utility/image-frame-renderer/ImageFrameRenderer.js').then(x => x.ImageFrameRenderer);
-			const frameRenderer = new ImageFrameRenderer({
-				canvas: canvas,
-				image: await window.createImageBitmap(preprocessedFile),
-				exif,
-				caption: item.caption ?? null,
-				filename: item.name,
-			});
-
-			await frameRenderer.render(item.imageFrameParams);
-
-			preprocessedFile = await new Promise<Blob>((resolve) => {
-				canvas.toBlob((blob) => {
-					if (blob == null) {
-						throw new Error('Failed to convert canvas to blob');
-					}
-					resolve(blob);
-					frameRenderer.destroy();
-				}, 'image/png');
-			});
-		}
-
-		const compressionSettings = getCompressionSettings(item.compressionLevel);
-		const needsCompress = item.compressionLevel !== 0 && compressionSettings && IMAGE_EDITING_SUPPORTED_TYPES.includes(preprocessedFile.type) && !(await isAnimated(preprocessedFile));
-
-		if (needsCompress) {
-			const config = {
-				mimeType: (isWebpSupported() ? 'image/webp' : 'image/jpeg') as 'image/webp' | 'image/jpeg',
-				maxWidth: compressionSettings.maxWidth,
-				maxHeight: compressionSettings.maxHeight,
-				quality: isWebpSupported() ? 0.85 : 0.8,
-			};
-
-			try {
-				const result = await readAndCompressImage(preprocessedFile, config);
-				if (result.size < preprocessedFile.size || preprocessedFile.type === 'image/webp') {
-					// The compression may not always reduce the file size
-					// (and WebP is not browser safe yet)
-					preprocessedFile = result;
-					item.compressedSize = result.size;
-					item.suffix = '.' + mimeTypeMap[config.mimeType];
 				}
-			} catch (err) {
-				console.error('Failed to resize image', err);
-			}
-		} else {
-			item.compressedSize = null;
-			item.suffix = '';
-		}
-
-		imageBitmap.close();
-
-		updateItemObjectUrls(item, preprocessedFile);
-		item.preprocessedFile = markRaw(preprocessedFile);
+			}, 'image/png');
+		});
 	}
 
-	async function preprocessForVideo(item: UploaderItem): Promise<void> {
+	async function preprocessForImage(item: UploaderItem, signal: AbortSignal): Promise<void> {
+		const imageBitmap = await window.createImageBitmap(item.file);
+		try {
+			signal.throwIfAborted();
+			let preprocessedFile: Blob | File = item.file;
+
+			const needsWatermark = item.watermarkLayers != null && IMAGE_EDITING_SUPPORTED_TYPES.includes(preprocessedFile.type) && $i.policies.watermarkAvailable;
+			if (needsWatermark && item.watermarkLayers != null) {
+				const canvas = window.document.createElement('canvas');
+				const WatermarkRenderer = await import('@/utility/watermark/WatermarkRenderer.js').then(x => x.WatermarkRenderer);
+				signal.throwIfAborted();
+				const renderer = new WatermarkRenderer({
+					canvas: canvas,
+					renderWidth: imageBitmap.width,
+					renderHeight: imageBitmap.height,
+					image: imageBitmap,
+				});
+
+				try {
+					await renderer.render(item.watermarkLayers);
+					signal.throwIfAborted();
+					preprocessedFile = await canvasToBlob(canvas);
+				} finally {
+					renderer.destroy();
+				}
+			}
+
+			signal.throwIfAborted();
+			const needsImageFrame = item.imageFrameParams != null && IMAGE_EDITING_SUPPORTED_TYPES.includes(preprocessedFile.type);
+			if (needsImageFrame && item.imageFrameParams != null) {
+				const canvas = window.document.createElement('canvas');
+				const ExifReader = await import('exifreader');
+				signal.throwIfAborted();
+				const exif = await ExifReader.load(await item.file.arrayBuffer());
+				signal.throwIfAborted();
+				const ImageFrameRenderer = await import('@/utility/image-frame-renderer/ImageFrameRenderer.js').then(x => x.ImageFrameRenderer);
+				signal.throwIfAborted();
+				const frameBitmap = await window.createImageBitmap(preprocessedFile);
+				try {
+					signal.throwIfAborted();
+					const frameRenderer = new ImageFrameRenderer({
+						canvas: canvas,
+						image: frameBitmap,
+						exif,
+						caption: item.caption ?? null,
+						filename: item.name,
+					});
+
+					try {
+						await frameRenderer.render(item.imageFrameParams);
+						signal.throwIfAborted();
+						preprocessedFile = await canvasToBlob(canvas);
+					} finally {
+						frameRenderer.destroy();
+					}
+				} finally {
+					frameBitmap.close();
+				}
+			}
+
+			signal.throwIfAborted();
+			const compressionSettings = getCompressionSettings(item.compressionLevel);
+			const needsCompress = item.compressionLevel !== 0 && compressionSettings && IMAGE_EDITING_SUPPORTED_TYPES.includes(preprocessedFile.type) && !(await isAnimated(preprocessedFile));
+			signal.throwIfAborted();
+
+			if (needsCompress) {
+				const config = {
+					mimeType: (isWebpSupported() ? 'image/webp' : 'image/jpeg') as 'image/webp' | 'image/jpeg',
+					maxWidth: compressionSettings.maxWidth,
+					maxHeight: compressionSettings.maxHeight,
+					quality: isWebpSupported() ? 0.85 : 0.8,
+				};
+
+				try {
+					const result = await readAndCompressImage(preprocessedFile, config);
+					signal.throwIfAborted();
+					if (result.size < preprocessedFile.size || preprocessedFile.type === 'image/webp') {
+						// The compression may not always reduce the file size
+						// (and WebP is not browser safe yet)
+						preprocessedFile = result;
+						item.compressedSize = result.size;
+						item.suffix = '.' + mimeTypeMap[config.mimeType];
+					}
+				} catch (err) {
+					if (signal.aborted) throw err;
+					console.error('Failed to resize image', err);
+				}
+			} else {
+				item.compressedSize = null;
+				item.suffix = '';
+			}
+
+			item.preprocessedFile = preprocessedFile;
+		} finally {
+			imageBitmap.close();
+		}
+	}
+
+	async function preprocessForVideo(item: UploaderItem, signal: AbortSignal, onProgress: (progress: number) => void): Promise<void> {
 		let preprocessedFile: Blob | File = item.file;
 
 		const needsCompress = item.compressionLevel !== 0 && VIDEO_COMPRESSION_SUPPORTED_TYPES.includes(preprocessedFile.type);
 
 		if (needsCompress) {
 			const mediabunny = await import('mediabunny');
-
+			signal.throwIfAborted();
 			const source = new mediabunny.BlobSource(preprocessedFile);
-
 			const input = new mediabunny.Input({
 				source,
 				formats: mediabunny.ALL_FORMATS,
 			});
 
-			const output = new mediabunny.Output({
-				target: new mediabunny.BufferTarget(),
-				format: new mediabunny.Mp4OutputFormat(),
-			});
+			try {
+				const output = new mediabunny.Output({
+					target: new mediabunny.BufferTarget(),
+					format: new mediabunny.Mp4OutputFormat(),
+				});
 
-			const currentConversion = await mediabunny.Conversion.init({
-				input,
-				output,
-				video: {
-					//width: 320, // Height will be deduced automatically to retain aspect ratio
-					bitrate: item.compressionLevel === 1 ? mediabunny.QUALITY_VERY_HIGH : item.compressionLevel === 2 ? mediabunny.QUALITY_MEDIUM : mediabunny.QUALITY_VERY_LOW,
-				},
-				audio: {
-					// Explicitly keep audio (don't discard) and copy it if possible
-					// without re-encoding to avoid WebCodecs limitations on iOS Safari
-					discard: false,
-				},
-			});
+				const currentConversion = await mediabunny.Conversion.init({
+					input,
+					output,
+					video: {
+						//width: 320, // Height will be deduced automatically to retain aspect ratio
+						bitrate: item.compressionLevel === 1 ? mediabunny.QUALITY_VERY_HIGH : item.compressionLevel === 2 ? mediabunny.QUALITY_MEDIUM : mediabunny.QUALITY_VERY_LOW,
+					},
+					audio: {
+						// Explicitly keep audio (don't discard) and copy it if possible
+						// without re-encoding to avoid WebCodecs limitations on iOS Safari
+						discard: false,
+					},
+				});
 
-			currentConversion.onProgress = newProgress => item.preprocessProgress = newProgress;
+				const cancellation: { promise: Promise<void> | null } = { promise: null };
+				const cancel = () => {
+					cancellation.promise ??= currentConversion.cancel();
+					void cancellation.promise.catch(() => {});
+				};
+				signal.addEventListener('abort', cancel, { once: true });
+				try {
+					if (signal.aborted) cancel();
+					signal.throwIfAborted();
+					currentConversion.onProgress = onProgress;
+					await currentConversion.execute();
+					signal.throwIfAborted();
 
-			item.abortPreprocess = () => {
-				item.abortPreprocess = null;
-				currentConversion.cancel();
-				item.preprocessing = false;
-				item.preprocessProgress = null;
-			};
-
-			await currentConversion.execute();
-
-			item.abortPreprocess = null;
-
-			preprocessedFile = new Blob([output.target.buffer!], { type: output.format.mimeType });
-			item.compressedSize = output.target.buffer!.byteLength;
-			item.suffix = '.mp4';
+					preprocessedFile = new Blob([output.target.buffer!], { type: output.format.mimeType });
+					item.compressedSize = output.target.buffer!.byteLength;
+					item.suffix = '.mp4';
+				} finally {
+					signal.removeEventListener('abort', cancel);
+					await cancellation.promise?.catch(() => {});
+				}
+			} finally {
+				input.dispose();
+			}
 		} else {
 			item.compressedSize = null;
 			item.suffix = '';
 		}
 
-		updateItemObjectUrls(item, preprocessedFile);
-		item.preprocessedFile = markRaw(preprocessedFile);
+		item.preprocessedFile = preprocessedFile;
 	}
 
 	function reset() {
@@ -840,4 +890,3 @@ export function useUploader(options: {
 		events,
 	};
 }
-

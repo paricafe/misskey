@@ -253,7 +253,8 @@ if (!store.s.realtimeMode) {
 	// TODO: 先頭のノートの作成日時が1日以上前であれば流速が遅いTLと見做してインターバルを通常より延ばす
 	useInterval(async () => {
 		paginator.fetchNewer({
-			toQueue: !isTop() || isPausingUpdate,
+			toQueue: () => !isTop() || isPausingUpdate,
+			trim: true,
 		});
 	}, POLLING_INTERVAL, {
 		immediate: false,
@@ -262,7 +263,8 @@ if (!store.s.realtimeMode) {
 
 	useGlobalEvent('notePosted', (note) => {
 		paginator.fetchNewer({
-			toQueue: !isTop() || isPausingUpdate,
+			toQueue: () => !isTop() || isPausingUpdate,
+			trim: true,
 		});
 	});
 }
