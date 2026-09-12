@@ -20,6 +20,7 @@ import { initExtraThreadPool, jobQueue, server } from './common.js';
 import { installShutdownSignalHandlers, isShutdownInProgress } from './shutdown-handler.js';
 import { shutdownApplications } from './application-lifecycle.js';
 import { forceStopClusterWorkers, shutdownClusterWorkers } from './cluster-shutdown.js';
+import { superviseWorker } from './worker-supervisor.js';
 import { prepareUnixSocket } from './unix-socket.js';
 
 const logger = new Logger('core', 'cyan');
@@ -208,15 +209,13 @@ async function spawnWorkers(limit = 1) {
 }
 
 function spawnWorker(): Promise<void> {
-	return new Promise(res => {
-		const worker = cluster.fork();
-		worker.on('message', message => {
-			if (message === 'listenFailed') {
-				bootLogger.error('The server Listen failed due to the previous error.');
-				process.exit(1);
-			}
-			if (message !== 'ready') return;
-			res();
-		});
+	return superviseWorker({
+		fork: () => cluster.fork(),
+		isStopping: isShutdownInProgress,
+		onRestart: (workerId, delayMs) => bootLogger.error(`Worker ${workerId} exited; restarting in ${delayMs}ms.`),
+		onFatal: error => {
+			bootLogger.error(error);
+			process.exit(1);
+		},
 	});
 }
