@@ -173,6 +173,7 @@ export class QueueProcessorService implements OnApplicationShutdown {
 					case 'cleanCharts': return this.cleanChartsProcessorService.process();
 					case 'aggregateRetention': return this.aggregateRetentionProcessorService.process();
 					case 'checkExpiredMutings': return this.checkExpiredMutingsProcessorService.process();
+					case 'recoverScheduledNotes': return this.postScheduledNoteProcessorService.recover();
 					case 'bakeBufferedReactions': return this.bakeBufferedReactionsProcessorService.process();
 					case 'checkModeratorsActivity': return this.checkModeratorsActivityProcessorService.process();
 					case 'clean': return this.cleanProcessorService.process();

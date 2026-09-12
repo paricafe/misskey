@@ -14,6 +14,7 @@ import { extractCustomEmojisFromMfm } from '@/misc/extract-custom-emojis-from-mf
 import { extractHashtags } from '@/misc/extract-hashtags.js';
 import type { IMentionedRemoteUsers } from '@/models/Note.js';
 import { MiNote } from '@/models/Note.js';
+import { MiNoteDraft } from '@/models/NoteDraft.js';
 import type { BlockingsRepository, ChannelFollowingsRepository, ChannelsRepository, DriveFilesRepository, FollowingsRepository, InstancesRepository, MiFollowing, MiMeta, MutingsRepository, NotesRepository, NoteThreadMutingsRepository, UserListMembershipsRepository, UserProfilesRepository, UsersRepository } from '@/models/_.js';
 import type { MiDriveFile } from '@/models/DriveFile.js';
 import type { MiApp } from '@/models/App.js';
@@ -171,6 +172,8 @@ type MinimumUser = {
 };
 
 type Option = {
+	// Internal only: consume this draft in the same transaction that inserts the note.
+	scheduledDraft?: { id: string; revision: number };
 	createdAt?: Date | null;
 	name?: string | null;
 	text?: string | null;
@@ -192,6 +195,8 @@ type Option = {
 	url?: string | null;
 	app?: MiApp | null;
 };
+
+export class ScheduledNoteNotReadyError extends Error {}
 
 @Injectable()
 export class NoteCreateService implements OnApplicationShutdown {
@@ -284,6 +289,7 @@ export class NoteCreateService implements OnApplicationShutdown {
 		isBot: MiUser['isBot'];
 		isCat: MiUser['isCat'];
 	}, data: {
+		scheduledDraft?: Option['scheduledDraft'];
 		createdAt: Date;
 		replyId: MiNote['id'] | null;
 		renoteId: MiNote['id'] | null;
@@ -423,6 +429,7 @@ export class NoteCreateService implements OnApplicationShutdown {
 		}
 
 		return this.create(user, {
+			scheduledDraft: data.scheduledDraft,
 			createdAt: data.createdAt,
 			files: files,
 			poll: data.poll,
@@ -716,24 +723,40 @@ export class NoteCreateService implements OnApplicationShutdown {
 
 		// 投稿を作成
 		try {
-			if (insert.hasPoll) {
+			if (insert.hasPoll || data.scheduledDraft) {
 				// Start transaction
 				await this.db.transaction(async transactionalEntityManager => {
+					if (data.scheduledDraft) {
+						const draft = await transactionalEntityManager.findOne(MiNoteDraft, {
+							where: { id: data.scheduledDraft.id, userId: user.id },
+							lock: { mode: 'pessimistic_write' },
+						});
+						if (!draft?.isActuallyScheduled || draft.scheduleRevision !== data.scheduledDraft.revision ||
+							draft.scheduledAt == null || draft.scheduledAt.getTime() > Date.now()) {
+							throw new ScheduledNoteNotReadyError('The scheduled draft changed or is not due');
+						}
+					}
+
 					await transactionalEntityManager.insert(MiNote, insert);
 
-					const poll = new MiPoll({
-						noteId: insert.id,
-						choices: data.poll!.choices,
-						expiresAt: data.poll!.expiresAt,
-						multiple: data.poll!.multiple,
-						votes: new Array(data.poll!.choices.length).fill(0),
-						noteVisibility: insert.visibility,
-						userId: user.id,
-						userHost: user.host,
-						channelId: insert.channelId,
-					});
+					if (insert.hasPoll) {
+						const poll = new MiPoll({
+							noteId: insert.id,
+							choices: data.poll!.choices,
+							expiresAt: data.poll!.expiresAt,
+							multiple: data.poll!.multiple,
+							votes: new Array(data.poll!.choices.length).fill(0),
+							noteVisibility: insert.visibility,
+							userId: user.id,
+							userHost: user.host,
+							channelId: insert.channelId,
+						});
 
-					await transactionalEntityManager.insert(MiPoll, poll);
+						await transactionalEntityManager.insert(MiPoll, poll);
+					}
+					if (data.scheduledDraft) {
+						await transactionalEntityManager.delete(MiNoteDraft, { id: data.scheduledDraft.id });
+					}
 				});
 			} else {
 				await this.notesRepository.insert(insert);
@@ -745,6 +768,7 @@ export class NoteCreateService implements OnApplicationShutdown {
 				renote: data.renote ?? null,
 			};
 		} catch (e) {
+			if (e instanceof ScheduledNoteNotReadyError) throw e;
 			// duplicate key error
 			if (isDuplicateKeyValueError(e)) {
 				const err = new Error('Duplicated note');

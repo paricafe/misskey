@@ -14,6 +14,7 @@ import type { MiDriveFile } from './DriveFile.js';
 @Entity('note_draft')
 @Index('IDX_NOTE_DRAFT_FILE_IDS', { synchronize: false }) // GIN for fileIds in production
 @Index('IDX_NOTE_DRAFT_VISIBLE_USER_IDS', { synchronize: false }) // GIN for visibleUserIds in production
+@Index('IDX_NOTE_DRAFT_SCHEDULED', ['scheduledAt', 'id'], { where: '"isActuallyScheduled" = true' })
 export class MiNoteDraft {
 	@PrimaryColumn(id())
 	public id: string;
@@ -165,4 +166,7 @@ export class MiNoteDraft {
 		default: false,
 	})
 	public isActuallyScheduled: boolean;
+
+	@Column('integer', { default: 0 })
+	public scheduleRevision: number;
 }

@@ -9,7 +9,9 @@ import type { NoteDraftsRepository } from '@/models/_.js';
 import type Logger from '@/logger.js';
 import { NotificationService } from '@/core/NotificationService.js';
 import { bindThis } from '@/decorators.js';
-import { NoteCreateService } from '@/core/NoteCreateService.js';
+import { NoteCreateService, ScheduledNoteNotReadyError } from '@/core/NoteCreateService.js';
+import { NoteDraftService } from '@/core/NoteDraftService.js';
+import { IdentifiableError } from '@/misc/identifiable-error.js';
 import { QueueLoggerService } from '../QueueLoggerService.js';
 import type * as Bull from 'bullmq';
 import type { PostScheduledNoteJobData } from '../types.js';
@@ -25,8 +27,14 @@ export class PostScheduledNoteProcessorService {
 		private noteCreateService: NoteCreateService,
 		private notificationService: NotificationService,
 		private queueLoggerService: QueueLoggerService,
+		private noteDraftService: NoteDraftService,
 	) {
 		this.logger = this.queueLoggerService.logger.createSubLogger('post-scheduled-note');
+	}
+
+	@bindThis
+	public async recover(): Promise<void> {
+		await this.noteDraftService.recoverSchedules();
 	}
 
 	@bindThis
@@ -35,12 +43,16 @@ export class PostScheduledNoteProcessorService {
 			where: { id: job.data.noteDraftId },
 			relations: { user: true },
 		});
-		if (draft == null || draft.user == null || draft.scheduledAt == null || !draft.isActuallyScheduled) {
+		const revision = job.data.scheduleRevision ?? 0;
+		if (draft == null || draft.user == null || draft.scheduledAt == null || !draft.isActuallyScheduled ||
+			draft.scheduleRevision !== revision || draft.scheduledAt.getTime() > Date.now()) {
 			return;
 		}
 
+		let noteId: string;
 		try {
 			const note = await this.noteCreateService.fetchAndCreate(draft.user, {
+				scheduledDraft: { id: draft.id, revision },
 				createdAt: new Date(),
 				fileIds: draft.fileIds,
 				poll: draft.hasPoll ? {
@@ -59,17 +71,27 @@ export class PostScheduledNoteProcessorService {
 				channelId: draft.channelId,
 			});
 
-			// await不要
-			this.noteDraftsRepository.remove(draft);
-
-			// await不要
-			this.notificationService.createNotification(draft.userId, 'scheduledNotePosted', {
-				noteId: note.id,
-			});
-		} catch (_) {
-			this.notificationService.createNotification(draft.userId, 'scheduledNotePostFailed', {
-				noteDraftId: draft.id,
-			});
+			noteId = note.id;
+		} catch (error) {
+			if (error instanceof ScheduledNoteNotReadyError) return;
+			// Infrastructure failures must remain retryable. Invalid content is kept
+			// as an ordinary draft so the recovery scanner cannot retry it forever.
+			if (!(error instanceof IdentifiableError)) throw error;
+			const result = await this.noteDraftsRepository.update({
+				id: draft.id,
+				scheduleRevision: revision,
+				isActuallyScheduled: true,
+			}, { isActuallyScheduled: false });
+			if (result.affected) {
+				await this.notificationService.createNotification(draft.userId, 'scheduledNotePostFailed', {
+					noteDraftId: draft.id,
+				});
+			}
+			return;
 		}
+
+		// Note insertion and draft deletion have committed together. A notification
+		// failure cannot turn a successfully published note into a failed draft.
+		await this.notificationService.createNotification(draft.userId, 'scheduledNotePosted', { noteId });
 	}
 }

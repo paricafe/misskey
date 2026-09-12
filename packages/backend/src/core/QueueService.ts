@@ -4,7 +4,7 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { MetricsTime, type JobType } from 'bullmq';
 import type { IActivity } from '@/core/activitypub/type.js';
 import type { MiDriveFile } from '@/models/DriveFile.js';
@@ -74,6 +74,9 @@ const REPEATABLE_SYSTEM_JOB_DEF = [{
 	name: 'checkExpiredMutings',
 	pattern: '*/5 * * * *',
 }, {
+	name: 'recoverScheduledNotes',
+	pattern: '* * * * *',
+}, {
 	name: 'bakeBufferedReactions',
 	pattern: '0 0 * * *',
 }, {
@@ -100,7 +103,7 @@ function parseRedisInfo(infoText: string): Record<string, string> {
 }
 
 @Injectable()
-export class QueueService {
+export class QueueService implements OnModuleInit {
 	constructor(
 		@Inject(DI.config)
 		private config: Config,
@@ -117,6 +120,7 @@ export class QueueService {
 		@Inject('queue:systemWebhookDeliver') public systemWebhookDeliverQueue: SystemWebhookDeliverQueue,
 	) {
 		for (const def of REPEATABLE_SYSTEM_JOB_DEF) {
+			if (def.name === 'recoverScheduledNotes') continue;
 			this.systemQueue.upsertJobScheduler(def.name, {
 				pattern: def.pattern,
 				immediately: false,
@@ -141,6 +145,23 @@ export class QueueService {
 					this.systemQueue.removeJobScheduler(scheduler.key);
 				}
 			}
+		});
+	}
+
+	public async onModuleInit(): Promise<void> {
+		// Startup must not succeed without the recovery scheduler: PostgreSQL may
+		// already contain accepted schedules whose original Redis enqueue failed.
+		await this.systemQueue.upsertJobScheduler('recoverScheduledNotes', {
+			pattern: '* * * * *',
+			immediately: true,
+		}, {
+			name: 'recoverScheduledNotes',
+			opts: {
+				attempts: 5,
+				backoff: { type: 'exponential', delay: 1000 },
+				removeOnComplete: { age: 3600 * 24 * 7 },
+				removeOnFail: { age: 3600 * 24 * 7 },
+			},
 		});
 	}
 
