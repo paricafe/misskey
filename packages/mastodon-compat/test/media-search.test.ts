@@ -48,6 +48,9 @@ async function fixture(t: TestContext, handler: (endpoint: string, body: Json, r
 		if (endpoint === 'users/show' && body.userId === alice.id) {
 			return { status: 200, body: JSON.stringify({ ...alice, pinnedNoteIds: [], pinnedNotes: [] }) };
 		}
+		if (endpoint === 'users/show' && Array.isArray(body.userIds)) {
+			return { status: 200, body: JSON.stringify(body.userIds.includes(alice.id) ? [{ ...alice, pinnedNoteIds: [], pinnedNotes: [] }] : []) };
+		}
 		calls.push({ endpoint, body, request });
 		const result = await handler(endpoint, body, request);
 		return result === undefined ? { status: 204, body: '' } : { status: 200, body: JSON.stringify(result) };

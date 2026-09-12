@@ -152,7 +152,7 @@ function keywordMatches(keyword: FilterKeyword, text: string): boolean {
 }
 
 /** Mastodon v2 delegates hide/warn/blur presentation to clients through FilterResult metadata. */
-export async function applyFilters(store: CompatStore, userId: string, status: Json, context?: FilterContext, now = Date.now()): Promise<Json> {
+export async function applyFilters(store: Pick<CompatStore, 'list'>, userId: string, status: Json, context?: FilterContext, now = Date.now()): Promise<Json> {
 	const filters = userId ? (await store.list<Filter>('filter', userId)).map(item => item.value)
 		.filter(filter => (!filter.expires_at || Date.parse(filter.expires_at) > now) && (!context || filter.context.includes(context))) : [];
 	const visit = (source: Json, depth: number): Json => {

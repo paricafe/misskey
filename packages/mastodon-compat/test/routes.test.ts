@@ -5,6 +5,7 @@
 
 import assert from 'node:assert/strict';
 import { test, type TestContext } from 'node:test';
+import { setImmediate as nextTurn } from 'node:timers/promises';
 import Fastify from 'fastify';
 import { EntityConverter } from '../src/entities.js';
 import { NativeClient, NativeError } from '../src/native-client.js';
@@ -39,7 +40,10 @@ async function fixture(t: TestContext, options: { store?: CompatStore; handler?:
 		const handled = await options.handler?.(endpoint, body);
 		if (handled) return handled;
 		if (endpoint === 'ping') return response({ pong: 1 });
-		if (endpoint === 'users/show') return response(user(body.userId ?? body.username, { pinnedNotes: notes.filter(item => pinned.has(item.id)) }));
+		if (endpoint === 'users/show') {
+			const author = (id: string) => user(id, { pinnedNotes: notes.filter(item => pinned.has(item.id) && item.userId === id) });
+			return response(Array.isArray(body.userIds) ? body.userIds.map(author) : author(body.userId ?? body.username));
+		}
 		if (endpoint === 'notes/state') return response({ isFavorited: bookmarks.has(body.noteId), isMutedThread: muted.has(body.noteId) });
 		if (endpoint === 'notes/show') {
 			const found = notes.find(item => item.id === body.noteId);
@@ -78,6 +82,72 @@ async function fixture(t: TestContext, options: { store?: CompatStore; handler?:
 	t.after(async () => { await app.close(); if (!options.store) await store.close(); });
 	return { store, calls, notes, followers, notifications, pinned, bookmarks, muted, token, request };
 }
+
+test('timeline pages batch metadata and authors with bounded state reads and fresh request state', async t => {
+	let active = 0, peak = 0;
+	const f = await fixture(t, { handler: async endpoint => {
+		if (endpoint !== 'notes/state') return;
+		peak = Math.max(peak, ++active);
+		await nextTurn();
+		active--;
+	} });
+	for (let i = 0; i < 20; i++) f.notes.push(note(String(1000 + i), { userId: `author${i}`, user: user(`author${i}`) }));
+	await f.store.put('status', 'author19', '1019', { language: 'ja' });
+	const batch = t.mock.method(f.store, 'getMany');
+	const single = t.mock.method(f.store, 'get');
+	const lists = t.mock.method(f.store, 'list');
+	const first = await f.request('GET', '/api/v1/timelines/home?limit=20');
+	assert.equal(first.statusCode, 200, first.body);
+	assert.deepEqual(first.json().map((item: Json) => item.id), f.notes.map(item => item.id).reverse());
+	assert.equal(first.json()[0].language, 'ja');
+	assert.equal(batch.mock.callCount(), 1);
+	assert.equal(single.mock.callCount(), 0);
+	assert.equal(lists.mock.callCount(), 1);
+	assert.equal(f.calls.filter(call => call.endpoint === 'users/show').length, 1);
+	assert.equal(f.calls.filter(call => call.endpoint === 'notes/state').length, 20);
+	assert.equal(f.calls.length, 23);
+	assert.ok(peak > 1 && peak <= 4, `peak state concurrency: ${peak}`);
+
+	await f.store.put('status', 'author19', '1019', { language: 'en' });
+	f.bookmarks.add('1019');
+	f.pinned.add('1019');
+	const next = await f.request('GET', '/api/v1/timelines/home?limit=20');
+	assert.equal(next.statusCode, 200, next.body);
+	assert.equal(next.json()[0].language, 'en');
+	assert.equal(next.json()[0].bookmarked, true);
+	assert.equal(next.json()[0].pinned, true);
+});
+
+test('batch timeline reads preserve nested boost metadata and filters', async t => {
+	const f = await fixture(t);
+	const original = note('100', { files: [{ id: 'file', type: 'image/png', url: 'https://social.test/file.png' }] });
+	f.notes.push(original, note('101', { text: null, renoteId: original.id, renote: original }));
+	await f.store.put('status', 'alice', '100', { language: 'ja', sensitive: true });
+	await f.store.put('media', 'alice', 'file', { focus: { x: 0.5, y: -0.5 } });
+	await f.store.put('filter', 'alice', 'filter', { id: 'filter', title: 'Text', context: ['home'], expires_at: null, filter_action: 'warn', keywords: [{ id: 'keyword', keyword: 'Text', whole_word: false }], statuses: [] });
+	const result = await f.request('GET', '/api/v1/timelines/home');
+	assert.equal(result.statusCode, 200, result.body);
+	const boost = result.json()[0];
+	assert.equal(boost.reblog.id, '100');
+	assert.equal(boost.reblog.language, 'ja');
+	assert.equal(boost.reblog.sensitive, true);
+	assert.deepEqual(boost.reblog.media_attachments[0].meta.focus, { x: 0.5, y: -0.5 });
+	assert.equal(boost.reblog.filtered[0].filter.id, 'filter');
+});
+
+test('a fatal timeline read stops scheduling the remaining page', async t => {
+	const f = await fixture(t, { handler: async (endpoint, body) => {
+		if (endpoint !== 'notes/state') return;
+		if (body.noteId === '1019') throw new NativeError(503, 'UNAVAILABLE', 'Unavailable');
+		await nextTurn();
+	} });
+	for (let i = 0; i < 20; i++) f.notes.push(note(String(1000 + i)));
+	const result = await f.request('GET', '/api/v1/timelines/home');
+	assert.equal(result.statusCode, 503);
+	await nextTurn();
+	await nextTurn();
+	assert.ok(f.calls.filter(call => call.endpoint === 'notes/state').length <= 4);
+});
 
 test('all compatibility status inputs validate before creation, editing, metadata writes or idempotency claims', async t => {
 	const f = await fixture(t);

@@ -44,11 +44,14 @@ export interface StoreEntry {
 	expiresAt: number | null;
 }
 
+export type StoreKey = Pick<StoreEntry, 'namespace' | 'owner' | 'key'>;
+
 /** Storage adapters must serialize mutations with their transaction lock. */
 export interface StoreAdapter {
 	close(): Promise<void>;
 	transaction<T>(callback: () => T | Promise<T>): Promise<T>;
 	get(namespace: string, owner: string, key: string): Promise<StoreEntry | undefined>;
+	getMany(keys: StoreKey[]): Promise<StoreEntry[]>;
 	put(entry: StoreEntry, insertOnly?: boolean): Promise<void>;
 	delete(namespace: string, owner: string, key: string): Promise<boolean>;
 	take(namespace: string, owner: string, key: string): Promise<StoreEntry | undefined>;
@@ -123,6 +126,13 @@ class MemoryAdapter implements StoreAdapter {
 			if (insertOnly && this.data().has(key)) throw new Error('Compatibility entry already exists');
 			this.data().set(key, { ...clone(entry), value: clone(entry.value) });
 		});
+	}
+
+	async getMany(keys: StoreKey[]): Promise<StoreEntry[]> {
+		return this.locked(() => keys.flatMap(key => {
+			const entry = this.data().get(entryKey(key.namespace, key.owner, key.key));
+			return entry ? [clone(entry)] : [];
+		}));
 	}
 
 	async delete(namespace: string, owner: string, key: string): Promise<boolean> {
@@ -219,6 +229,12 @@ export class CompatStore {
 	}
 
 	async get<T>(namespace: string, ownerId: string, key: string): Promise<T | undefined> { return (await this.adapter.get(`kv:${namespace}`, ownerId, key))?.value as T | undefined; }
+
+	async getMany(keys: StoreKey[]): Promise<StoreEntry[]> {
+		if (keys.length === 0) return [];
+		const entries = await this.adapter.getMany(keys.map(key => ({ ...key, namespace: `kv:${key.namespace}` })));
+		return entries.map(entry => ({ ...entry, namespace: entry.namespace.slice(3) }));
+	}
 
 	async put(namespace: string, ownerId: string, key: string, value: unknown): Promise<void> {
 		await this.adapter.put({ namespace: `kv:${namespace}`, owner: ownerId, key, value, expiresAt: null });

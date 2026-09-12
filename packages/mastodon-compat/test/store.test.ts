@@ -14,6 +14,25 @@ function deferred() {
 	return { promise, resolve };
 }
 
+test('batch metadata reads preserve namespace and owner isolation without aliasing values', async t => {
+	const store = new CompatStore(':memory:');
+	t.after(() => store.close());
+	await store.put('status', 'alice', 'one', { language: 'ja' });
+	await store.put('status', 'bob', 'one', { language: 'en' });
+	await store.put('media', 'alice', 'one', { focus: { x: 0, y: 1 } });
+	const keys = [
+		{ namespace: 'status', owner: 'alice', key: 'one' },
+		{ namespace: 'media', owner: 'alice', key: 'one' },
+		{ namespace: 'status', owner: 'alice', key: 'missing' },
+	];
+	const entries = await store.getMany(keys);
+	assert.equal(entries.length, 2);
+	assert.ok(entries.every(entry => entry.owner === 'alice'));
+	(entries[0].value as { language: string }).language = 'changed';
+	assert.deepEqual(await store.get('status', 'alice', 'one'), { language: 'ja' });
+	assert.deepEqual(await store.getMany([]), []);
+});
+
 test('credentials authenticate their client, grant and code and revoked tokens become unusable', async t => {
 	const store = new CompatStore(':memory:');
 	t.after(() => store.close());

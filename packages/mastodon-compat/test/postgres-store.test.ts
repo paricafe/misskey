@@ -19,6 +19,25 @@ function deferred() {
 
 const postgresOnly = { skip: !process.env.MASTODON_TEST_DATABASE_URL };
 
+test('PostgreSQL batch metadata lookup uses complete keys and excludes missing or unrelated values', postgresOnly, async t => {
+	const connectionString = await postgresFixture(t);
+	const store = await createPostgresStore({ connectionString });
+	t.after(() => store.close());
+	await store.put('status', 'alice', 'one', { language: 'ja' });
+	await store.put('status', 'bob', 'one', { language: 'en' });
+	await store.put('media', 'alice', 'one', { focus: { x: 0, y: 1 } });
+	const entries = await store.getMany([
+		{ namespace: 'status', owner: 'alice', key: 'one' },
+		{ namespace: 'media', owner: 'alice', key: 'one' },
+		{ namespace: 'status', owner: 'alice', key: 'missing' },
+	]);
+	assert.equal(entries.length, 2);
+	assert.deepEqual(entries.find(entry => entry.namespace === 'status')?.value, { language: 'ja' });
+	assert.deepEqual(entries.find(entry => entry.namespace === 'media')?.value, { focus: { x: 0, y: 1 } });
+	assert.ok(entries.every(entry => entry.owner === 'alice'));
+	assert.deepEqual(await store.getMany([]), []);
+});
+
 test('an idle PostgreSQL connection failure is recoverable and close is idempotent', postgresOnly, async t => {
 	const connectionString = await postgresFixture(t);
 	const applicationName = `mastodon_idle_${randomBytes(8).toString('hex')}`;

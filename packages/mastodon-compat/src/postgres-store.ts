@@ -5,7 +5,7 @@
 
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { Pool, type PoolClient, type PoolConfig, type QueryResultRow } from 'pg';
-import { CompatStore, type StoreAdapter, type StoreEntry } from './store.js';
+import { CompatStore, type StoreAdapter, type StoreEntry, type StoreKey } from './store.js';
 
 // Stable across every gateway process sharing this database. All mutations use
 // this transaction lock, including standalone writes and one-time consumption.
@@ -55,6 +55,15 @@ class PostgresAdapter implements StoreAdapter {
 	async get(namespace: string, owner: string, key: string): Promise<StoreEntry | undefined> {
 		const result = await this.query<Row>(`SELECT ${columns} FROM "mastodon_compat_entry" WHERE "namespace" = $1 AND "owner" = $2 AND "key" = $3`, [namespace, owner, key]);
 		return result.rows[0] ? entry(result.rows[0]) : undefined;
+	}
+
+	async getMany(keys: StoreKey[]): Promise<StoreEntry[]> {
+		if (keys.length === 0) return [];
+		const result = await this.query<Row>(`SELECT e.* FROM "mastodon_compat_entry" e
+			JOIN unnest($1::text[], $2::text[], $3::text[]) AS requested(namespace, owner, key)
+			ON e."namespace" = requested.namespace AND e."owner" = requested.owner AND e."key" = requested.key`,
+		[keys.map(key => key.namespace), keys.map(key => key.owner), keys.map(key => key.key)]);
+		return result.rows.map(entry);
 	}
 
 	async put(value: StoreEntry, insertOnly = false): Promise<void> {
