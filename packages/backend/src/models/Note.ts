@@ -23,6 +23,7 @@ import type { MiDriveFile } from './DriveFile.js';
 // Not appending `{ concurrent: true }` to `@Index` will not cause any problem in production,
 
 @Index(['userId', 'id']) // Note: this index is ("userId", "id" DESC) in production, but not in test.
+@Index('IDX_note_search_text', { synchronize: false }) // PGroonga expression index managed by migration.
 @Entity('note')
 export class MiNote {
 	@PrimaryColumn(id())

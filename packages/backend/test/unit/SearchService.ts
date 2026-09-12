@@ -3,9 +3,11 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
 import { Test, TestingModule } from '@nestjs/testing';
+import type { DataSource } from 'typeorm';
 import type { Index, Meilisearch } from 'meilisearch';
+import { NoteSearchText1789191974803 } from '../../migration/1789191974803-NoteSearchText.js';
 import { type Config, loadConfig } from '@/config.js';
 import { GlobalModule } from '@/GlobalModule.js';
 import { CoreModule } from '@/core/CoreModule.js';
@@ -29,6 +31,7 @@ import {
 describe('SearchService', () => {
 	type TestContext = {
 		app: TestingModule;
+		db: DataSource;
 		service: SearchService;
 		cacheService: CacheService;
 		idService: IdService;
@@ -80,9 +83,18 @@ describe('SearchService', () => {
 		const app = await builder.compile();
 
 		app.enableShutdownHooks();
+		const db = app.get<DataSource>(DI.db);
+		// Test schema synchronization does not create SQL functions or expression indexes.
+		const runner = db.createQueryRunner();
+		try {
+			await new NoteSearchText1789191974803().up(runner);
+		} finally {
+			await runner.release();
+		}
 
 		return {
 			app,
+			db,
 			service: app.get(SearchService),
 			cacheService: app.get(CacheService),
 			idService: app.get(IdService),
@@ -202,12 +214,60 @@ describe('SearchService', () => {
 		{
 			supportsFollowersVisibility,
 			sinceIdOrder,
+			excludesReplyMentions = false,
 		}: {
 			supportsFollowersVisibility: boolean;
 			sinceIdOrder: 'asc' | 'desc';
+			excludesReplyMentions?: boolean;
 		},
 	) {
 		describe('searchNote', () => {
+			if (excludesReplyMentions) {
+				test.each([
+					'@pari@remote.example reply body',
+					'@alice@pari.example reply body',
+					' \n@alice@remote.example @pari@other.example:3000\nreply body',
+					'@pari reply body',
+					'@pari@remote.example',
+				])('ignores reply recipients in %j', async (text) => {
+					const ctx = getCtx();
+					const author = await createUser(ctx);
+					const parent = await createNote(ctx, author, { text: 'parent' });
+					await createNote(ctx, author, { text, replyId: parent.id });
+
+					expect(await ctx.service.searchNote('pari', author, {}, { limit: 10 })).toEqual([]);
+				});
+
+				test('keeps original text and finds body matches, middle mentions and non-reply mentions', async () => {
+					const ctx = getCtx();
+					const author = await createUser(ctx);
+					const parent = await createNote(ctx, author, { text: 'parent' });
+					const body = await createNote(ctx, author, { text: '@alice@remote.example pari body', replyId: parent.id });
+					const middle = await createNote(ctx, author, { text: 'hello @pari@remote.example', replyId: parent.id });
+					const standalone = await createNote(ctx, author, { text: '@pari@remote.example hello' });
+
+					const result = await ctx.service.searchNote('pari', author, {}, { limit: 10 });
+					expect(result.map(note => note.id)).toEqual([standalone.id, middle.id, body.id]);
+					expect(result.find(note => note.id === body.id)?.text).toBe(body.text);
+				});
+
+				test('fills pages after excluding recipient-only and invisible matches', async () => {
+					const ctx = getCtx();
+					const author = await createUser(ctx);
+					const me = await createUser(ctx);
+					const parent = await createNote(ctx, author, { text: 'parent' });
+					const older = await createNote(ctx, author, { text: 'pari older', replyId: parent.id });
+					const newer = await createNote(ctx, author, { text: 'pari newer', replyId: parent.id });
+					await createNote(ctx, author, { text: '@pari@remote.example body', replyId: parent.id });
+					await createNote(ctx, author, { text: 'pari secret', visibility: 'specified' });
+
+					const first = await ctx.service.searchNote('pari', me, {}, { limit: 1 });
+					const second = await ctx.service.searchNote('pari', me, {}, { limit: 1, untilId: first[0].id });
+					expect(first.map(note => note.id)).toEqual([newer.id]);
+					expect(second.map(note => note.id)).toEqual([older.id]);
+				});
+			}
+
 			test('filters notes by visibility (followers only visible to followers)', async () => {
 				const ctx = getCtx();
 				const me = await createUser(ctx, { username: 'me', usernameLower: 'me', host: null });
@@ -536,7 +596,66 @@ describe('SearchService', () => {
 			await cleanupContext(ctx);
 		});
 
-		defineSearchNoteTests(() => ctx, { supportsFollowersVisibility: true, sinceIdOrder: 'asc' });
+		defineSearchNoteTests(() => ctx, { supportsFollowersVisibility: true, sinceIdOrder: 'asc', excludesReplyMentions: true });
+	});
+
+	// Run with MISSKEY_TEST_PGROONGA=1 and the PGroonga extension installed in the test DB.
+	describe.skipIf(process.env.MISSKEY_TEST_PGROONGA !== '1')('sqlPgroonga', () => {
+		let ctx: TestContext;
+
+		beforeAll(async () => {
+			ctx = await buildContext({ ...loadConfig(), fulltextSearch: { provider: 'sqlPgroonga' } });
+		});
+
+		afterAll(async () => {
+			await ctx.app.close();
+		});
+
+		afterEach(async () => {
+			await cleanupContext(ctx);
+		});
+
+		defineSearchNoteTests(() => ctx, { supportsFollowersVisibility: true, sinceIdOrder: 'asc', excludesReplyMentions: true });
+
+		test('evaluates exclusion terms against the reply body', async () => {
+			const author = await createUser(ctx);
+			const parent = await createNote(ctx, author, { text: 'parent' });
+			const expected = await createNote(ctx, author, { text: '@pari@remote.example hello world', replyId: parent.id });
+			await createNote(ctx, author, { text: '@alice@remote.example hello pari', replyId: parent.id });
+
+			const result = await ctx.service.searchNote('hello -pari', author, {}, { limit: 10 });
+			expect(result.map(note => note.id)).toEqual([expected.id]);
+		});
+
+		test('materializes scoped text matches without sorting or limiting candidates', async () => {
+			const author = await createUser(ctx);
+			const expected = await createNote(ctx, author, { text: 'pari body' });
+			const logQuery = vi.spyOn(ctx.db.logger, 'logQuery');
+
+			expect((await ctx.service.searchNote('pari', author, { userId: author.id, host: '.' }, { limit: 1 })).map(note => note.id)).toEqual([expected.id]);
+			const call = logQuery.mock.calls.find(([sql]) => sql.startsWith('WITH "matched_note"'));
+			expect(call).toBeDefined();
+			const [sql, parameters] = call!;
+			const candidateSql = sql.slice(0, sql.indexOf(') SELECT'));
+			expect(candidateSql).toContain('AS MATERIALIZED');
+			expect(candidateSql).toContain('note_search_text(');
+			expect(candidateSql).toContain('"note"."userId" =');
+			expect(candidateSql).toContain('"note"."userHost" IS NULL');
+			expect(candidateSql).not.toMatch(/ORDER BY|LIMIT/);
+
+			// A tiny fixture normally prefers a sequential scan. Check that the real
+			// expression index is usable, without imposing planner settings on searches.
+			const runner = ctx.db.createQueryRunner();
+			await runner.startTransaction();
+			try {
+				await runner.query('SET LOCAL enable_seqscan = off');
+				const plan = await runner.query(`EXPLAIN (FORMAT JSON) ${sql}`, parameters);
+				expect(JSON.stringify(plan)).toContain('IDX_note_search_text');
+			} finally {
+				await runner.rollbackTransaction();
+				await runner.release();
+			}
+		});
 	});
 
 	describe('meilisearch', () => {
