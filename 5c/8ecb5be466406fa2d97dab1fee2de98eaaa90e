@@ -30,6 +30,16 @@ packages/backend/src/models/NoteDraft.ts
   s_d32bac5aaa6ca1::t_11064c30c0a223 17,169-171
 packages/backend/src/queue/QueueProcessorService.ts
   s_d32bac5aaa6ca1::t_48960234ddce4e 176
+packages/backend/src/boot/master.ts
+  s_d32bac5aaa6ca1::t_edbc02f196698d 23,113
+packages/backend/src/boot/unix-socket.ts
+  s_d32bac5aaa6ca1::t_84ad57944ce724 1-49
+packages/backend/src/server/ServerService.ts
+  s_d32bac5aaa6ca1::t_edbc02f196698d 38,304
+packages/backend/test/unit/boot/unix-socket.ts
+  s_d32bac5aaa6ca1::t_7842862841ac1a 10,64-101,103-120
+  s_d32bac5aaa6ca1::t_84ad57944ce724 1-9,11-63,121
+  s_d32bac5aaa6ca1::t_2a3d402ee8e631 102
 ---
 {
   "schema_version": "authorship/3.0.0",
