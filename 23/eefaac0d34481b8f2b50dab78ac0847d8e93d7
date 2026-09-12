@@ -1,0 +1,26 @@
+packages/backend/src/boot/master.ts
+  s_d32bac5aaa6ca1::t_edbc02f196698d 23,113
+packages/backend/src/boot/unix-socket.ts
+  s_d32bac5aaa6ca1::t_84ad57944ce724 1-49
+packages/backend/src/server/ServerService.ts
+  s_d32bac5aaa6ca1::t_edbc02f196698d 38,304
+packages/backend/test/unit/boot/unix-socket.ts
+  s_d32bac5aaa6ca1::t_7842862841ac1a 10,64-120
+  s_d32bac5aaa6ca1::t_84ad57944ce724 1-9,11-63,121
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "23eefaac0d34481b8f2b50dab78ac0847d8e93d7",
+  "prompts": {},
+  "sessions": {
+    "s_d32bac5aaa6ca1": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a09430-b6ee-7310-ac0a-9dee4efe823d",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "Natsuki-Kaede <i@pari.network>"
+    }
+  }
+}
