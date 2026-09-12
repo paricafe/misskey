@@ -1,0 +1,71 @@
+packages/backend/test/unit/boot/cluster-shutdown.ts
+  s_d32bac5aaa6ca1::t_cb8da0ea572883 11-12
+  s_d32bac5aaa6ca1::t_9fc9c51d850b61 1-10,13-15,17-29,31,33-38
+  s_d32bac5aaa6ca1::t_a44881f885c19c 16,30
+  s_d32bac5aaa6ca1::t_ed2c68d92b9e4f 32
+packages/backend/src/misc/promise-tracker.ts
+  s_d32bac5aaa6ca1::t_f6c9fc8607140d 6,13-16,20-23
+packages/backend/src/server/api/StreamingApiServerService.test.ts
+  s_d32bac5aaa6ca1::t_cb8da0ea572883 6-11,21-88
+  s_d32bac5aaa6ca1::t_69b4f5d46d0aec 89
+packages/backend/src/boot/master.ts
+  s_d32bac5aaa6ca1::t_76c2cdd62574ad 20-22,94-100,201
+packages/backend/src/boot/worker.ts
+  s_d32bac5aaa6ca1::t_76c2cdd62574ad 15,44-45
+  s_d32bac5aaa6ca1::t_8237de42ed4ca2 46
+packages/backend/src/boot/shutdown-handler.ts
+  s_d32bac5aaa6ca1::t_8237de42ed4ca2 24-25,101
+  s_d32bac5aaa6ca1::t_ed2c68d92b9e4f 73,84-87,89-91
+  s_d32bac5aaa6ca1::t_4350558d4b074a 6-7,9,13,22-23,26-27,42-43,54,56-64,66-68,79-83,88,93-100,102,105,108-111,113
+  s_d32bac5aaa6ca1::t_7eb8f4791d23ae 69-72,74,77-78,92
+packages/backend/src/boot/application-lifecycle.ts
+  s_d32bac5aaa6ca1::t_a607f726c66e09 26,29-33,35
+  s_d32bac5aaa6ca1::t_bc036e9ba0a4af 1-25,27-28,34,36-39
+packages/backend/src/boot/entry.ts
+  s_d32bac5aaa6ca1::t_76c2cdd62574ad 120
+packages/backend/src/server/api/StreamingApiServerService.ts
+  s_d32bac5aaa6ca1::t_204d63f0eaae35 19,34-40,54,59,111-119,121-131,133-135,139,142-143,180,199-202,207-216,218-219
+  s_d32bac5aaa6ca1::t_57d03a28052e86 10
+packages/backend/test/unit/misc/promise-tracker.ts
+  s_d32bac5aaa6ca1::t_f6c9fc8607140d 1-47
+packages/backend/test/unit/boot/application-lifecycle.ts
+  s_d32bac5aaa6ca1::t_9fc9c51d850b61 1-6,8-30,32-48,72-73
+  s_d32bac5aaa6ca1::t_02283fcab1b8a6 7,49-71
+  s_d32bac5aaa6ca1::t_a607f726c66e09 31
+packages/backend/test/unit/boot/shutdown-process.ts
+  s_d32bac5aaa6ca1::t_02283fcab1b8a6 1-33,35-54
+  s_d32bac5aaa6ca1::t_a44881f885c19c 34
+packages/backend/src/server/ServerService.ts
+  s_d32bac5aaa6ca1::t_8237de42ed4ca2 45,322-325,327-329
+  s_d32bac5aaa6ca1::t_204d63f0eaae35 173
+  s_d32bac5aaa6ca1::t_5a8da47e2e5b0f 14
+packages/backend/test/unit/boot/shutdown-handler.ts
+  s_d32bac5aaa6ca1::t_e75eedc9996a57 12-13,42,116-144
+  s_d32bac5aaa6ca1::t_58ea9fbe4a98cf 16,33-34,55,74,88,110
+  s_d32bac5aaa6ca1::t_add919db4a428c 145-147
+packages/backend/src/boot/common.ts
+  s_d32bac5aaa6ca1::t_38b7262bcccefb 11,26,47-49,53,67-69
+  s_d32bac5aaa6ca1::t_a4c2ac236f702f 45,64-65
+  s_d32bac5aaa6ca1::t_58ea9fbe4a98cf 27-28,30-31,54-56,58-59
+  s_d32bac5aaa6ca1::t_521005a2e79888 32,34-35,37-40,42-44,60,62-63
+packages/backend/src/boot/cluster-shutdown.ts
+  s_d32bac5aaa6ca1::t_aa11c85929e961 12-16,22
+  s_d32bac5aaa6ca1::t_ed2c68d92b9e4f 8,10,25-27
+  s_d32bac5aaa6ca1::t_bc036e9ba0a4af 1-7,9,11,17-21,23-24,28-34
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "8267652dcff59f2d132f65119d4bb8591c0b71db",
+  "prompts": {},
+  "sessions": {
+    "s_d32bac5aaa6ca1": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a09430-b6ee-7310-ac0a-9dee4efe823d",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "Natsuki-Kaede <i@pari.network>"
+    }
+  }
+}
