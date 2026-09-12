@@ -627,6 +627,82 @@ describe('SearchService', () => {
 			expect(result.map(note => note.id)).toEqual([expected.id]);
 		});
 
+		test.each(['desc', 'asc'] as const)('refills %s pages after a whole batch of invisible candidates', async (direction) => {
+			const author = await createUser(ctx);
+			const me = await createUser(ctx);
+			const t = Date.now() - 200000;
+			const cursor = await createNote(ctx, author, { text: 'cursor' }, t);
+			const expected: MiNote[] = [];
+			for (let i = 0; i < 3; i++) {
+				expected.push(await createNote(ctx, author, { text: 'ban 网站 visible' }, t + (direction === 'asc' ? 110000 : 1000) + i * 1000));
+			}
+			await ctx.notesRepository.insert(Array.from({ length: 105 }, (_, i) => ({
+				id: ctx.idService.gen(t + (direction === 'asc' ? 1000 : 10000) + i * 1000),
+				userId: author.id,
+				text: 'ban 网站 private',
+				visibility: 'specified' as const,
+			})));
+
+			if (direction === 'desc') expected.reverse();
+			const first = await ctx.service.searchNote('ban 网站', me, {}, { limit: 2, ...(direction === 'asc' ? { sinceId: cursor.id } : {}) });
+			expect(first.map(note => note.id)).toEqual(expected.slice(0, 2).map(note => note.id));
+			const second = await ctx.service.searchNote('ban 网站', me, {}, {
+				limit: 2,
+				...(direction === 'asc' ? { sinceId: first[1].id } : { untilId: first[1].id }),
+			});
+			expect(second.map(note => note.id)).toEqual([expected[2].id]);
+		});
+
+		test('stops after exhausting a full batch with no visible matches', async () => {
+			const author = await createUser(ctx);
+			const me = await createUser(ctx);
+			await ctx.notesRepository.insert(Array.from({ length: 100 }, () => ({
+				id: ctx.idService.gen(),
+				userId: author.id,
+				text: 'ban 网站 private',
+				visibility: 'specified' as const,
+			})));
+
+			expect(await ctx.service.searchNote('ban 网站', me, {}, { limit: 10 })).toEqual([]);
+		});
+
+		test.each(['unrelated body', '@ban@remote.example 网站'])('rechecks a candidate edited to %j before hydration', async (text) => {
+			const author = await createUser(ctx);
+			const parent = await createNote(ctx, author, { text: 'parent' });
+			const expected = await createNote(ctx, author, { text: 'ban 网站 body' });
+			const edited = await createNote(ctx, author, { text: 'ban 网站 body', replyId: parent.id });
+			const createRunner = ctx.db.createQueryRunner.bind(ctx.db);
+			vi.spyOn(ctx.db, 'createQueryRunner').mockImplementation((mode) => {
+				const runner = createRunner(mode);
+				const runQuery = runner.query.bind(runner);
+				vi.spyOn(runner, 'query').mockImplementation(async (sql: string, parameters?: Parameters<typeof runner.query>[1], useStructuredResult?: boolean) => {
+					const result = useStructuredResult ? await runQuery(sql, parameters, true) : await runQuery(sql, parameters);
+					if (sql.startsWith('WITH "matched_note"')) {
+						await ctx.notesRepository.update(edited.id, { text });
+					}
+					return result;
+				});
+				return runner;
+			});
+
+			expect((await ctx.service.searchNote('ban 网站', author, {}, { limit: 1 })).map(note => note.id)).toEqual([expected.id]);
+		});
+
+		test('uses the same custom normalization for candidates and bounded row checks', async () => {
+			const runner = ctx.db.createQueryRunner();
+			await runner.query('DROP INDEX "IDX_note_search_text"');
+			try {
+				await runner.query(`CREATE INDEX "IDX_note_search_text" ON note USING pgroonga (note_search_text(text, "replyId")) WITH (normalizers = 'NormalizerNFKC150("remove_symbol", true)')`);
+				const author = await createUser(ctx);
+				const expected = await createNote(ctx, author, { text: 'c-a-f-e' });
+				expect((await ctx.service.searchNote('cafe', author, {}, { limit: 10 })).map(note => note.id)).toEqual([expected.id]);
+			} finally {
+				await runner.query('DROP INDEX IF EXISTS "IDX_note_search_text"');
+				await new NoteSearchText1789191974803().up(runner);
+				await runner.release();
+			}
+		});
+
 		test('materializes scoped text matches without sorting or limiting candidates', async () => {
 			const author = await createUser(ctx);
 			const expected = await createNote(ctx, author, { text: 'pari body' });
@@ -642,6 +718,12 @@ describe('SearchService', () => {
 			expect(candidateSql).toContain('"note"."userId" =');
 			expect(candidateSql).toContain('"note"."userHost" IS NULL');
 			expect(candidateSql).not.toMatch(/ORDER BY|LIMIT/);
+			// Candidate retrieval must not merge-join the CTE against the note table.
+			expect(sql).not.toContain('JOIN');
+			const hydration = logQuery.mock.calls.find(([query]) => query.includes('"note"."id" IN ('));
+			expect(hydration).toBeDefined();
+			expect(hydration![0]).not.toContain('matched_note');
+			expect(hydration![1]).toContain(expected.id);
 
 			// A tiny fixture normally prefers a sequential scan. Check that the real
 			// expression index is usable, without imposing planner settings on searches.
