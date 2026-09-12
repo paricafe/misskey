@@ -213,19 +213,6 @@ export class SearchService {
 			query.andWhere('note.channelId = :channelId', { channelId: opts.channelId });
 		}
 
-		query
-			.innerJoinAndSelect('note.user', 'user')
-			.leftJoinAndSelect('note.reply', 'reply')
-			.leftJoinAndSelect('note.renote', 'renote')
-			.leftJoinAndSelect('reply.user', 'replyUser')
-			.leftJoinAndSelect('renote.user', 'renoteUser');
-
-		if (this.config.fulltextSearch?.provider === 'sqlPgroonga') {
-			query.andWhere('note.text &@~ :q', { q });
-		} else {
-			query.andWhere('LOWER(note.text) LIKE :q', { q: `%${ sqlLikeEscape(q.toLowerCase()) }%` });
-		}
-
 		if (opts.host) {
 			if (opts.host === '.') {
 				query.andWhere('note.userHost IS NULL');
@@ -243,6 +230,29 @@ export class SearchService {
 			const date = this.idService.gen(opts.rangeEndAt + 1);
 			query.andWhere('note.id < :rangeEndAt', { rangeEndAt: date });
 		}
+
+		if (this.provider === 'sqlPgroonga') {
+			// Keep ORDER BY / LIMIT out of the full-text query: otherwise the planner can
+			// scan the primary key backwards and evaluate PGroonga on every visited row.
+			// Retain the range/scope filters, but never cap matches before visibility filtering.
+			const matches = query.clone()
+				.select('note.id', 'id')
+				.orderBy()
+				.andWhere('note_search_text(note.text, note.replyId) &@~ :q', { q });
+
+			query
+				.addCommonTableExpression(matches, 'matched_note', { materialized: true })
+				.innerJoin('matched_note', 'matched_note', 'matched_note.id = note.id');
+		} else {
+			query.andWhere('LOWER(note_search_text(note.text, note.replyId)) LIKE :q', { q: `%${ sqlLikeEscape(q.toLowerCase()) }%` });
+		}
+
+		query
+			.innerJoinAndSelect('note.user', 'user')
+			.leftJoinAndSelect('note.reply', 'reply')
+			.leftJoinAndSelect('note.renote', 'renote')
+			.leftJoinAndSelect('reply.user', 'replyUser')
+			.leftJoinAndSelect('renote.user', 'renoteUser');
 
 		this.queryService.generateVisibilityQuery(query, me);
 		this.queryService.generateBaseNoteFilteringQuery(query, me);

@@ -343,6 +343,7 @@ id: 'aidx'
 
 # Enable the Mastodon-compatible API (default: true)
 #enableMastodonApi: true
+# Compatibility state uses the existing PostgreSQL database automatically.
 
 # Whether disable HSTS
 #disableHsts: true

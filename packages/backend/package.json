@@ -68,6 +68,7 @@
 		"@nestjs/core": "11.2.3",
 		"@nestjs/testing": "11.2.3",
 		"@oxc-project/runtime": "0.147.0",
+		"@pari/mastodon-compat": "workspace:*",
 		"@peertube/http-signature": "1.7.0",
 		"@sentry/node": "10.72.0",
 		"@sentry/profiling-node": "10.72.0",

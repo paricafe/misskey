@@ -15,14 +15,6 @@ import { ModerationLogService } from '@/core/ModerationLogService.js';
 import { SystemAccountService } from '@/core/SystemAccountService.js';
 import { IdService } from './IdService.js';
 
-type AbuseReportInput = {
-	targetUserId: MiAbuseUserReport['targetUserId'];
-	targetUserHost: MiAbuseUserReport['targetUserHost'];
-	reporterId: MiAbuseUserReport['reporterId'];
-	reporterHost: MiAbuseUserReport['reporterHost'];
-	comment: string;
-};
-
 @Injectable()
 export class AbuseReportService {
 	constructor(
@@ -51,16 +43,13 @@ export class AbuseReportService {
 	 * @see AbuseReportNotificationService.notify
 	 */
 	@bindThis
-	public async report(params: AbuseReportInput[]) {
-		return (await this.createAndNotify(params)).notifications;
-	}
-
-	@bindThis
-	public async reportAndGetCreated(params: AbuseReportInput[]): Promise<MiAbuseUserReport[]> {
-		return (await this.createAndNotify(params)).reports;
-	}
-
-	private async createAndNotify(params: AbuseReportInput[]) {
+	public async report(params: {
+		targetUserId: MiAbuseUserReport['targetUserId'],
+		targetUserHost: MiAbuseUserReport['targetUserHost'],
+		reporterId: MiAbuseUserReport['reporterId'],
+		reporterHost: MiAbuseUserReport['reporterHost'],
+		comment: string,
+	}[]) {
 		const entities = params.map(param => {
 			return {
 				id: this.idService.gen(),
@@ -78,13 +67,11 @@ export class AbuseReportService {
 			reports.push(report);
 		}
 
-		const notifications = await Promise.all([
+		return Promise.all([
 			this.abuseReportNotificationService.notifyAdminStream(reports),
 			this.abuseReportNotificationService.notifySystemWebhook(reports, 'abuseReport'),
 			this.abuseReportNotificationService.notifyMail(reports),
 		]);
-
-		return { reports, notifications };
 	}
 
 	/**

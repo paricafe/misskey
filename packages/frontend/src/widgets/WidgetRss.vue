@@ -76,7 +76,6 @@ const fetchEndpoint = computed(() => {
 	url.searchParams.set('url', widgetProps.url);
 	return url.toString();
 });
-let intervalClear: (() => void) | null | undefined = null;
 
 const tick = () => {
 	window.fetch(fetchEndpoint.value, {})
@@ -92,15 +91,10 @@ const tick = () => {
 };
 
 watch(fetchEndpoint, tick);
-watch(() => widgetProps.refreshIntervalSec, () => {
-	if (intervalClear != null) {
-		intervalClear();
-	}
-	intervalClear = useInterval(tick, Math.max(10000, widgetProps.refreshIntervalSec * 1000), {
-		immediate: true,
-		afterMounted: true,
-	});
-}, { immediate: true });
+useInterval(tick, () => Math.max(10000, widgetProps.refreshIntervalSec * 1000), {
+	immediate: true,
+	afterMounted: true,
+});
 
 defineExpose<WidgetComponentExpose>({
 	name,

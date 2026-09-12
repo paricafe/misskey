@@ -17,7 +17,11 @@ import { showMachineInfo } from '@/misc/show-machine-info.js';
 import { envOption } from '@/env.js';
 import { initTelemetry, shutdownTelemetry } from '@/core/telemetry/telemetry-registry.js';
 import { initExtraThreadPool, jobQueue, server } from './common.js';
-import { installShutdownSignalHandlers } from './shutdown-handler.js';
+import { installShutdownSignalHandlers, isShutdownInProgress } from './shutdown-handler.js';
+import { shutdownApplications } from './application-lifecycle.js';
+import { forceStopClusterWorkers, shutdownClusterWorkers } from './cluster-shutdown.js';
+import { superviseWorker } from './worker-supervisor.js';
+import { prepareUnixSocket } from './unix-socket.js';
 
 const logger = new Logger('core', 'cyan');
 const bootLogger = logger.createSubLogger('boot', 'magenta');
@@ -89,7 +93,13 @@ export async function masterMain() {
 		process.exit(1);
 	}
 	installShutdownSignalHandlers({
-		shutdownTasks: [shutdownTelemetry, shutdownLogging],
+		shutdownTasks: [async () => {
+			const results = await Promise.allSettled([shutdownApplications(), shutdownClusterWorkers()]);
+			const errors = results.flatMap(result => result.status === 'rejected' ? [result.reason] : []);
+			if (errors.length > 0) throw new AggregateError(errors, 'Application shutdown failed');
+		}],
+		finalizeTasks: [shutdownTelemetry, shutdownLogging],
+		onTimeout: forceStopClusterWorkers,
 		onRegistered: message => bootLogger.info(message),
 	});
 
@@ -101,6 +111,7 @@ export async function masterMain() {
 		// clusterモジュール有効時
 
 		if (envOption.onlyServer) {
+			if (config.socket) await prepareUnixSocket(config.socket);
 			// onlyServer かつ enableCluster な場合、メインプロセスはforkのみに制限する(listenしない)。
 			// ワーカープロセス側でlistenすると、メインプロセスでポートへの着信を受け入れてワーカープロセスへの分配を行う動作をする。
 			// そのため、メインプロセスでも直接listenするとポートの競合が発生して起動に失敗してしまう。
@@ -190,6 +201,7 @@ async function connectDb(): Promise<void> {
 */
 
 async function spawnWorkers(limit = 1) {
+	if (isShutdownInProgress()) return;
 	const workers = Math.min(limit, os.cpus().length);
 	bootLogger.info(`Starting ${workers} worker${workers === 1 ? '' : 's'}...`);
 	await Promise.all([...Array(workers)].map(spawnWorker));
@@ -197,15 +209,13 @@ async function spawnWorkers(limit = 1) {
 }
 
 function spawnWorker(): Promise<void> {
-	return new Promise(res => {
-		const worker = cluster.fork();
-		worker.on('message', message => {
-			if (message === 'listenFailed') {
-				bootLogger.error('The server Listen failed due to the previous error.');
-				process.exit(1);
-			}
-			if (message !== 'ready') return;
-			res();
-		});
+	return superviseWorker({
+		fork: () => cluster.fork(),
+		isStopping: isShutdownInProgress,
+		onRestart: (workerId, delayMs) => bootLogger.error(`Worker ${workerId} exited; restarting in ${delayMs}ms.`),
+		onFatal: error => {
+			bootLogger.error(error);
+			process.exit(1);
+		},
 	});
 }

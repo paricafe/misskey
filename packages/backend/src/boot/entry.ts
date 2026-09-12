@@ -42,18 +42,6 @@ cluster.on('online', worker => {
 	clusterLogger.debug(`Process is now online: [${worker.id}]`);
 });
 
-// Listen for dying workers
-cluster.on('exit', worker => {
-	if (isShutdownInProgress()) {
-		clusterLogger.info(`Process exited during shutdown: [${worker.id}]`);
-		return;
-	}
-
-	// 終了したワーカーは従来どおり再生成し、表示色は出力処理へ任せます。
-	clusterLogger.error(`[${worker.id}] died :(`);
-	cluster.fork();
-});
-
 // Dying away...
 process.on('exit', code => {
 	if (isShutdownInProgress()) return;
@@ -117,7 +105,7 @@ process.on('message', msg => {
 	}
 });
 
-readyRef.value = true;
+readyRef.value = !isShutdownInProgress();
 
 // ユニットテスト時にMisskeyが子プロセスで起動された時のため
 // それ以外のときは process.send は使えないので弾く

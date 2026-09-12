@@ -44,6 +44,7 @@ describe('NoteCreateService', () => {
 			repliesCount: 0,
 			clippedCount: 0,
 			pageCount: 0,
+			lastReactionsBufferId: null,
 			reactions: {},
 			visibility: 'public',
 			uri: null,

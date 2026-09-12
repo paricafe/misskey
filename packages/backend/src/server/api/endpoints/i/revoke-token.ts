@@ -4,12 +4,10 @@
  */
 
 import { Inject, Injectable } from '@nestjs/common';
-import * as Redis from 'ioredis';
 import { Endpoint } from '@/server/api/endpoint-base.js';
-import type { AccessTokensRepository, MastodonOAuthTokensRepository } from '@/models/_.js';
+import type { AccessTokensRepository } from '@/models/_.js';
+import type { MiAccessToken } from '@/models/AccessToken.js';
 import { DI } from '@/di-symbols.js';
-import { digestCredential } from '@/server/api/mastodon/utils.js';
-import type { Config } from '@/config.js';
 import { ApiError } from '../../error.js';
 
 export const meta = {
@@ -59,63 +57,28 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 	constructor(
 		@Inject(DI.accessTokensRepository)
 		private accessTokensRepository: AccessTokensRepository,
-
-		@Inject(DI.mastodonOAuthTokensRepository)
-		private mastodonOAuthTokensRepository: MastodonOAuthTokensRepository,
-
-		@Inject(DI.config)
-		private config: Config,
-
-		@Inject(DI.redis)
-		private redis: Redis.Redis,
 	) {
 		super(meta, paramDef, async (ps, me, token) => {
 			if (me == null) {
 				throw new ApiError(meta.errors.credentialRequired);
 			}
 
-			const target = 'tokenId' in ps
-				? await this.accessTokensRepository.findOneBy({ id: ps.tokenId, userId: me.id })
-				: ps.token == null || ps.token === ''
-					? null
-					: await this.accessTokensRepository.findOneBy({ token: ps.token, userId: me.id });
-
-			// サードパーティアプリ (アクセストークン) からのリクエストでは、いま使われているトークン自身のみ失効できる
-			if (token != null) {
-				if (target == null) return;
-				if (token.id !== target.id) throw new ApiError(meta.errors.permissionDenied);
-			}
-
-			if (target != null) {
-				await this.accessTokensRepository.delete({ id: target.id });
-			}
-
-			if (!this.config.enableMastodonApi) return;
-
-			let mastodonTokenId: string | null = null;
+			let target: MiAccessToken | null = null;
 			if ('tokenId' in ps) {
-				const result = await this.mastodonOAuthTokensRepository.delete({ id: ps.tokenId, userId: me.id });
-				if (result.affected) mastodonTokenId = ps.tokenId;
+				target = await this.accessTokensRepository.findOneBy({ id: ps.tokenId, userId: me.id });
 			} else {
 				if (ps.token == null || ps.token === '') return;
-				const mastodonToken = await this.mastodonOAuthTokensRepository.findOneBy({
-					tokenHash: digestCredential(ps.token),
-					userId: me.id,
-				});
-				if (mastodonToken != null) {
-					const result = await this.mastodonOAuthTokensRepository.delete({ id: mastodonToken.id, userId: me.id });
-					if (result.affected) mastodonTokenId = mastodonToken.id;
-				}
+				target = await this.accessTokensRepository.findOneBy({ token: ps.token, userId: me.id });
 			}
 
-			if (mastodonTokenId != null) await this.publishMastodonTokenRevoked(mastodonTokenId);
-		});
-	}
+			if (target == null) return;
 
-	private async publishMastodonTokenRevoked(tokenId: string): Promise<void> {
-		await this.redis.publish(this.config.host, JSON.stringify({
-			channel: `mastodonTokenRevoked:${tokenId}`,
-			message: null,
-		}));
+			// サードパーティアプリ (アクセストークン) からのリクエストでは、いま使われているトークン自身のみ失効できる
+			if (token != null && token.id !== target.id) {
+				throw new ApiError(meta.errors.permissionDenied);
+			}
+
+			await this.accessTokensRepository.delete({ id: target.id });
+		});
 	}
 }

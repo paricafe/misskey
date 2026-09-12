@@ -3,21 +3,22 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-const promiseRefs: Set<WeakRef<Promise<unknown>>> = new Set();
+const promises = new Set<Promise<unknown>>();
 
 /**
  * This tracks promises that other modules decided not to wait for,
  * and makes sure they are all settled before fully closing down the server.
  */
 export function trackPromise(promise: Promise<unknown>) {
-	if (process.env.NODE_ENV !== 'test') {
-		return;
-	}
-	const ref = new WeakRef(promise);
-	promiseRefs.add(ref);
-	promise.finally(() => promiseRefs.delete(ref));
+	promises.add(promise);
+	// Handle both outcomes without producing an unobserved rejected promise,
+	// which Promise.finally() would do when the tracked work rejects.
+	void promise.then(() => promises.delete(promise), () => promises.delete(promise));
 }
 
 export async function allSettled(): Promise<void> {
-	await Promise.allSettled([...promiseRefs].map(r => r.deref()));
+	// A completing task may register more work; drain until that work also ends.
+	while (promises.size > 0) {
+		await Promise.allSettled(promises);
+	}
 }

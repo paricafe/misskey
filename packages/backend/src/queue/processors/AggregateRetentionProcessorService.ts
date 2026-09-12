@@ -45,9 +45,12 @@ export class AggregateRetentionProcessorService {
 		});
 
 		// 今日登録したユーザーを全て取得
-		const targetUsers = await this.usersRepository.findBy({
-			host: IsNull(),
-			id: MoreThan(this.idService.gen(Date.now() - (1000 * 60 * 60 * 24))),
+		const targetUsers = await this.usersRepository.find({
+			select: { id: true },
+			where: {
+				host: IsNull(),
+				id: MoreThan(this.idService.gen(Date.now() - (1000 * 60 * 60 * 24))),
+			},
 		});
 		const targetUserIds = targetUsers.map(u => u.id);
 
@@ -69,14 +72,17 @@ export class AggregateRetentionProcessorService {
 		}
 
 		// 今日活動したユーザーを全て取得
-		const activeUsers = await this.usersRepository.findBy({
-			host: IsNull(),
-			lastActiveDate: MoreThan(new Date(Date.now() - (1000 * 60 * 60 * 24))),
+		const activeUsers = await this.usersRepository.find({
+			select: { id: true },
+			where: {
+				host: IsNull(),
+				lastActiveDate: MoreThan(new Date(Date.now() - (1000 * 60 * 60 * 24))),
+			},
 		});
-		const activeUsersIds = activeUsers.map(u => u.id);
+		const activeUsersIds = new Set(activeUsers.map(u => u.id));
 
 		for (const record of pastRecords) {
-			const retention = record.userIds.filter(id => activeUsersIds.includes(id)).length;
+			const retention = record.userIds.filter(id => activeUsersIds.has(id)).length;
 
 			const data = deepClone(record.data);
 			data[dateKey] = retention;

@@ -106,7 +106,7 @@ export class ReactionService {
 	}
 
 	@bindThis
-	public async create(user: { id: MiUser['id']; host: MiUser['host']; isBot: MiUser['isBot'] }, note: MiNote, _reaction?: string | null) {
+	public async create(user: { id: MiUser['id']; host: MiUser['host']; isBot: MiUser['isBot'] }, note: MiNote, _reaction?: string | null, options: { replaceExisting?: boolean } = {}) {
 		// Check blocking
 		if (note.userId !== user.id) {
 			const blocked = await this.userBlockingService.checkBlocked(note.userId, user.id);
@@ -194,12 +194,12 @@ export class ReactionService {
 					userId: user.id,
 				});
 
-				if (exists.reaction !== reaction) {
+				if (exists.reaction !== reaction && options.replaceExisting !== false) {
 					// 別のリアクションがすでにされていたら置き換える
 					await this.delete(user, note);
 					await this.noteReactionsRepository.insert(record);
 				} else {
-					// 同じリアクションがすでにされていたらエラー
+					// 同じリアクション、または置き換えを許可しない呼び出しでは既存のリアクションを維持する
 					throw new IdentifiableError('51c42bb4-931a-456b-bff7-e5a8a70dd298');
 				}
 			} else {
@@ -209,7 +209,7 @@ export class ReactionService {
 
 		// Increment reactions count
 		if (this.meta.enableReactionsBuffering) {
-			await this.reactionsBufferingService.create(note.id, user.id, reaction, note.reactionAndUserPairCache);
+			await this.reactionsBufferingService.create(note.id, user.id, reaction);
 		} else {
 			const sql = `jsonb_set("reactions", '{${reaction}}', (COALESCE("reactions"->>'${reaction}', '0')::int + 1)::text::jsonb)`;
 			await this.notesRepository.createQueryBuilder().update()
@@ -309,14 +309,14 @@ export class ReactionService {
 	}
 
 	@bindThis
-	public async delete(user: { id: MiUser['id']; host: MiUser['host']; isBot: MiUser['isBot']; }, note: MiNote) {
+	public async delete(user: { id: MiUser['id']; host: MiUser['host']; isBot: MiUser['isBot']; }, note: MiNote, expectedReaction?: string) {
 		// if already unreacted
 		const exist = await this.noteReactionsRepository.findOneBy({
 			noteId: note.id,
 			userId: user.id,
 		});
 
-		if (exist == null) {
+		if (exist == null || (expectedReaction != null && exist.reaction !== expectedReaction)) {
 			throw new IdentifiableError('60527ec9-b4cb-4a88-a6bd-32d3ad26817d', 'not reacted');
 		}
 

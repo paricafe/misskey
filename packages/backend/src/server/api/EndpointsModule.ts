@@ -9,7 +9,6 @@ import { CoreModule } from '@/core/CoreModule.js';
 import * as endpointsObject from './endpoint-list.js';
 import { GetterService } from './GetterService.js';
 import { ApiLoggerService } from './ApiLoggerService.js';
-import { MastodonScopeService } from './mastodon/MastodonScopeService.js';
 import type { Provider } from '@nestjs/common';
 
 const endpoints = Object.entries(endpointsObject);
@@ -22,7 +21,6 @@ const endpointProviders = endpoints.map(([path, endpoint]): Provider => ({ provi
 	providers: [
 		GetterService,
 		ApiLoggerService,
-		MastodonScopeService,
 		...endpointProviders,
 	],
 	exports: [

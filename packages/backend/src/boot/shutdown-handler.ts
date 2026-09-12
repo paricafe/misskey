@@ -3,11 +3,14 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { readyRef } from './ready.js';
+
 type ShutdownSignalProcess = {
-	once(event: 'SIGTERM' | 'SIGINT', listener: () => Promise<void>): unknown;
+	on(event: 'SIGTERM' | 'SIGINT', listener: () => Promise<void>): unknown;
 };
 
 const SHUTDOWN_TIMEOUT_MS = 10_000;
+const FINALIZATION_TIMEOUT_MS = 2_000;
 
 export type ShutdownTask = () => Promise<void>;
 
@@ -16,6 +19,12 @@ export type ShutdownHandlerOptions = {
 	process?: ShutdownSignalProcess;
 	/** Shutdown tasks, executed in array order. */
 	shutdownTasks: readonly ShutdownTask[];
+	/** Final flushes, given a reserved deadline even when draining times out. */
+	finalizeTasks?: readonly ShutdownTask[];
+	/** Workers reserve time for their primary to observe exit and flush its logs. */
+	timeoutMs?: number;
+	/** Last-resort cleanup of child processes when draining exceeds its deadline. */
+	onTimeout?: () => void;
 	/** Process termination function. */
 	exit?: (code: number) => void;
 	/** Optional boot logger hook used after signal handlers are registered. */
@@ -30,11 +39,8 @@ let shuttingDown = false;
  * Boot owns signal coordination and receives shutdown tasks through callbacks
  * so individual domains do not depend on each other.
  *
- * 注意: このプロジェクトでは app.enableShutdownHooks() が一切呼ばれていないため、
- * NestJSのOnApplicationShutdown経由のgraceful shutdown(GlobalModule.dispose()によるDB/Redis切断、
- * QueueProcessorService.stop()によるqueue drain、ServerService.dispose()によるfastify/WebSocket close)は
- * SIGTERM/SIGINTを起点には発火しない。このhandlerはそれらを経由せず、登録された終了処理を実行して即exitする。
- * 将来enableShutdownHooks()を配線する場合は、この即exitとNestJS側のshutdown sequenceが競合しないよう順序を設計すること。
+ * Boot closes its registered Nest contexts explicitly. Do not additionally call
+ * enableShutdownHooks(): that would race this coordinated shutdown sequence.
  */
 export function installShutdownSignalHandlers(options: ShutdownHandlerOptions): void {
 	// テストではprocess/exitを差し替え、本番では実processにSIGTERM/SIGINT handlerを登録する。
@@ -45,53 +51,66 @@ export function installShutdownSignalHandlers(options: ShutdownHandlerOptions): 
 		// 同時に複数signalが来てもflushを二重実行せず、cluster refork抑止用の状態もここで立てる。
 		if (shuttingDown) return;
 		shuttingDown = true;
+		readyRef.value = false;
 
-		let timedOut = false;
-		let timeout: NodeJS.Timeout | undefined;
-		try {
-			// 処理時間上限つきのシャットダウンプロセス
-			await Promise.race([
-				(async () => {
-					for (const shutdownTask of options.shutdownTasks) {
-						if (timedOut) return;
-						try {
-							await shutdownTask();
-						} catch (error) {
-							// 1つの終了処理の失敗で後続タスクを妨げないよう、stderrへフォールバックする。
+		let failed = false;
+		const runTasks = async (tasks: readonly ShutdownTask[], timeoutMs: number) => {
+			let timedOut = false;
+			let timeout: NodeJS.Timeout | undefined;
+			try {
+				await Promise.race([
+					(async () => {
+						for (const shutdownTask of tasks) {
+							if (timedOut) return;
 							try {
-								console.error('Shutdown task failed:', error);
-							} catch {
-								// stderrの出力自体が失敗しても、残りの終了処理とexitは継続する。
+								await shutdownTask();
+							} catch (error) {
+								failed = true;
+								// 1つの終了処理の失敗で後続タスクを妨げないよう、stderrへフォールバックする。
+								try {
+									console.error('Shutdown task failed:', error);
+								} catch {
+									// stderrの出力自体が失敗しても、残りの終了処理とexitは継続する。
+								}
 							}
 						}
-					}
-				})(),
-				new Promise<void>(resolve => {
-					timeout = setTimeout(() => {
-						timedOut = true;
-						try {
-							console.error(`Shutdown tasks timed out after ${SHUTDOWN_TIMEOUT_MS}ms.`);
-						} catch {
-							// stderrの出力自体が失敗してもexitは継続する。
-						}
-						resolve();
-					}, SHUTDOWN_TIMEOUT_MS);
-				}),
-			]);
-		} finally {
-			if (timeout != null) clearTimeout(timeout);
-		}
+					})(),
+					new Promise<void>(resolve => {
+						timeout = setTimeout(() => {
+							timedOut = true;
+							failed = true;
+							try {
+								console.error(`Shutdown tasks timed out after ${timeoutMs}ms.`);
+							} catch {
+								// stderrの出力自体が失敗してもexitは継続する。
+							}
+							try {
+								options.onTimeout?.();
+							} catch {
+								// Last-resort cleanup must not prevent the final exit.
+							}
+							resolve();
+						}, timeoutMs);
+					}),
+				]);
+			} finally {
+				if (timeout != null) clearTimeout(timeout);
+			}
+		};
+		const finalizers = options.finalizeTasks ?? [];
+		await runTasks(options.shutdownTasks, (options.timeoutMs ?? SHUTDOWN_TIMEOUT_MS) - (finalizers.length > 0 ? FINALIZATION_TIMEOUT_MS : 0));
+		if (finalizers.length > 0) await runTasks(finalizers, FINALIZATION_TIMEOUT_MS);
 
 		// 既存挙動と同じく、終了処理後はプロセスを終了する。
-		exit(0);
+		exit(failed ? 1 : 0);
 	};
 
-	// onceにして、同じsignalでhandlerが再入しないようにする。
-	processLike.once('SIGTERM', handleSignal);
-	processLike.once('SIGINT', handleSignal);
+	// Keep listeners installed: a process-group signal and the primary's forwarded
+	// signal can reach the same worker while its first shutdown is still draining.
+	processLike.on('SIGTERM', handleSignal);
+	processLike.on('SIGINT', handleSignal);
 
-	// app.enableShutdownHooks()未配線の現状、SIGTERM/SIGINT時には登録済み終了処理のみを行う。
-	options.onRegistered?.('Registered SIGTERM/SIGINT shutdown handler (this process does not perform NestJS graceful shutdown on these signals).');
+	options.onRegistered?.('Registered coordinated SIGTERM/SIGINT graceful shutdown handler.');
 }
 
 export function isShutdownInProgress(): boolean {

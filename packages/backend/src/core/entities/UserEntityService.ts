@@ -244,6 +244,8 @@ export class UserEntityService implements OnModuleInit {
 
 	@bindThis
 	public async getRelations(me: MiUser['id'], targets: MiUser['id'][]): Promise<Map<MiUser['id'], UserRelation>> {
+		if (targets.length === 0) return new Map();
+
 		const [
 			followers,
 			followees,
@@ -254,43 +256,50 @@ export class UserEntityService implements OnModuleInit {
 			muters,
 			renoteMuters,
 		] = await Promise.all([
-			this.followingsRepository.findBy({ followerId: me })
+			this.followingsRepository.findBy({ followerId: me, followeeId: In(targets) })
 				.then(f => new Map(f.map(it => [it.followeeId, it]))),
 			this.followingsRepository.createQueryBuilder('f')
 				.select('f.followerId')
 				.where('f.followeeId = :me', { me })
+				.andWhere('f.followerId IN (:...targets)', { targets })
 				.getRawMany<{ f_followerId: string }>()
-				.then(it => it.map(it => it.f_followerId)),
+				.then(it => new Set(it.map(it => it.f_followerId))),
 			this.followRequestsRepository.createQueryBuilder('f')
 				.select('f.followeeId')
 				.where('f.followerId = :me', { me })
+				.andWhere('f.followeeId IN (:...targets)', { targets })
 				.getRawMany<{ f_followeeId: string }>()
-				.then(it => it.map(it => it.f_followeeId)),
+				.then(it => new Set(it.map(it => it.f_followeeId))),
 			this.followRequestsRepository.createQueryBuilder('f')
 				.select('f.followerId')
 				.where('f.followeeId = :me', { me })
+				.andWhere('f.followerId IN (:...targets)', { targets })
 				.getRawMany<{ f_followerId: string }>()
-				.then(it => it.map(it => it.f_followerId)),
+				.then(it => new Set(it.map(it => it.f_followerId))),
 			this.blockingsRepository.createQueryBuilder('b')
 				.select('b.blockeeId')
 				.where('b.blockerId = :me', { me })
+				.andWhere('b.blockeeId IN (:...targets)', { targets })
 				.getRawMany<{ b_blockeeId: string }>()
-				.then(it => it.map(it => it.b_blockeeId)),
+				.then(it => new Set(it.map(it => it.b_blockeeId))),
 			this.blockingsRepository.createQueryBuilder('b')
 				.select('b.blockerId')
 				.where('b.blockeeId = :me', { me })
+				.andWhere('b.blockerId IN (:...targets)', { targets })
 				.getRawMany<{ b_blockerId: string }>()
-				.then(it => it.map(it => it.b_blockerId)),
+				.then(it => new Set(it.map(it => it.b_blockerId))),
 			this.mutingsRepository.createQueryBuilder('m')
 				.select('m.muteeId')
 				.where('m.muterId = :me', { me })
+				.andWhere('m.muteeId IN (:...targets)', { targets })
 				.getRawMany<{ m_muteeId: string }>()
-				.then(it => it.map(it => it.m_muteeId)),
+				.then(it => new Set(it.map(it => it.m_muteeId))),
 			this.renoteMutingsRepository.createQueryBuilder('m')
 				.select('m.muteeId')
 				.where('m.muterId = :me', { me })
+				.andWhere('m.muteeId IN (:...targets)', { targets })
 				.getRawMany<{ m_muteeId: string }>()
-				.then(it => it.map(it => it.m_muteeId)),
+				.then(it => new Set(it.map(it => it.m_muteeId))),
 		]);
 
 		return new Map(
@@ -303,13 +312,13 @@ export class UserEntityService implements OnModuleInit {
 						id: target,
 						following: following,
 						isFollowing: following != null,
-						isFollowed: followees.includes(target),
-						hasPendingFollowRequestFromYou: followersRequests.includes(target),
-						hasPendingFollowRequestToYou: followeesRequests.includes(target),
-						isBlocking: blockers.includes(target),
-						isBlocked: blockees.includes(target),
-						isMuted: muters.includes(target),
-						isRenoteMuted: renoteMuters.includes(target),
+						isFollowed: followees.has(target),
+						hasPendingFollowRequestFromYou: followersRequests.has(target),
+						hasPendingFollowRequestToYou: followeesRequests.has(target),
+						isBlocking: blockers.has(target),
+						isBlocked: blockees.has(target),
+						isMuted: muters.has(target),
+						isRenoteMuted: renoteMuters.has(target),
 					},
 				];
 			}),
@@ -417,10 +426,11 @@ export class UserEntityService implements OnModuleInit {
 			pinNotes?: Map<MiUser['id'], MiUserNotePining[]>,
 		},
 	): Promise<Packed<S>> {
-		const opts = Object.assign({
-			schema: 'UserLite',
+		const opts = {
 			includeSecrets: false,
-		}, options);
+			...options,
+			schema: options?.schema ?? 'UserLite',
+		};
 
 		const user = typeof src === 'object' ? src : await this.usersRepository.findOneByOrFail({ id: src });
 
@@ -693,6 +703,10 @@ export class UserEntityService implements OnModuleInit {
 			includeSecrets?: boolean,
 		},
 	): Promise<Packed<S>[]> {
+		if (users.length === 0) return [];
+
+		const schema = options?.schema ?? 'UserLite';
+
 		// -- IDのみの要素を補完して完全なエンティティ一覧を作る
 
 		const _users = users.filter((user): user is MiUser => typeof user !== 'string');
@@ -712,35 +726,38 @@ export class UserEntityService implements OnModuleInit {
 		let userMemos: Map<MiUser['id'], string | null> = new Map();
 		let pinNotes: Map<MiUser['id'], MiUserNotePining[]> = new Map();
 
-		if (options?.schema !== 'UserLite') {
+		if (schema !== 'UserLite') {
 			profilesMap = await this.userProfilesRepository.findBy({ userId: In(_userIds) })
 				.then(profiles => new Map(profiles.map(p => [p.userId, p])));
 
 			const meId = me ? me.id : null;
 			if (meId) {
-				userMemos = await this.userMemosRepository.findBy({ userId: meId })
+				userMemos = await this.userMemosRepository.findBy({ userId: meId, targetUserId: In(_userIds) })
 					.then(memos => new Map(memos.map(memo => [memo.targetUserId, memo.memo])));
 
 				if (_userIds.length > 0) {
 					userRelations = await this.getRelations(meId, _userIds);
-					pinNotes = await this.userNotePiningsRepository.createQueryBuilder('pin')
-						.where('pin.userId IN (:...userIds)', { userIds: _userIds })
-						.innerJoinAndSelect('pin.note', 'note')
-						.getMany()
-						.then(pinsNotes => {
-							const map = new Map<MiUser['id'], MiUserNotePining[]>();
-							for (const note of pinsNotes) {
-								const notes = map.get(note.userId) ?? [];
-								notes.push(note);
-								map.set(note.userId, notes);
-							}
-							for (const [, notes] of map.entries()) {
-								// pack側ではDESCで取得しているので、それに合わせて降順に並び替えておく
-								notes.sort((a, b) => b.id.localeCompare(a.id));
-							}
-							return map;
-						});
 				}
+			}
+
+			if (_userIds.length > 0) {
+				pinNotes = await this.userNotePiningsRepository.createQueryBuilder('pin')
+					.where('pin.userId IN (:...userIds)', { userIds: _userIds })
+					.innerJoinAndSelect('pin.note', 'note')
+					.getMany()
+					.then(pinsNotes => {
+						const map = new Map<MiUser['id'], MiUserNotePining[]>();
+						for (const note of pinsNotes) {
+							const notes = map.get(note.userId) ?? [];
+							notes.push(note);
+							map.set(note.userId, notes);
+						}
+						for (const [, notes] of map.entries()) {
+							// pack側ではDESCで取得しているので、それに合わせて降順に並び替えておく
+							notes.sort((a, b) => b.id.localeCompare(a.id));
+						}
+						return map;
+					});
 			}
 		}
 

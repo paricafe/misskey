@@ -34,7 +34,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 </template>
 
 <script lang="ts" setup>
-import { onMounted, ref } from 'vue';
+import { onDeactivated, onMounted, onUnmounted, ref } from 'vue';
 const props = defineProps<{
 	activity: {
 		total: number;
@@ -52,18 +52,24 @@ const pointsNote = ref<string>();
 const pointsReply = ref<string>();
 const pointsRenote = ref<string>();
 const pointsTotal = ref<string>();
+let stopDragging: (() => void) | null = null;
 
 function dragListen(fn: (ev: MouseEvent | TouchEvent) => void) {
+	stopDragging?.();
+	const clear = () => {
+		window.removeEventListener('mousemove', fn);
+		window.removeEventListener('mouseleave', clear);
+		window.removeEventListener('mouseup', clear);
+		stopDragging = null;
+	};
+	stopDragging = clear;
 	window.addEventListener('mousemove', fn);
-	window.addEventListener('mouseleave', dragClear.bind(null, fn));
-	window.addEventListener('mouseup', dragClear.bind(null, fn));
+	window.addEventListener('mouseleave', clear);
+	window.addEventListener('mouseup', clear);
 }
 
-function dragClear(fn: (ev: MouseEvent | TouchEvent) => void) {
-	window.removeEventListener('mousemove', fn);
-	window.removeEventListener('mouseleave', dragClear as any);
-	window.removeEventListener('mouseup', dragClear as any);
-}
+onDeactivated(() => stopDragging?.());
+onUnmounted(() => stopDragging?.());
 
 function getPositionX(event: MouseEvent | TouchEvent) {
 	return 'touches' in event && event.touches.length > 0 ? event.touches[0].clientX : 'clientX' in event ? event.clientX : 0;

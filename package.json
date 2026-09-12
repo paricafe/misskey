@@ -1,6 +1,6 @@
 {
 	"name": "misskey",
-	"version": "2026.9.0-pari.0",
+	"version": "2026.9.0-pari.8",
 	"codename": "nasubi",
 	"repository": {
 		"type": "git",
@@ -8,6 +8,7 @@
 	},
 	"packageManager": "pnpm@11.25.0",
 	"workspaces": [
+		"packages/mastodon-compat",
 		"packages/backend",
 		"packages/frontend-shared",
 		"packages/frontend",

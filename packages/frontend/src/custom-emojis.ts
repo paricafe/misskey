@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { shallowRef, computed, markRaw, watch } from 'vue';
+import { shallowRef, shallowReactive, computed, markRaw, watch } from 'vue';
 import * as Misskey from 'misskey-js';
 import { misskeyApi, misskeyApiGet } from '@/utility/misskey-api.js';
 import { get, set } from '@/utility/idb-proxy.js';
@@ -20,7 +20,7 @@ export const customEmojiCategories = computed<[ ...string[], null ]>(() => {
 	return markRaw([...Array.from(categories), null]);
 });
 
-export const customEmojisMap = new Map<string, Misskey.entities.EmojiSimple>();
+export const customEmojisMap = shallowReactive(new Map<string, Misskey.entities.EmojiSimple>());
 watch(customEmojis, emojis => {
 	customEmojisMap.clear();
 	for (const emoji of emojis) {
@@ -58,6 +58,12 @@ export async function fetchCustomEmojis(force = false) {
 	customEmojis.value = res.emojis;
 	set('emojis', res.emojis);
 	set('lastEmojisFetchedAt', now);
+}
+
+export async function fetchCustomEmojisForBoot(): Promise<void> {
+	// Cached emojis can render immediately while the catalog refreshes in the background.
+	const fetching = fetchCustomEmojis().catch(() => {});
+	if (!Array.isArray(storageCache)) await fetching;
 }
 
 let cachedTags: string[] | null = null;

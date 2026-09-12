@@ -77,12 +77,15 @@ export class UserBlockingService implements OnModuleInit {
 
 		await this.blockingsRepository.insert(blocking);
 
-		this.cacheService.userBlockingCache.refresh(blocker.id);
-		this.cacheService.userBlockedCache.refresh(blockee.id);
-
-		this.globalEventService.publishInternalEvent('blockingCreated', {
-			blockerId: blocker.id,
-			blockeeId: blockee.id,
+		await Promise.all([
+			this.cacheService.userBlockingCache.refresh(blocker.id),
+			this.cacheService.userBlockedCache.refresh(blockee.id),
+		]).finally(() => {
+			// The database change also needs to invalidate peers if refreshing Redis fails.
+			this.globalEventService.publishInternalEvent('blockingCreated', {
+				blockerId: blocker.id,
+				blockeeId: blockee.id,
+			});
 		});
 
 		if (this.userEntityService.isLocalUser(blocker) && this.userEntityService.isRemoteUser(blockee)) {
@@ -168,12 +171,14 @@ export class UserBlockingService implements OnModuleInit {
 
 		await this.blockingsRepository.delete(blocking.id);
 
-		this.cacheService.userBlockingCache.refresh(blocker.id);
-		this.cacheService.userBlockedCache.refresh(blockee.id);
-
-		this.globalEventService.publishInternalEvent('blockingDeleted', {
-			blockerId: blocker.id,
-			blockeeId: blockee.id,
+		await Promise.all([
+			this.cacheService.userBlockingCache.refresh(blocker.id),
+			this.cacheService.userBlockedCache.refresh(blockee.id),
+		]).finally(() => {
+			this.globalEventService.publishInternalEvent('blockingDeleted', {
+				blockerId: blocker.id,
+				blockeeId: blockee.id,
+			});
 		});
 
 		// deliver if remote bloking

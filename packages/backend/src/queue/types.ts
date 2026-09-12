@@ -136,6 +136,8 @@ export type EndedPollNotificationJobData = {
 
 export type PostScheduledNoteJobData = {
 	noteDraftId: string;
+	// Jobs created before revisions were introduced belong to revision zero.
+	scheduleRevision?: number;
 };
 
 export type SystemWebhookDeliverJobData<T extends SystemWebhookEventType = SystemWebhookEventType> = {

@@ -29,11 +29,10 @@ export class BakeBufferedReactionsProcessorService {
 	@bindThis
 	public async process(): Promise<void> {
 		if (!this.meta.enableReactionsBuffering) {
-			this.logger.info('Reactions buffering is disabled. Skipping...');
-			return;
+			this.logger.info('Draining remaining buffered reactions after buffering was disabled...');
+		} else {
+			this.logger.info('Baking buffered reactions...');
 		}
-
-		this.logger.info('Baking buffered reactions...');
 
 		await this.reactionsBufferingService.bake();
 

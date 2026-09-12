@@ -15,8 +15,9 @@ import { IdentifiableError } from '@/misc/identifiable-error.js';
 import { isRenote, isQuote } from '@/misc/is-renote.js';
 import { NoteEntityService } from '@/core/entities/NoteEntityService.js';
 import { QueueService } from '@/core/QueueService.js';
+import { LoggerService } from '@/core/LoggerService.js';
 
-export type NoteDraftOptions = Omit<MiNoteDraft, 'id' | 'userId' | 'user' | 'reply' | 'renote' | 'channel'>;
+export type NoteDraftOptions = Omit<MiNoteDraft, 'id' | 'userId' | 'user' | 'reply' | 'renote' | 'channel' | 'scheduleRevision'>;
 
 @Injectable()
 export class NoteDraftService {
@@ -43,6 +44,7 @@ export class NoteDraftService {
 		private idService: IdService,
 		private noteEntityService: NoteEntityService,
 		private queueService: QueueService,
+		private loggerService: LoggerService,
 	) {
 	}
 
@@ -85,10 +87,11 @@ export class NoteDraftService {
 			...data,
 			id: this.idService.gen(),
 			userId: me.id,
+			scheduleRevision: 1,
 		});
 
 		if (draft.scheduledAt && draft.isActuallyScheduled) {
-			this.schedule(draft);
+			await this.schedulePersistedDraft(draft);
 		}
 
 		return draft;
@@ -122,17 +125,20 @@ export class NoteDraftService {
 		await this.validate(me, data);
 
 		const updatedDraft = await this.noteDraftsRepository.createQueryBuilder().update()
-			.set(data)
-			.where('id = :id', { id: draftId })
+			.set({ ...data, scheduleRevision: () => '"scheduleRevision" + 1' })
+			.where('id = :id AND "userId" = :userId', { id: draftId, userId: me.id })
 			.returning('*')
 			.execute()
 			.then((response) => response.raw[0]);
 
-		this.clearSchedule(draftId).then(() => {
-			if (updatedDraft.scheduledAt != null && updatedDraft.isActuallyScheduled) {
-				this.schedule(updatedDraft);
-			}
-		});
+		if (updatedDraft == null) {
+			throw new IdentifiableError('49cd6b9d-848e-41ee-b0b9-adaca711a6b1', 'No such note draft');
+		}
+
+		// Publish the new revision before removing the previous job. A locked old job
+		// is harmless because publication validates the revision again in PostgreSQL.
+		await this.schedulePersistedDraft(updatedDraft);
+		await this.clearObsoleteSchedule(draft.id, draft.scheduleRevision);
 
 		return updatedDraft;
 	}
@@ -148,9 +154,12 @@ export class NoteDraftService {
 			throw new IdentifiableError('49cd6b9d-848e-41ee-b0b9-adaca711a6b1', 'No such note draft');
 		}
 
-		await this.noteDraftsRepository.delete(draft.id);
+		const deleted = await this.noteDraftsRepository.delete(draft.id);
+		if (!deleted.affected) {
+			throw new IdentifiableError('49cd6b9d-848e-41ee-b0b9-adaca711a6b1', 'No such note draft');
+		}
 
-		this.clearSchedule(draftId);
+		await this.clearObsoleteSchedule(draftId, draft.scheduleRevision);
 	}
 
 	@bindThis
@@ -304,17 +313,48 @@ export class NoteDraftService {
 		//#endregion
 	}
 
+	private async schedulePersistedDraft(draft: MiNoteDraft): Promise<void> {
+		try {
+			await this.schedule(draft);
+		} catch (error) {
+			// A committed schedule is accepted even while Redis is unavailable.
+			// Reporting failure here would invite the client to create a duplicate.
+			this.loggerService.getLogger('note-drafts').error({ message: 'Failed to enqueue persisted draft; schedule recovery will retry', error });
+		}
+	}
+
+	private async clearObsoleteSchedule(draftId: string, revision: number): Promise<void> {
+		try {
+			await this.clearSchedule(draftId, revision);
+		} catch (error) {
+			// The old revision can no longer publish, even if Redis cleanup fails.
+			this.loggerService.getLogger('note-drafts').error({ message: 'Failed to remove obsolete scheduled job', error });
+		}
+	}
+
 	@bindThis
-	public async schedule(draft: MiNoteDraft): Promise<void> {
+	public async schedule(draft: Pick<MiNoteDraft, 'id' | 'scheduledAt' | 'isActuallyScheduled' | 'scheduleRevision'>): Promise<void> {
 		if (!draft.isActuallyScheduled) return;
 		if (draft.scheduledAt == null) return;
-		if (draft.scheduledAt.getTime() <= Date.now()) return;
 
-		const delay = draft.scheduledAt.getTime() - Date.now();
-		this.queueService.postScheduledNoteQueue.add(draft.id, {
+		const jobId = `${draft.id}-${draft.scheduleRevision}`;
+		const previous = await this.queueService.postScheduledNoteQueue.getJob(jobId);
+		if (previous) {
+			const state = await previous.getState();
+			if (state === 'failed' || state === 'completed') {
+				await previous.retry(state);
+			}
+			return;
+		}
+
+		await this.queueService.postScheduledNoteQueue.add(draft.id, {
 			noteDraftId: draft.id,
+			scheduleRevision: draft.scheduleRevision,
 		}, {
-			delay,
+			jobId,
+			delay: Math.max(0, draft.scheduledAt.getTime() - Date.now()),
+			attempts: 5,
+			backoff: { type: 'exponential', delay: 60_000 },
 			removeOnComplete: {
 				age: 3600 * 24 * 7, // keep up to 7 days
 				count: 30,
@@ -327,13 +367,40 @@ export class NoteDraftService {
 	}
 
 	@bindThis
-	public async clearSchedule(draftId: MiNoteDraft['id']): Promise<void> {
-		// TODO: 線形探索なのをどうにかする
-		const jobs = await this.queueService.postScheduledNoteQueue.getJobs(['delayed', 'waiting', 'active']);
-		for (const job of jobs) {
-			if (job.data.noteDraftId === draftId) {
-				await job.remove();
+	public async clearSchedule(draftId: MiNoteDraft['id'], revision: number): Promise<void> {
+		const job = await this.queueService.postScheduledNoteQueue.getJob(`${draftId}-${revision}`);
+		if (job == null || await job.isActive()) return;
+		try {
+			await job.remove();
+		} catch (error) {
+			// The job may have become active between the state check and removal.
+			if (!await job.isActive()) throw error;
+		}
+	}
+
+	@bindThis
+	public async recoverSchedules(): Promise<void> {
+		// The database is the durable scheduling record. Bound both the look-ahead
+		// and each page so a Redis restart does not require loading every draft.
+		const dueBefore = new Date(Date.now() + 60_000);
+		let cursor: { scheduledAt: Date; id: string } | undefined;
+		// At most 1,000 schedules per sweep; subsequent sweeps continue as the
+		// publication workers consume these rows, without monopolizing system jobs.
+		for (let page = 0; page < 10; page++) {
+			const query = this.noteDraftsRepository.createQueryBuilder('draft')
+				.where('draft."isActuallyScheduled" = true')
+				.andWhere('draft."scheduledAt" <= :dueBefore', { dueBefore })
+				.orderBy('draft."scheduledAt"', 'ASC')
+				.addOrderBy('draft.id', 'ASC')
+				.take(100);
+			if (cursor) {
+				query.andWhere('(draft."scheduledAt", draft.id) > (:scheduledAt, :id)', cursor);
 			}
+			const drafts = await query.getMany();
+			if (drafts.length === 0) return;
+			for (const draft of drafts) await this.schedule(draft);
+			const last = drafts.at(-1)!;
+			cursor = { scheduledAt: last.scheduledAt!, id: last.id };
 		}
 	}
 }
