@@ -174,6 +174,7 @@ export class ServerService implements OnApplicationShutdown {
 			installGateway(fastify, {
 				publicUrl: this.config.url,
 				nativeUrl: `http://127.0.0.1:${this.config.port}`,
+				nativeSocketPath: this.config.socket,
 				store,
 				maxFileSize: this.config.maxFileSize,
 				transport: async request => {

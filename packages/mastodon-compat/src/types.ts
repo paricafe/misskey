@@ -32,6 +32,8 @@ export type NativeTransport = (request: NativeTransportRequest) => Promise<Nativ
 export type NativeClientOptions = {
 	baseUrl: string;
 	publicUrl: string;
+	/** Unix socket for native streaming; HTTP requests use the configured transport. */
+	socketPath?: string;
 	transport?: NativeTransport;
 };
 

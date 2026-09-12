@@ -26,6 +26,7 @@ export type { NativeTransport } from './types.js';
 export interface GatewayOptions {
 	publicUrl: string;
 	nativeUrl: string;
+	nativeSocketPath?: string;
 	store: CompatStore;
 	maxFileSize?: number;
 	transport?: NativeTransport;
@@ -33,7 +34,7 @@ export interface GatewayOptions {
 
 function dependencies(options: GatewayOptions) {
 	const store = options.store;
-	const native = new NativeClient({ baseUrl: options.nativeUrl, publicUrl: options.publicUrl, transport: options.transport });
+	const native = new NativeClient({ baseUrl: options.nativeUrl, publicUrl: options.publicUrl, socketPath: options.nativeSocketPath, transport: options.transport });
 	return { store, native, entities: new EntityConverter(options.publicUrl), publicUrl: options.publicUrl, nativeUrl: options.nativeUrl };
 }
 

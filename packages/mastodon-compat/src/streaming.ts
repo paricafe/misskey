@@ -4,6 +4,7 @@
  */
 
 import type { IncomingMessage, Server } from 'node:http';
+import { createConnection } from 'node:net';
 import type { Duplex } from 'node:stream';
 import WebSocket, { WebSocketServer } from 'ws';
 import type { EntityConverter } from './entities.js';
@@ -16,7 +17,7 @@ import type { CompatStore, Grant } from './store.js';
 import type { Json } from './types.js';
 
 export interface StreamingDependencies {
-	native: Pick<NativeClient, 'call' | 'socketUrl'>;
+	native: Pick<NativeClient, 'call' | 'socketUrl' | 'socketPath'>;
 	entities: EntityConverter;
 	store: CompatStore;
 	publicUrl: string;
@@ -106,7 +107,12 @@ function rejectUpgrade(socket: Duplex, status: number, message: string): void {
 }
 
 async function openNative(native: StreamingDependencies['native'], token: string, signal: AbortSignal): Promise<WebSocket> {
-	const socket = new WebSocket(native.socketUrl(token), { handshakeTimeout: 10_000, maxPayload: MAX_BUFFERED_BYTES, followRedirects: false });
+	const socketPath = native.socketPath;
+	const socket = new WebSocket(native.socketUrl(token), {
+		handshakeTimeout: 10_000, maxPayload: MAX_BUFFERED_BYTES, followRedirects: false,
+		// ws resets socketPath internally; keep the HTTP URL intact and override only the transport.
+		...(socketPath ? { createConnection: () => createConnection({ path: socketPath }) } : {}),
+	});
 	// A transport error may contain its credential-bearing URL. It must never reach a client or a logger.
 	socket.on('error', () => undefined);
 	await new Promise<void>((resolve, reject) => {

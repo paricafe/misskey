@@ -48,11 +48,13 @@ async function fetchTransport(request: NativeTransportRequest): Promise<NativeTr
 export class NativeClient {
 	readonly baseUrl: string;
 	readonly publicUrl: string;
+	readonly socketPath?: string;
 	private readonly transport: NativeTransport;
 
 	constructor(options: NativeClientOptions) {
 		this.baseUrl = httpUrl(options.baseUrl).toString();
 		this.publicUrl = httpUrl(options.publicUrl).toString();
+		this.socketPath = options.socketPath;
 		this.transport = options.transport ?? fetchTransport;
 	}
 
