@@ -1,0 +1,49 @@
+packages/backend/src/queue/types.ts
+  s_d32bac5aaa6ca1::t_11064c30c0a223 139-140
+packages/backend/src/queue/processors/PostScheduledNoteProcessorService.test.ts
+  s_d32bac5aaa6ca1::t_ad92a43c968356 7-8,13-14,17-20,23-26,31-35,38-85
+packages/backend/src/core/NoteCreateService.ts
+  s_d32bac5aaa6ca1::t_48960234ddce4e 17,175-176,199-200,292,432,726,729-739,742-759,771
+packages/backend/src/core/NoteCreateService.scheduled.test.ts
+  s_d32bac5aaa6ca1::t_5b02d642f82b21 1-86
+packages/backend/src/queue/processors/PostScheduledNoteProcessorService.ts
+  s_d32bac5aaa6ca1::t_13b53a1f6f6644 12-14,30,35-39,46-48,52,55,74-90,92-95
+packages/backend/src/core/NoteDraftService.test.ts
+  s_d32bac5aaa6ca1::t_ad92a43c968356 1-7,9-13,15-16,18,20-34,37,41,54-91,121-122
+  s_d32bac5aaa6ca1::t_acc3c3303266ef 42
+  s_d32bac5aaa6ca1::t_0dac3c30403e4c 14,17,19,35-36,38-40,43-53
+  s_d32bac5aaa6ca1::t_7effb04b9981e6 8,92-120
+packages/backend/src/core/QueueService.ts
+  s_d32bac5aaa6ca1::t_0dac3c30403e4c 7,106,123,151-164
+  s_d32bac5aaa6ca1::t_48960234ddce4e 77-78
+  s_d32bac5aaa6ca1::t_87208bb5b670c8 76,165-167
+packages/backend/src/core/NoteDraftService.ts
+  s_d32bac5aaa6ca1::t_0dac3c30403e4c 18,47,94,140-141,162,316-321,323-330,332
+  s_d32bac5aaa6ca1::t_7effb04b9981e6 387-389
+  s_d32bac5aaa6ca1::t_48960234ddce4e 157-160
+  s_d32bac5aaa6ca1::t_11064c30c0a223 20,90,128-129,134-139,336,340-350,352,354-357,370-386,390-397,399-403
+  s_d32bac5aaa6ca1::t_acc3c3303266ef 322,331
+  s_d32bac5aaa6ca1::t_912fadf6dc8ba4 333-334
+packages/backend/migration/1789193346727-reliable-scheduled-notes.js
+  s_d32bac5aaa6ca1::t_48960234ddce4e 1-18
+packages/backend/src/models/NoteDraft.ts
+  s_d32bac5aaa6ca1::t_11064c30c0a223 17,169-171
+packages/backend/src/queue/QueueProcessorService.ts
+  s_d32bac5aaa6ca1::t_48960234ddce4e 176
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "09a19e0f6db602ec18315dcb64fb40cf77e213f3",
+  "prompts": {},
+  "sessions": {
+    "s_d32bac5aaa6ca1": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a09430-b6ee-7310-ac0a-9dee4efe823d",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "Natsuki-Kaede <i@pari.network>"
+    }
+  }
+}
