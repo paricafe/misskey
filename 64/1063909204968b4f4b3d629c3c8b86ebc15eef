@@ -1,0 +1,39 @@
+packages/mastodon-compat/src/postgres-store.ts
+  s_d32bac5aaa6ca1::t_4c9407974e455c 8,60-66
+  s_d32bac5aaa6ca1::t_b57f16939b712f 67-68
+packages/mastodon-compat/test/store.test.ts
+  s_d32bac5aaa6ca1::t_5f62eb8068f0d9 17-35
+packages/mastodon-compat/test/postgres-store.test.ts
+  s_d32bac5aaa6ca1::t_5f62eb8068f0d9 22-40
+packages/mastodon-compat/test/routes.test.ts
+  s_d32bac5aaa6ca1::t_494d1276b54b21 8,91
+  s_d32bac5aaa6ca1::t_406a101bfe8134 121-151
+  s_d32bac5aaa6ca1::t_5f62eb8068f0d9 43-46,86-90,92-119
+  s_d32bac5aaa6ca1::t_0391719a5c9821 120
+packages/mastodon-compat/src/store.ts
+  s_d32bac5aaa6ca1::t_4c9407974e455c 47-48,54,131-137,233-237
+  s_d32bac5aaa6ca1::t_3e085a9a929cd2 238
+packages/mastodon-compat/src/features.ts
+  s_d32bac5aaa6ca1::t_4c9407974e455c 155
+packages/mastodon-compat/src/routes.ts
+  s_d32bac5aaa6ca1::t_4c9407974e455c 12,24-25,44-46,50-52,55-91,93,95,97-108
+  s_d32bac5aaa6ca1::t_29a48da6036b57 92,94,96
+packages/mastodon-compat/test/media-search.test.ts
+  s_d32bac5aaa6ca1::t_5f62eb8068f0d9 51-53
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "641063909204968b4f4b3d629c3c8b86ebc15eef",
+  "prompts": {},
+  "sessions": {
+    "s_d32bac5aaa6ca1": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a09430-b6ee-7310-ac0a-9dee4efe823d",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "Natsuki-Kaede <i@pari.network>"
+    }
+  }
+}
