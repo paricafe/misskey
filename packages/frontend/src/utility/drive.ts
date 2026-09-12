@@ -73,8 +73,31 @@ export function uploadFile(file: File | Blob, options: {
 			reject(new UploadAbortedError());
 		}, { once: true });
 
+		const failUpload = (error: Error) => {
+			reject(error);
+			os.alert({
+				type: 'error',
+				title: i18n.ts.failedToUpload,
+				text: error.message,
+			});
+		};
+
 		xhr.open('POST', apiUrl + '/drive/files/create', true);
+		xhr.onerror = () => failUpload(new Error(i18n.ts.serverIsDead));
+		xhr.ontimeout = () => failUpload(new Error(i18n.ts.serverIsDead));
+		xhr.onabort = () => reject(new UploadAbortedError());
 		xhr.onload = ((ev: ProgressEvent<XMLHttpRequest>) => {
+			let response;
+			try {
+				// Proxies may return an HTML error page instead of an API response.
+				if (xhr.status !== 413 && ev.target?.response != null) {
+					response = JSON.parse(ev.target.response);
+				}
+			} catch {
+				failUpload(new Error(`${i18n.ts.somethingHappened} (HTTP ${xhr.status})`));
+				return;
+			}
+
 			if (xhr.status !== 200 || ev.target == null || ev.target.response == null) {
 				if (xhr.status === 413) {
 					os.alert({
@@ -82,8 +105,8 @@ export function uploadFile(file: File | Blob, options: {
 						title: i18n.ts.failedToUpload,
 						text: i18n.ts.cannotUploadBecauseExceedsFileSizeLimit,
 					});
-				} else if (ev.target?.response) {
-					const res = JSON.parse(ev.target.response);
+				} else if (response?.error) {
+					const res = response;
 					if (res.error?.id === 'bec5bd69-fba3-43c9-b4fb-2894b66ad5d2') {
 						os.alert({
 							type: 'error',
@@ -121,7 +144,12 @@ export function uploadFile(file: File | Blob, options: {
 				return;
 			}
 
-			const driveFile = JSON.parse(ev.target.response);
+			if (response == null || typeof response !== 'object' || Array.isArray(response) || typeof response.id !== 'string' || response.id.length === 0) {
+				failUpload(new Error(`${i18n.ts.somethingHappened} (HTTP ${xhr.status})`));
+				return;
+			}
+
+			const driveFile = response;
 			globalEvents.emit('driveFileCreated', driveFile);
 			resolve(driveFile);
 		}) as (ev: ProgressEvent<EventTarget>) => void;
