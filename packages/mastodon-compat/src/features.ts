@@ -103,30 +103,30 @@ function updatedFilter(body: Json, existing?: Filter): Filter {
 	return filter;
 }
 
-function getFilter(store: CompatStore, userId: string, id: string): Filter {
-	const filter = store.get<Filter>('filter', userId, id);
+async function getFilter(store: CompatStore, userId: string, id: string): Promise<Filter> {
+	const filter = await store.get<Filter>('filter', userId, id);
 	if (!filter) throw new HttpError(404, 'Record not found');
 	return filter;
 }
 
-function saveFilter(store: CompatStore, userId: string, filter: Filter): Filter {
-	store.transaction(() => {
-		store.put('filter', userId, filter.id, filter);
-		store.put('filter-revision', userId, 'current', newId());
+async function saveFilter(store: CompatStore, userId: string, filter: Filter): Promise<Filter> {
+	await store.transaction(async () => {
+		await store.put('filter', userId, filter.id, filter);
+		await store.put('filter-revision', userId, 'current', newId());
 	});
 	return filter;
 }
 
-function findKeyword(store: CompatStore, userId: string, id: string): { filter: Filter; keyword: FilterKeyword } {
-	for (const { value: filter } of store.list<Filter>('filter', userId)) {
+async function findKeyword(store: CompatStore, userId: string, id: string): Promise<{ filter: Filter; keyword: FilterKeyword }> {
+	for (const { value: filter } of await store.list<Filter>('filter', userId)) {
 		const keyword = filter.keywords.find(item => item.id === id);
 		if (keyword) return { filter, keyword };
 	}
 	throw new HttpError(404, 'Record not found');
 }
 
-function findStatusFilter(store: CompatStore, userId: string, id: string): { filter: Filter; status: FilterStatus } {
-	for (const { value: filter } of store.list<Filter>('filter', userId)) {
+async function findStatusFilter(store: CompatStore, userId: string, id: string): Promise<{ filter: Filter; status: FilterStatus }> {
+	for (const { value: filter } of await store.list<Filter>('filter', userId)) {
 		const status = filter.statuses.find(item => item.id === id);
 		if (status) return { filter, status };
 	}
@@ -152,8 +152,8 @@ function keywordMatches(keyword: FilterKeyword, text: string): boolean {
 }
 
 /** Mastodon v2 delegates hide/warn/blur presentation to clients through FilterResult metadata. */
-export function applyFilters(store: CompatStore, userId: string, status: Json, context?: FilterContext, now = Date.now()): Json {
-	const filters = userId ? store.list<Filter>('filter', userId).map(item => item.value)
+export async function applyFilters(store: CompatStore, userId: string, status: Json, context?: FilterContext, now = Date.now()): Promise<Json> {
+	const filters = userId ? (await store.list<Filter>('filter', userId)).map(item => item.value)
 		.filter(filter => (!filter.expires_at || Date.parse(filter.expires_at) > now) && (!context || filter.context.includes(context))) : [];
 	const visit = (source: Json, depth: number): Json => {
 		if (depth > 4) return source;
@@ -193,8 +193,8 @@ export async function conversationRootId(note: Json, call: NativeCall): Promise<
 	throw new HttpError(422, 'The conversation reply chain exceeds the supported depth');
 }
 
-export function conversationState(store: CompatStore, userId: string, rootId: string, note: Json): { hidden: boolean; unread: boolean } {
-	const state = store.get<ConversationState>('conversation', userId, rootId);
+export async function conversationState(store: CompatStore, userId: string, rootId: string, note: Json): Promise<{ hidden: boolean; unread: boolean }> {
+	const state = await store.get<ConversationState>('conversation', userId, rootId);
 	const incoming = (note.userId ?? note.user?.id) !== userId;
 	return {
 		hidden: !!state?.hiddenThrough && compareIds(string(note.id), state.hiddenThrough) <= 0,
@@ -205,7 +205,7 @@ export function conversationState(store: CompatStore, userId: string, rootId: st
 export async function conversationFromNote(store: CompatStore, userId: string, note: Json, call: NativeCall, entities: EntityConverter, options: { rootId?: string; status?: Json } = {}): Promise<Json | null> {
 	if (note.visibility !== 'specified' || note.isHidden === true) return null;
 	const id = options.rootId ?? await conversationRootId(note, call);
-	const previous = store.get<ConversationState>('conversation', userId, id);
+	const previous = await store.get<ConversationState>('conversation', userId, id);
 	let latest = note;
 	if (previous?.latestId && compareIds(previous.latestId, note.id) > 0) {
 		try {
@@ -217,17 +217,22 @@ export async function conversationFromNote(store: CompatStore, userId: string, n
 	}
 	const lastStatus = latest === note ? options.status ?? entities.status(latest, { viewerId: userId, allowLocalOnly: true }) : entities.status(latest, { viewerId: userId, allowLocalOnly: true });
 	if (!lastStatus) return null;
-	const state = conversationState(store, userId, id, latest);
+	const state = await store.transaction(async () => {
+		const current = await store.get<ConversationState>('conversation', userId, id);
+		const state = await conversationState(store, userId, id, latest);
+		const replaceLatest = current?.latestId !== latest.id && (current?.latestId === previous?.latestId || !current?.latestId || compareIds(latest.id, current.latestId) > 0);
+		if (!state.hidden && replaceLatest) await store.put('conversation', userId, id, { ...current, latestId: latest.id });
+		return state;
+	});
 	if (state.hidden) return null;
-	if (previous?.latestId !== latest.id) store.put('conversation', userId, id, { ...previous, latestId: latest.id });
 	const participantIds = new Set<string>([latest.userId ?? latest.user?.id, ...strings(latest.visibleUserIds)].filter(value => typeof value === 'string' && value && value !== userId));
 	const accounts = await Promise.all([...participantIds].map(async participantId => entities.account(participantId === latest.user?.id ? latest.user : await call('users/show', { userId: participantId }))));
-	return { id, accounts, unread: state.unread, last_status: applyFilters(store, userId, decorateStatus(store, lastStatus, userId)) };
+	return { id, accounts, unread: state.unread, last_status: await applyFilters(store, userId, await decorateStatus(store, lastStatus, userId)) };
 }
 
 /** Recover a conversation after its last visible note was removed, using only native APIs. */
 export async function latestConversationNote(store: CompatStore, userId: string, rootId: string, call: NativeCall, removedId: string): Promise<Json | null> {
-	const previous = store.get<ConversationState>('conversation', userId, rootId);
+	const previous = await store.get<ConversationState>('conversation', userId, rootId);
 	if (previous?.latestId && previous.latestId !== removedId) {
 		try {
 			const latest = await call('notes/show', { noteId: previous.latestId });
@@ -258,7 +263,11 @@ export async function latestConversationNote(store: CompatStore, userId: string,
 		}
 		if (latest && (incomingDone || compareIds(latest.id, incomingCursor!) >= 0) && (outgoingDone || compareIds(latest.id, outgoingCursor!) >= 0)) break;
 	}
-	store.put('conversation', userId, rootId, { ...previous, latestId: latest?.id });
+	const latestId = latest?.id;
+	await store.transaction(async () => {
+		const current = await store.get<ConversationState>('conversation', userId, rootId);
+		if (current?.latestId === previous?.latestId || current?.latestId === removedId) await store.put('conversation', userId, rootId, { ...current, latestId });
+	});
 	return latest;
 }
 
@@ -301,7 +310,7 @@ async function conversations(routes: Routes, context: RequestContext): Promise<J
 			const id = await conversationRootId(note, call);
 			if (context.query.max_id && compareIds(id, string(context.query.max_id)) >= 0) continue;
 			if ((context.query.since_id || context.query.min_id) && compareIds(id, string(context.query.since_id || context.query.min_id)) <= 0) continue;
-			if (conversationState(routes.deps.store, context.userId, id, note).hidden) continue;
+			if ((await conversationState(routes.deps.store, context.userId, id, note)).hidden) continue;
 			if (!groups.has(id) || compareIds(note.id, groups.get(id)!.id) > 0) groups.set(id, note);
 		}
 		if (groups.size >= limit) break;
@@ -316,80 +325,84 @@ export function registerFeatures(routes: Routes): void {
 	const { store, entities, publicUrl } = routes.deps;
 	const save = (userId: string, filter: Filter) => saveFilter(store, userId, filter);
 
-	add('GET', '/api/v2/filters', 'read:filters', c => store.list<Filter>('filter', c.userId).map(item => item.value));
-	add('GET', '/api/v2/filters/:id', 'read:filters', c => getFilter(store, c.userId, string(c.params.id)));
-	add('POST', '/api/v2/filters', 'write:filters', c => {
-		if (store.list('filter', c.userId).length >= 200) throw new HttpError(422, 'The filter limit has been reached');
+	add('GET', '/api/v2/filters', 'read:filters', async c => (await store.list<Filter>('filter', c.userId)).map(item => item.value));
+	add('GET', '/api/v2/filters/:id', 'read:filters', async c => getFilter(store, c.userId, string(c.params.id)));
+	add('POST', '/api/v2/filters', 'write:filters', async c => store.transaction(async () => {
+		if ((await store.list('filter', c.userId)).length >= 200) throw new HttpError(422, 'The filter limit has been reached');
 		return save(c.userId, updatedFilter(c.body));
-	});
-	add('PUT', '/api/v2/filters/:id', 'write:filters', c => save(c.userId, updatedFilter(c.body, getFilter(store, c.userId, string(c.params.id)))));
-	add('DELETE', '/api/v2/filters/:id', 'write:filters', c => {
-		const filter = getFilter(store, c.userId, string(c.params.id));
-		store.transaction(() => { store.delete('filter', c.userId, filter.id); store.put('filter-revision', c.userId, 'current', newId()); });
+	}));
+	add('PUT', '/api/v2/filters/:id', 'write:filters', async c => store.transaction(async () => save(c.userId, updatedFilter(c.body, await getFilter(store, c.userId, string(c.params.id))))));
+	add('DELETE', '/api/v2/filters/:id', 'write:filters', async c => store.transaction(async () => {
+		const filter = await getFilter(store, c.userId, string(c.params.id));
+		await store.delete('filter', c.userId, filter.id);
+		await store.put('filter-revision', c.userId, 'current', newId());
 		return {};
-	});
-	add('GET', '/api/v2/filters/:id/keywords', 'read:filters', c => getFilter(store, c.userId, string(c.params.id)).keywords);
-	add('POST', '/api/v2/filters/:id/keywords', 'write:filters', c => {
-		const filter = getFilter(store, c.userId, string(c.params.id));
+	}));
+	add('GET', '/api/v2/filters/:id/keywords', 'read:filters', async c => (await getFilter(store, c.userId, string(c.params.id))).keywords);
+	add('POST', '/api/v2/filters/:id/keywords', 'write:filters', async c => store.transaction(async () => {
+		const filter = await getFilter(store, c.userId, string(c.params.id));
 		filter.keywords = updateKeywords(filter, [{ keyword: c.body.keyword, whole_word: c.body.whole_word }]);
-		save(c.userId, filter);
+		await save(c.userId, filter);
 		return filter.keywords.at(-1);
-	});
-	add('GET', '/api/v2/filters/keywords/:id', 'read:filters', c => findKeyword(store, c.userId, string(c.params.id)).keyword);
-	add('PUT', '/api/v2/filters/keywords/:id', 'write:filters', c => {
-		const { filter, keyword } = findKeyword(store, c.userId, string(c.params.id));
+	}));
+	add('GET', '/api/v2/filters/keywords/:id', 'read:filters', async c => (await findKeyword(store, c.userId, string(c.params.id))).keyword);
+	add('PUT', '/api/v2/filters/keywords/:id', 'write:filters', async c => store.transaction(async () => {
+		const { filter, keyword } = await findKeyword(store, c.userId, string(c.params.id));
 		filter.keywords = updateKeywords(filter, [{ id: keyword.id, keyword: requiredText(c.body.keyword, 'Keyword', 400), ...(c.body.whole_word !== undefined ? { whole_word: c.body.whole_word } : {}) }]);
-		save(c.userId, filter);
+		await save(c.userId, filter);
 		return filter.keywords.find(item => item.id === keyword.id);
-	});
-	add('DELETE', '/api/v2/filters/keywords/:id', 'write:filters', c => {
-		const { filter, keyword } = findKeyword(store, c.userId, string(c.params.id));
+	}));
+	add('DELETE', '/api/v2/filters/keywords/:id', 'write:filters', async c => store.transaction(async () => {
+		const { filter, keyword } = await findKeyword(store, c.userId, string(c.params.id));
 		filter.keywords = filter.keywords.filter(item => item.id !== keyword.id);
-		save(c.userId, filter);
+		await save(c.userId, filter);
 		return {};
-	});
-	add('GET', '/api/v2/filters/:id/statuses', 'read:filters', c => getFilter(store, c.userId, string(c.params.id)).statuses);
+	}));
+	add('GET', '/api/v2/filters/:id/statuses', 'read:filters', async c => (await getFilter(store, c.userId, string(c.params.id))).statuses);
 	add('POST', '/api/v2/filters/:id/statuses', 'write:filters', async c => {
-		const filter = getFilter(store, c.userId, string(c.params.id));
+		await getFilter(store, c.userId, string(c.params.id));
 		const statusId = requiredText(c.body.status_id, 'Status identifier');
 		await routes.status(await routes.note(c, statusId), c);
-		const existing = filter.statuses.find(item => item.status_id === statusId);
-		if (existing) return existing;
-		if (filter.statuses.length >= 1000) throw new HttpError(422, 'The status filter limit has been reached');
-		const status = { id: newId(), status_id: statusId };
-		filter.statuses.push(status);
-		save(c.userId, filter);
-		return status;
+		return store.transaction(async () => {
+			const filter = await getFilter(store, c.userId, string(c.params.id));
+			const existing = filter.statuses.find(item => item.status_id === statusId);
+			if (existing) return existing;
+			if (filter.statuses.length >= 1000) throw new HttpError(422, 'The status filter limit has been reached');
+			const status = { id: newId(), status_id: statusId };
+			filter.statuses.push(status);
+			await save(c.userId, filter);
+			return status;
+		});
 	});
-	add('GET', '/api/v2/filters/statuses/:id', 'read:filters', c => findStatusFilter(store, c.userId, string(c.params.id)).status);
-	add('DELETE', '/api/v2/filters/statuses/:id', 'write:filters', c => {
-		const { filter, status } = findStatusFilter(store, c.userId, string(c.params.id));
+	add('GET', '/api/v2/filters/statuses/:id', 'read:filters', async c => (await findStatusFilter(store, c.userId, string(c.params.id))).status);
+	add('DELETE', '/api/v2/filters/statuses/:id', 'write:filters', async c => store.transaction(async () => {
+		const { filter, status } = await findStatusFilter(store, c.userId, string(c.params.id));
 		filter.statuses = filter.statuses.filter(item => item.id !== status.id);
-		save(c.userId, filter);
+		await save(c.userId, filter);
 		return {};
-	});
+	}));
 
-	add('GET', '/api/v1/filters', 'read:filters', c => store.list<Filter>('filter', c.userId).flatMap(({ value: filter }) => filter.keywords.map(keyword => legacyFilter(filter, keyword))));
-	add('GET', '/api/v1/filters/:id', 'read:filters', c => { const { filter, keyword } = findKeyword(store, c.userId, string(c.params.id)); return legacyFilter(filter, keyword); });
-	add('POST', '/api/v1/filters', 'write:filters', c => {
-		if (store.list('filter', c.userId).length >= 200) throw new HttpError(422, 'The filter limit has been reached');
+	add('GET', '/api/v1/filters', 'read:filters', async c => (await store.list<Filter>('filter', c.userId)).flatMap(({ value: filter }) => filter.keywords.map(keyword => legacyFilter(filter, keyword))));
+	add('GET', '/api/v1/filters/:id', 'read:filters', async c => { const { filter, keyword } = await findKeyword(store, c.userId, string(c.params.id)); return legacyFilter(filter, keyword); });
+	add('POST', '/api/v1/filters', 'write:filters', async c => store.transaction(async () => {
+		if ((await store.list('filter', c.userId)).length >= 200) throw new HttpError(422, 'The filter limit has been reached');
 		const filter = updatedFilter({ title: c.body.phrase, context: c.body.context, expires_in: c.body.expires_in, filter_action: boolean(c.body.irreversible) ? 'hide' : 'warn', keywords_attributes: [{ keyword: c.body.phrase, whole_word: c.body.whole_word }] });
-		save(c.userId, filter);
+		await save(c.userId, filter);
 		return legacyFilter(filter, filter.keywords[0]);
-	});
-	add('PUT', '/api/v1/filters/:id', 'write:filters', c => {
-		const { filter, keyword } = findKeyword(store, c.userId, string(c.params.id));
+	}));
+	add('PUT', '/api/v1/filters/:id', 'write:filters', async c => store.transaction(async () => {
+		const { filter, keyword } = await findKeyword(store, c.userId, string(c.params.id));
 		const updated = updatedFilter({ ...(c.body.phrase !== undefined ? { title: c.body.phrase } : {}), ...(c.body.context !== undefined ? { context: c.body.context } : {}), expires_in: c.body.expires_in, ...(c.body.irreversible !== undefined ? { filter_action: boolean(c.body.irreversible) ? 'hide' : 'warn' } : {}), keywords_attributes: [{ id: keyword.id, ...(c.body.phrase !== undefined ? { keyword: c.body.phrase } : {}), ...(c.body.whole_word !== undefined ? { whole_word: c.body.whole_word } : {}) }] }, filter);
 		if (filter.keywords.length > 1 && ['title', 'context', 'expires_at', 'filter_action'].some(key => JSON.stringify((filter as unknown as Json)[key]) !== JSON.stringify((updated as unknown as Json)[key]))) throw new HttpError(422, 'Use the v2 API to edit a filter with multiple keywords');
-		save(c.userId, updated);
+		await save(c.userId, updated);
 		return legacyFilter(updated, updated.keywords.find(item => item.id === keyword.id)!);
-	});
-	add('DELETE', '/api/v1/filters/:id', 'write:filters', c => {
-		const { filter, keyword } = findKeyword(store, c.userId, string(c.params.id));
+	}));
+	add('DELETE', '/api/v1/filters/:id', 'write:filters', async c => store.transaction(async () => {
+		const { filter, keyword } = await findKeyword(store, c.userId, string(c.params.id));
 		filter.keywords = filter.keywords.filter(item => item.id !== keyword.id);
-		save(c.userId, filter);
+		await save(c.userId, filter);
 		return {};
-	});
+	}));
 
 	add('GET', '/api/v1/preferences', 'read:accounts', async c => {
 		const user = await c.call('i');
@@ -405,20 +418,30 @@ export function registerFeatures(routes: Routes): void {
 	add('GET', '/api/v1/conversations', 'read:statuses', c => conversations(routes, c));
 	add('POST', '/api/v1/conversations/:id/read', 'write:conversations', async c => {
 		const id = string(c.params.id);
-		const previous = store.get<ConversationState>('conversation', c.userId, id);
+		const previous = await store.get<ConversationState>('conversation', c.userId, id);
 		const note = await routes.note(c, previous?.latestId ?? id);
 		if (note.visibility !== 'specified' || await conversationRootId(note, c.call) !== id) throw new HttpError(404, 'Record not found');
 		await routes.status(note, c);
-		store.put('conversation', c.userId, id, { ...previous, latestId: note.id, readThrough: note.id });
+		await store.transaction(async () => {
+			const current = await store.get<ConversationState>('conversation', c.userId, id);
+			const latestId = current?.latestId && compareIds(current.latestId, note.id) > 0 ? current.latestId : note.id;
+			const through = current?.readThrough && compareIds(current.readThrough, note.id) > 0 ? current.readThrough : note.id;
+			await store.put('conversation', c.userId, id, { ...current, latestId, readThrough: through });
+		});
 		return asConversation(routes, c, note, id);
 	});
 	add('DELETE', '/api/v1/conversations/:id', 'write:conversations', async c => {
 		const id = string(c.params.id);
-		const previous = store.get<ConversationState>('conversation', c.userId, id);
+		const previous = await store.get<ConversationState>('conversation', c.userId, id);
 		const note = await routes.note(c, previous?.latestId ?? id);
 		if (note.visibility !== 'specified' || await conversationRootId(note, c.call) !== id) throw new HttpError(404, 'Record not found');
 		await routes.status(note, c);
-		store.put('conversation', c.userId, id, { ...previous, latestId: note.id, hiddenThrough: note.id });
+		await store.transaction(async () => {
+			const current = await store.get<ConversationState>('conversation', c.userId, id);
+			const latestId = current?.latestId && compareIds(current.latestId, note.id) > 0 ? current.latestId : note.id;
+			const through = current?.hiddenThrough && compareIds(current.hiddenThrough, note.id) > 0 ? current.hiddenThrough : note.id;
+			await store.put('conversation', c.userId, id, { ...current, latestId, hiddenThrough: through });
+		});
 		return {};
 	});
 

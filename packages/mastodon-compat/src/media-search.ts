@@ -65,9 +65,9 @@ async function ownedFile(c: RequestContext): Promise<Json> {
 	return file;
 }
 
-function attachment(routes: Routes, c: RequestContext, file: Json): Json {
+async function attachment(routes: Routes, c: RequestContext, file: Json): Promise<Json> {
 	const result = routes.deps.entities.attachment(file);
-	const metadata = routes.deps.store.get<Json>('media', c.userId, file.id);
+	const metadata = await routes.deps.store.get<Json>('media', c.userId, file.id);
 	if (metadata?.focus) result.meta.focus = metadata.focus;
 	return result;
 }
@@ -81,7 +81,7 @@ export function registerMediaSearch(routes: Routes): void {
 		const focus = focalPoint(fields.focus);
 		const comment = description(fields.description);
 		const uploaded = await upload(routes, c, file, { ...(comment === undefined ? {} : { comment }) });
-		if (focus) routes.deps.store.put('media', c.userId, uploaded.id, { focus });
+		if (focus) await routes.deps.store.put('media', c.userId, uploaded.id, { focus });
 		return attachment(routes, c, uploaded);
 	});
 	routes.add('GET', '/api/v1/media/:id', 'write:media', async c => attachment(routes, c, await ownedFile(c)));
@@ -92,7 +92,7 @@ export function registerMediaSearch(routes: Routes): void {
 		const comment = description(fields.description);
 		const existing = await ownedFile(c);
 		const file = comment === undefined ? existing : await c.call('drive/files/update', { fileId: existing.id, comment });
-		if (focus) routes.deps.store.put('media', c.userId, file.id, { focus });
+		if (focus) await routes.deps.store.put('media', c.userId, file.id, { focus });
 		return attachment(routes, c, file);
 	});
 	routes.add('PATCH', '/api/v1/accounts/update_credentials', 'write:accounts', c => updateProfile(routes, c));
@@ -118,7 +118,7 @@ async function updateProfile(routes: Routes, c: RequestContext): Promise<Json> {
 			return { name: string(item.name), value: string(item.value) };
 		}).filter(item => item.name || item.value);
 	}
-	const oldSource = routes.deps.store.get<Json>('account-source', c.userId, 'defaults') ?? {};
+	const oldSource = await routes.deps.store.get<Json>('account-source', c.userId, 'defaults') ?? {};
 	const source: Json = { ...oldSource };
 	if (fields.source !== undefined) {
 		if (fields.source == null || typeof fields.source !== 'object' || Array.isArray(fields.source)) throw new HttpError(422, 'Invalid source preferences');
@@ -149,7 +149,7 @@ async function updateProfile(routes: Routes, c: RequestContext): Promise<Json> {
 		if (file) body[target] = (await upload(routes, c, file)).id;
 	}
 	const user = Object.keys(body).length ? await c.call('i/update', body) : await c.call('i');
-	if (fields.source !== undefined) routes.deps.store.put('account-source', c.userId, 'defaults', source);
+	if (fields.source !== undefined) await routes.deps.store.put('account-source', c.userId, 'defaults', source);
 	const result = routes.deps.entities.account(user, true);
 	Object.assign(result.source, source);
 	return result;

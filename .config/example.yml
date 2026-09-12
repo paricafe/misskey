@@ -343,9 +343,7 @@ id: 'aidx'
 
 # Enable the Mastodon-compatible API (default: true)
 #enableMastodonApi: true
-# Private SQLite state and adjacent .key file; persist and back up both together.
-# Default: .mastodon-compat/compat.sqlite under the installation directory.
-#mastodonApiStoragePath: /var/lib/misskey-mastodon/compat.sqlite
+# Compatibility state uses the existing PostgreSQL database automatically.
 
 # Whether disable HSTS
 #disableHsts: true

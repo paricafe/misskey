@@ -4,9 +4,6 @@
  */
 
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { test, type TestContext } from 'node:test';
 import Fastify from 'fastify';
 import { EntityConverter } from '../src/entities.js';
@@ -22,9 +19,9 @@ function user(id: string, extra: Json = {}): Json { return { id, username: id, n
 function note(id: string, extra: Json = {}): Json { return { id, userId: 'alice', user: user('alice'), text: 'Text', visibility: 'public', createdAt: '2026-01-01T00:00:00Z', files: [], reactions: {}, ...extra }; }
 const response = (body: unknown, status = 200): NativeTransportResponse => ({ status, body: JSON.stringify(body) });
 
-async function fixture(t: TestContext, options: { filename?: string; handler?: (endpoint: string, body: Json) => Promise<NativeTransportResponse | undefined> } = {}) {
+async function fixture(t: TestContext, options: { store?: CompatStore; handler?: (endpoint: string, body: Json) => Promise<NativeTransportResponse | undefined> } = {}) {
 
-	const store = new CompatStore(options.filename ?? ':memory:');
+	const store = options.store ?? new CompatStore(':memory:');
 	const app = Fastify();
 	const calls: Array<{ endpoint: string; body: Json }> = [];
 	const notes: Json[] = [], followers: Json[] = [], notifications: Json[] = [];
@@ -70,15 +67,15 @@ async function fixture(t: TestContext, options: { filename?: string; handler?: (
 	} });
 	registerNotifications(registerRoutes(app, { store, native, entities: new EntityConverter('https://social.test'), publicUrl: 'https://social.test' }));
 	app.setErrorHandler((error, _request, reply) => reply.code(error instanceof NativeError ? error.status : (error as { statusCode?: number }).statusCode ?? 500).send({ error: error instanceof Error ? error.message : String(error) }));
-	const client = store.createClient({ name: 'Tests', redirectUris: ['test://callback'], scopes: ['read', 'write'] }).client;
-	const token = (scopes = ['read', 'write']) => {
+	const { client } = await store.createClient({ name: 'Tests', redirectUris: ['test://callback'], scopes: ['read', 'write'] });
+	const token = async (scopes = ['read', 'write']) => {
 		const nativeToken = `native-${permissions.size}`;
 		permissions.set(`Bearer ${nativeToken}`, toNativePermissions(scopes));
-		return store.createGrant({ clientId: client.id, kind: 'user', scopes, userId: 'alice', nativeToken }).token;
+		return (await store.createGrant({ clientId: client.id, kind: 'user', scopes, userId: 'alice', nativeToken })).token;
 	};
-	const bearer = token();
+	const bearer = await token();
 	const request = (method: 'GET' | 'POST' | 'PUT' | 'DELETE', url: string, payload?: Json, accessToken = bearer, key?: string) => app.inject({ method, url, payload, headers: { authorization: `Bearer ${accessToken}`, ...(key ? { 'idempotency-key': key } : {}) } });
-	t.after(async () => { await app.close(); store.close(); });
+	t.after(async () => { await app.close(); if (!options.store) await store.close(); });
 	return { store, calls, notes, followers, notifications, pinned, bookmarks, muted, token, request };
 }
 
@@ -94,18 +91,18 @@ test('all compatibility status inputs validate before creation, editing, metadat
 	for (const patch of invalid) {
 		const result = await f.request('POST', '/api/v1/statuses', { status: 'Valid text', ...patch }, undefined, 'invalid');
 		assert.equal(result.statusCode, 422, JSON.stringify(patch));
-		assert.equal(f.store.get('idempotency', 'alice', 'invalid'), undefined);
+		assert.equal(await f.store.get('idempotency', 'alice', 'invalid'), undefined);
 		assert.equal((await f.request('PUT', '/api/v1/statuses/100', { status: 'Changed', ...patch })).statusCode, 422, JSON.stringify(patch));
 	}
 	assert.equal(f.calls.some(call => ['notes/create', 'notes/update'].includes(call.endpoint)), false);
 	assert.equal(f.notes[0].text, 'Text');
-	assert.equal(f.store.get('status', 'alice', '100'), undefined);
+	assert.equal(await f.store.get('status', 'alice', '100'), undefined);
 	assert.equal((await f.request('POST', '/api/v1/statuses', { status: 'Valid' }, undefined, 'invalid')).statusCode, 200);
 });
 
 test('posting applies saved source defaults, supports explicit overrides and keeps omitted edit metadata', async t => {
 	const f = await fixture(t);
-	f.store.put('account-source', 'alice', 'defaults', { privacy: 'private', sensitive: true, language: 'ja' });
+	await f.store.put('account-source', 'alice', 'defaults', { privacy: 'private', sensitive: true, language: 'ja' });
 	const first = await f.request('POST', '/api/v1/statuses', { status: 'Default post' });
 	assert.equal(first.statusCode, 200);
 	assert.equal(first.json().visibility, 'private');
@@ -120,6 +117,23 @@ test('posting applies saved source defaults, supports explicit overrides and kee
 	assert.equal(second.json().language, null);
 });
 
+test('concurrent partial status edits retain both metadata updates', async t => {
+	let updates = 0;
+	let release!: () => void;
+	const both = new Promise<void>(resolve => { release = resolve; });
+	const f = await fixture(t, { handler: async endpoint => {
+		if (endpoint === 'notes/update') { if (++updates === 2) release(); await both; }
+		return undefined;
+	} });
+	f.notes.push(note('100'));
+	const results = await Promise.all([
+		f.request('PUT', '/api/v1/statuses/100', { language: 'ja' }),
+		f.request('PUT', '/api/v1/statuses/100', { sensitive: true }),
+	]);
+	assert.ok(results.every(result => result.statusCode === 200));
+	assert.deepEqual(await f.store.get('status', 'alice', '100'), { language: 'ja', sensitive: true });
+});
+
 test('ordinary status creation accepts the public quote policy sent by generic clients', async t => {
 	const f = await fixture(t);
 	const created = await f.request('POST', '/api/v1/statuses', { status: 'A normal post', quote_approval_policy: 'public' });
@@ -131,9 +145,9 @@ test('ordinary status creation accepts the public quote policy sent by generic c
 	assert.equal(edited.statusCode, 200, edited.body);
 });
 
-test('direct status idempotency is claimed atomically across SQLite connections after recipient lookup', async t => {
-	const directory = mkdtempSync(join(tmpdir(), 'mastodon-routes-'));
-	t.after(() => rmSync(directory, { recursive: true, force: true }));
+test('direct status idempotency is claimed atomically across routes sharing a store after recipient lookup', async t => {
+	const store = new CompatStore(':memory:');
+	t.after(() => store.close());
 	let lookups = 0, writes = 0;
 	let release!: () => void;
 	const both = new Promise<void>(resolve => { release = resolve; });
@@ -144,8 +158,8 @@ test('direct status idempotency is claimed atomically across SQLite connections 
 		if (endpoint === 'notes/show' && body.noteId === created.id) return response(created);
 		return undefined;
 	};
-	const f = await fixture(t, { filename: join(directory, 'data.sqlite'), handler });
-	const g = await fixture(t, { filename: join(directory, 'data.sqlite'), handler });
+	const f = await fixture(t, { store, handler });
+	const g = await fixture(t, { store, handler });
 	const payload = { status: '@bob Hi', visibility: 'direct' };
 	const results = await Promise.all([f.request('POST', '/api/v1/statuses', payload, undefined, 'same'), g.request('POST', '/api/v1/statuses', payload, undefined, 'same')]);
 	assert.deepEqual(results.map(result => result.statusCode).sort(), [200, 409]);
@@ -163,6 +177,20 @@ test('ambiguous native write failures retain the idempotency reservation', async
 	assert.equal((await f.request('POST', '/api/v1/statuses', { status: 'Once' }, undefined, 'ambiguous')).statusCode, 502);
 	assert.equal((await f.request('POST', '/api/v1/statuses', { status: 'Once' }, undefined, 'ambiguous')).statusCode, 409);
 	assert.equal(writes, 1);
+});
+
+test('concurrent marker writes increment versions and invalid timelines roll back the whole update', async t => {
+	const f = await fixture(t);
+	const results = await Promise.all(Array.from({ length: 4 }, (_, index) => f.request('POST', '/api/v1/markers', { home: { last_read_id: String(index + 1) } })));
+	assert.ok(results.every(result => result.statusCode === 200));
+	assert.deepEqual(results.map(result => result.json().home.version).sort(), [1, 2, 3, 4]);
+	const before = await f.store.get<Json>('marker', 'alice', 'home');
+	const invalid = await f.request('POST', '/api/v1/markers', { home: { last_read_id: '999' }, notifications: { last_read_id: {} } });
+	assert.equal(invalid.statusCode, 422);
+	assert.deepEqual(await f.store.get('marker', 'alice', 'home'), before);
+	assert.equal(await f.store.get('marker', 'alice', 'notifications'), undefined);
+	const fetched = await f.request('GET', '/api/v1/markers?timeline=home');
+	assert.deepEqual(fetched.json(), { home: before });
 });
 
 test('since_id returns the newest newer page, min_id returns the nearest newer page, and links use source IDs', async t => {
@@ -183,20 +211,20 @@ test('since_id returns the newest newer page, min_id returns the nearest newer p
 test('native state overrides stale compatibility booleans and stale reblog hints are revalidated', async t => {
 	const f = await fixture(t);
 	f.notes.push(note('100'));
-	for (const kind of ['bookmark', 'thread-mute', 'pin']) f.store.put(kind, 'alice', '100', true);
-	f.store.put('reblog', 'alice', '100', 'deleted-renote');
+	for (const kind of ['bookmark', 'thread-mute', 'pin']) await f.store.put(kind, 'alice', '100', true);
+	await f.store.put('reblog', 'alice', '100', 'deleted-renote');
 	const clean = (await f.request('GET', '/api/v1/statuses/100')).json();
 	assert.equal(clean.bookmarked, false);
 	assert.equal(clean.muted, false);
 	assert.equal(clean.pinned, false);
 	assert.equal(clean.reblogged, undefined);
-	assert.equal(f.store.get('reblog', 'alice', '100'), undefined);
+	assert.equal(await f.store.get('reblog', 'alice', '100'), undefined);
 	f.bookmarks.add('100'); f.muted.add('100'); f.pinned.add('100');
 	const changed = (await f.request('GET', '/api/v1/statuses/100')).json();
 	assert.equal(changed.bookmarked, true);
 	assert.equal(changed.muted, true);
 	assert.equal(changed.pinned, true);
-	f.store.put('reblog', 'alice', '100', 'another-deleted-renote');
+	await f.store.put('reblog', 'alice', '100', 'another-deleted-renote');
 	assert.equal((await f.request('POST', '/api/v1/statuses/100/reblog', {})).statusCode, 200);
 	assert.equal(f.calls.filter(call => call.endpoint === 'notes/create').length, 1);
 });
@@ -217,7 +245,7 @@ test('quote policies retain native visibility guarantees and reject unsupported 
 		assert.equal((await f.request('POST', '/api/v1/statuses', { status: 'Must not publish', visibility, quote_approval_policy: policy }, undefined, 'invalid-policy')).statusCode, 422);
 	}
 	assert.equal(f.calls.filter(call => ['notes/create', 'notes/update'].includes(call.endpoint)).length, writes);
-	assert.equal(f.store.get('idempotency', 'alice', 'invalid-policy'), undefined);
+	assert.equal(await f.store.get('idempotency', 'alice', 'invalid-policy'), undefined);
 });
 
 test('quotes map to native renotes, preserve empty-comment quotes and replay idempotently', async t => {
@@ -274,18 +302,18 @@ test('hidden, missing and invalid quote targets are rejected before creating a n
 		assert.ok([404, 422].includes(result.statusCode), result.body);
 	}
 	assert.equal(f.calls.some(call => call.endpoint === 'notes/create'), false);
-	assert.equal(f.store.get('idempotency', 'alice', 'invalid-quote'), undefined);
+	assert.equal(await f.store.get('idempotency', 'alice', 'invalid-quote'), undefined);
 });
 
 test('narrow write grants cover native mutations without unauthorized viewer-state reads', async t => {
 	const f = await fixture(t);
 	f.notes.push(note('100'));
-	const muted = await f.request('POST', '/api/v1/statuses/100/mute', {}, f.token(['write:mutes']));
+	const muted = await f.request('POST', '/api/v1/statuses/100/mute', {}, await f.token(['write:mutes']));
 	assert.equal(muted.statusCode, 200);
 	assert.equal(muted.json().muted, true);
 	assert.equal(muted.json().bookmarked, undefined);
 	assert.equal(f.calls.some(call => call.endpoint === 'notes/state'), false);
-	assert.equal((await f.request('POST', '/api/v1/notifications/clear', {}, f.token(['write:notifications']))).statusCode, 200);
+	assert.equal((await f.request('POST', '/api/v1/notifications/clear', {}, await f.token(['write:notifications']))).statusCode, 200);
 	assert.ok(f.calls.some(call => call.endpoint === 'i/notifications'));
 	assert.ok(f.calls.some(call => call.endpoint === 'notifications/mark-all-as-read'));
 });

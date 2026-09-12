@@ -33,8 +33,7 @@ import { ClientServerService } from './web/ClientServerService.js';
 import { OpenApiServerService } from './api/openapi/OpenApiServerService.js';
 import { OAuth2ProviderService } from './oauth/OAuth2ProviderService.js';
 import { makeHstsHook } from './hsts.js';
-import { installGateway } from '@pari/mastodon-compat';
-import { resolve } from 'node:path';
+import { createPostgresStore, installGateway } from '@pari/mastodon-compat';
 import { registerHttpAccessLog } from './http-access-log.js';
 
 const _dirname = fileURLToPath(new URL('.', import.meta.url));
@@ -161,10 +160,20 @@ export class ServerService implements OnApplicationShutdown {
 		fastify.register(this.nodeinfoServerService.createServer);
 		fastify.register(this.wellKnownServerService.createServer);
 		if (this.config.enableMastodonApi) {
+			const store = await createPostgresStore({
+				host: this.config.db.host,
+				port: this.config.db.port,
+				database: this.config.db.db,
+				user: this.config.db.user,
+				password: this.config.db.pass,
+				max: 5,
+				statement_timeout: 10000,
+				...this.config.db.extra,
+			});
 			this.#mastodonGateway = installGateway(fastify, {
 				publicUrl: this.config.url,
 				nativeUrl: `http://127.0.0.1:${this.config.port}`,
-				database: this.config.mastodonApiStoragePath ?? resolve(_dirname, '../../../.mastodon-compat/compat.sqlite'),
+				store,
 				maxFileSize: this.config.maxFileSize,
 				transport: async request => {
 					const result = await fastify.inject({ method: 'POST', url: new URL(request.url).pathname, headers: request.headers, payload: Buffer.from(request.body), remoteAddress: request.context?.ip });

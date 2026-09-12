@@ -4,89 +4,111 @@
  */
 
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync, unlinkSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { setImmediate } from 'node:timers/promises';
 import { test } from 'node:test';
-import { CompatStore } from '../src/store.js';
+import { CompatStore, hashCredential } from '../src/store.js';
 
-test('encrypted credentials survive restart while bearer and client secrets are stored only as hashes', t => {
-	const directory = mkdtempSync(join(tmpdir(), 'mastodon-store-'));
-	t.after(() => rmSync(directory, { recursive: true, force: true }));
-	const filename = join(directory, 'compat.sqlite');
-	const store = new CompatStore(filename);
-	const { client, clientSecret } = store.createClient({ name: 'Test', scopes: ['read'], redirectUris: ['test://callback'] });
-	const token = store.createGrant({ kind: 'user', clientId: client.id, scopes: ['read'], userId: 'user', nativeToken: 'native-app-credential-never-plaintext' });
-	const code = store.issueCode({ clientId: client.id, redirectUri: 'test://callback', scopes: ['read'], userId: 'user', nativeToken: 'native-app-credential-never-plaintext' }, Date.now() + 10000);
-	store.putOperation('pending', 'one', { credential: 'operation-secret' }, Date.now() + 10000);
-	store.put('push', 'user', 'subscription', { auth: 'metadata-secret' });
-	assert.equal(store.getGrant(token.token)?.nativeToken, 'native-app-credential-never-plaintext');
-	assert.equal(store.verifyClient(client.id, clientSecret)?.id, client.id);
-	assert.equal(store.verifyClient(client.id, 'wrong'), undefined);
-	for (const file of readdirSync(directory)) {
-		assert.equal(statSync(join(directory, file)).mode & 0o777, 0o600);
-		const bytes = readFileSync(join(directory, file));
-		for (const secret of [clientSecret, token.token, code, 'native-app-credential-never-plaintext', 'operation-secret', 'metadata-secret']) assert.equal(bytes.includes(Buffer.from(secret)), false);
-	}
-	store.close();
-	const reopened = new CompatStore(filename);
-	assert.equal(reopened.getGrant(token.token)?.nativeToken, 'native-app-credential-never-plaintext');
-	assert.equal(reopened.getCode(code)?.nativeToken, 'native-app-credential-never-plaintext');
-	assert.equal(reopened.verifyClient(client.id, clientSecret)?.id, client.id);
-	reopened.close();
-	unlinkSync(`${filename}.key`);
-	assert.throws(() => new CompatStore(filename), /encryption key is missing/u);
-});
+function deferred() {
+	let resolve!: () => void;
+	const promise = new Promise<void>(accept => { resolve = accept; });
+	return { promise, resolve };
+}
 
-test('metadata is isolated by namespace and owner, with synchronous replacement and deletion', () => {
+test('credentials authenticate their client, grant and code and revoked tokens become unusable', async t => {
 	const store = new CompatStore(':memory:');
-	try {
-		store.put('filter', 'alice', 'one', { value: 1 });
-		store.put('filter', 'bob', 'one', { value: 2 });
-		store.put('marker', 'alice', 'one', { value: 3 });
-		store.put('filter', 'alice', 'one', { value: 4 });
-		assert.deepEqual(store.list('filter', 'alice'), [{ key: 'one', value: { value: 4 } }]);
-		assert.deepEqual(store.get('filter', 'bob', 'one'), { value: 2 });
-		assert.equal(store.delete('filter', 'alice', 'one'), true);
-		assert.equal(store.delete('filter', 'alice', 'one'), false);
-		assert.equal(store.get('filter', 'alice', 'one'), undefined);
-		assert.deepEqual(store.get('marker', 'alice', 'one'), { value: 3 });
-	} finally { store.close(); }
+	t.after(() => store.close());
+	const { client, clientSecret } = await store.createClient({ name: 'Test', scopes: ['read'], redirectUris: ['test://callback'] });
+	const { token, grant } = await store.createGrant({ kind: 'user', clientId: client.id, scopes: ['read'], userId: 'user', nativeToken: 'native-app-credential' });
+	const code = await store.issueCode({ clientId: client.id, redirectUri: 'test://callback', scopes: ['read'], userId: 'user', nativeToken: 'native-app-credential' }, Date.now() + 10000);
+	assert.equal((await store.getGrant(token))?.nativeToken, 'native-app-credential');
+	assert.equal((await store.verifyClient(client.id, clientSecret))?.id, client.id);
+	assert.equal(await store.verifyClient(client.id, 'wrong'), undefined);
+	assert.equal(grant.tokenHash, hashCredential(token));
+	assert.deepEqual(await store.getGrant(token), grant);
+	assert.equal(await store.getGrant('wrong'), undefined);
+	assert.equal((await store.getCode(code))?.nativeToken, 'native-app-credential');
+	assert.equal(await store.getCode('wrong'), undefined);
+	assert.equal(await store.revokeGrant(token, 'other'), false);
+	assert.ok(await store.getGrant(token));
+	assert.equal(await store.revokeGrant(token, client.id), true);
+	assert.equal(await store.getGrant(token), undefined);
 });
 
-test('expired states and codes are unusable, operations are consumed once, transactions roll back', () => {
+test('metadata is isolated by namespace and owner, and stored values cannot be mutated through references', async t => {
 	const store = new CompatStore(':memory:');
-	try {
-		store.putOperation('state', 'a', { session: 'abc' }, 100);
-		assert.deepEqual(store.takeOperation('state', 'a', 99), { session: 'abc' });
-		assert.equal(store.takeOperation('state', 'a', 99), undefined);
-		store.putOperation('state', 'b', { session: 'abc' }, 100);
-		assert.equal(store.takeOperation('state', 'b', 100), undefined);
-		const code = store.issueCode({ clientId: 'c', redirectUri: 'test://callback', scopes: ['read'], userId: 'u', nativeToken: 'app-token' }, 100);
-		assert.equal(store.getCode(code, 100), undefined);
-		assert.throws(() => store.transaction(() => { store.put('a', 'b', 'c', 4); throw new Error('failed'); }), /failed/u);
-		assert.equal(store.get('a', 'b', 'c'), undefined);
-		assert.equal(store.transaction(() => { store.put('a', 'b', 'c', 5); return 7; }), 7);
-		assert.equal(store.get('a', 'b', 'c'), 5);
-	} finally { store.close(); }
+	t.after(() => store.close());
+	const input = { value: 1 };
+	await store.put('filter', 'alice', 'one', input);
+	input.value = 99;
+	await store.put('filter', 'bob', 'one', { value: 2 });
+	await store.put('marker', 'alice', 'one', { value: 3 });
+	assert.deepEqual(await store.get('filter', 'alice', 'one'), { value: 1 });
+	const received = (await store.get<{ value: number }>('filter', 'alice', 'one'))!;
+	received.value = 100;
+	assert.deepEqual(await store.get('filter', 'alice', 'one'), { value: 1 });
+	await store.put('filter', 'alice', 'one', { value: 4 });
+	assert.deepEqual(await store.list('filter', 'alice'), [{ key: 'one', value: { value: 4 } }]);
+	assert.deepEqual(await store.get('filter', 'bob', 'one'), { value: 2 });
+	assert.equal(await store.delete('filter', 'alice', 'one'), true);
+	assert.equal(await store.delete('filter', 'alice', 'one'), false);
+	assert.equal(await store.get('filter', 'alice', 'one'), undefined);
+	assert.deepEqual(await store.get('marker', 'alice', 'one'), { value: 3 });
+	await assert.rejects(store.put('filter', 'alice', 'bad', undefined), /JSON serializable/u);
+	assert.equal(await store.get('filter', 'alice', 'bad'), undefined);
 });
 
-test('two connections cannot consume the same operation or read a revoked grant', t => {
-	const directory = mkdtempSync(join(tmpdir(), 'mastodon-concurrent-'));
-	t.after(() => rmSync(directory, { recursive: true, force: true }));
-	const filename = join(directory, 'compat.sqlite');
-	const first = new CompatStore(filename);
-	const second = new CompatStore(filename);
-	try {
-		first.putOperation('state', 'a', 'payload', 100);
-		assert.equal(first.takeOperation('state', 'a', 1), 'payload');
-		assert.equal(second.takeOperation('state', 'a', 1), undefined);
-		const { client } = first.createClient({ name: 'App', redirectUris: ['app://callback'], scopes: ['read'] });
-		const { token } = first.createGrant({ kind: 'app', clientId: client.id, scopes: ['read'] });
-		assert.equal(second.getGrant(token)?.kind, 'app');
-		assert.equal(second.revokeGrant(token, 'other-client'), false);
-		assert.equal(first.getGrant(token)?.kind, 'app');
-		assert.equal(second.revokeGrant(token, client.id), true);
-		assert.equal(first.getGrant(token), undefined);
-	} finally { first.close(); second.close(); }
+test('expired codes and operations are unusable and concurrent operation consumption occurs once', async t => {
+	const store = new CompatStore(':memory:');
+	t.after(() => store.close());
+	await store.putOperation('state', 'a', { session: 'abc' }, 100);
+	const consumed = await Promise.all([store.takeOperation('state', 'a', 99), store.takeOperation('state', 'a', 99)]);
+	assert.equal(consumed.filter(value => value !== undefined).length, 1);
+	await store.putOperation('state', 'b', { session: 'abc' }, 100);
+	assert.equal(await store.getOperation('state', 'b', 100), undefined);
+	const code = await store.issueCode({ clientId: 'c', redirectUri: 'test://callback', scopes: ['read'], userId: 'u', nativeToken: 'app-token' }, 100);
+	assert.equal(await store.getCode(code, 100), undefined);
+	await store.prune(100);
+	assert.equal(await store.deleteCode(code), false);
+	assert.equal(await store.deleteOperation('state', 'b'), false);
+});
+
+test('awaited and nested transactions roll back together without leaking state or overwriting concurrent writes', async t => {
+	const store = new CompatStore(':memory:');
+	t.after(() => store.close());
+	const started = deferred();
+	const finish = deferred();
+	const transaction = store.transaction(async () => {
+		await store.put('a', 'b', 'c', 4);
+		await store.transaction(async () => { await store.put('a', 'b', 'nested', 5); });
+		started.resolve();
+		await finish.promise;
+		throw new Error('failed');
+	});
+	await started.promise;
+	let readFinished = false;
+	const externalRead = store.get('a', 'b', 'c').then(value => { readFinished = true; return value; });
+	const externalWrite = store.put('a', 'b', 'outside', 6);
+	await setImmediate();
+	assert.equal(readFinished, false);
+	finish.resolve();
+	await assert.rejects(transaction, /failed/u);
+	assert.equal(await externalRead, undefined);
+	await externalWrite;
+	assert.equal(await store.get('a', 'b', 'nested'), undefined);
+	assert.equal(await store.get('a', 'b', 'outside'), 6);
+	assert.equal(await store.transaction(async () => { await store.put('a', 'b', 'c', 7); return 8; }), 8);
+	assert.equal(await store.get('a', 'b', 'c'), 7);
+});
+
+test('a detached task cannot reuse a completed memory transaction', async t => {
+	const store = new CompatStore(':memory:');
+	t.after(() => store.close());
+	const released = deferred();
+	let detached!: Promise<unknown>;
+	await store.transaction(() => {
+		detached = released.promise.then(() => store.put('a', 'b', 'c', 1));
+	});
+	released.resolve();
+	await assert.rejects(detached, /transaction has ended/u);
+	assert.equal(await store.get('a', 'b', 'c'), undefined);
 });

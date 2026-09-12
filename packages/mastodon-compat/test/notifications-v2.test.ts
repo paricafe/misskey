@@ -25,8 +25,8 @@ async function fixture(t: TestContext, events: Json[]) {
 	app.addHook('preValidation', async request => { request.query = parameters(request.query); request.body = parameters(request.body); });
 	app.setErrorHandler((error, _request, reply) => reply.code(error instanceof NativeError ? error.status : (error as { statusCode?: number }).statusCode ?? 500).send({ error: (error as Error).message }));
 	const store = new CompatStore(':memory:');
-	const { client } = store.createClient({ name: 'Notifications', scopes: ['read', 'write'], redirectUris: ['client://callback'] });
-	const token = (userId = 'alice', scopes = ['read', 'write']) => store.createGrant({ clientId: client.id, kind: 'user', userId, scopes, nativeToken: `native-${userId}` }).token;
+	const { client } = await store.createClient({ name: 'Notifications', scopes: ['read', 'write'], redirectUris: ['client://callback'] });
+	const token = async (userId = 'alice', scopes = ['read', 'write']) => (await store.createGrant({ clientId: client.id, kind: 'user', userId, scopes, nativeToken: `native-${userId}` })).token;
 	const calls: Array<{ endpoint: string; body: Json }> = [];
 	let markedRead = 0;
 	const native = new NativeClient({ baseUrl: 'http://native.example', publicUrl: 'https://social.example', transport: async request => {
@@ -46,8 +46,8 @@ async function fixture(t: TestContext, events: Json[]) {
 		return { status: 200, body: JSON.stringify(rows) };
 	} });
 	registerNotifications(new Routes(app, { store, native, entities: new EntityConverter('https://social.example'), publicUrl: 'https://social.example' }));
-	t.after(async () => { await app.close(); store.close(); });
-	return { app, store, events, calls, token, authorization: `Bearer ${token()}`, markedRead: () => markedRead };
+	t.after(async () => { await app.close(); await store.close(); });
+	return { app, store, events, calls, token, authorization: `Bearer ${await token()}`, markedRead: () => markedRead };
 }
 
 test('returns stable singleton groups with deduplicated accounts and statuses and string IDs', async t => {
@@ -85,7 +85,7 @@ test('distinguishes newest since_id pages from immediately newer min_id pages an
 
 test('fills a page after non-heart reactions, dismissed entries and hidden statuses are removed', async t => {
 	const f = await fixture(t, [event(1), event(2), event(3), event(4, { type: 'reaction', reaction: '😀', note: status }), event(5, { type: 'mention', note: { ...status, isHidden: true } }), event(6, { user: alice })]);
-	f.store.put('dismissed-notification', 'alice', 'notification-0003', true);
+	await f.store.put('dismissed-notification', 'alice', 'notification-0003', true);
 	const response = await f.app.inject({ url: '/api/v2/notifications?limit=2&types[]=follow&account_id=bob', headers: { authorization: f.authorization } });
 	assert.equal(response.statusCode, 200, response.body);
 	assert.deepEqual(ids(response), ['notification-0002', 'notification-0001']);
@@ -120,10 +120,10 @@ test('dismiss uses the same owner-isolated key as v1 and is idempotent', async t
 		const response = await f.app.inject({ method: 'POST', url: '/api/v2/notifications/ungrouped-notification-0001/dismiss', headers: { authorization: f.authorization } });
 		assert.equal(response.statusCode, 200, response.body);
 	}
-	assert.equal(f.store.get('dismissed-notification', 'alice', 'notification-0001'), true);
-	assert.equal(f.store.get('dismissed-notification', 'bob', 'notification-0001'), undefined);
+	assert.equal(await f.store.get('dismissed-notification', 'alice', 'notification-0001'), true);
+	assert.equal(await f.store.get('dismissed-notification', 'bob', 'notification-0001'), undefined);
 	assert.deepEqual(ids(await f.app.inject({ url: '/api/v2/notifications', headers: { authorization: f.authorization } })), []);
-	assert.deepEqual(ids(await f.app.inject({ url: '/api/v2/notifications', headers: { authorization: `Bearer ${f.token('bob')}` } })), ['notification-0001']);
+	assert.deepEqual(ids(await f.app.inject({ url: '/api/v2/notifications', headers: { authorization: `Bearer ${await f.token('bob')}` } })), ['notification-0001']);
 	assert.equal(f.markedRead(), 0);
 });
 
@@ -132,7 +132,7 @@ test('clear delegates native read state and hides the shared cleared boundary wi
 	const response = await f.app.inject({ method: 'POST', url: '/api/v2/notifications/clear', headers: { authorization: f.authorization } });
 	assert.equal(response.statusCode, 200, response.body);
 	assert.equal(f.markedRead(), 1);
-	assert.equal(f.store.get('notifications', 'alice', 'cleared'), 'notification-0002');
+	assert.equal(await f.store.get('notifications', 'alice', 'cleared'), 'notification-0002');
 	f.events.push(event(3));
 	assert.deepEqual(ids(await f.app.inject({ url: '/api/v2/notifications', headers: { authorization: f.authorization } })), ['notification-0003']);
 	assert.equal((await f.app.inject({ url: '/api/v2/notifications/ungrouped-notification-0002', headers: { authorization: f.authorization } })).statusCode, 404);
@@ -140,8 +140,8 @@ test('clear delegates native read state and hides the shared cleared boundary wi
 
 test('unread count respects the notification marker, dismissal, filters and count cap', async t => {
 	const f = await fixture(t, [event(1), event(2), event(3), event(4), event(5), event(6, { type: 'reaction', reaction: '❤', note: status })]);
-	f.store.put('marker', 'alice', 'notifications', { last_read_id: 'notification-0002', version: 1, updated_at: '2026-01-03T00:00:00Z' });
-	f.store.put('dismissed-notification', 'alice', 'notification-0004', true);
+	await f.store.put('marker', 'alice', 'notifications', { last_read_id: 'notification-0002', version: 1, updated_at: '2026-01-03T00:00:00Z' });
+	await f.store.put('dismissed-notification', 'alice', 'notification-0004', true);
 	const get = (query = '') => f.app.inject({ url: `/api/v2/notifications/unread_count${query}`, headers: { authorization: f.authorization } });
 	assert.deepEqual((await get()).json(), { count: 3 });
 	assert.deepEqual((await get('?exclude_types[]=favourite')).json(), { count: 2 });
@@ -149,7 +149,7 @@ test('unread count respects the notification marker, dismissal, filters and coun
 	assert.deepEqual((await get('?account_id=alice')).json(), { count: 0 });
 	assert.deepEqual((await get('?limit=1')).json(), { count: 1 });
 	assert.equal(f.markedRead(), 0);
-	assert.equal(f.store.get<Json>('marker', 'alice', 'notifications')?.last_read_id, 'notification-0002');
+	assert.equal((await f.store.get<Json>('marker', 'alice', 'notifications'))?.last_read_id, 'notification-0002');
 });
 
 test('unread_count supports its documented larger cap independently of the native page maximum', async t => {
@@ -163,8 +163,8 @@ test('unread_count supports its documented larger cap independently of the nativ
 
 test('read and write notification scopes are enforced separately for every route family', async t => {
 	const f = await fixture(t, [event(1)]);
-	const read = `Bearer ${f.token('alice', ['read:notifications'])}`;
-	const write = `Bearer ${f.token('alice', ['write:notifications'])}`;
+	const read = `Bearer ${await f.token('alice', ['read:notifications'])}`;
+	const write = `Bearer ${await f.token('alice', ['write:notifications'])}`;
 	for (const url of ['/api/v2/notifications', '/api/v2/notifications/unread_count', '/api/v2/notifications/ungrouped-notification-0001', '/api/v2/notifications/ungrouped-notification-0001/accounts']) {
 		assert.equal((await f.app.inject({ url, headers: { authorization: read } })).statusCode, 200);
 		assert.equal((await f.app.inject({ url, headers: { authorization: write } })).statusCode, 403);
@@ -194,8 +194,8 @@ test('v1 finds an older notification across native pages and shares dismissal wi
 
 test('v1 unread count scans past one page and counts only visible notifications after the marker', async t => {
 	const f = await fixture(t, Array.from({ length: 150 }, (_, index) => event(index + 1, index === 49 ? { type: 'reaction', reaction: '😀', note: status } : {})));
-	f.store.put('marker', 'alice', 'notifications', { last_read_id: 'notification-0020', version: 1, updated_at: '2026-01-03T00:00:00Z' });
-	f.store.put('dismissed-notification', 'alice', 'notification-0040', true);
+	await f.store.put('marker', 'alice', 'notifications', { last_read_id: 'notification-0020', version: 1, updated_at: '2026-01-03T00:00:00Z' });
+	await f.store.put('dismissed-notification', 'alice', 'notification-0040', true);
 	const response = await f.app.inject({ url: '/api/v1/notifications/unread_count?limit=200', headers: { authorization: f.authorization } });
 	assert.equal(response.statusCode, 200, response.body);
 	assert.deepEqual(response.json(), { count: 128 });
@@ -204,6 +204,6 @@ test('v1 unread count scans past one page and counts only visible notifications 
 	const capped = await f.app.inject({ url: '/api/v1/notifications/unread_count?limit=5', headers: { authorization: f.authorization } });
 	assert.equal(capped.statusCode, 200, capped.body);
 	assert.deepEqual(capped.json(), { count: 5 });
-	assert.equal(f.store.get<Json>('marker', 'alice', 'notifications')?.last_read_id, 'notification-0020');
+	assert.equal((await f.store.get<Json>('marker', 'alice', 'notifications'))?.last_read_id, 'notification-0020');
 	assert.equal(f.markedRead(), 0);
 });

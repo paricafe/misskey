@@ -37,9 +37,7 @@ import { MiGalleryLike } from '@/models/GalleryLike.js';
 import { MiGalleryPost } from '@/models/GalleryPost.js';
 import { MiHashtag } from '@/models/Hashtag.js';
 import { MiInstance } from '@/models/Instance.js';
-import { MiMastodonOAuthClient } from '@/models/MastodonOAuthClient.js';
-import { MiMastodonOAuthToken } from '@/models/MastodonOAuthToken.js';
-import { MiMastodonUserState } from '@/models/MastodonUserState.js';
+import { MiMastodonCompatEntry } from '@/models/MastodonCompatEntry.js';
 import { MiMeta } from '@/models/Meta.js';
 import { MiModerationLog } from '@/models/ModerationLog.js';
 import { MiMuting } from '@/models/Muting.js';
@@ -189,9 +187,7 @@ export const entities = [
 	MiAvatarDecoration,
 	MiAuthSession,
 	MiAccessToken,
-	MiMastodonOAuthClient,
-	MiMastodonOAuthToken,
-	MiMastodonUserState,
+	MiMastodonCompatEntry,
 	MiUser,
 	MiUserProfile,
 	MiUserKeypair,

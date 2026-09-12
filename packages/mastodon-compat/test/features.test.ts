@@ -57,11 +57,11 @@ async function fixture(t: TestContext) {
 	const routes = new Routes(app, { store, native, entities, publicUrl: 'https://social.test' });
 	registerFeatures(routes);
 	app.setErrorHandler((error, _request, reply) => reply.code(error instanceof NativeError ? error.status : (error as { statusCode?: number }).statusCode ?? 500).send({ error: error instanceof Error ? error.message : String(error) }));
-	const client = store.createClient({ name: 'Tests', redirectUris: ['test://callback'], scopes: ['read', 'write', 'push'] }).client;
-	const token = (userId = 'alice', scopes = ['read', 'write', 'push']) => store.createGrant({ clientId: client.id, kind: 'user', scopes, userId, nativeToken: 'native-app-token' }).token;
-	const bearer = token();
+	const { client } = await store.createClient({ name: 'Tests', redirectUris: ['test://callback'], scopes: ['read', 'write', 'push'] });
+	const token = async (userId = 'alice', scopes = ['read', 'write', 'push']) => (await store.createGrant({ clientId: client.id, kind: 'user', scopes, userId, nativeToken: 'native-app-token' })).token;
+	const bearer = await token();
 	const request = (method: 'GET' | 'POST' | 'PUT' | 'DELETE', url: string, payload?: Json, accessToken = bearer) => app.inject({ method, url, payload, headers: { authorization: `Bearer ${accessToken}` } });
-	t.after(async () => { await app.close(); store.close(); });
+	t.after(async () => { await app.close(); await store.close(); });
 	return { app, store, calls, notes, announcements, native, entities, token, request, revokeNative: () => { revoked = true; } };
 }
 
@@ -75,7 +75,7 @@ test('v2 filters and keywords persist, validate ownership, and interoperate with
 	assert.equal(v1.length, 2);
 	assert.equal(v1[0].id, filter.keywords[0].id);
 	assert.equal(v1[0].phrase, 'spoiler');
-	assert.equal((await f.request('GET', `/api/v2/filters/${filter.id}`, undefined, f.token('bob'))).statusCode, 404);
+	assert.equal((await f.request('GET', `/api/v2/filters/${filter.id}`, undefined, await f.token('bob'))).statusCode, 404);
 	assert.equal((await f.request('PUT', `/api/v1/filters/${filter.keywords[0].id}`, { context: ['thread'] })).statusCode, 422);
 	const updated = await f.request('PUT', `/api/v2/filters/${filter.id}`, { keywords_attributes: [{ id: filter.keywords[0].id, keyword: 'ending' }, { id: filter.keywords[1].id, _destroy: true }] });
 	assert.equal(updated.statusCode, 200);
@@ -86,7 +86,7 @@ test('v2 filters and keywords persist, validate ownership, and interoperate with
 	assert.equal((await f.request('PUT', `/api/v2/filters/keywords/${keywordId}`, { keyword: 'secret', whole_word: true })).json().whole_word, true);
 	assert.equal((await f.request('DELETE', `/api/v2/filters/keywords/${keywordId}`)).statusCode, 200);
 	assert.equal((await f.request('GET', `/api/v2/filters/keywords/${keywordId}`)).statusCode, 404);
-	assert.ok(f.store.get('filter-revision', 'alice', 'current'));
+	assert.ok(await f.store.get('filter-revision', 'alice', 'current'));
 	assert.equal((await f.request('DELETE', `/api/v2/filters/${filter.id}`)).statusCode, 200);
 	assert.deepEqual((await f.request('GET', '/api/v2/filters')).json(), []);
 });
@@ -114,27 +114,27 @@ test('filter matching handles words, escaped text, reblogs, contexts, expiry and
 	assert.equal(added.statusCode, 200);
 	assert.equal((await f.request('GET', `/api/v2/filters/statuses/${added.json().id}`)).json().status_id, 'target');
 	const status: Json = { id: 'target', content: '<p>A cat &lt;secret&gt; appears</p>', spoiler_text: '', filtered: [] };
-	const matched = applyFilters(f.store, 'alice', status, 'home');
+	const matched = await applyFilters(f.store, 'alice', status, 'home');
 	assert.equal(matched.id, 'target');
 	assert.equal(matched.filtered[0].filter.id, first.id);
 	assert.deepEqual(matched.filtered[0].keyword_matches, ['cat', '<secret>']);
 	assert.deepEqual(status.filtered, []);
-	assert.equal(applyFilters(f.store, 'alice', { ...status, content: 'concatenate' }, 'home').filtered.length, 0);
-	assert.deepEqual(applyFilters(f.store, 'alice', status, 'public').filtered[0].status_matches, ['target']);
-	assert.equal(applyFilters(f.store, 'bob', status).filtered.length, 0);
-	const reblog = applyFilters(f.store, 'alice', { id: 'boost', content: '', reblog: status });
+	assert.equal((await applyFilters(f.store, 'alice', { ...status, content: 'concatenate' }, 'home')).filtered.length, 0);
+	assert.deepEqual((await applyFilters(f.store, 'alice', status, 'public')).filtered[0].status_matches, ['target']);
+	assert.equal((await applyFilters(f.store, 'bob', status)).filtered.length, 0);
+	const reblog = await applyFilters(f.store, 'alice', { id: 'boost', content: '', reblog: status });
 	assert.equal(reblog.filtered.length, 2);
 	assert.equal(reblog.reblog.filtered.length, 2);
 	await f.request('PUT', `/api/v2/filters/${first.id}`, { expires_in: 0 });
-	assert.equal(applyFilters(f.store, 'alice', status, 'home', Date.now() + 1).filtered.length, 0);
+	assert.equal((await applyFilters(f.store, 'alice', status, 'home', Date.now() + 1)).filtered.length, 0);
 	assert.equal((await f.request('DELETE', `/api/v2/filters/statuses/${added.json().id}`)).statusCode, 200);
-	assert.equal(applyFilters(f.store, 'alice', status, 'public').filtered.length, 0);
+	assert.equal((await applyFilters(f.store, 'alice', status, 'public')).filtered.length, 0);
 });
 
 test('invalid filter edits are atomic, and revoked native grants cannot access stored features', async t => {
 	const f = await fixture(t);
-	const write = f.token('alice', ['write:filters']);
-	const read = f.token('alice', ['read:filters']);
+	const write = await f.token('alice', ['write:filters']);
+	const read = await f.token('alice', ['read:filters']);
 	const created = await f.request('POST', '/api/v2/filters', { title: 'One', context: ['home'], keywords_attributes: [{ keyword: 'word' }] }, write);
 	assert.equal(created.statusCode, 200);
 	assert.equal((await f.request('GET', '/api/v2/filters', undefined, write)).statusCode, 403);
@@ -147,7 +147,7 @@ test('invalid filter edits are atomic, and revoked native grants cannot access s
 	f.revokeNative();
 	assert.equal((await f.request('GET', '/api/v2/filters', undefined, read)).statusCode, 401);
 	assert.equal((await f.request('PUT', `/api/v2/filters/${id}`, { title: 'After revoke' }, write)).statusCode, 401);
-	assert.equal(f.store.get<Json>('filter', 'alice', id)?.title, 'One');
+	assert.equal((await f.store.get<Json>('filter', 'alice', id))?.title, 'One');
 });
 
 test('preferences and announcements use native state and native dismissal', async t => {
@@ -221,4 +221,31 @@ test('unavailable tag following, scheduled writes and push delivery do not claim
 	assert.equal((await f.request('PUT', '/api/v1/scheduled_statuses/123', { scheduled_at: '2027-01-01T00:00:00Z' })).statusCode, 422);
 	assert.equal((await f.request('GET', '/api/v1/push/subscription')).statusCode, 404);
 	assert.equal((await f.request('POST', '/api/v1/push/subscription', { subscription: {} })).statusCode, 501);
+});
+
+
+test('concurrent keyword edits keep both changes and commit a visible filter revision', async t => {
+	const f = await fixture(t);
+	const created = (await f.request('POST', '/api/v2/filters', { title: 'Concurrent', context: ['home'] })).json();
+	const before = await f.store.get('filter-revision', 'alice', 'current');
+	const responses = await Promise.all(['first', 'second'].map(keyword => f.request('POST', `/api/v2/filters/${created.id}/keywords`, { keyword })));
+	assert.ok(responses.every(response => response.statusCode === 200));
+	const updated = (await f.request('GET', `/api/v2/filters/${created.id}`)).json();
+	assert.deepEqual(updated.keywords.map((item: Json) => item.keyword).sort(), ['first', 'second']);
+	assert.notEqual(await f.store.get('filter-revision', 'alice', 'current'), before);
+	assert.equal((await applyFilters(f.store, 'alice', { id: 'new', content: 'first second' }, 'home')).filtered[0].keyword_matches.length, 2);
+});
+
+
+test('conversation refresh replaces a removed latest note without losing its read state', async t => {
+	const f = await fixture(t);
+	const root = nativeNote('100');
+	const received = nativeNote('200', 'bob', { replyId: '100' });
+	f.notes.push(root, received);
+	await f.store.put('conversation', 'alice', '100', { latestId: '300', readThrough: '200' });
+	const call = <T = Json>(endpoint: string, body?: Json) => f.native.call<T>(endpoint, body, 'native-app-token');
+	const conversation = await conversationFromNote(f.store, 'alice', received, call, f.entities);
+	assert.equal(conversation?.last_status.id, '200');
+	assert.equal(conversation?.unread, false);
+	assert.deepEqual(await f.store.get('conversation', 'alice', '100'), { latestId: '200', readThrough: '200' });
 });

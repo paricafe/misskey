@@ -22,8 +22,8 @@ async function fixture(t: TestContext, nativeResult: unknown = { ok: true, token
 		store, publicUrl: 'https://social.example', nativeUrl: 'http://127.0.0.1:3000', now: () => now,
 		native: { async call<T>(endpoint: string): Promise<T> { calls.push(endpoint); return nativeResult as T; } },
 	});
-	server.get('/inspect', async request => ({ handled: handlesOAuth(request), grant: getAuthorization(request, store) }));
-	t.after(async () => { await server.close(); store.close(); });
+	server.get('/inspect', async request => ({ handled: handlesOAuth(request), grant: await getAuthorization(request, store) }));
+	t.after(async () => { await server.close(); await store.close(); });
 	async function app(scopes = 'read write', redirect = 'testapp://callback') {
 		const response = await server.inject({ method: 'POST', url: '/api/v1/apps', payload: { client_name: 'Example', redirect_uris: redirect, scopes } });
 		assert.equal(response.statusCode, 200);
@@ -76,13 +76,25 @@ test('MiAuth callback yields a one-time authorization code and an isolated beare
 	const response = await f.server.inject({ method: 'POST', url: '/oauth/token', payload: body });
 	assert.equal(response.statusCode, 200);
 	assert.equal(response.json().access_token.includes('native-application-token'), false);
-	const grant = f.store.getGrant(response.json().access_token)!;
+	const grant = (await f.store.getGrant(response.json().access_token))!;
 	assert.equal(grant.userId, 'alice');
 	assert.equal(grant.nativeToken, 'native-application-token');
 	assert.equal(grant.kind, 'user');
 	assert.equal((await f.server.inject({ method: 'POST', url: '/oauth/token', payload: body })).statusCode, 400);
 	assert.equal((await f.server.inject({ method: 'GET', url: completed.callbackUrl.pathname + completed.callbackUrl.search })).statusCode, 400);
 	assert.equal(f.calls.length, 1);
+});
+
+test('concurrent authorization code exchanges issue exactly one bearer', async t => {
+	const f = await fixture(t);
+	const client = await f.app();
+	const { response } = await f.complete(client.client_id);
+	const code = new URL(String(response.headers.location)).searchParams.get('code');
+	const payload = { ...client, grant_type: 'authorization_code', code, redirect_uri: 'testapp://callback' };
+	const results = await Promise.all(Array.from({ length: 4 }, () => f.server.inject({ method: 'POST', url: '/oauth/token', payload })));
+	assert.deepEqual(results.map(result => result.statusCode).sort(), [200, 400, 400, 400]);
+	assert.equal(results.filter(result => result.json().access_token).length, 1);
+	assert.equal(await f.store.getCode(code!, 1000), undefined);
 });
 
 test('PKCE requires S256, verifies the challenge, and retains a code after a rejected verifier', async t => {
@@ -120,7 +132,7 @@ test('client_credentials uses persisted app-only grants and Basic client authent
 	const basic = Buffer.from(`${encodeURIComponent(client.client_id)}:${encodeURIComponent(client.client_secret)}`).toString('base64');
 	const response = await f.server.inject({ method: 'POST', url: '/oauth/token', headers: { authorization: `basic ${basic}`, 'content-type': 'application/x-www-form-urlencoded' }, payload: 'grant_type=client_credentials' });
 	assert.equal(response.statusCode, 200);
-	const grant = f.store.getGrant(response.json().access_token)!;
+	const grant = (await f.store.getGrant(response.json().access_token))!;
 	assert.equal(grant.kind, 'app');
 	assert.equal(grant.nativeToken, undefined);
 	assert.equal(grant.userId, undefined);
@@ -137,10 +149,10 @@ test('revocation is client-owned, persistent and idempotent', async t => {
 	const response = await f.server.inject({ method: 'POST', url: '/oauth/token', payload: { ...client, grant_type: 'client_credentials' } });
 	const token = response.json().access_token;
 	assert.equal((await f.server.inject({ method: 'POST', url: '/oauth/revoke', payload: { ...other, token } })).statusCode, 403);
-	assert.ok(f.store.getGrant(token));
+	assert.ok(await f.store.getGrant(token));
 	assert.equal((await f.server.inject({ method: 'POST', url: '/oauth/revoke', payload: { ...client } })).statusCode, 403);
 	assert.equal((await f.server.inject({ method: 'POST', url: '/oauth/revoke', payload: { ...client, token } })).statusCode, 200);
-	assert.equal(f.store.getGrant(token), undefined);
+	assert.equal(await f.store.getGrant(token), undefined);
 	assert.equal((await f.server.inject({ method: 'POST', url: '/oauth/revoke', payload: { ...client, token } })).statusCode, 200);
 });
 

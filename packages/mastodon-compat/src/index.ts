@@ -20,18 +20,19 @@ import { attachStreaming } from './streaming.js';
 import type { NativeTransport } from './types.js';
 
 export { NativeClient, NativeError, EntityConverter, CompatStore };
+export { createPostgresStore } from './store.js';
 export type { NativeTransport } from './types.js';
 
 export interface GatewayOptions {
 	publicUrl: string;
 	nativeUrl: string;
-	database: string;
+	store: CompatStore;
 	maxFileSize?: number;
 	transport?: NativeTransport;
 }
 
 function dependencies(options: GatewayOptions) {
-	const store = new CompatStore(options.database);
+	const store = options.store;
 	const native = new NativeClient({ baseUrl: options.nativeUrl, publicUrl: options.publicUrl, transport: options.transport });
 	return { store, native, entities: new EntityConverter(options.publicUrl), publicUrl: options.publicUrl, nativeUrl: options.nativeUrl };
 }
@@ -59,10 +60,10 @@ async function setup(app: FastifyInstance, options: GatewayOptions, deps: Return
 		reply.header('Cache-Control', 'private, no-store');
 		if (request.method === 'POST' && new URL(request.url, options.publicUrl).pathname === '/api/v1/apps') {
 			const now = Date.now();
-			deps.store.transaction(() => {
-				const counter = deps.store.getOperation<{ count: number; expires: number }>('registration-rate', request.ip, now) ?? { count: 0, expires: now + 3600000 };
+			await deps.store.transaction(async () => {
+				const counter = await deps.store.getOperation<{ count: number; expires: number }>('registration-rate', request.ip, now) ?? { count: 0, expires: now + 3600000 };
 				if (counter.count >= 100) { reply.header('Retry-After', Math.ceil((counter.expires - now) / 1000)); throw new HttpError(429, 'Too many application registrations'); }
-				deps.store.putOperation('registration-rate', request.ip, { ...counter, count: counter.count + 1 }, counter.expires);
+				await deps.store.putOperation('registration-rate', request.ip, { ...counter, count: counter.count + 1 }, counter.expires);
 			});
 		}
 	});
@@ -87,10 +88,10 @@ async function setup(app: FastifyInstance, options: GatewayOptions, deps: Return
 export async function createGateway(options: GatewayOptions): Promise<FastifyInstance> {
 	const app = Fastify({ bodyLimit: 1024 * 1024 });
 	const deps = dependencies(options);
-	try { await setup(app, options, deps, false); } catch (error) { deps.store.close(); throw error; }
+	try { await setup(app, options, deps, false); } catch (error) { await deps.store.close(); throw error; }
 	const streaming = attachStreaming(app.server, deps);
 	app.addHook('preClose', async () => { await streaming.close(); });
-	app.addHook('onClose', async () => { deps.store.close(); });
+	app.addHook('onClose', async () => { await deps.store.close(); });
 	return app;
 }
 
@@ -119,6 +120,6 @@ export function installGateway(app: FastifyInstance, options: GatewayOptions): {
 	app.register(async scope => setup(scope, options, deps, true));
 	const streaming = attachStreaming(app.server, deps);
 	app.addHook('preClose', async () => { await streaming.close(); });
-	app.addHook('onClose', async () => { deps.store.close(); });
+	app.addHook('onClose', async () => { await deps.store.close(); });
 	return { close: () => streaming.close() };
 }

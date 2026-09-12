@@ -70,9 +70,9 @@ type NativeSession = {
 
 async function fixture() {
 	const store = new CompatStore(':memory:');
-	const { client } = store.createClient({ name: 'Streaming test', redirectUris: ['https://client.example/callback'], scopes: ['read', 'write'] });
+	const { client } = await store.createClient({ name: 'Streaming test', redirectUris: ['https://client.example/callback'], scopes: ['read', 'write'] });
 	const grant = (scopes = ['read'], userId = alice.id, nativeToken = 'native-alice') => store.createGrant({ clientId: client.id, kind: 'user', userId, nativeToken, scopes });
-	const { token } = grant();
+	const { token } = await grant();
 	const notes = new Map<string, Json>();
 	const states = new Map<string, { isFavorited: boolean; isMutedThread: boolean }>();
 	const users = new Map<string, Json>([[alice.id, { ...alice, pinnedNoteIds: [] }], [bob.id, { ...bob, pinnedNoteIds: [] }]]);
@@ -177,7 +177,7 @@ async function fixture() {
 			await new Promise<void>(resolve => nativeWss.close(() => resolve()));
 			nativeServer.closeAllConnections();
 			await new Promise<void>(resolve => nativeServer.close(() => resolve()));
-			store.close();
+			await store.close();
 		},
 	};
 }
@@ -200,10 +200,10 @@ test('rejects missing, app, mismatched, revoked, and insufficiently scoped grant
 	t.after(() => f.close());
 	assert.equal(await f.failedUpgrade(), 401);
 	assert.equal(await f.failedUpgrade({}, 'unknown-token'), 401);
-	const app = f.store.createGrant({ clientId: f.client.id, kind: 'app', scopes: ['read'] });
+	const app = await f.store.createGrant({ clientId: f.client.id, kind: 'app', scopes: ['read'] });
 	assert.equal(await f.failedUpgrade({}, app.token), 401);
-	assert.equal(await f.failedUpgrade({}, f.grant(['write']).token), 403);
-	assert.equal(await f.failedUpgrade({}, f.grant(['read'], bob.id).token), 401);
+	assert.equal(await f.failedUpgrade({}, (await f.grant(['write'])).token), 403);
+	assert.equal(await f.failedUpgrade({}, (await f.grant(['read'], bob.id)).token), 401);
 	assert.equal(await f.failedUpgrade({}, f.token, 'Basic unsupported'), 401);
 	assert.equal(await f.failedUpgrade({}, f.token, 'Bearer other-token'), 401);
 	assert.equal(await f.failedUpgrade({ stream: 'unknown' }, f.token), 400);
@@ -235,15 +235,15 @@ test('shares compatibility metadata and context filters with REST and signals fi
 	const c = await f.connect({ stream: 'user' });
 	const home = await channel(c.native, 'homeTimeline');
 	const main = await channel(c.native, 'main');
-	f.store.put('status', bob.id, 'filtered', { language: 'ja', sensitive: true });
-	f.store.put('bookmark', alice.id, 'filtered', true);
-	f.store.put('thread-mute', alice.id, 'filtered', false);
-	f.store.put('pin', alice.id, 'filtered', false);
-	f.store.put('reblog', alice.id, 'filtered', 'deleted-boost');
+	await f.store.put('status', bob.id, 'filtered', { language: 'ja', sensitive: true });
+	await f.store.put('bookmark', alice.id, 'filtered', true);
+	await f.store.put('thread-mute', alice.id, 'filtered', false);
+	await f.store.put('pin', alice.id, 'filtered', false);
+	await f.store.put('reblog', alice.id, 'filtered', 'deleted-boost');
 	f.states.set('filtered', { isFavorited: false, isMutedThread: true });
 	f.users.get(bob.id)!.pinnedNoteIds = ['filtered'];
-	f.store.put('filter', alice.id, 'home-filter', { id: 'home-filter', title: 'Home rule', context: ['home'], expires_at: null, filter_action: 'warn', keywords: [{ id: 'keyword', keyword: 'Native', whole_word: true }], statuses: [] });
-	f.store.put('filter-revision', alice.id, 'current', 'updated');
+	await f.store.put('filter', alice.id, 'home-filter', { id: 'home-filter', title: 'Home rule', context: ['home'], expires_at: null, filter_action: 'warn', keywords: [{ id: 'keyword', keyword: 'Native', whole_word: true }], statuses: [] });
+	await f.store.put('filter-revision', alice.id, 'current', 'updated');
 	f.notes.set('filtered', note('filtered'));
 	emit(c.native, home, 'note', { id: 'filtered' });
 	const revision = await c.messages.take(message => message.event === 'filters_changed');
@@ -255,7 +255,7 @@ test('shares compatibility metadata and context filters with REST and signals fi
 	assert.equal(status.muted, true);
 	assert.equal(status.pinned, true);
 	assert.equal(status.reblogged, undefined);
-	assert.equal(f.store.get('reblog', alice.id, 'filtered'), undefined);
+	assert.equal(await f.store.get('reblog', alice.id, 'filtered'), undefined);
 	assert.deepEqual(status.filtered.map((match: Json) => match.filter.id), ['home-filter']);
 	f.states.set('filtered', { isFavorited: true, isMutedThread: false });
 	f.users.get(bob.id)!.pinnedNoteIds = [];
@@ -272,7 +272,7 @@ test('shares compatibility metadata and context filters with REST and signals fi
 test('keeps notification-only grants scoped when subscribing and receiving native events', async t => {
 	const f = await fixture();
 	t.after(() => f.close());
-	const token = f.grant(['read:notifications']).token;
+	const token = (await f.grant(['read:notifications'])).token;
 	const c = await f.connect({ stream: 'user' }, token);
 	const main = await channel(c.native, 'main');
 	c.socket.send(JSON.stringify({ type: 'subscribe', stream: 'public' }));
@@ -394,7 +394,7 @@ test('closes an active connection before emitting after compatibility grant revo
 	t.after(() => f.close());
 	const c = await f.connect({ stream: 'public' });
 	const global = await channel(c.native, 'globalTimeline');
-	assert.equal(f.store.revokeGrant(f.token, f.client.id), true);
+	assert.equal(await f.store.revokeGrant(f.token, f.client.id), true);
 	const closed = once(c.socket, 'close');
 	f.notes.set('after-revocation', note('after-revocation'));
 	emit(c.native, global, 'note', { id: 'after-revocation' });
@@ -451,7 +451,7 @@ test('keeps the newest direct status after older edits and refreshes its visible
 	assert.equal(refreshed.last_status.bookmarked, false);
 	assert.equal(refreshed.last_status.muted, false);
 	assert.equal(refreshed.last_status.pinned, false);
-	assert.equal(f.store.get<Json>('conversation', alice.id, '100')?.latestId, '200');
+	assert.equal((await f.store.get<Json>('conversation', alice.id, '100'))?.latestId, '200');
 	await c.native.commands.take(message => message.type === 'subNote' && message.body.id === '200');
 	f.notes.delete('200');
 	change(c.native, '200', 'deleted');
@@ -471,4 +471,70 @@ test('propagates native disconnects and releases gateway listeners and sockets o
 	assert.equal((await closed)[0], 1012);
 	await f.bridge.close();
 	assert.equal(f.gateway.listenerCount('upgrade'), 0);
+});
+
+
+test('awaits the final asynchronous grant check and rejects revocation before the WebSocket handshake', async t => {
+	const f = await fixture();
+	t.after(() => f.close());
+	const started = deferred<void>();
+	const resume = deferred<void>();
+	t.after(() => resume.resolve());
+	const getGrant = f.store.getGrant.bind(f.store);
+	let reads = 0;
+	t.mock.method(f.store, 'getGrant', async (token: string) => {
+		if (++reads === 2) { started.resolve(); await resume.promise; }
+		return getGrant(token);
+	});
+	const result = f.failedUpgrade({ stream: 'public' }, f.token);
+	await started.promise;
+	assert.equal(await f.store.revokeGrant(f.token, f.client.id), true);
+	resume.resolve();
+	assert.equal(await result, 401);
+});
+
+test('does not upgrade a socket after shutdown while the final database authorization is pending', async t => {
+	const f = await fixture();
+	t.after(() => f.close());
+	const started = deferred<void>();
+	const resume = deferred<void>();
+	t.after(() => resume.resolve());
+	const getGrant = f.store.getGrant.bind(f.store);
+	let reads = 0;
+	t.mock.method(f.store, 'getGrant', async (token: string) => {
+		if (++reads === 2) { started.resolve(); await resume.promise; }
+		return getGrant(token);
+	});
+	const socket = new WebSocket(`${f.gatewayUrl}?access_token=${encodeURIComponent(f.token)}&stream=public`);
+	socket.on('error', () => undefined);
+	let opened = false;
+	socket.once('open', () => { opened = true; });
+	const closed = new Promise<void>(resolve => socket.once('close', () => resolve()));
+	await started.promise;
+	await f.bridge.close();
+	resume.resolve();
+	await closed;
+	assert.equal(opened, false);
+	assert.equal(f.gateway.listenerCount('upgrade'), 0);
+});
+
+test('rechecks authorization after an in-flight native read before emitting an event', async t => {
+	const f = await fixture();
+	t.after(() => f.close());
+	const c = await f.connect({ stream: 'public' });
+	const global = await channel(c.native, 'globalTimeline');
+	const started = deferred<void>();
+	const resume = deferred<void>();
+	t.after(() => resume.resolve());
+	f.setBeforeCall(async endpoint => {
+		if (endpoint === 'notes/show') { started.resolve(); await resume.promise; }
+	});
+	f.notes.set('revoked-during-read', note('revoked-during-read'));
+	emit(c.native, global, 'note', { id: 'revoked-during-read' });
+	await started.promise;
+	assert.equal(await f.store.revokeGrant(f.token, f.client.id), true);
+	const closed = once(c.socket, 'close');
+	resume.resolve();
+	assert.equal((await closed)[0], 1008);
+	assert.equal(c.messages.received.length, 0);
 });

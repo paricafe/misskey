@@ -70,23 +70,23 @@ function basicCredentials(header: string | undefined): { id: string; secret: str
 	}
 }
 
-function authenticatedClient(request: FastifyRequest, body: Parameters, store: CompatStore): CompatClient {
+async function authenticatedClient(request: FastifyRequest, body: Parameters, store: CompatStore): Promise<CompatClient> {
 	const basic = basicCredentials(request.headers.authorization);
 	const id = basic?.id ?? field(body, 'client_id');
 	const secret = basic?.secret ?? field(body, 'client_secret');
 	if (basic && (body.client_id !== undefined || body.client_secret !== undefined)) {
 		throw new OAuthError(400, 'invalid_request', 'Use one client authentication method');
 	}
-	const client = id && secret ? store.verifyClient(id, secret) : undefined;
+	const client = id && secret ? await store.verifyClient(id, secret) : undefined;
 	if (!client) throw new OAuthError(401, 'invalid_client', 'Invalid client authentication');
 	return client;
 }
 
-export function getAuthorization(request: FastifyRequest, store: CompatStore): Grant | undefined {
+export async function getAuthorization(request: FastifyRequest, store: CompatStore): Promise<Grant | undefined> {
 	const header = request.headers.authorization;
 	if (!header) return undefined;
 	const match = /^Bearer\s+(\S+)$/iu.exec(header);
-	const grant = match?.[1].startsWith('mc_') ? store.getGrant(match[1]) : undefined;
+	const grant = match?.[1].startsWith('mc_') ? await store.getGrant(match[1]) : undefined;
 	if (!grant) throw new OAuthError(401, 'invalid_token', 'A valid compatibility access token is required');
 	return grant;
 }
@@ -137,17 +137,17 @@ function application(client: CompatClient): Record<string, unknown> {
 	return { id: client.id, name: client.name, website: client.website ?? null, scopes: client.scopes, redirect_uris: client.redirectUris, redirect_uri: client.redirectUris.join('\n') };
 }
 
-function registerApplication(body: Parameters, deps: OAuthDependencies): Record<string, unknown> {
+async function registerApplication(body: Parameters, deps: OAuthDependencies): Promise<Record<string, unknown>> {
 	const name = field(body, 'client_name')?.trim();
 	if (!name || name.length > 256) throw new OAuthError(422, 'invalid_request', 'A valid client_name is required');
 	const website = field(body, 'website');
 	if (website && (website.length > 2048 || !/^https?:\/\//iu.test(website))) throw new OAuthError(422, 'invalid_request', 'Invalid application website');
-	const { client, clientSecret } = deps.store.createClient({ name, website, redirectUris: redirectUris(body.redirect_uris ?? body['redirect_uris[]']), scopes: scopes(body.scopes) }, deps.now?.());
+	const { client, clientSecret } = await deps.store.createClient({ name, website, redirectUris: redirectUris(body.redirect_uris ?? body['redirect_uris[]']), scopes: scopes(body.scopes) }, deps.now?.());
 	return { ...application(client), client_id: client.id, client_secret: clientSecret };
 }
 
-function beginAuthorization(query: Parameters, reply: FastifyReply, deps: OAuthDependencies): unknown {
-	const client = deps.store.getClient(required(query, 'client_id'));
+async function beginAuthorization(query: Parameters, reply: FastifyReply, deps: OAuthDependencies): Promise<unknown> {
+	const client = await deps.store.getClient(required(query, 'client_id'));
 	if (!client) throw new OAuthError(400, 'invalid_client', 'Unknown application');
 	const redirectUri = required(query, 'redirect_uri');
 	if (!client.redirectUris.includes(redirectUri)) throw new OAuthError(400, 'invalid_request', 'The redirect URI is not registered');
@@ -162,11 +162,11 @@ function beginAuthorization(query: Parameters, reply: FastifyReply, deps: OAuthD
 		throw new OAuthError(400, 'invalid_request', 'PKCE requires an S256 code challenge');
 	}
 	const now = deps.now?.() ?? Date.now();
-	deps.store.prune(now);
+	await deps.store.prune(now);
 	const state = randomBytes(32).toString('base64url');
 	const session = randomUUID();
 	const pending: AuthorizationState = { clientId: client.id, redirectUri, scopes: requested, session, clientState: field(query, 'state'), codeChallenge: challenge };
-	deps.store.putOperation('oauth_state', hashCredential(state), pending, now + STATE_TTL);
+	await deps.store.putOperation('oauth_state', hashCredential(state), pending, now + STATE_TTL);
 	const callback = new URL('/mastodon/oauth/callback', deps.publicUrl);
 	callback.searchParams.set('state', state);
 	const destination = new URL(`/miauth/${session}`, deps.publicUrl);
@@ -194,7 +194,7 @@ function authorizationResult(reply: FastifyReply, state: AuthorizationState, res
 async function callback(query: Parameters, reply: FastifyReply, deps: OAuthDependencies): Promise<unknown> {
 	const rawState = required(query, 'state');
 	const now = deps.now?.() ?? Date.now();
-	const state = deps.store.takeOperation<AuthorizationState>('oauth_state', hashCredential(rawState), now);
+	const state = await deps.store.takeOperation<AuthorizationState>('oauth_state', hashCredential(rawState), now);
 	if (!state) throw new OAuthError(400, 'invalid_request', 'The authorization state has expired or was already used');
 	if (query.session !== undefined && query.session !== state.session) throw new OAuthError(400, 'invalid_request', 'The MiAuth session does not match');
 	let result: { ok?: boolean; token?: string; user?: { id?: string } };
@@ -204,7 +204,7 @@ async function callback(query: Parameters, reply: FastifyReply, deps: OAuthDepen
 	if (!result.ok || typeof result.token !== 'string' || !result.token || typeof result.user?.id !== 'string' || !result.user.id) {
 		return authorizationResult(reply, state, { error: 'access_denied', error_description: 'The application was not authorized' });
 	}
-	const code = deps.store.issueCode({ clientId: state.clientId, redirectUri: state.redirectUri, scopes: state.scopes, userId: result.user.id, nativeToken: result.token, codeChallenge: state.codeChallenge }, now + CODE_TTL);
+	const code = await deps.store.issueCode({ clientId: state.clientId, redirectUri: state.redirectUri, scopes: state.scopes, userId: result.user.id, nativeToken: result.token, codeChallenge: state.codeChallenge }, now + CODE_TTL);
 	return authorizationResult(reply, state, { code });
 }
 
@@ -217,24 +217,24 @@ function verifyPkce(code: AuthorizationCode, body: Parameters): void {
 	if (expected.length !== actual.length || !timingSafeEqual(expected, actual)) throw new OAuthError(400, 'invalid_grant', 'Invalid PKCE verifier');
 }
 
-function token(request: FastifyRequest, body: Parameters, deps: OAuthDependencies): Record<string, unknown> {
-	const client = authenticatedClient(request, body, deps.store);
+async function token(request: FastifyRequest, body: Parameters, deps: OAuthDependencies): Promise<Record<string, unknown>> {
+	const client = await authenticatedClient(request, body, deps.store);
 	const now = deps.now?.() ?? Date.now();
 	let issued: { token: string; grant: Grant };
 	if (body.grant_type === 'client_credentials') {
 		const requested = scopes(body.scope, ['read']);
 		requireSubset(requested, client.scopes);
-		issued = deps.store.createGrant({ clientId: client.id, scopes: requested, kind: 'app' }, now);
+		issued = await deps.store.createGrant({ clientId: client.id, scopes: requested, kind: 'app' }, now);
 	} else if (body.grant_type === 'authorization_code') {
 		const raw = required(body, 'code');
-		issued = deps.store.transaction(() => {
-			const code = deps.store.getCode(raw, now);
+		issued = await deps.store.transaction(async () => {
+			const code = await deps.store.getCode(raw, now);
 			if (!code || code.clientId !== client.id || code.redirectUri !== field(body, 'redirect_uri')) throw new OAuthError(400, 'invalid_grant', 'Invalid authorization code or redirect URI');
 			verifyPkce(code, body);
 			const requested = scopes(body.scope, code.scopes);
 			requireSubset(requested, code.scopes);
-			deps.store.deleteCode(raw);
-			return deps.store.createGrant({ clientId: client.id, scopes: requested, kind: 'user', userId: code.userId, nativeToken: code.nativeToken }, now);
+			await deps.store.deleteCode(raw);
+			return await deps.store.createGrant({ clientId: client.id, scopes: requested, kind: 'user', userId: code.userId, nativeToken: code.nativeToken }, now);
 		});
 	} else {
 		throw new OAuthError(400, 'unsupported_grant_type', 'Only authorization_code and client_credentials are supported');
@@ -242,13 +242,13 @@ function token(request: FastifyRequest, body: Parameters, deps: OAuthDependencie
 	return { access_token: issued.token, token_type: 'Bearer', scope: issued.grant.scopes.join(' '), created_at: Math.floor(issued.grant.createdAt / 1000) };
 }
 
-function revoke(request: FastifyRequest, body: Parameters, deps: OAuthDependencies): Record<string, never> {
-	const client = authenticatedClient(request, body, deps.store);
+async function revoke(request: FastifyRequest, body: Parameters, deps: OAuthDependencies): Promise<Record<string, never>> {
+	const client = await authenticatedClient(request, body, deps.store);
 	const raw = field(body, 'token');
 	if (!raw) throw new OAuthError(403, 'access_denied', 'A token is required');
-	const grant = deps.store.getGrant(raw);
+	const grant = await deps.store.getGrant(raw);
 	if (grant && grant.clientId !== client.id) throw new OAuthError(403, 'access_denied', 'The token belongs to another application');
-	deps.store.revokeGrant(raw, client.id);
+	await deps.store.revokeGrant(raw, client.id);
 	return {};
 }
 
@@ -257,17 +257,17 @@ export async function dispatchHandler(request: FastifyRequest, reply: FastifyRep
 	reply.header('Cache-Control', 'no-store').header('Pragma', 'no-cache').header('Referrer-Policy', 'no-referrer');
 	try {
 		const route = pathname(request);
-		if (request.method === 'POST' && route === '/api/v1/apps') return reply.send(registerApplication(await readBody(request), deps));
+		if (request.method === 'POST' && route === '/api/v1/apps') return reply.send(await registerApplication(await readBody(request), deps));
 		if (request.method === 'GET' && route === '/api/v1/apps/verify_credentials') {
-			const grant = getAuthorization(request, deps.store);
-			const client = grant && deps.store.getClient(grant.clientId);
+			const grant = await getAuthorization(request, deps.store);
+			const client = grant && await deps.store.getClient(grant.clientId);
 			if (!client) throw new OAuthError(401, 'invalid_token', 'An application token is required');
 			return reply.send(application(client));
 		}
-		if (request.method === 'GET' && route === '/oauth/authorize') return beginAuthorization(object(request.query), reply, deps);
+		if (request.method === 'GET' && route === '/oauth/authorize') return await beginAuthorization(object(request.query), reply, deps);
 		if (request.method === 'GET' && route === '/mastodon/oauth/callback') return await callback(object(request.query), reply, deps);
-		if (request.method === 'POST' && route === '/oauth/token') return reply.send(token(request, await readBody(request), deps));
-		if (request.method === 'POST' && route === '/oauth/revoke') return reply.send(revoke(request, await readBody(request), deps));
+		if (request.method === 'POST' && route === '/oauth/token') return reply.send(await token(request, await readBody(request), deps));
+		if (request.method === 'POST' && route === '/oauth/revoke') return reply.send(await revoke(request, await readBody(request), deps));
 		throw new OAuthError(404, 'not_found', 'Unknown OAuth endpoint');
 	} catch (error) {
 		if (error instanceof OAuthError) {

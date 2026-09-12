@@ -17,13 +17,13 @@ function groupNotificationId(value: unknown): string {
 	return key.slice('ungrouped-'.length);
 }
 
-function isDismissed(routes: Routes, c: RequestContext, id: string): boolean {
-	const cleared = routes.deps.store.get<string>('notifications', c.userId, 'cleared');
-	return !!((cleared && compareIds(id, cleared) <= 0) || routes.deps.store.get('dismissed-notification', c.userId, id));
+async function isDismissed(routes: Routes, c: RequestContext, id: string): Promise<boolean> {
+	const cleared = await routes.deps.store.get<string>('notifications', c.userId, 'cleared');
+	return !!((cleared && compareIds(id, cleared) <= 0) || await routes.deps.store.get('dismissed-notification', c.userId, id));
 }
 
 async function convert(routes: Routes, c: RequestContext, row: Json): Promise<Json | null> {
-	if (isDismissed(routes, c, row.id)) return null;
+	if (await isDismissed(routes, c, row.id)) return null;
 	const result = routes.deps.entities.notification(row);
 	if (!result) return null;
 	if (result.status) {
@@ -70,7 +70,7 @@ async function readPage(routes: Routes, c: RequestContext, limit: number, query 
 	const minId = string(query.min_id);
 	const sinceId = string(query.since_id);
 	const maxId = string(query.max_id);
-	const cleared = routes.deps.store.get<string>('notifications', c.userId, 'cleared');
+	const cleared = await routes.deps.store.get<string>('notifications', c.userId, 'cleared');
 	const lowerBound = [minId || sinceId, cleared ?? ''].sort(compareIds).at(-1)!;
 	if (maxId && lowerBound && compareIds(maxId, lowerBound) <= 0) return { notifications: [], cursors: [] };
 	const ascending = !!minId;
@@ -108,7 +108,7 @@ async function readPage(routes: Routes, c: RequestContext, limit: number, query 
 }
 
 async function findNotification(routes: Routes, c: RequestContext, target: string): Promise<Json> {
-	if (isDismissed(routes, c, target)) throw new HttpError(404, 'Record not found');
+	if (await isDismissed(routes, c, target)) throw new HttpError(404, 'Record not found');
 	let untilId: string | undefined;
 	const visited = new Set<string>();
 	while (true) {
@@ -128,20 +128,20 @@ async function findNotification(routes: Routes, c: RequestContext, target: strin
 	throw new HttpError(404, 'Record not found');
 }
 
-function dismissNotification(routes: Routes, c: RequestContext, id: string): Json {
-	routes.deps.store.put('dismissed-notification', c.userId, id, true);
+async function dismissNotification(routes: Routes, c: RequestContext, id: string): Promise<Json> {
+	await routes.deps.store.put('dismissed-notification', c.userId, id, true);
 	return {};
 }
 
 async function clearNotifications(routes: Routes, c: RequestContext): Promise<Json> {
 	const latest = await c.call<Json[]>('i/notifications', { limit: 1, markAsRead: false });
 	await c.call('notifications/mark-all-as-read');
-	if (latest[0]) routes.deps.store.put('notifications', c.userId, 'cleared', latest[0].id);
+	if (latest[0]) await routes.deps.store.put('notifications', c.userId, 'cleared', latest[0].id);
 	return {};
 }
 
 async function unreadCount(routes: Routes, c: RequestContext): Promise<Json> {
-	const marker = routes.deps.store.get<Json>('marker', c.userId, 'notifications');
+	const marker = await routes.deps.store.get<Json>('marker', c.userId, 'notifications');
 	const query = { types: c.query.types, exclude_types: c.query.exclude_types, account_id: c.query.account_id, grouped_types: c.query.grouped_types, since_id: marker?.last_read_id };
 	const page = await readPage(routes, c, integer(c.query.limit, 100, 1, 1000), query);
 	return { count: page.notifications.length };

@@ -9,7 +9,7 @@ import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { test } from 'node:test';
 import WebSocket, { WebSocketServer } from 'ws';
-import { createGateway } from '../src/index.js';
+import { CompatStore, createGateway } from '../src/index.js';
 
 async function within<T>(promise: Promise<T>, milliseconds: number): Promise<T> {
 	let timer: NodeJS.Timeout | undefined;
@@ -31,7 +31,7 @@ test('standalone shutdown closes active client and native WebSockets before wait
 	const nativeWss = new WebSocketServer({ server: upstream, path: '/streaming' });
 	upstream.listen(0, '127.0.0.1');
 	await once(upstream, 'listening');
-	const gateway = await createGateway({ publicUrl: 'https://social.example', nativeUrl: `http://127.0.0.1:${(upstream.address() as AddressInfo).port}`, database: ':memory:' });
+	const gateway = await createGateway({ publicUrl: 'https://social.example', nativeUrl: `http://127.0.0.1:${(upstream.address() as AddressInfo).port}`, store: new CompatStore(':memory:') });
 	let clientSocket: WebSocket | undefined;
 	t.after(async () => {
 		clientSocket?.terminate();

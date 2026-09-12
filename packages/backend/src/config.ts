@@ -41,7 +41,6 @@ type Source = {
 	chmodSocket?: string;
 	enableIpRateLimit?: boolean;
 	enableMastodonApi?: boolean;
-	mastodonApiStoragePath?: string;
 	disableHsts?: boolean;
 	hstsPreload?: boolean;
 	db: {
@@ -148,7 +147,6 @@ export type Config = {
 	chmodSocket: string | undefined;
 	enableIpRateLimit: boolean;
 	enableMastodonApi: boolean;
-	mastodonApiStoragePath?: string;
 	disableHsts: boolean | undefined;
 	hstsPreload: boolean | undefined;
 	db: {
@@ -325,7 +323,6 @@ export function loadConfig(): Config {
 		hstsPreload: config.hstsPreload ?? false,
 		enableIpRateLimit: config.enableIpRateLimit ?? true,
 		enableMastodonApi: config.enableMastodonApi ?? true,
-		mastodonApiStoragePath: config.mastodonApiStoragePath,
 		host,
 		hostname,
 		scheme,

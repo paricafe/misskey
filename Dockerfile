@@ -110,11 +110,6 @@ COPY --chown=misskey:misskey --from=native-builder /misskey/packages/mastodon-co
 COPY --chown=misskey:misskey --from=native-builder /misskey/packages/i18n/built ./packages/i18n/built
 COPY --chown=misskey:misskey . ./
 
-# Keep OAuth clients, grants and their encryption key outside the container layer.
-# Compose uses a named volume; initialize its ownership for the non-root server.
-RUN mkdir -p /misskey/.mastodon-compat && chmod 0700 /misskey/.mastodon-compat
-VOLUME ["/misskey/.mastodon-compat"]
-
 ENV LD_PRELOAD=/usr/local/lib/libjemalloc.so
 ENV NODE_ENV=production
 HEALTHCHECK --interval=5s --retries=20 CMD ["/bin/bash", "/misskey/healthcheck.sh"]

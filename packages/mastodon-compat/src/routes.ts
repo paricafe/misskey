@@ -27,7 +27,7 @@ export class Routes {
 	constructor(readonly app: FastifyInstance, readonly deps: RouteDependencies) {}
 	add(method: HTTPMethods, url: string, scope: string | undefined, handler: RouteHandler, optional = false): void {
 		this.app.route({ method, url, handler: async (request, reply) => {
-			const grant = getAuthorization(request, this.deps.store);
+			const grant = await getAuthorization(request, this.deps.store);
 			if (!optional && (!grant || grant.kind !== 'user')) throw new HttpError(401, 'A user access token is required');
 			if (grant && scope && !(scope === 'read:accounts' && allowsScope(grant.scopes, 'profile'))) assertScope(grant.scopes, scope);
 			if (grant?.nativeToken) await this.deps.native.call('ping', {}, grant.nativeToken, { ip: request.ip });
@@ -42,7 +42,7 @@ export class Routes {
 		const path = context.request.url;
 		const filterContext: FilterContext = path.includes('/timelines/home') || path.includes('/timelines/list/') ? 'home' : path.includes('/accounts/') ? 'account' : path.includes('/notifications') ? 'notifications' : path.includes('/statuses/') ? 'thread' : 'public';
 		const readAccount = !!context.grant && toNativePermissions(context.grant.scopes).includes('read:account');
-		const decorated = decorateStatus(this.deps.store, status, context.userId);
+		const decorated = await decorateStatus(this.deps.store, status, context.userId);
 		const hydrated = await hydrateStatus(this.deps.store, decorated, context.userId || undefined, readAccount, (endpoint, body) => this.cachedRead(context, endpoint, body));
 		return applyFilters(this.deps.store, context.userId, hydrated, filterContext);
 	}
@@ -80,7 +80,7 @@ export class Routes {
 	async note(context: RequestContext, id = string(context.params.id)): Promise<Json> { return context.call('notes/show', { noteId: id }); }
 	async relationship(context: RequestContext, id = string(context.params.id)): Promise<Json> {
 		const user = await context.call('users/show', { userId: id });
-		return { ...this.deps.entities.relationship(user), note: this.deps.store.get('account-note', context.userId, id) ?? '' };
+		return { ...this.deps.entities.relationship(user), note: await this.deps.store.get('account-note', context.userId, id) ?? '' };
 	}
 }
 
@@ -103,7 +103,7 @@ export function registerRoutes(app: FastifyInstance, deps: RouteDependencies): R
 	for (const version of [1, 2] as const) add('GET', `/api/v${version}/suggestions`, 'read:accounts', async c => (await c.call<Json[]>('users/recommendation', { limit: integer(c.query.limit, 40, 1, 80), offset: 0 })).map(user => version === 1 ? account(user) : { source: 'global', sources: ['most_followed'], account: account(user) }));
 	add('GET', '/api/v1/accounts/verify_credentials', 'read:accounts', async c => {
 		const result = entities.account(await c.call('i'), true);
-		result.source = { ...result.source, ...store.get<Json>('account-source', c.userId, 'defaults') };
+		result.source = { ...result.source, ...await store.get<Json>('account-source', c.userId, 'defaults') };
 		return result;
 	});
 	add('GET', '/api/v1/accounts/relationships', 'read:follows', c => Promise.all(strings(c.query.id).map(id => routes.relationship(c, id))));
@@ -134,7 +134,7 @@ export function registerRoutes(app: FastifyInstance, deps: RouteDependencies): R
 		if (action === 'follow' && c.body.notify !== undefined) await c.call('following/update', { userId: c.params.id, notify: boolean(c.body.notify) ? 'normal' : 'none' });
 		return routes.relationship(c);
 	});
-	add('POST', '/api/v1/accounts/:id/note', 'write:accounts', async c => { await c.call('users/show', { userId: c.params.id }); store.put('account-note', c.userId, c.params.id, string(c.body.comment)); return routes.relationship(c); });
+	add('POST', '/api/v1/accounts/:id/note', 'write:accounts', async c => { await c.call('users/show', { userId: c.params.id }); await store.put('account-note', c.userId, c.params.id, string(c.body.comment)); return routes.relationship(c); });
 	add('GET', '/api/v1/follow_requests', 'read:follows', async c => {
 		const rows = await routes.readPage(c, 'following/requests/list'); return routes.page(c, rows, rows.map(item => account(item.follower)));
 	});
@@ -159,7 +159,7 @@ export function registerRoutes(app: FastifyInstance, deps: RouteDependencies): R
 		return { ancestors: (await routes.statuses(ancestors, c)).reverse(), descendants: descendants.sort((a, b) => compareIds(a.id, b.id)) };
 	}, true);
 	add('GET', '/api/v1/statuses/:id/source', 'read:statuses', async c => { const note = await routes.note(c); if (note.userId !== c.userId) throw new HttpError(403, 'You do not own this status'); return { id: note.id, text: note.text ?? '', spoiler_text: note.cw ?? '' }; });
-	add('DELETE', '/api/v1/statuses/:id', 'write:statuses', async c => { const note = await routes.note(c); const result = await routes.status(note, c); await c.call('notes/delete', { noteId: note.id }); store.delete('status', c.userId, note.id); return { ...result, text: note.text ?? '' }; });
+	add('DELETE', '/api/v1/statuses/:id', 'write:statuses', async c => { const note = await routes.note(c); const result = await routes.status(note, c); await c.call('notes/delete', { noteId: note.id }); await store.delete('status', c.userId, note.id); return { ...result, text: note.text ?? '' }; });
 	add('POST', '/api/v1/statuses', 'write:statuses', async c => createStatus(routes, c));
 	add('PUT', '/api/v1/statuses/:id', 'write:statuses', async c => {
 		const prepared = prepareStatusInput(c.body, undefined, true);
@@ -169,7 +169,9 @@ export function registerRoutes(app: FastifyInstance, deps: RouteDependencies): R
 		const body = { noteId: note.id, text: c.body.status === undefined ? note.text : prepared.native.text, cw: c.body.spoiler_text === undefined ? note.cw : prepared.native.cw, ...(c.body.media_ids !== undefined ? { fileIds: prepared.native.fileIds ?? [] } : {}) };
 		if (note.renoteId && !body.text?.trim() && !(body.fileIds ?? note.files)?.length && !note.poll) body.text = (await quoteTarget(routes, c, note.renoteId)).url;
 		await c.call('notes/update', body);
-		store.put('status', c.userId, note.id, { ...store.get<Json>('status', c.userId, note.id), ...prepared.metadata });
+		await store.transaction(async () => {
+			await store.put('status', c.userId, note.id, { ...await store.get<Json>('status', c.userId, note.id), ...prepared.metadata });
+		});
 		return routes.status(await routes.note(c), c);
 	});
 	for (const [action, endpoint] of [['reblog', 'notes/create'], ['unreblog', 'notes/unrenote']]) add('POST', `/api/v1/statuses/:id/${action}`, 'write:statuses', async c => {
@@ -177,8 +179,8 @@ export function registerRoutes(app: FastifyInstance, deps: RouteDependencies): R
 		const note = await routes.note(c);
 		if (action === 'reblog') {
 			const existing = await liveReblog(store, c.userId, note.id, c.call);
-			if (!existing) { const result = await c.call(endpoint, { renoteId: note.id, visibility: selectedVisibility }); store.put('reblog', c.userId, note.id, result.createdNote.id); }
-		} else { await c.call(endpoint, { noteId: note.id }); store.delete('reblog', c.userId, note.id); }
+			if (!existing) { const result = await c.call(endpoint, { renoteId: note.id, visibility: selectedVisibility }); await store.put('reblog', c.userId, note.id, result.createdNote.id); }
+		} else { await c.call(endpoint, { noteId: note.id }); await store.delete('reblog', c.userId, note.id); }
 		return { ...await routes.status(await routes.note(c), c), reblogged: action === 'reblog' };
 	});
 	for (const action of ['favourite', 'unfavourite']) add('POST', `/api/v1/statuses/:id/${action}`, 'write:favourites', async c => {
@@ -304,19 +306,19 @@ async function quoteTarget(routes: Routes, context: RequestContext, id: string):
 
 async function createStatus(routes: Routes, c: RequestContext): Promise<Json> {
 	const { store } = routes.deps;
-	const prepared = prepareStatusInput(c.body, store.get<Json>('account-source', c.userId, 'defaults'));
+	const prepared = prepareStatusInput(c.body, await store.get<Json>('account-source', c.userId, 'defaults'));
 	validateQuoteApprovalPolicy(c.body.quote_approval_policy, prepared.native.visibility);
 	const key = c.request.headers['idempotency-key'];
 	if (Array.isArray(key) || (key !== undefined && (!key || key.length > 256))) throw new HttpError(422, 'Invalid idempotency key');
 	const digest = createHash('sha256').update(canonicalJson(c.body)).digest('hex');
-	const existing = (): string | undefined => {
-		const stored = key ? store.get<Json>('idempotency', c.userId, key) : undefined;
+	const existing = async (): Promise<string | undefined> => {
+		const stored = key ? await store.get<Json>('idempotency', c.userId, key) : undefined;
 		if (!stored || stored.expiresAt <= Date.now()) return undefined;
 		if (stored.digest !== digest) throw new HttpError(422, 'Idempotency key was used for a different request');
 		if (!stored.id) throw new HttpError(409, 'This request is already being processed; check the timeline before retrying');
 		return string(stored.id);
 	};
-	const replay = existing();
+	const replay = await existing();
 	if (replay) return routes.status(await routes.note(c, replay), c);
 	const body = prepared.native;
 	const quoted = body.renoteId ? await quoteTarget(routes, c, body.renoteId) : undefined;
@@ -333,25 +335,25 @@ async function createStatus(routes: Routes, c: RequestContext): Promise<Json> {
 		body.visibleUserIds = [...new Set(ids)].filter(id => id !== c.userId);
 		if (!body.visibleUserIds.length) throw new HttpError(422, 'A direct status needs a recipient mention');
 	}
-	// Recipient lookups above yield. Recheck and claim under SQLite's write lock
-	// so requests using another connection cannot both submit the native write.
-	const claimedReplay = key ? store.transaction(() => {
-		const id = existing();
+	// Recipient lookups above yield. Recheck and claim in a short database
+	// transaction so concurrent requests cannot both submit the native write.
+	const claimedReplay = key ? await store.transaction(async () => {
+		const id = await existing();
 		if (id) return id;
-		store.put('idempotency', c.userId, key, { digest, expiresAt: Date.now() + 86400000 });
+		await store.put('idempotency', c.userId, key, { digest, expiresAt: Date.now() + 86400000 });
 		return undefined;
 	}) : undefined;
 	if (claimedReplay) return routes.status(await routes.note(c, claimedReplay), c);
 	let result: Json;
 	try { result = await c.call('notes/create', body); } catch (error) {
-		if (key && error instanceof NativeError && error.status >= 400 && error.status < 500 && ![408, 499].includes(error.status)) store.delete('idempotency', c.userId, key);
+		if (key && error instanceof NativeError && error.status >= 400 && error.status < 500 && ![408, 499].includes(error.status)) await store.delete('idempotency', c.userId, key);
 		throw error;
 	}
 	const note = result.createdNote;
 	if (!note || typeof note.id !== 'string' || !note.id) throw new NativeError(502, 'INVALID_NATIVE_RESPONSE', 'The native API did not return the created status');
-	store.transaction(() => {
-		store.put('status', c.userId, note.id, prepared.metadata);
-		if (key) store.put('idempotency', c.userId, key, { id: note.id, digest, expiresAt: Date.now() + 86400000 });
+	await store.transaction(async () => {
+		await store.put('status', c.userId, note.id, prepared.metadata);
+		if (key) await store.put('idempotency', c.userId, key, { id: note.id, digest, expiresAt: Date.now() + 86400000 });
 	});
 	return routes.status(note, c);
 }
@@ -385,12 +387,19 @@ async function replyDescendants(routes: Routes, context: RequestContext, rootId:
 function registerMarkers(routes: Routes): void {
 	const { store } = routes.deps;
 	const add = routes.add.bind(routes);
-	add('GET', '/api/v1/markers', 'read:statuses', c => Object.fromEntries(strings(c.query.timeline).filter(name => ['home', 'notifications'].includes(name)).flatMap(name => { const value = store.get('marker', c.userId, name); return value ? [[name, value]] : []; })));
-	add('POST', '/api/v1/markers', 'write:statuses', c => store.transaction(() => {
+	add('GET', '/api/v1/markers', 'read:statuses', async c => {
+		const result: Json = {};
+		for (const name of strings(c.query.timeline).filter(name => ['home', 'notifications'].includes(name))) {
+			const value = await store.get('marker', c.userId, name);
+			if (value) result[name] = value;
+		}
+		return result;
+	});
+	add('POST', '/api/v1/markers', 'write:statuses', c => store.transaction(async () => {
 		const result: Json = {};
 		for (const name of ['home', 'notifications']) if (c.body[name]) {
-			const old = store.get<Json>('marker', c.userId, name);
-			result[name] = { last_read_id: string(c.body[name].last_read_id), version: (old?.version ?? 0) + 1, updated_at: new Date().toISOString() }; store.put('marker', c.userId, name, result[name]);
+			const old = await store.get<Json>('marker', c.userId, name);
+			result[name] = { last_read_id: string(c.body[name].last_read_id), version: (old?.version ?? 0) + 1, updated_at: new Date().toISOString() }; await store.put('marker', c.userId, name, result[name]);
 		}
 		return result;
 	}));

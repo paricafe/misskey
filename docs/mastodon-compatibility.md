@@ -5,7 +5,7 @@
 ```mermaid
 flowchart LR
   Client[Mastodon client] --> Gateway[Mastodon gateway]
-  Gateway --> SQLite[Private compatibility SQLite]
+  Gateway --> PostgreSQL[Private compatibility table in existing PostgreSQL]
   Gateway --> HTTP[Public Misskey HTTP API]
   Gateway --> WS[Public Misskey WebSocket API]
   HTTP --> Native[Native permissions and business services]
@@ -22,48 +22,17 @@ Mastodon registration creates a gateway application. Authorization redirects to 
 
 PKCE S256 and registered custom-scheme redirects are supported. OOB redirects display an authorization code. `lang` is an optional hint; the MiAuth page uses native language settings. `force_login=true` is explicitly rejected because the unchanged native consent page cannot guarantee forced account selection.
 
-## Private state and rollback
+## PostgreSQL state and deployment
 
-The gateway keeps its own SQLite database, defaulting to `.mastodon-compat/compat.sqlite` in the installation directory. Configure an absolute private location when deploying:
+The embedded gateway uses Misskey's existing `db` configuration and the primary PostgreSQL server. Its application registrations, hashed client secrets, hashed bearer tokens, native application grants, pending authorization state, filters, markers, and other metadata live in the dedicated `mastodon_compat_entry` table. No SQLite file, encryption-key file, or additional Docker volume is needed for normal operation. The independent package owns the SQL storage implementation and does not import native business repositories or services.
 
-```yaml
-enableMastodonApi: true
-mastodonApiStoragePath: /var/lib/misskey-mastodon/compat.sqlite
-```
+A new migration creates the table and its expiry index; run the normal Misskey migration before starting the updated server. The Docker image's existing `migrateandstart` command does this. Existing Compose configurations that already persist PostgreSQL need no extra compatibility mount. Back up the PostgreSQL database normally. Keep native application credentials private with the rest of that database.
 
-Mount that directory as a persistent writable volume in containers. Do not place it under the public Drive/file directory. Back up the SQLite database and adjacent `compat.sqlite.key` together, with writes stopped or a consistent SQLite backup. Restoring the database without its encryption key cannot recover native grants. Files are restricted to their owner; bearer/client credentials are hashed, and native grants and pending authorization payloads are encrypted with AES-256-GCM.
+This is a fresh compatibility store. Clients must register and authorize again; there is no SQLite import, legacy storage configuration, or credential conversion. After creating the new table, the migration deletes `mastodon_user_state`, `mastodon_oauth_token`, and `mastodon_oauth_client`, including their old data. Both an existing installation and a fresh installation finish with only the new compatibility table. The three historical migration files and their execution records are retained.
 
-### Docker / Compose upgrades
+The new migration's `down()` restores the old tables, indexes, and foreign keys in their final form, including nullable `mastodon_oauth_token.userId` for application tokens, then removes the new table. It restores schema only: it cannot recover deleted legacy data or preserve new gateway data through rollback. Use a database backup to restore data when rolling back a deployment.
 
-The default image path is `/misskey/.mastodon-compat/compat.sqlite`. `compose_example.yml` now mounts a named volume at its parent directory. Existing installations must also add this to their actual Compose file, preserving their other mounts:
-
-```yaml
-services:
-  web:
-    volumes:
-      - mastodon_compat:/misskey/.mastodon-compat
-volumes:
-  mastodon_compat:
-```
-
-This mount uses the default storage path. If `mastodonApiStoragePath` points elsewhere, mount its parent directory instead. Keep the Compose project name stable so upgrades select the same named volume. The image creates the directory with mode `0700`, owned by its `misskey` user (UID/GID `991:991` by default). Bind mounts need matching ownership on the host.
-
-The image also declares `VOLUME`, but this alone does not ensure that later containers reuse the same anonymous volume. Explicitly configure the persistent mount. An image update does not edit an existing Compose file or migrate the previous container's writable layer. See [Docker volume lifecycle and Compose mounts](https://docs.docker.com/engine/storage/volumes/).
-
-Earlier gateway images did not declare or mount this directory. Replacing such a container loses application registrations, tokens, filters, markers, and other compatibility metadata stored in its writable layer. Cached client IDs then fail with `invalid_client` / `Unknown application`; existing bearer tokens also stop working. Native Misskey accounts and posts remain in PostgreSQL.
-
-If the old container or a complete backup remains, recover the state **before** creating an empty replacement store:
-
-1. Stop the old web container without removing it. Stop all processes writing the same compatibility database.
-2. Copy its complete `/misskey/.mastodon-compat` directory, including `compat.sqlite`, `compat.sqlite.key`, and any `-wal` / `-shm` files, into a new private host directory. `docker cp` works with stopped containers; do not copy just the main database file or mix files from different backups.
-3. Bind-mount that recovered directory at `/misskey/.mastodon-compat`, replacing the named-volume line above. Set ownership to the image's UID/GID and keep the directory private. Retain the original backup separately.
-4. Start the replacement web service and verify that the old client can authorize and its existing token can verify credentials. Remove the old container only after recovery is confirmed.
-
-If both the old directory and its backups are gone, the server cannot reconstruct the lost secrets, encryption key, or application registrations. Configure persistence first, then have each client or API integration register a new application and authorize again. Removing an account or clearing browser data does not necessarily clear a client platform's server-side application cache. For example, [Elk stores its application registration on its own server](https://github.com/elk-zone/elk/blob/main/server/utils/shared.ts); its operator may need to invalidate a stale registration when the original store cannot be restored.
-
-The gateway uses SQLite WAL and synchronous transactions for authorization/state changes. Processes on one host can share the same local SQLite database. A deployment across multiple hosts should route the compatibility service to one persistent gateway instance; a network filesystem is not a substitute for a shared database service.
-
-This rewrite adds **no PostgreSQL migration**. The three previously deployed compatibility migrations, tables, and entity schema declarations remain as legacy data. They are not used by the new runtime. Retaining them avoids modifying deployed migration history, avoids implicit schema drops, and allows rollback to the previous release. A rollback must restore the previous application build as well as its matching configuration; it does not migrate new SQLite state back into the old tables.
+Multiple gateway processes and hosts can use the same primary database. Short database transactions serialize state changes, while one-time operation consumption is atomic. Native HTTP operations run outside those transactions. Database failure fails the operation; the gateway does not fall back to a new empty file or an in-memory registry.
 
 ## Standalone mode
 
@@ -71,9 +40,11 @@ This rewrite adds **no PostgreSQL migration**. The three previously deployed com
 pnpm --filter @pari/mastodon-compat build
 MASTODON_PUBLIC_URL=https://social.example \
 MISSKEY_NATIVE_URL=http://127.0.0.1:3000 \
-MASTODON_DATABASE=/var/lib/misskey-mastodon/compat.sqlite \
+MASTODON_DATABASE_URL="$MISSKEY_DATABASE_URL" \
 pnpm --filter @pari/mastodon-compat start
 ```
+
+Set `MISSKEY_DATABASE_URL` to the existing PostgreSQL connection URL and run the native migrations first.
 
 The gateway listens on `127.0.0.1:3100` by default (`MASTODON_HOST` and `MASTODON_PORT` override it). A same-origin reverse proxy must route Mastodon API/streaming URLs and the compatibility OAuth requests to this service, and native API, `/miauth/`, UI resources, and ActivityPub URLs to Misskey. Avoid routing every `/api/` request to the gateway: native Misskey also uses that prefix. When native OAuth is needed on the same origin, use the embedded dispatcher or an equivalent explicit routing setup for the overlapping OAuth paths.
 
@@ -108,7 +79,7 @@ This is a practical compatibility implementation, not a claim of complete Mastod
 - Conversation discovery scans at most the latest 1,000 native entries per incoming/outgoing source. It does not provide a full historical conversation index.
 - Reply context traversal returns at most 100 visible descendants and performs at most 200 native child-page reads.
 - Remote search, translation, public timelines and uploads remain subject to native server configuration, connectivity, and permissions.
-- Node.js must satisfy the repository's engine range, including the built-in `node:sqlite` module.
+- Node.js must satisfy the repository's engine range.
 
 ## Verification
 
@@ -123,24 +94,27 @@ node scripts/check-shipping.mjs --base HEAD
 
 The e2e suite needs the standard ignored `.config/test.yml` and test PostgreSQL/Redis instances. Passing protocol tests does not establish that every third-party application's UI has been exercised. Client UI and live federation acceptance remain separate checks.
 
-Local rewrite validation on 2026-09-12:
+For PostgreSQL-backed gateway tests, set `MASTODON_TEST_DATABASE_URL` to a dedicated test database. The tests create isolated schemas using the three historical compatibility migrations followed by the new migration, and remove those schemas afterward. With no test URL, PostgreSQL-specific cases are explicitly skipped; protocol tests use an explicitly constructed in-memory adapter.
+
+Local validation on 2026-09-12:
 
 | Check | Result |
 | --- | --- |
-| Gateway protocol, transport, persistence and lifecycle tests | PASS: 97 tests |
-| Real Misskey HTTP/WebSocket with PostgreSQL and Redis | PASS: 12 e2e tests |
-| Native reaction, poll, OAuth, token, report, push and scheduled-note regressions | PASS: 39 tests in 8 suites |
-| Gateway/backend TypeScript and generated `misskey-js` API types | PASS |
+| Gateway protocol, HTTP/WebSocket, memory and real PostgreSQL storage tests | PASS: 121 tests, no skips |
+| Real Misskey HTTP/WebSocket with PostgreSQL and Redis | PASS: 13 e2e tests |
+| Gateway and backend TypeScript; production backend build | PASS |
+| New migration up/down/up and actual migration-created table vs entity schema | PASS: zero pending DDL |
+| Historical application-token migration unit test | PASS: 1 test |
 | Changed-file lint, SPDX and locale safety | PASS |
-| Native entities and deployed migrations | Unchanged; no PostgreSQL migration added |
-| Docker image and individual third-party client UI | Not executed |
+| Deployed migrations and original native business implementations | Unchanged |
+| Actual Docker image rebuild and individual third-party client UI | Not executed |
 
-The native e2e harness retains its existing controller-server exit warning (`close timed out after 10000ms`); all 12 assertions pass and the runner exits with code 0. This warning is separate from the active-stream gateway shutdown tests.
+The PostgreSQL HTTP lifecycle test starts separate gateway processes, forcibly terminates them, and removes their entire writable directories. Registered clients, pending consent, one-time codes, grants, and revocations survive without a shared file directory. Additional tests cover transaction rollback and isolation, once-only consumption, and reconnecting after an idle PostgreSQL connection is terminated.
 
-The quote-policy follow-up on 2026-09-12 passed 102 gateway tests and 13 real-service e2e tests, including ordinary posts with `quote_approval_policy`, quoted posts, empty-comment quotes, quoting boosts, clearing quote comments, and native visibility restrictions. Changed-file lint, TypeScript, SPDX and locale safety also passed; the existing e2e exit warning remains.
+Migration regressions cover an empty compatibility migration history and a populated legacy database. They compare rollback columns, indexes, and foreign keys with the actual historical migration result, verify that deleted credentials are not restored, and check that an external dependency blocking the last table deletion rolls back the entire transaction. The retired entities and repository registrations are removed so schema checks do not propose recreating the old tables.
 
-The Docker persistence follow-up on 2026-09-12 passed 104 gateway tests, TypeScript, changed-file lint, SPDX, locale safety, and Compose YAML validation. Two new tests make real HTTP OAuth requests to separate gateway processes, forcibly terminate them, and replace their writable directories. An unmounted directory reproduces `Unknown application` and invalid tokens; a shared persistent directory preserves registrations, pending consent, single-use codes, encrypted grants, and revocation. The mount is modeled using a local symlink; an actual Docker rebuild was not run because no Docker daemon is available. Native business code and migrations are unchanged.
+The native e2e harness retains its existing controller-server exit warning (`close timed out after 10000ms`); all 13 tests pass and the runner exits with code 0. This warning is separate from the active-stream gateway shutdown tests.
 
-Changelog candidate: Fix: Preserve Mastodon application registrations and authorization across Docker container replacement.
+Changelog candidate: Fix: Store Mastodon compatibility state in PostgreSQL and remove obsolete compatibility tables.
 
 References: [Mastodon API guidelines](https://docs.joinmastodon.org/api/guidelines/), [OAuth](https://docs.joinmastodon.org/methods/oauth/), [Mastodon entities](https://docs.joinmastodon.org/entities/), [MiAuth](https://misskey-hub.net/en/docs/for-developers/api/token/miauth/). The package follows the HTTP-adapter architecture used by Megalodon; it is implemented against the current public native APIs rather than importing an obsolete Misskey SDK or native backend internals.

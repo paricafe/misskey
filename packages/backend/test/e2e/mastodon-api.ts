@@ -7,12 +7,10 @@ process.env.NODE_ENV = 'test';
 
 import * as assert from 'node:assert/strict';
 import { once } from 'node:events';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { afterEach, beforeAll, describe, test } from 'vitest';
 import WebSocket from 'ws';
-import { createGateway } from '@pari/mastodon-compat';
+import { createGateway, createPostgresStore } from '@pari/mastodon-compat';
+import { loadConfig } from '@/config.js';
 import { api, port, relativeFetch, sendEnvResetRequest, signup } from '../utils.js';
 import type * as misskey from 'misskey-js';
 
@@ -239,9 +237,13 @@ describe('Mastodon gateway against real Misskey HTTP and streaming APIs', () => 
 	});
 
 	test('runs as a separate service and preserves authorization across a gateway restart', async () => {
-		const directory = mkdtempSync(join(tmpdir(), 'misskey-gateway-e2e-'));
-		const options = { publicUrl: 'http://misskey.local', nativeUrl: `http://127.0.0.1:${port}`, database: join(directory, 'compat.sqlite') };
-		let gateway = await createGateway(options);
+		const config = loadConfig();
+		const newGateway = async () => createGateway({
+			publicUrl: 'http://misskey.local',
+			nativeUrl: `http://127.0.0.1:${port}`,
+			store: await createPostgresStore({ host: config.db.host, port: config.db.port, database: config.db.db, user: config.db.user, password: config.db.pass, ...config.db.extra }),
+		});
+		let gateway = await newGateway();
 		await gateway.listen({ host: '127.0.0.1', port: 0 });
 		const address = gateway.server.address(); assert.ok(address && typeof address !== 'string');
 		const base = `http://127.0.0.1:${address.port}`;
@@ -262,12 +264,12 @@ describe('Mastodon gateway against real Misskey HTTP and streaming APIs', () => 
 			assert.equal((await api('notes/show', { noteId: note.id }, alice)).body.text, 'posted through the separate HTTP gateway');
 			const mediaPage = await fetchGateway(`/api/v1/accounts/${alice.id}/statuses?only_media=true`, { headers: { authorization: `Bearer ${token.access_token}` } }); assert.equal(mediaPage.status, 200);
 			await gateway.close();
-			gateway = await createGateway(options);
+			gateway = await newGateway();
 			await gateway.listen({ host: '127.0.0.1', port: address.port });
 			const restored = await fetchGateway('/api/v1/accounts/verify_credentials', { headers: { authorization: `Bearer ${token.access_token}` } });
 			assert.equal(restored.status, 200, await restored.clone().text());
 			assert.equal((await restored.json() as Json).id, alice.id);
-		} finally { await gateway.close(); rmSync(directory, { recursive: true, force: true }); }
+		} finally { await gateway.close(); }
 	});
 
 	test('honours narrow scopes, app tokens, OAuth revoke, and native grant revocation', async () => {

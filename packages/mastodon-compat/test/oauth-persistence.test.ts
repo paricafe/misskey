@@ -6,29 +6,29 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test, type TestContext } from 'node:test';
+import { postgresFixture } from './postgres-http-fixture.js';
 
-// A separate process exercises WAL recovery and reloads the encryption key. The
-// native consent response is fixed; all OAuth requests use the real HTTP routes.
+// The native consent response is fixed; all OAuth requests use real HTTP routes
+// in disposable processes sharing an actual PostgreSQL database.
 const program = `
-const { createGateway } = await import(process.env.TEST_GATEWAY_MODULE);
-const { resolve } = await import('node:path');
+const { createGateway, createPostgresStore } = await import(process.env.TEST_GATEWAY_MODULE);
 const gateway = await createGateway({
   publicUrl: 'https://social.example', nativeUrl: 'https://native.example',
-  database: resolve('.mastodon-compat/compat.sqlite'),
+  store: await createPostgresStore({ connectionString: process.env.TEST_DATABASE_URL }),
   transport: async () => ({ status: 200, body: JSON.stringify({ ok: true, token: 'native-test-grant', user: { id: 'alice' } }) }),
 });
 console.log(await gateway.listen({ host: '127.0.0.1', port: 0 }));
 `;
 
-async function start(t: TestContext, directory: string) {
+async function start(t: TestContext, directory: string, connectionString: string) {
 	mkdirSync(directory, { recursive: true });
 	const child = spawn(process.execPath, ['--input-type=module', '-e', program], {
 		cwd: directory,
-		env: { ...process.env, TEST_GATEWAY_MODULE: new URL('../src/index.js', import.meta.url).href },
+		env: { ...process.env, TEST_GATEWAY_MODULE: new URL('../src/index.js', import.meta.url).href, TEST_DATABASE_URL: connectionString },
 		stdio: ['ignore', 'pipe', 'pipe'],
 	});
 	let errors = '';
@@ -58,39 +58,15 @@ const callbackPath = (response: Response) => {
 	return callback.pathname + callback.search;
 };
 
-test('replacing an unmounted writable directory reproduces Unknown application and invalidates tokens', { timeout: 20000 }, async t => {
-	const root = mkdtempSync(join(tmpdir(), 'mastodon-unmounted-'));
+test('PostgreSQL retains authorization and revocation after processes and writable directories are replaced', { timeout: 20000, skip: !process.env.MASTODON_TEST_DATABASE_URL }, async t => {
+	const connectionString = await postgresFixture(t);
+	const root = mkdtempSync(join(tmpdir(), 'mastodon-postgres-http-'));
 	t.after(() => rmSync(root, { recursive: true, force: true }));
-	const directory = join(root, 'container');
-	const before = await start(t, directory);
-	const created = await before.request('/api/v1/apps', registration);
-	assert.equal(created.status, 200);
-	const client = await created.json() as Client;
-	const issued = await before.request('/oauth/token', { ...client, grant_type: 'client_credentials' });
-	assert.equal(issued.status, 200);
-	const { access_token: token } = await issued.json() as { access_token: string };
-	await before.stop();
-	rmSync(directory, { recursive: true });
-	const after = await start(t, directory);
-	const failed = await after.request(authorizePath(client));
-	assert.equal(failed.status, 400);
-	assert.deepEqual(await failed.json(), { error: 'invalid_client', error_description: 'Unknown application' });
-	assert.equal((await after.request('/api/v1/apps/verify_credentials', undefined, token)).status, 401);
-	await after.stop();
-});
-
-test('a persistent directory retains clients, pending authorization, encrypted grants and revocation across replacement', { timeout: 20000 }, async t => {
-	const root = mkdtempSync(join(tmpdir(), 'mastodon-mounted-'));
-	t.after(() => rmSync(root, { recursive: true, force: true }));
-	const volume = join(root, 'volume');
-	mkdirSync(volume, { mode: 0o700 });
 	let generation = 0;
 	const replacement = () => {
 		const directory = join(root, `container-${generation++}`);
 		mkdirSync(directory);
-		// Model a private mounted directory without requiring a Docker daemon.
-		symlinkSync(volume, join(directory, '.mastodon-compat'));
-		return start(t, directory);
+		return start(t, directory, connectionString);
 	};
 	const first = await replacement();
 	const created = await first.request('/api/v1/apps', registration);
@@ -101,6 +77,7 @@ test('a persistent directory retains clients, pending authorization, encrypted g
 	const { access_token: token } = await issued.json() as { access_token: string };
 	const pendingCallback = callbackPath(await first.request(authorizePath(client)));
 	await first.stop();
+	assert.deepEqual(readdirSync(join(root, 'container-0')), []);
 	rmSync(join(root, 'container-0'), { recursive: true });
 	const second = await replacement();
 	assert.equal((await second.request('/api/v1/apps/verify_credentials', undefined, token)).status, 200);
@@ -124,4 +101,5 @@ test('a persistent directory retains clients, pending authorization, encrypted g
 	assert.equal((await fourth.request('/api/v1/apps/verify_credentials', undefined, token)).status, 401);
 	assert.equal((await fourth.request('/api/v1/apps/verify_credentials', undefined, userToken)).status, 200);
 	await fourth.stop();
+	assert.deepEqual(readdirSync(join(root, 'container-3')), []);
 });

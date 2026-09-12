@@ -20,10 +20,12 @@
 		"@fastify/multipart": "10.1.1",
 		"fastify": "5.12.1",
 		"mfm-js": "0.26.0",
+		"pg": "8.23.0",
 		"ws": "8.21.3"
 	},
 	"devDependencies": {
 		"@types/node": "26.4.0",
+		"@types/pg": "8.23.1",
 		"@types/ws": "8.18.1",
 		"@typescript-eslint/eslint-plugin": "8.68.0",
 		"@typescript-eslint/parser": "8.68.0",

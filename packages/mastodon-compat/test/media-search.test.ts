@@ -34,8 +34,8 @@ async function fixture(t: TestContext, handler: (endpoint: string, body: Json, r
 		reply.code(status).send({ error: (error as Error).message });
 	});
 	const store = new CompatStore(':memory:');
-	const { client } = store.createClient({ name: 'Client', scopes, redirectUris: ['client://callback'] });
-	const { token } = store.createGrant({ clientId: client.id, scopes, kind: 'user', userId: 'alice', nativeToken: 'native-secret' });
+	const { client } = await store.createClient({ name: 'Client', scopes, redirectUris: ['client://callback'] });
+	const { token } = await store.createGrant({ clientId: client.id, scopes, kind: 'user', userId: 'alice', nativeToken: 'native-secret' });
 	const calls: Array<{ endpoint: string; body: Json; request: NativeTransportRequest }> = [];
 	const native = new NativeClient({ baseUrl: 'http://native.example', publicUrl: 'https://social.example', transport: async request => {
 		const endpoint = new URL(request.url).pathname.slice(5);
@@ -53,7 +53,7 @@ async function fixture(t: TestContext, handler: (endpoint: string, body: Json, r
 		return result === undefined ? { status: 204, body: '' } : { status: 200, body: JSON.stringify(result) };
 	} });
 	registerMediaSearch(new Routes(app, { native, entities: new EntityConverter('https://social.example'), store, publicUrl: 'https://social.example' }));
-	t.after(async () => { await app.close(); store.close(); });
+	t.after(async () => { await app.close(); await store.close(); });
 	return { app, store, calls, authorization: `Bearer ${token}` };
 }
 
@@ -82,7 +82,7 @@ test('multipart upload accepts binary bytes and trailing metadata through the pu
 	assert.deepEqual(response.json().meta.focus, { x: -0.5, y: 0.7 });
 	assert.equal(nativeForm?.get('force'), 'true');
 	assert.deepEqual(new Uint8Array(await (nativeForm?.get('file') as File).arrayBuffer()), bytes);
-	assert.deepEqual(f.store.get('media', 'alice', 'opaque-file'), { focus: { x: -0.5, y: 0.7 } });
+	assert.deepEqual(await f.store.get('media', 'alice', 'opaque-file'), { focus: { x: -0.5, y: 0.7 } });
 });
 
 test('invalid trailing upload fields and custom thumbnails fail before the first native mutation', async t => {
@@ -132,7 +132,7 @@ test('profile updates decode bracket fields and map native preferences plus isol
 	assert.equal(response.json().source.privacy, 'private');
 	assert.equal(response.json().source.sensitive, true);
 	assert.equal(response.json().source.language, 'ja');
-	assert.deepEqual(f.store.get('account-source', 'alice', 'defaults'), { privacy: 'private', sensitive: true, language: 'ja' });
+	assert.deepEqual(await f.store.get('account-source', 'alice', 'defaults'), { privacy: 'private', sensitive: true, language: 'ja' });
 });
 
 test('profile multipart uploads both images and applies their native IDs in a single profile update', async t => {

@@ -72,8 +72,8 @@ function subscription(input: Json): Subscription {
 	return { key: JSON.stringify(identity), stream, identity, tag, list, media: stream.endsWith(':media') };
 }
 
-function authorizedGrant(store: StreamingDependencies['store'], token: string): UserGrant {
-	const grant = store.getGrant(token);
+async function authorizedGrant(store: StreamingDependencies['store'], token: string): Promise<UserGrant> {
+	const grant = await store.getGrant(token);
 	if (!grant || grant.kind !== 'user' || !identifier(grant.userId) || !grant.nativeToken) throw new StreamError(401, 'The access token is invalid');
 	if (!allowsScope(grant.scopes, 'read:statuses') && !allowsScope(grant.scopes, 'read:notifications')) throw new StreamError(403, 'A read scope is required');
 	return grant as UserGrant;
@@ -141,7 +141,6 @@ class StreamingSession {
 	private ended = false;
 	private alive = true;
 	private validating = false;
-	private filterRevision: unknown;
 	private readonly heartbeat: NodeJS.Timeout;
 	private readonly controller = new AbortController();
 
@@ -151,21 +150,23 @@ class StreamingSession {
 		private readonly deps: StreamingDependencies,
 		private readonly token: string,
 		private readonly grant: UserGrant,
+		private filterRevision: unknown,
 		private readonly onClosed: () => void,
 	) {
-		this.filterRevision = deps.store.get('filter-revision', grant.userId, 'current');
 		client.on('error', () => this.close());
 		client.on('close', () => this.close());
 		client.on('pong', () => { this.alive = true; });
 		client.on('message', (data, binary) => {
-			if (binary) { this.sendError(new StreamError(400, 'Only JSON text messages are supported')); return; }
+			if (binary) { this.enqueue(() => this.sendError(new StreamError(400, 'Only JSON text messages are supported'))); return; }
 			try {
 				const input: unknown = JSON.parse(data.toString());
 				if (!object(input) || !['subscribe', 'unsubscribe'].includes(input.type)) throw new StreamError(400, 'Invalid subscription request');
 				const target = subscription(input);
-				if (input.type === 'unsubscribe') this.unsubscribe(target);
-				else this.requestSubscription(target);
-			} catch (error) { this.sendError(error); }
+				if (input.type === 'unsubscribe') {
+					this.desiredSubscriptions.delete(target.key);
+					this.enqueue(() => this.unsubscribe(target));
+				} else this.requestSubscription(target);
+			} catch (error) { this.enqueue(() => this.sendError(error)); }
 		});
 		upstream.on('message', (data, binary) => {
 			if (!binary) this.enqueue(() => this.nativeFrame(data.toString()));
@@ -173,29 +174,32 @@ class StreamingSession {
 		upstream.on('error', () => this.close(1011, 'The native streaming connection failed'));
 		upstream.on('close', () => this.close(1012, 'The native streaming connection closed'));
 		this.heartbeat = setInterval(() => {
+			if (this.validating || this.ended) return;
 			if (!this.alive) { this.close(); return; }
-			this.alive = false;
-			if (this.currentGrant() == null) return;
-			this.checkFilters();
-			this.client.ping();
-			if (!this.validating) {
-				this.validating = true;
-				void this.native<Json>('i').then(user => {
-					if (user.id !== this.grant.userId || user.isSuspended === true || user.isDeleted === true) this.close(1008, 'The access token is invalid');
-				}).catch(() => this.close(1008, 'The native authorization is unavailable')).finally(() => { this.validating = false; });
-			}
+			this.validating = true;
+			void (async () => {
+				if (await this.currentGrant() == null) return;
+				await this.checkFilters();
+				if (this.ended || this.client.readyState !== WebSocket.OPEN) return;
+				this.alive = false;
+				this.client.ping();
+				const user = await this.native<Json>('i');
+				if (user.id !== this.grant.userId || user.isSuspended === true || user.isDeleted === true) this.close(1008, 'The access token is invalid');
+			})().catch(() => this.close(1008, 'The native authorization is unavailable')).finally(() => { this.validating = false; });
 		}, HEARTBEAT_MS);
 		this.heartbeat.unref();
 	}
 
 	requestSubscription(target: Subscription): void {
+		const existing = this.subscriptions.get(target.key);
+		if (existing && this.desiredSubscriptions.get(target.key) === existing) return;
 		this.desiredSubscriptions.set(target.key, target);
 		this.enqueue(() => this.subscribe(target));
 	}
 
 	private async subscribe(target: Subscription): Promise<void> {
 		if (this.desiredSubscriptions.get(target.key) !== target) return;
-		const grant = this.currentGrant();
+		const grant = await this.currentGrant();
 		if (!grant) return;
 		authorizeSubscription(grant, target);
 		if (this.subscriptions.has(target.key)) return;
@@ -232,10 +236,11 @@ class StreamingSession {
 		this.onClosed();
 	}
 
-	private currentGrant(): UserGrant | null {
+	private async currentGrant(): Promise<UserGrant | null> {
 		if (this.ended) return null;
 		try {
-			const grant = authorizedGrant(this.deps.store, this.token);
+			const grant = await authorizedGrant(this.deps.store, this.token);
+			if (this.ended) return null;
 			if (grant.userId !== this.grant.userId || grant.nativeToken !== this.grant.nativeToken) throw new StreamError(401, 'The access token is invalid');
 			return grant;
 		} catch {
@@ -258,9 +263,8 @@ class StreamingSession {
 		this.nativeSend({ type: 'connect', body: { id: channel.id, channel: name, params, pong: true } });
 	}
 
-	private unsubscribe(target: Subscription): void {
-		if (!this.currentGrant()) return;
-		this.desiredSubscriptions.delete(target.key);
+	private async unsubscribe(target: Subscription): Promise<void> {
+		if (!await this.currentGrant()) return;
 		if (!this.subscriptions.delete(target.key)) return;
 		for (const channel of this.channels.values()) {
 			channel.targets.delete(target.key);
@@ -285,32 +289,32 @@ class StreamingSession {
 		if (this.ended) return;
 		if (++this.pendingEvents > MAX_PENDING_EVENTS) { this.close(1013, 'Too many pending streaming events'); return; }
 		this.queue = this.queue.then(async () => {
-			if (this.currentGrant()) { this.checkFilters(); await action(); }
-		}).catch(error => {
+			if (await this.currentGrant()) { await this.checkFilters(); if (!this.ended) await action(); }
+		}).catch(async error => {
 			if (error instanceof NativeError && [401, 403].includes(error.status)) this.close(1008, 'The native authorization is unavailable');
-			else if (error instanceof StreamError) this.sendError(error);
+			else if (error instanceof StreamError) await this.sendError(error);
 			// Hidden/deleted entities and malformed native frames are intentionally not emitted.
 		}).finally(() => { this.pendingEvents--; });
 	}
 
-	private sendError(error: unknown): void {
-		if (!this.currentGrant() || this.client.readyState !== WebSocket.OPEN) return;
+	private async sendError(error: unknown): Promise<void> {
+		if (!await this.currentGrant() || this.client.readyState !== WebSocket.OPEN) return;
 		const failure = error instanceof StreamError ? error : new StreamError(400, 'Invalid subscription request');
 		this.client.send(JSON.stringify({ error: failure.message, status: failure.status }));
 	}
 
-	private checkFilters(): void {
-		const revision = this.deps.store.get('filter-revision', this.grant.userId, 'current');
+	private async checkFilters(): Promise<void> {
+		const revision = await this.deps.store.get('filter-revision', this.grant.userId, 'current');
 		if (revision === this.filterRevision) return;
 		this.filterRevision = revision;
 		for (const target of this.subscriptions.values()) {
-			if (target.stream === 'user') this.send(target, 'filters_changed');
+			if (target.stream === 'user') await this.send(target, 'filters_changed');
 		}
 	}
 
-	private send(target: Subscription, event: string, payload?: Json | string): boolean {
-		const grant = this.currentGrant();
-		if (!grant || this.subscriptions.get(target.key) !== target || this.client.readyState !== WebSocket.OPEN) return false;
+	private async send(target: Subscription, event: string, payload?: Json | string): Promise<boolean> {
+		const grant = await this.currentGrant();
+		if (!grant || this.desiredSubscriptions.get(target.key) !== target || this.subscriptions.get(target.key) !== target || this.client.readyState !== WebSocket.OPEN) return false;
 		const required = event === 'notification' ? 'read:notifications' : 'read:statuses';
 		if (event !== 'filters_changed' && !allowsScope(grant.scopes, required)) return false;
 		if (this.client.bufferedAmount > MAX_BUFFERED_BYTES) { this.close(1013, 'The streaming client is too slow'); return false; }
@@ -369,18 +373,18 @@ class StreamingSession {
 			if (event === 'update' && this.delivered.get(note.id)?.targets.has(key)) continue;
 			if (target.stream === 'direct') {
 				const conversation = await this.conversation(note, status);
-				if (conversation && this.send(target, 'conversation', conversation)) this.remember(note, target, conversation);
+				if (conversation && await this.send(target, 'conversation', conversation)) this.remember(note, target, conversation);
 			} else {
 				const context = target.stream.startsWith('public') || target.stream.startsWith('hashtag') ? 'public' : 'home';
 				hydrated ??= await this.hydratedStatus(status);
-				const decorated = applyFilters(this.deps.store, this.grant.userId, hydrated, context);
-				if (this.send(target, event, decorated)) this.remember(note, target);
+				const decorated = await applyFilters(this.deps.store, this.grant.userId, hydrated, context);
+				if (await this.send(target, event, decorated)) this.remember(note, target);
 			}
 		}
 	}
 
 	private async notification(channel: NativeChannel, source: Json): Promise<void> {
-		if (!allowsScope(this.currentGrant()?.scopes ?? [], 'read:notifications')) return;
+		if (!allowsScope((await this.currentGrant())?.scopes ?? [], 'read:notifications')) return;
 		let note: Json | null = null;
 		if (object(source.note)) {
 			if (!identifier(source.note.id)) return;
@@ -392,11 +396,11 @@ class StreamingSession {
 		if (note) {
 			const status = this.deps.entities.status(note, { viewerId: this.grant.userId });
 			if (!status) return;
-			converted.status = applyFilters(this.deps.store, this.grant.userId, await this.hydratedStatus(status), 'notifications');
+			converted.status = await applyFilters(this.deps.store, this.grant.userId, await this.hydratedStatus(status), 'notifications');
 		}
 		for (const key of channel.targets) {
 			const target = this.subscriptions.get(key);
-			if (target && ['user', 'user:notification'].includes(target.stream)) this.send(target, 'notification', converted);
+			if (target && ['user', 'user:notification'].includes(target.stream)) await this.send(target, 'notification', converted);
 		}
 	}
 
@@ -457,7 +461,7 @@ class StreamingSession {
 				for (const key of delivery.targets) {
 					const target = this.subscriptions.get(key);
 					if (target?.stream === 'direct') await this.refreshConversation(target, delivery, noteId);
-					else if (target) this.send(target, 'delete', noteId);
+					else if (target) await this.send(target, 'delete', noteId);
 				}
 				this.forget(noteId);
 				continue;
@@ -466,7 +470,7 @@ class StreamingSession {
 				const target = this.subscriptions.get(key);
 				if (!target || this.matches(target, note)) continue;
 				if (target.stream === 'direct') await this.refreshConversation(target, delivery, noteId);
-				else this.send(target, 'delete', noteId);
+				else await this.send(target, 'delete', noteId);
 				delivery.targets.delete(key);
 			}
 			if (delivery.targets.size === 0) this.forget(noteId);
@@ -481,23 +485,23 @@ class StreamingSession {
 		if (note) {
 			const status = this.deps.entities.status(note, { viewerId: this.grant.userId });
 			const conversation = status ? await this.conversation(note, status) : null;
-			if (conversation && this.send(target, 'conversation', conversation)) this.remember(note, target, conversation);
-		} else if (!conversationState(this.deps.store, this.grant.userId, previous.id, { id: removedId }).hidden) {
-			this.send(target, 'conversation', { ...previous, last_status: null, unread: false });
+			if (conversation && await this.send(target, 'conversation', conversation)) this.remember(note, target, conversation);
+		} else if (!(await conversationState(this.deps.store, this.grant.userId, previous.id, { id: removedId })).hidden) {
+			await this.send(target, 'conversation', { ...previous, last_status: null, unread: false });
 		}
 	}
 
 	private async conversation(note: Json, status: Json): Promise<Json | null> {
-		const conversation = await conversationFromNote(this.deps.store, this.grant.userId, note, this.native.bind(this), this.deps.entities, { status: decorateStatus(this.deps.store, status, this.grant.userId) });
+		const conversation = await conversationFromNote(this.deps.store, this.grant.userId, note, this.native.bind(this), this.deps.entities, { status: await decorateStatus(this.deps.store, status, this.grant.userId) });
 		if (conversation?.last_status) conversation.last_status = await this.hydratedStatus(conversation.last_status);
 		return conversation;
 	}
 
 	private async hydratedStatus(status: Json): Promise<Json> {
-		const grant = this.currentGrant();
+		const grant = await this.currentGrant();
 		if (!grant) throw new StreamError(401, 'The access token is invalid');
 		const reads = new Map<string, Promise<Json>>();
-		return await hydrateStatus(this.deps.store, decorateStatus(this.deps.store, status, grant.userId), grant.userId, toNativePermissions(grant.scopes).includes('read:account'), (endpoint, body) => {
+		return await hydrateStatus(this.deps.store, await decorateStatus(this.deps.store, status, grant.userId), grant.userId, toNativePermissions(grant.scopes).includes('read:account'), (endpoint, body) => {
 			const key = JSON.stringify([endpoint, body]);
 			let response = reads.get(key);
 			if (!response) { response = this.native<Json>(endpoint, body); reads.set(key, response); }
@@ -526,7 +530,7 @@ export function attachStreaming(server: Server, deps: StreamingDependencies): { 
 			let adopted = false;
 			try {
 				const token = credential(request, url);
-				const grant = authorizedGrant(deps.store, token);
+				const grant = await authorizedGrant(deps.store, token);
 				if (['stream', 'tag', 'list'].some(name => url.searchParams.getAll(name).length > 1)) throw new StreamError(400, 'A subscription parameter was repeated');
 				const initial = url.searchParams.has('stream') ? subscription(Object.fromEntries(url.searchParams)) : null;
 				if (initial) authorizeSubscription(grant, initial);
@@ -537,10 +541,15 @@ export function attachStreaming(server: Server, deps: StreamingDependencies): { 
 				upstream = await openNative(deps.native, grant.nativeToken, controller.signal);
 				if (closed || socket.destroyed || controller.signal.aborted) { upstream.terminate(); return; }
 				if (upstream.readyState !== WebSocket.OPEN) throw new StreamError(502, 'The native streaming connection closed');
-				authorizedGrant(deps.store, token);
+				const filterRevision = await deps.store.get('filter-revision', grant.userId, 'current');
+				const current = await authorizedGrant(deps.store, token);
+				if (current.userId !== grant.userId || current.nativeToken !== grant.nativeToken) throw new StreamError(401, 'The access token is invalid');
+				if (initial) authorizeSubscription(current, initial);
+				if (closed || socket.destroyed || controller.signal.aborted) { upstream.terminate(); return; }
+				if (upstream.readyState !== WebSocket.OPEN) throw new StreamError(502, 'The native streaming connection closed');
 				wss.handleUpgrade(request, socket, head, client => {
 					adopted = true;
-					const session = new StreamingSession(client, upstream!, deps, token, grant, () => sessions.delete(session));
+					const session = new StreamingSession(client, upstream!, deps, token, current, filterRevision, () => sessions.delete(session));
 					sessions.add(session);
 					if (initial) session.requestSubscription(initial);
 				});
