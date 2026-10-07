@@ -1,0 +1,341 @@
+packages/frontend/src/pages/settings/notifications.vue
+  s_11ec3b933e2a8e::t_78486457615b10 108
+packages/frontend/src/pages/my-lists/list.vue
+  s_11ec3b933e2a8e::t_78486457615b10 62
+packages/backend/test/unit/server/FileServerService.ts
+  s_11ec3b933e2a8e::t_78486457615b10 10,26,84,95,98,162,294-303,335,387,391-394,412,417,420-421,424-427,445-446,449-450,453-456,474-475,557
+packages/frontend/src/utility/lookup.ts
+  s_11ec3b933e2a8e::t_78486457615b10 11
+packages/frontend-embed/src/components/EmNoteSub.vue
+  s_11ec3b933e2a8e::t_78486457615b10 40
+packages/frontend-embed/src/components/EmUrl.vue
+  s_11ec3b933e2a8e::t_78486457615b10 8,30,40-42
+packages/backend/src/core/FanoutTimelineEndpointService.ts
+  s_11ec3b933e2a8e::t_78486457615b10 154-163
+packages/backend/src/server/web/ClientServerService.ts
+  s_11ec3b933e2a8e::t_78486457615b10 461-467
+packages/backend/src/core/ClipService.ts
+  s_11ec3b933e2a8e::t_78486457615b10 145,150-152
+  s_11ec3b933e2a8e::t_2a986114e0253d 153
+packages/frontend/src/signout.ts
+  s_11ec3b933e2a8e::t_78486457615b10 13,57,62-63
+packages/backend/src/core/ChatService.ts
+  s_11ec3b933e2a8e::t_78486457615b10 32-33,879-880,883,887,894,898-901,904,907,941-942,946-953,956,959
+packages/misskey-js/src/autogen/apiClientJSDoc.ts
+  s_11ec3b933e2a8e::t_78486457615b10 2454
+packages/backend/src/server/api/endpoints/federation/following.ts
+  s_11ec3b933e2a8e::t_78486457615b10 11,51,57-59
+  s_11ec3b933e2a8e::t_3ae00d8aea9f9f 60
+packages/frontend/src/components/global/MkTime.vue
+  s_11ec3b933e2a8e::t_78486457615b10 20-21,34,38-44,55
+packages/backend/package.json
+  s_11ec3b933e2a8e::t_78486457615b10 92,118
+packages/backend/src/core/RelayService.ts
+  s_11ec3b933e2a8e::t_78486457615b10 77-78,82-84,86-94
+scripts/check-shipping.mjs
+  s_11ec3b933e2a8e::t_78486457615b10 25,102,105-106,108-109,111,146
+locales/fr-FR.yml
+  s_11ec3b933e2a8e::t_78486457615b10 2373-2375
+packages/backend/src/core/chart/core.ts
+  s_11ec3b933e2a8e::t_78486457615b10 15,25-26,32,68-103,464-470,480,499-503,506-509,520-521,549-550,571,589
+.config/docker_example.yml
+  s_11ec3b933e2a8e::t_78486457615b10 248-263
+packages/backend/src/core/PollService.ts
+  s_11ec3b933e2a8e::t_78486457615b10 84
+packages/frontend/src/components/MkNoteMediaGrid.vue
+  s_11ec3b933e2a8e::t_78486457615b10 45
+packages/backend/src/server/api/endpoints/notes/search-by-tag.ts
+  s_11ec3b933e2a8e::t_78486457615b10 102
+locales/zh-CN.yml
+  s_11ec3b933e2a8e::t_78486457615b10 156-157,1788,2119,2431-2432,2702
+packages/backend/test-server/server.ts
+  s_11ec3b933e2a8e::t_78486457615b10 1-112
+packages/misskey-js/package.json
+  s_11ec3b933e2a8e::t_78486457615b10 4
+packages/frontend/src/components/global/MkCustomEmoji.vue
+  s_11ec3b933e2a8e::t_78486457615b10 69
+packages/frontend/src/widgets/WidgetAiscriptApp.vue
+  s_11ec3b933e2a8e::t_78486457615b10 82-88,99-103,111-112
+packages/frontend/src/components/MkPoll.vue
+  s_11ec3b933e2a8e::t_78486457615b10 39
+packages/frontend-shared/package.json
+  s_11ec3b933e2a8e::t_78486457615b10 12,27
+packages/backend/src/server/api/endpoints/federation/update-remote-user.ts
+  s_11ec3b933e2a8e::t_78486457615b10 7,15-21,40
+packages/frontend/src/pages/reversi/game.board.vue
+  s_11ec3b933e2a8e::t_78486457615b10 157
+packages/backend/src/server/api/endpoints/chat/messages/unreact.ts
+  s_11ec3b933e2a8e::t_78486457615b10 6,8,44-50
+packages/frontend/src/utility/get-user-menu.ts
+  s_11ec3b933e2a8e::t_78486457615b10 430
+packages/frontend-shared/js/note.ts
+  s_11ec3b933e2a8e::t_78486457615b10 1-8
+packages/frontend/src/components/MkModal.vue
+  s_11ec3b933e2a8e::t_78486457615b10 298
+packages/backend/src/server/file/FileServerDriveHandler.ts
+  s_11ec3b933e2a8e::t_78486457615b10 105-106,108
+packages/backend/src/server/api/ApiCallService.ts
+  s_11ec3b933e2a8e::t_78486457615b10 25,36-78,249-258,261
+packages/backend/src/server/oauth/OAuth2ProviderService.ts
+  s_11ec3b933e2a8e::t_78486457615b10 539-545
+packages/frontend-embed/src/components/EmTime.vue
+  s_11ec3b933e2a8e::t_78486457615b10 16,19-20,33,37-46,54
+packages/frontend-embed/src/components/EmAvatar.vue
+  s_11ec3b933e2a8e::t_78486457615b10 44
+packages/backend/src/core/PollVoteService.test.ts
+  s_11ec3b933e2a8e::t_6282655eea8c45 23,129-131,164,176,405-419
+packages/backend/src/core/QueueService.ts
+  s_11ec3b933e2a8e::t_78486457615b10 887-898,906,927,946,948-949,954,956-957
+packages/backend/src/server/api/endpoints/users/show.ts
+  s_11ec3b933e2a8e::t_78486457615b10 141
+packages/backend/src/postgres.ts
+  s_11ec3b933e2a8e::t_78486457615b10 303
+packages/backend/src/server/api/endpoints/notes/reactions.ts
+  s_11ec3b933e2a8e::t_78486457615b10 68
+packages/backend/src/core/PushNotificationService.ts
+  s_11ec3b933e2a8e::t_78486457615b10 16,66-67,78-92,109-110,125
+locales/it-IT.yml
+  s_11ec3b933e2a8e::t_78486457615b10 8,12-14,1425
+packages/backend/src/core/SearchService.ts
+  s_11ec3b933e2a8e::t_78486457615b10 12,53,99-101,262,356-358
+  s_11ec3b933e2a8e::t_8e63409ade5cb6 359
+packages/frontend-shared/js/user.ts
+  s_11ec3b933e2a8e::t_78486457615b10 1-19
+packages/frontend/src/pages/settings/mute-block.vue
+  s_11ec3b933e2a8e::t_78486457615b10 181
+packages/backend/src/core/chart/ChartManagementService.ts
+  s_11ec3b933e2a8e::t_78486457615b10 21,42-43,62-64,66-67,69-76,84
+packages/frontend-embed/src/components/EmLink.vue
+  s_11ec3b933e2a8e::t_78486457615b10 8,20,28-29
+packages/backend/src/server/ActivityPubServerService.ts
+  s_11ec3b933e2a8e::t_78486457615b10 634-637
+packages/frontend/src/utility/encode-push-subscription-key.ts
+  s_11ec3b933e2a8e::t_78486457615b10 1-12
+.config/example.yml
+  s_11ec3b933e2a8e::t_78486457615b10 390-405
+packages/frontend/src/pages/scratchpad.vue
+  s_11ec3b933e2a8e::t_78486457615b10 27,84,96-105,124,139,142,146-149,159,165-166,228-234
+.github/workflows/test-backend.yml
+  s_11ec3b933e2a8e::t_78486457615b10 36-39,86,88,103-106,140,142
+packages/backend/src/server/api/endpoints/chat/messages/react.ts
+  s_11ec3b933e2a8e::t_78486457615b10 6,8,44-50
+packages/backend/test-server/entry.ts
+  s_11ec3b933e2a8e::t_78486457615b10 1-4,6-7,9-11,13,16-22,24-40,42-67,71-76,80,82-84,88,90-91
+packages/frontend/src/pages/user/index.vue
+  s_11ec3b933e2a8e::t_78486457615b10 9,30,65,89-95
+  s_11ec3b933e2a8e::t_7a799ceb77dad0 96
+CHANGELOG.md
+  s_11ec3b933e2a8e::t_78486457615b10 32-63
+packages/backend/src/server/web/FeedService.ts
+  s_11ec3b933e2a8e::t_78486457615b10 19,60-64
+packages/frontend/src/components/MkFlashPreview.vue
+  s_11ec3b933e2a8e::t_78486457615b10 26
+packages/backend/test/unit/ap-request.ts
+  s_11ec3b933e2a8e::t_78486457615b10 69-133
+locales/uk-UA.yml
+  s_11ec3b933e2a8e::t_78486457615b10 622-623,758-759,1249-1250,1306-1307,1310-1315,1317-1324,1326-1330,1332-1335,1337-1341,1343-1347,1349,1352-1358,1418-1425,1428,1430-1440,1442,1447-1448,1450-1454,1456,1461-1462,1479-1486,1488,1491,1493-1494,1496,1498,1502-1607,1609,1611,1614-1740,2139,2236,2450,2483,2485
+packages/frontend/src/lib/nirax.ts
+  s_11ec3b933e2a8e::t_78486457615b10 10
+packages/frontend/src/pages/admin-user.vue
+  s_11ec3b933e2a8e::t_78486457615b10 230
+packages/frontend/src/widgets/WidgetButton.vue
+  s_11ec3b933e2a8e::t_78486457615b10 68-74,86-87,96-97
+packages/backend/src/server/api/stream/channels/role-timeline.ts
+  s_11ec3b933e2a8e::t_78486457615b10 11-12,29-31,41,44-45,47-54,59-60
+packages/backend/rolldown.config.ts
+  s_11ec3b933e2a8e::t_78486457615b10 83-85,132-133,166
+packages/frontend/src/pages/user/index.timeline.vue
+  s_11ec3b933e2a8e::t_78486457615b10 57-60
+packages/backend/src/core/PollVoteService.ts
+  s_11ec3b933e2a8e::t_6282655eea8c45 21,79,92
+  s_11feedbc7ac6fd::t_d47e1a79fb1c15 93-95
+packages/backend/src/server/api/endpoints/sw/unregister.ts
+  s_11ec3b933e2a8e::t_78486457615b10 7,16-17,20-24,32-33,35,47,50-51,54-59
+packages/backend/src/core/DownloadService.ts
+  s_11ec3b933e2a8e::t_78486457615b10 63-78
+packages/frontend/src/pages/user/raw.vue
+  s_11ec3b933e2a8e::t_78486457615b10 44
+packages/frontend-shared/js/url.ts
+  s_11ec3b933e2a8e::t_78486457615b10 6-7,56-81
+packages/frontend/src/widgets/WidgetBirthdayFollowings.vue
+  s_11ec3b933e2a8e::t_78486457615b10 34
+packages/backend/src/server/api/endpoints/sw/register.ts
+  s_11ec3b933e2a8e::t_78486457615b10 12,49-56,83-86
+locales/en-US.yml
+  s_11ec3b933e2a8e::t_78486457615b10 1425,1604,2837,3166,3192,3195
+packages/frontend/src/components/MkAutocomplete.vue
+  s_11ec3b933e2a8e::t_78486457615b10 55
+packages/frontend/src/components/global/MkMfm.ts
+  s_11ec3b933e2a8e::t_78486457615b10 241,243,375,382
+  s_11ec3b933e2a8e::t_b1588a1e3f30c3 242,376
+packages/backend/src/server/api/endpoints/notes/featured.ts
+  s_11ec3b933e2a8e::t_78486457615b10 99,110
+packages/backend/src/misc/sql-string-escape.ts
+  s_11ec3b933e2a8e::t_78486457615b10 1-17
+packages/frontend/src/components/global/MkUrl.vue
+  s_11ec3b933e2a8e::t_78486457615b10 31,48
+packages/frontend/src/components/MkNoteSub.vue
+  s_11ec3b933e2a8e::t_78486457615b10 51,55
+packages/backend/src/server/api/endpoints/users/notes.ts
+  s_11ec3b933e2a8e::t_78486457615b10 214
+packages/frontend/src/components/MkUserPopup.vue
+  s_11ec3b933e2a8e::t_78486457615b10 64
+packages/backend/src/server/api/endpoints/notes/favorites/create.ts
+  s_11ec3b933e2a8e::t_78486457615b10 14,62,71-74
+  s_11ec3b933e2a8e::t_ea905207346781 75
+packages/frontend/src/ui/_common_/statusbar-user-list.vue
+  s_11ec3b933e2a8e::t_78486457615b10 40
+packages/frontend/src/components/MkNoteDetailed.vue
+  s_11ec3b933e2a8e::t_78486457615b10 259-260
+packages/frontend/src/components/MkUserCardMini.vue
+  s_11ec3b933e2a8e::t_78486457615b10 22
+packages/frontend-embed/src/ui.vue
+  s_11ec3b933e2a8e::t_78486457615b10 40
+packages/backend/src/core/activitypub/ApRequestService.ts
+  s_11ec3b933e2a8e::t_78486457615b10 123-125
+packages/backend/src/server/api/endpoints/i/update.ts
+  s_11ec3b933e2a8e::t_78486457615b10 566,585,587
+packages/frontend/src/components/MkPushNotificationAllowButton.vue
+  s_11ec3b933e2a8e::t_78486457615b10 53,108-109,129-133,139-140,142,144
+packages/backend/src/server/file/FileServerUtils.ts
+  s_11ec3b933e2a8e::t_78486457615b10 62,70,78
+locales/ko-GS.yml
+  s_11ec3b933e2a8e::t_78486457615b10 461,474
+packages/backend/test/e2e/clips.ts
+  s_11ec3b933e2a8e::t_78486457615b10 9,814-846
+  s_11ec3b933e2a8e::t_fa52b3ddad2810 847-849
+packages/frontend/src/pages/user/home.vue
+  s_11ec3b933e2a8e::t_78486457615b10 65,147,176,190,213-214,218,233,238,240-244,290-294,298,300-303
+packages/frontend/src/components/MkUserInfo.vue
+  s_11ec3b933e2a8e::t_78486457615b10 42
+packages/frontend/src/pages/qr.show.vue
+  s_11ec3b933e2a8e::t_78486457615b10 36
+packages/frontend/src/components/MkPagePreview.vue
+  s_11ec3b933e2a8e::t_78486457615b10 33
+packages/backend/src/server/api/endpoints/notes/show-partial-bulk.ts
+  s_11ec3b933e2a8e::t_78486457615b10 71
+packages/frontend/src/components/global/MkAvatar.vue
+  s_11ec3b933e2a8e::t_78486457615b10 52
+packages/mastodon-compat/package.json
+  s_11ec3b933e2a8e::t_2b60919ecaf659 21
+packages/frontend/src/components/MkNote.vue
+  s_11ec3b933e2a8e::t_78486457615b10 219
+packages/frontend-shared/js/relative-time.ts
+  s_11ec3b933e2a8e::t_78486457615b10 1-58
+packages/backend/src/server/api/endpoints/notes.ts
+  s_11ec3b933e2a8e::t_78486457615b10 67-68
+packages/frontend/src/widgets/WidgetBirthdayFollowings.user.vue
+  s_11ec3b933e2a8e::t_78486457615b10 29-30
+packages/backend/src/server/api/stream/Connection.ts
+  s_11ec3b933e2a8e::t_78486457615b10 7,10,17,47,58,61,78-79,133,145-146,164,189-202,204,219,223,225-226,245-247,259,266,330,411,415-420
+packages/frontend/src/widgets/WidgetCalendar.vue
+  s_11ec3b933e2a8e::t_78486457615b10 46
+packages/frontend/src/pages/chat/room.members.vue
+  s_11ec3b933e2a8e::t_78486457615b10 43
+packages/backend/src/queue/processors/CleanRemoteNotesProcessorService.ts
+  s_11ec3b933e2a8e::t_78486457615b10 8,18-22,37-39,60,74-75,83,126,131,140-151,279-280,285-287,297-298,342-343,363
+packages/backend/src/server/api/endpoints/channels/timeline.ts
+  s_11ec3b933e2a8e::t_78486457615b10 129
+packages/backend/src/server/api/endpoints/notes/translate.ts
+  s_11ec3b933e2a8e::t_78486457615b10 86-91
+pnpm-workspace.yaml
+  s_11ec3b933e2a8e::t_78486457615b10 36,59-62
+packages/frontend-shared/js/use-lowres-time.ts
+  s_11ec3b933e2a8e::t_78486457615b10 1-35
+packages/frontend-embed/src/components/EmNote.vue
+  s_11ec3b933e2a8e::t_78486457615b10 126
+packages/backend/src/core/activitypub/ApInboxService.ts
+  s_11ec3b933e2a8e::t_78486457615b10 253,618
+packages/misskey-js/src/autogen/types.ts
+  s_11ec3b933e2a8e::t_78486457615b10 2013,21826-21834,34958-34959,35006-35007
+  s_11ec3b933e2a8e::t_32e01d606555df 35008-35014
+packages/backend/src/server/api/endpoints/get-avatar-decorations.ts
+  s_11ec3b933e2a8e::t_78486457615b10 76,83
+packages/frontend/src/pages/follow-requests.vue
+  s_11ec3b933e2a8e::t_78486457615b10 41
+packages/frontend-embed/src/components/EmMfm.ts
+  s_11ec3b933e2a8e::t_78486457615b10 302-310,343-344,349,365
+packages/frontend/src/pages/list.vue
+  s_11ec3b933e2a8e::t_78486457615b10 34
+packages/frontend/src/pages/flash/flash.vue
+  s_11ec3b933e2a8e::t_78486457615b10 235-241,255-256,265-266
+packages/backend/test-server/tsconfig.json
+  s_11ec3b933e2a8e::t_78486457615b10 31
+packages/frontend/src/widgets/WidgetProfile.vue
+  s_11ec3b933e2a8e::t_78486457615b10 29
+packages/backend/src/server/api/endpoints/federation/followers.ts
+  s_11ec3b933e2a8e::t_78486457615b10 11,51,57-59
+  s_11ec3b933e2a8e::t_9b47acece30a38 60
+packages/backend/src/server/api/SigninWithPasskeyApiService.ts
+  s_11ec3b933e2a8e::t_78486457615b10 94-95
+packages/backend/src/server/api/stream/NoteStreamingHidingService.ts
+  s_11ec3b933e2a8e::t_78486457615b10 6-7,14,20-22,49-53,56,58,63,75-76
+  s_11ec3b933e2a8e::t_0aa959d6a00efc 77
+packages/backend/src/core/QueryService.ts
+  s_11ec3b933e2a8e::t_78486457615b10 114-122,273-275,391-430
+packages/backend/src/core/ReactionService.ts
+  s_11ec3b933e2a8e::t_78486457615b10 216,218,222,336-337,340
+packages/frontend-embed/src/components/EmNoteDetailed.vue
+  s_11ec3b933e2a8e::t_78486457615b10 144-145
+packages/backend/src/server/api/SignupApiService.ts
+  s_11ec3b933e2a8e::t_f9d8f82f4846c8 259,261-264
+  s_11ec3b933e2a8e::t_78486457615b10 8,23,26-27,153-154,178,209-212,214-220,222,224,226-238,286-290,303-307,313-315,321-390,400
+  s_11ec3b933e2a8e::t_8b2a33becafa2d 221,244-246,249-251,254-258,265-267,269-276,279-284
+packages/backend/vitest.config.e2e.ts
+  s_11ec3b933e2a8e::t_78486457615b10 11-16
+packages/frontend/src/components/MkNoteHeader.vue
+  s_11ec3b933e2a8e::t_78486457615b10 53-54
+packages/backend/src/core/entities/NoteEntityService.ts
+  s_11ec3b933e2a8e::t_78486457615b10 142-144,311,641,643-644,646,652,654-657,666-671
+  s_11ec3b933e2a8e::t_52e498e14acbe1 672
+packages/frontend/src/components/MkNotification.vue
+  s_11ec3b933e2a8e::t_78486457615b10 184-185
+packages/backend/vitest.config.ts
+  s_11ec3b933e2a8e::t_78486457615b10 16-17
+packages/frontend/src/composables/use-note.ts
+  s_11ec3b933e2a8e::t_78486457615b10 36
+packages/backend/test/unit/queue/processors/CleanRemoteNotesProcessorService.ts
+  s_11ec3b933e2a8e::t_78486457615b10 8,38,49-50,125,134,138-140,172,188,219,870-945,1219
+packages/frontend-embed/src/components/EmNoteHeader.vue
+  s_11ec3b933e2a8e::t_78486457615b10 34-35
+locales/ru-RU.yml
+  s_11ec3b933e2a8e::t_78486457615b10 52,63,92,127,135,209,406,435,546,622-623,708,758-759,901,1077-1080,1082,1107,1225,1250-1251,1281-1282,1284-1285,1287,1289-1290,1293,1323,1333,1340,1346,1353-1354,1358-1384,1387-1395,1407-1413,1440-1442,1446-1459,1461-1471,1473-1474,1476-1481,1483,1486-1513,1515,1517-1520,1523-1534,1538-1546,1548-1550,1553-1566,1572,1575-1578,1580-1581,1584,1587-1592,1594,1596-1599,1601-1603,1605-1615,1617-1618,1620,1622-1625,1627-1632,1885-1890,1948,2154,2238-2239,2241,2296,2348,2489,2506,2542,2592,2605-2638,2646-2648,2658,2660,2674,2676
+packages/backend/test-server/coverage.ts
+  s_11ec3b933e2a8e::t_78486457615b10 1-223
+locales/id-ID.yml
+  s_11ec3b933e2a8e::t_78486457615b10 7,12-13,17-18,20,23-25,33,38,44,46-50,52,56-58,622-623,1112,1170,1172,1187,1311,1323-1324,1326-1327,1329,1331-1333,1338
+packages/frontend/src/widgets/WidgetAiscript.vue
+  s_11ec3b933e2a8e::t_78486457615b10 15,64,69,72-81,84,91-94,97-98,106-107,112-113,170-176
+packages/backend/src/server/api/endpoints/notes/global-timeline.ts
+  s_11ec3b933e2a8e::t_78486457615b10 82
+packages/backend/src/server/api/endpoints/notes/conversation.ts
+  s_11ec3b933e2a8e::t_78486457615b10 8,55-57,62-63
+packages/backend/src/server/file/FileServerFileResolver.ts
+  s_11ec3b933e2a8e::t_78486457615b10 101-102
+pnpm-lock.yaml
+  s_11ec3b933e2a8e::t_9644175f834ead 281-282,359-360,1176-1178,1192-1194,1279-1280,4518-4519,5651-5652,7055-7056,12251,12716,14144,15858
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "7b18cf6a8617024fa682b9d0f47718e054956680",
+  "prompts": {},
+  "sessions": {
+    "s_11ec3b933e2a8e": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a116c1-13ef-7920-b16f-9547e421b57a",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "Natsuki-Kaede <i@pari.network>"
+    },
+    "s_11feedbc7ac6fd": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a116ae-1150-7052-a741-fd26a0bddc24",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "Natsuki-Kaede <i@pari.network>"
+    }
+  }
+}
