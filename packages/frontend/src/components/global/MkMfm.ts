@@ -238,7 +238,9 @@ export default function (props: MfmProps, { emit }: { emit: SetupContext<MfmEven
 						if (!useAnim) {
 							return genEl(token.children, scale, false, nodePath);
 						}
-						return h(MkSparkle, {}, { default: () => genEl(token.children, scale, false, nodePath) });
+						// スロット関数の中で genEl を呼ぶと MkSparkle が再描画されるたびに子の VNode が作り直される
+						const sparkleChildren = genEl(token.children, scale, false, nodePath);
+						return h(MkSparkle, {}, { default: () => sparkleChildren });
 					}
 					case 'rotate': {
 						const degrees = safeParseFloat(token.props.args.deg) ?? 90;
@@ -370,12 +372,14 @@ export default function (props: MfmProps, { emit }: { emit: SetupContext<MfmEven
 			}
 
 			case 'link': {
+				// スロット関数の中で genEl を呼ぶと再描画されるたびに子の VNode が作り直される
+				const linkChildren = genEl(token.children, scale, true, nodePath);
 				return [h(MkLink, {
 					key: key(token.props.url),
 					url: token.props.url,
 					rel: 'nofollow noopener',
 					navigationBehavior: props.linkNavigationBehavior,
-				}, { default: () => genEl(token.children, scale, true, nodePath) })];
+				}, { default: () => linkChildren })];
 			}
 
 			case 'mention': {

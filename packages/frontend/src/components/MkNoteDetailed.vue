@@ -256,8 +256,8 @@ import { createRepliesRefreshScheduler } from '@/composables/use-replies-refresh
 import type { NoteChildrenChange } from '@/composables/use-replies-refresh.js';
 import { prefer } from '@/preferences.js';
 import { i18n } from '@/i18n.js';
-import { userPage } from '@/filters/user.js';
-import { notePage } from '@/filters/note.js';
+import { userPage } from '@@/js/user.js';
+import { notePage } from '@@/js/note.js';
 import { isEnabledUrlPreview } from '@/utility/url-preview.js';
 import { Paginator } from '@/utility/paginator.js';
 import { misskeyApi } from '@/utility/misskey-api.js';

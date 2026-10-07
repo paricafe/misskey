@@ -18,6 +18,7 @@ import { IdService } from '@/core/IdService.js';
 import { PollService } from '@/core/PollService.js';
 import { QueueService } from '@/core/QueueService.js';
 import { UserBlockingService } from '@/core/UserBlockingService.js';
+import { NoteEntityService } from '@/core/entities/NoteEntityService.js';
 
 export const pollVoteErrors = {
 	noSuchNote: {
@@ -75,6 +76,7 @@ export class PollVoteService {
 		private apRendererService: ApRendererService,
 		private globalEventService: GlobalEventService,
 		private userBlockingService: UserBlockingService,
+		private noteEntityService: NoteEntityService,
 	) {
 	}
 
@@ -84,6 +86,10 @@ export class PollVoteService {
 		const note = await this.notesRepository.findOneBy({ id: noteId });
 
 		if (note == null) {
+			throw new ApiError(pollVoteErrors.noSuchNote);
+		}
+
+		if (!await this.noteEntityService.isVisibleForMe(note, me.id)) {
 			throw new ApiError(pollVoteErrors.noSuchNote);
 		}
 

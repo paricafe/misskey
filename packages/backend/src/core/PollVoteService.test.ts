@@ -20,6 +20,7 @@ function createService(options: {
 	remote?: boolean;
 	hasPoll?: boolean;
 	noteMissing?: boolean;
+	visible?: boolean;
 	advisoryLockWait?: () => Promise<void>;
 } = {}) {
 	const me = { id: 'voter-id' };
@@ -125,6 +126,9 @@ function createService(options: {
 	const userBlockingService = {
 		checkBlocked: vi.fn().mockResolvedValue(options.blocked ?? false),
 	};
+	const noteEntityService = {
+		isVisibleForMe: vi.fn().mockResolvedValue(options.visible ?? true),
+	};
 	const globalEventService = {
 		publishNoteStream: vi.fn(() => order.push('event')),
 	};
@@ -157,6 +161,7 @@ function createService(options: {
 		apRendererService as never,
 		globalEventService as never,
 		userBlockingService as never,
+		noteEntityService as never,
 	);
 
 	return {
@@ -168,6 +173,7 @@ function createService(options: {
 		usersRepository,
 		notesRepository,
 		userBlockingService,
+		noteEntityService,
 		globalEventService,
 		queueService,
 		apRendererService,
@@ -396,6 +402,21 @@ describe(PollVoteService, () => {
 			id: '5f979967-52d9-4314-a911-1c673727f92f',
 		});
 		expect(pollVotesRepository.manager.transaction).not.toHaveBeenCalled();
+	});
+
+	test('rejects an invisible note before starting a transaction or publishing side effects', async () => {
+		const { service, note, me, noteEntityService, pollVotesRepository, globalEventService, queueService, pollService } = createService({ visible: false });
+
+		await expect(service.vote(note.id, [0], me as never)).rejects.toMatchObject({
+			code: 'NO_SUCH_NOTE',
+			id: 'ecafbd2e-c283-4d6d-aecb-1a0a33b75396',
+		});
+		expect(noteEntityService.isVisibleForMe).toHaveBeenCalledWith(note, me.id);
+		expect(pollVotesRepository.manager.transaction).not.toHaveBeenCalled();
+		expect(pollVotesRepository.insert).not.toHaveBeenCalled();
+		expect(globalEventService.publishNoteStream).not.toHaveBeenCalled();
+		expect(queueService.deliver).not.toHaveBeenCalled();
+		expect(pollService.deliverQuestionUpdate).not.toHaveBeenCalled();
 	});
 
 	test.each([
