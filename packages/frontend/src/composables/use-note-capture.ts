@@ -125,123 +125,121 @@ function pollingSubscribe(props: {
 	};
 }
 
-const realtimeSubscriptions = new WeakMap<Misskey.IStream, Map<Misskey.entities.Note['id'], {
-	referenceCount: number;
-	onStreamNoteUpdated: (noteData: NoteUpdatedEvent) => void;
-	onStreamConnected: () => void;
-}>>();
+function emitNoteUpdated(noteData: NoteUpdatedEvent): void {
+	const { type, id, body } = noteData;
+
+	switch (type) {
+		case 'reacted': {
+			noteEvents.emit(`reacted:${id}`, {
+				userId: body.userId,
+				reaction: body.reaction,
+				emoji: body.emoji,
+			});
+			break;
+		}
+
+		case 'unreacted': {
+			noteEvents.emit(`unreacted:${id}`, {
+				userId: body.userId,
+				reaction: body.reaction,
+			});
+			break;
+		}
+
+		case 'pollVoted': {
+			noteEvents.emit(`pollVoted:${id}`, {
+				userId: body.userId,
+				choice: body.choice,
+			});
+			break;
+		}
+
+		case 'repliesCountChanged': {
+			noteEvents.emit(`repliesCountChanged:${id}`, body);
+			break;
+		}
+
+		case 'renoteCountChanged': {
+			noteEvents.emit(`renoteCountChanged:${id}`, body);
+			break;
+		}
+
+		case 'childrenChanged': {
+			noteEvents.emit(`childrenChanged:${id}`, body);
+			break;
+		}
+
+		case 'updated': {
+			noteEvents.emit(`updated:${id}`, {
+				cw: body.cw,
+				text: body.text,
+				updatedAt: body.updatedAt,
+				tags: body.tags,
+				emojis: body.emojis,
+				fileIds: body.fileIds,
+				files: body.files,
+			});
+			break;
+		}
+
+		case 'deleted': {
+			globalEvents.emit('noteDeleted', id);
+			break;
+		}
+	}
+}
+
+type RealtimeCapture = {
+	referenceCounts: Map<Misskey.entities.Note['id'], number>;
+	onNoteUpdated: (noteData: NoteUpdatedEvent) => void;
+	onConnected: () => void;
+};
+
+// One listener per stream connection dispatches to the subscribed notes, instead of
+// one listener per note that would each receive and filter every event.
+const realtimeCaptures = new WeakMap<Misskey.IStream, RealtimeCapture>();
 
 function realtimeSubscribe(props: {
 	note: Pick<Misskey.entities.Note, 'id' | 'createdAt'>;
 }): () => void {
-	const note = props.note;
+	const id = props.note.id;
 	const connection = useStream();
-	let subscriptions = realtimeSubscriptions.get(connection);
-	if (subscriptions == null) {
-		subscriptions = new Map();
-		realtimeSubscriptions.set(connection, subscriptions);
-	}
-
-	const existingSubscription = subscriptions.get(note.id);
-	if (existingSubscription != null) {
-		existingSubscription.referenceCount++;
-		return () => {
-			existingSubscription.referenceCount--;
-			if (existingSubscription.referenceCount !== 0) return;
-			connection.send('un', { id: note.id });
-			connection.off('noteUpdated', existingSubscription.onStreamNoteUpdated);
-			connection.off('_connected_', existingSubscription.onStreamConnected);
-			subscriptions.delete(note.id);
+	let capture = realtimeCaptures.get(connection);
+	if (capture == null) {
+		const referenceCounts = new Map<Misskey.entities.Note['id'], number>();
+		capture = {
+			referenceCounts,
+			onNoteUpdated: noteData => {
+				if (referenceCounts.has(noteData.id)) emitNoteUpdated(noteData);
+			},
+			onConnected: () => {
+				for (const noteId of referenceCounts.keys()) connection.send('sr', { id: noteId });
+			},
 		};
+		realtimeCaptures.set(connection, capture);
 	}
 
-	function onStreamNoteUpdated(noteData: NoteUpdatedEvent): void {
-		const { type, id, body } = noteData;
-
-		if (id !== note.id) return;
-
-		switch (type) {
-			case 'reacted': {
-				noteEvents.emit(`reacted:${id}`, {
-					userId: body.userId,
-					reaction: body.reaction,
-					emoji: body.emoji,
-				});
-				break;
-			}
-
-			case 'unreacted': {
-				noteEvents.emit(`unreacted:${id}`, {
-					userId: body.userId,
-					reaction: body.reaction,
-				});
-				break;
-			}
-
-			case 'pollVoted': {
-				noteEvents.emit(`pollVoted:${id}`, {
-					userId: body.userId,
-					choice: body.choice,
-				});
-				break;
-			}
-
-			case 'repliesCountChanged': {
-				noteEvents.emit(`repliesCountChanged:${id}`, body);
-				break;
-			}
-
-			case 'renoteCountChanged': {
-				noteEvents.emit(`renoteCountChanged:${id}`, body);
-				break;
-			}
-
-			case 'childrenChanged': {
-				noteEvents.emit(`childrenChanged:${id}`, body);
-				break;
-			}
-
-			case 'updated': {
-				noteEvents.emit(`updated:${id}`, {
-					cw: body.cw,
-					text: body.text,
-					updatedAt: body.updatedAt,
-					tags: body.tags,
-					emojis: body.emojis,
-					fileIds: body.fileIds,
-					files: body.files,
-				});
-				break;
-			}
-
-			case 'deleted': {
-				globalEvents.emit('noteDeleted', id);
-				break;
-			}
-		}
+	const { referenceCounts, onNoteUpdated, onConnected } = capture;
+	if (referenceCounts.size === 0) {
+		connection.on('noteUpdated', onNoteUpdated);
+		connection.on('_connected_', onConnected);
 	}
-
-	function onStreamConnected() {
-		connection.send('sr', { id: note.id });
-	}
-
-	const subscription = {
-		referenceCount: 1,
-		onStreamNoteUpdated,
-		onStreamConnected,
-	};
-	subscriptions.set(note.id, subscription);
-	connection.send('sr', { id: note.id });
-	connection.on('noteUpdated', onStreamNoteUpdated);
-	connection.on('_connected_', onStreamConnected);
+	const count = referenceCounts.get(id) ?? 0;
+	referenceCounts.set(id, count + 1);
+	if (count === 0) connection.send('sr', { id });
 
 	return () => {
-		subscription.referenceCount--;
-		if (subscription.referenceCount !== 0) return;
-		connection.send('un', { id: note.id });
-		connection.off('noteUpdated', onStreamNoteUpdated);
-		connection.off('_connected_', onStreamConnected);
-		subscriptions.delete(note.id);
+		const remaining = referenceCounts.get(id)! - 1;
+		if (remaining > 0) {
+			referenceCounts.set(id, remaining);
+			return;
+		}
+		referenceCounts.delete(id);
+		connection.send('un', { id });
+		if (referenceCounts.size === 0) {
+			connection.off('noteUpdated', onNoteUpdated);
+			connection.off('_connected_', onConnected);
+		}
 	};
 }
 

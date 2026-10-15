@@ -173,6 +173,30 @@ describe('useNoteCapture counts', () => {
 		expect(mocks.connection.send).toHaveBeenCalledTimes(2);
 	});
 
+	test('uses one stream listener for all captured notes and resubscribes them on reconnect', () => {
+		mocks.realtimeMode = true;
+		const first = mountCapture({ note: { ...makeNote(), id: 'first-note' }, mock: false });
+		const second = mountCapture({ note: { ...makeNote(), id: 'second-note' }, mock: false });
+
+		expect(mocks.connection.on.mock.calls.filter(([event]) => event === 'noteUpdated')).toHaveLength(1);
+
+		mocks.connection.emit('noteUpdated', { id: 'second-note', type: 'repliesCountChanged', body: { delta: 1 } });
+		expect(first.state.repliesCount).toBe(2);
+		expect(second.state.repliesCount).toBe(3);
+
+		mocks.connection.send.mockClear();
+		mocks.connection.emit('_connected_');
+		expect(mocks.connection.send).toHaveBeenCalledWith('sr', { id: 'first-note' });
+		expect(mocks.connection.send).toHaveBeenCalledWith('sr', { id: 'second-note' });
+
+		first.app.unmount();
+		mountedApps.splice(mountedApps.indexOf(first.app), 1);
+		expect(mocks.connection.off).not.toHaveBeenCalled();
+		second.app.unmount();
+		mountedApps.splice(mountedApps.indexOf(second.app), 1);
+		expect(mocks.connection.off.mock.calls.map(([event]) => event).sort()).toEqual(['_connected_', 'noteUpdated']);
+	});
+
 	test('manual subscription is idempotent when called repeatedly', () => {
 		mocks.realtimeMode = true;
 		const oldNote = makeNote(new Date(Date.now() - 1000 * 60 * 10).toISOString());
