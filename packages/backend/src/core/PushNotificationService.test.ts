@@ -19,6 +19,8 @@ describe(PushNotificationService, () => {
 
 	test('delivers native push notifications', async () => {
 		vi.mocked(push.sendNotification).mockResolvedValue({} as never);
+		const agent = {};
+		const httpRequestService = { getAgentForHttps: vi.fn().mockReturnValue(agent) };
 		service = new PushNotificationService(
 			{ url: 'https://misskey.example/', proxy: undefined } as never,
 			{ enableServiceWorker: true, swPublicKey: 'public-key', swPrivateKey: 'private-key' } as never,
@@ -26,11 +28,15 @@ describe(PushNotificationService, () => {
 			{ findBy: vi.fn().mockResolvedValue([{
 				userId: 'user-id', endpoint: 'https://native-push.example/subscription', auth: 'native-auth', publickey: 'native-public-key', sendReadMessage: false,
 			}]) } as never,
+			httpRequestService as never,
 		);
 
 		await service.pushNotification('user-id', 'notification', { id: 'notification-id', type: 'mention', note: null } as never);
 
 		expect(push.sendNotification).toHaveBeenCalledOnce();
 		expect(vi.mocked(push.sendNotification).mock.calls[0]?.[0].endpoint).toBe('https://native-push.example/subscription');
+		// Push requests go through the shared HTTP agent (proxy and private-network checks).
+		expect(httpRequestService.getAgentForHttps).toHaveBeenCalledWith(new URL('https://native-push.example/subscription'));
+		expect(vi.mocked(push.sendNotification).mock.calls[0]?.[2]).toMatchObject({ agent });
 	});
 });
