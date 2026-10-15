@@ -89,7 +89,6 @@ export class MiNote {
 	public threadId: string | null;
 
 	// TODO: varcharにしたい
-	@Index() // USING pgroonga
 	@Column('text', {
 		nullable: true,
 	})
@@ -100,7 +99,6 @@ export class MiNote {
 	})
 	public name: string | null;
 
-	@Index() // USING pgroonga
 	@Column('text', {
 		nullable: true,
 	})
