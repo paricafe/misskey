@@ -366,9 +366,15 @@ export class ApPersonService implements OnModuleInit {
 
 		//#region resolve counts
 		const _resolver = resolver ?? this.apResolverService.createResolver();
-		const outboxcollection = await _resolver.resolveCollection(person.outbox).catch(() => { return null; });
-		const followerscollection = await _resolver.resolveCollection(person.followers!).catch(() => { return null; });
-		const followingcollection = await _resolver.resolveCollection(person.following!).catch(() => { return null; });
+		// Only the counts are used; fetch the collections concurrently and tolerate failures.
+		const resolveCount = (collection: string | IObject | undefined) => collection == null
+			? Promise.resolve(null)
+			: _resolver.resolveCollection(collection).catch(() => null);
+		const [outboxcollection, followerscollection, followingcollection] = await Promise.all([
+			resolveCount(person.outbox),
+			resolveCount(person.followers),
+			resolveCount(person.following),
+		]);
 
 		try {
 			// Start transaction
