@@ -8,6 +8,7 @@ import { id } from './util/id.js';
 import { MiDriveFile } from './DriveFile.js';
 
 @Entity('user')
+@Index('IDX_065d4d8f3b5adb4a08841eae3c', { synchronize: false }) // PGroonga index managed by migration.
 @Index(['usernameLower', 'host'], { unique: true })
 export class MiUser {
 	@PrimaryColumn(id())
@@ -49,7 +50,6 @@ export class MiUser {
 	})
 	public usernameLower: string;
 
-	@Index() // USING pgroonga pgroonga_varchar_full_text_search_ops_v2
 	@Column('varchar', {
 		length: 128, nullable: true,
 		comment: 'The name of the User.',

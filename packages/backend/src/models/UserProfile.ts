@@ -13,6 +13,7 @@ import { MiUserList } from './UserList.js';
 // TODO: このテーブルで管理している情報すべてレジストリで管理するようにしても良いかも
 //       ただ、「emailVerified が true なユーザーを find する」のようなクエリは書けなくなるからウーン
 @Entity('user_profile')
+@Index('IDX_fcb770976ff8240af5799e3ffc', { synchronize: false }) // PGroonga index managed by migration.
 export class MiUserProfile {
 	@PrimaryColumn(id())
 	public userId: MiUser['id'];
@@ -36,7 +37,6 @@ export class MiUserProfile {
 	})
 	public birthday: string | null;
 
-	@Index() // USING pgroonga pgroonga_varchar_full_text_search_ops_v2
 	@Column('varchar', {
 		length: 2048, nullable: true,
 		comment: 'The description (bio) of the User.',
