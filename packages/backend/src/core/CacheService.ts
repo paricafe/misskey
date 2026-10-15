@@ -152,10 +152,9 @@ export class CacheService implements OnApplicationShutdown {
 		this.pariRemoteUserDecorationsCache = new RedisKVCache<PariRemoteUserDecorationsCacheType>(this.redisClient, 'pariRemoteUserDecorationsCache', {
 			lifetime: 1000 * 60 * 30, // 30m
 			memoryCacheLifetime: 1000 * 60, // 1m
-			fetcher: (key) => this.userByIdCache.fetch(key, () => this.usersRepository.findOneBy({
-				id: key,
-			}) as Promise<MiLocalUser>).then(user => {
-				if (user.host == null) return [];
+			fetcher: (key) => this.usersRepository.findOneBy({ id: key }).then(user => {
+				// A deleted or local user has no remote decorations.
+				if (user == null || user.host == null) return [];
 				if (!(this.config.avatarDecorationAllowedHosts?.includes(user.host))) return [];
 				return this.httpRequestService.send(`https://${user.host}/api/users/show`, {
 					method: 'POST',

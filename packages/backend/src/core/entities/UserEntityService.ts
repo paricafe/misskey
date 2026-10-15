@@ -414,6 +414,21 @@ export class UserEntityService implements OnModuleInit {
 		return `${this.config.url}/users/${userId}`;
 	}
 
+	/**
+	 * Remote decorations are fetched from the remote server. Never wait for that while
+	 * packing: on a cache miss, refresh in the background and show none for now.
+	 */
+	@bindThis
+	private async getRemoteUserDecorations(user: { id: MiUser['id']; host: string }) {
+		if (!this.config.avatarDecorationAllowedHosts?.includes(user.host)) return [];
+		const cache = this.cacheService.pariRemoteUserDecorationsCache;
+		const cached = await cache.get(user.id);
+		if (cached !== undefined) return cached;
+		// fetch() deduplicates concurrent loads of the same key.
+		cache.fetch(user.id).catch(() => {});
+		return [];
+	}
+
 	public async pack<S extends 'MeDetailed' | 'UserDetailedNotMe' | 'UserDetailed' | 'UserLite' = 'UserLite'>(
 		src: MiUser['id'] | MiUser,
 		me?: { id: MiUser['id']; } | null | undefined,
@@ -511,7 +526,7 @@ export class UserEntityService implements OnModuleInit {
 				: [];
 		const avatarDecorations = user.host == null
 			? getLocalUserDecorations()
-			: this.cacheService.pariRemoteUserDecorationsCache.fetch(user.id).then(res => res.map(ad => ({
+			: this.getRemoteUserDecorations(user as MiUser & { host: string }).then(res => res.map(ad => ({
 				...ad,
 				url: ad.url && this.config.mediaProxy
 					? `${this.config.mediaProxy}/static.webp?url=${(encodeURIComponent(ad.url))}`
