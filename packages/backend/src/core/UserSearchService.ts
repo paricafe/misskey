@@ -230,7 +230,8 @@ export class UserSearchService {
 
 		const nameQuery = this.usersRepository.createQueryBuilder('user')
 			.where(new Brackets(qb => {
-				qb.where('user.name &@~ :query', { query: sqlLikeEscape(query) });
+				// &@ matches the input as one keyword; &@~ would parse it as query syntax.
+				qb.where('user.name &@ :query', { query });
 
 				if (isUsername) {
 					qb.orWhere('user.usernameLower LIKE :username', { username: sqlLikeEscape(query.replace('@', '').toLowerCase()) + '%' });
@@ -265,7 +266,7 @@ export class UserSearchService {
 		if (users.length < (options.limit ?? 30)) {
 			const profQuery = this.userProfilesRepository.createQueryBuilder('prof')
 				.select('prof.userId')
-				.where('prof.description &@~ :query', { query: sqlLikeEscape(query) });
+				.where('prof.description &@ :query', { query });
 
 			if (mutingQuery) {
 				profQuery.andWhere(`prof.userId NOT IN (${mutingQuery.getQuery()})`);

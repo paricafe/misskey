@@ -95,6 +95,7 @@ describe('UserSearchService', () => {
 						provide: UserEntityService, useFactory: vi.fn(() => ({
 							// とりあえずIDが返れば確認が出来るので
 							packMany: (value: any) => value,
+							validateLocalUsername: (value: string) => /^\w{1,20}$/.test(value),
 						})),
 					},
 					IdService,
@@ -260,6 +261,30 @@ describe('UserSearchService', () => {
 			);
 
 			expect(result).toEqual([alysha, alyson, alyssa].map(x => x.id));
+		});
+	});
+	// Run with MISSKEY_TEST_PGROONGA=1 and the PGroonga extension installed in the test DB.
+	describe.skipIf(process.env.MISSKEY_TEST_PGROONGA !== '1')('search', () => {
+		test.each(['a_b', '100%', 'c\\d'])('matches a name containing %j literally', async (name) => {
+			const expected = await createUser({ username: 'literal', usernameLower: 'literal', name });
+
+			const result = await service.search(name, null, { limit: 10 });
+			expect(result.map(user => user.id)).toEqual([expected.id]);
+		});
+
+		test.each(['(open', 'say "hi', 'a OR', '-minus'])('does not parse %j as query syntax', async (query) => {
+			const expected = await createUser({ username: 'syntax', usernameLower: 'syntax', name: `name ${query} end` });
+
+			const result = await service.search(query, null, { limit: 10 });
+			expect(result.map(user => user.id)).toEqual([expected.id]);
+		});
+
+		test('matches a description containing query syntax characters', async () => {
+			const expected = await createUser({ username: 'described', usernameLower: 'described' });
+			await userProfilesRepository.update(expected.id, { description: 'likes (parentheses) and "quotes"' });
+
+			const result = await service.search('(parentheses) and "quotes', null, { limit: 10 });
+			expect(result.map(user => user.id)).toEqual([expected.id]);
 		});
 	});
 });
