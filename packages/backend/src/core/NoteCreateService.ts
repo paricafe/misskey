@@ -842,7 +842,8 @@ export class NoteCreateService implements OnApplicationShutdown {
 			});
 		}
 
-		if (data.reply == null) {
+		// Silent creation (imports and fetched notes) must not notify followers.
+		if (data.reply == null && !silent) {
 			// TODO: キャッシュ
 			this.followingsRepository.findBy({
 				followeeId: user.id,
