@@ -1,0 +1,27 @@
+packages/backend/src/models/Note.ts
+  s_9954e39b618d28::t_35317a58933429 26
+packages/backend/test/unit/SearchService.ts
+  s_9954e39b618d28::t_2f72bf9246b779 8,11,72-76,96,675,677,679,683-702,705-709,711,714-715,722-771,786,793,803
+  s_9954e39b618d28::t_fcd904c0c4009c 703-704,710
+  s_9954e39b618d28::t_dc655a99cbaf85 720-721
+packages/backend/migration/1792049504336-NoteSearchTextIdIndex.js
+  s_9954e39b618d28::t_3c64bfd657b3b5 1-62
+packages/backend/src/core/SearchService.ts
+  s_9954e39b618d28::t_0f9f47059881a7 45-50,245-246,250-251,271,279,285,288-335,338-342
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f9be903185dacbe4bca3e6761a4a76cad38ca5b2",
+  "prompts": {},
+  "sessions": {
+    "s_9954e39b618d28": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f1c0ffe8-941f-4e8b-95d0-bd7f2756a8c1",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Natsuki-Kaede <i@pari.network>"
+    }
+  }
+}
