@@ -126,7 +126,7 @@ export class ExportAccountDataProcessorService {
 		await writeUser(`{"metaVersion":1,"host":"${this.config.host}","exportedAt":"${new Date().toString()}","user":[`);
 
 		// eslint-disable-next-line @typescript-eslint/no-unused-vars
-		const { host, uri, sharedInbox, followersUri, lastFetchedAt, inbox, ...userTrimmed } = user;
+		const { host, uri, sharedInbox, followersUri, lastFetchedAt, inbox, token, ...userTrimmed } = user;
 
 		await writeUser(JSON.stringify(userTrimmed));
 
