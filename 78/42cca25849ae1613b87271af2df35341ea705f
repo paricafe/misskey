@@ -1,0 +1,23 @@
+packages/backend/src/core/entities/UserEntityService.decorations.test.ts
+  s_9954e39b618d28::t_6a727402f0467a 1-49
+packages/backend/src/core/CacheService.ts
+  s_9954e39b618d28::t_eb21d4f9fd1e28 155-157
+packages/backend/src/core/entities/UserEntityService.ts
+  s_9954e39b618d28::t_eb21d4f9fd1e28 417-431,529
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "7842cca25849ae1613b87271af2df35341ea705f",
+  "prompts": {},
+  "sessions": {
+    "s_9954e39b618d28": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f1c0ffe8-941f-4e8b-95d0-bd7f2756a8c1",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Natsuki-Kaede <i@pari.network>"
+    }
+  }
+}
