@@ -243,7 +243,7 @@ export class SearchService {
 		let matches: SelectQueryBuilder<MiNote> | undefined;
 		if (this.provider === 'sqlPgroonga') {
 			// The index name preserves its tokenizer/normalizers for the condition.
-			const textMatch = 'note_search_text(note.text, note.replyId) &@~ (:q, NULL, \'"IDX_note_search_text_id"\')::pgroonga_full_text_search_condition';
+			const textMatch = 'note_search_text(note.text, note.replyId) &@~ (:q, NULL, \'"IDX_note_search_text"\')::pgroonga_full_text_search_condition';
 			// Keep ORDER BY / LIMIT out of the full-text query: otherwise the planner can
 			// scan the primary key backwards and evaluate PGroonga on every visited row.
 			// Retain the range/scope filters inside the full-text query.
@@ -285,9 +285,9 @@ export class SearchService {
 		// Exclusive bound on the side that has already been examined.
 		let cursor: MiNote['id'] | undefined;
 
-		// Search in ID windows moving away from the pagination cursor. PGroonga applies
-		// the window inside the (search text, id) index, so only matches in the window
-		// are fetched from the table; frequent terms no longer read every matching row.
+		// Search in ID windows moving away from the pagination cursor. PostgreSQL combines
+		// the PGroonga matches with a primary key range (BitmapAnd), so only matches in the
+		// window are fetched from the table; frequent terms no longer read every matching row.
 		const startId = ascending ? pagination.sinceId : pagination.untilId;
 		let edge = startId != null ? this.idService.parse(startId).date.getTime() : Date.now();
 		if (!ascending && opts.rangeEndAt != null) edge = Math.min(edge, opts.rangeEndAt);

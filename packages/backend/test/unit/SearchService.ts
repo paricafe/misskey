@@ -9,6 +9,7 @@ import type { DataSource, QueryRunner } from 'typeorm';
 import type { Index, Meilisearch } from 'meilisearch';
 import { NoteSearchText1789191974803 } from '../../migration/1789191974803-NoteSearchText.js';
 import { NoteSearchTextIdIndex1792049504336 } from '../../migration/1792049504336-NoteSearchTextIdIndex.js';
+import { RestoreSingleColumnNoteSearchIndex1792058058152 } from '../../migration/1792058058152-RestoreSingleColumnNoteSearchIndex.js';
 import { type Config, loadConfig } from '@/config.js';
 import { GlobalModule } from '@/GlobalModule.js';
 import { CoreModule } from '@/core/CoreModule.js';
@@ -72,6 +73,7 @@ describe('SearchService', () => {
 	async function applySearchMigrations(runner: QueryRunner) {
 		await new NoteSearchText1789191974803().up(runner);
 		await new NoteSearchTextIdIndex1792049504336().up(runner);
+		await new RestoreSingleColumnNoteSearchIndex1792058058152().up(runner);
 	}
 
 	async function buildContext(configOverride?: Config): Promise<TestContext> {
@@ -674,41 +676,41 @@ describe('SearchService', () => {
 
 		test('uses the custom normalization of the search index', async () => {
 			const runner = ctx.db.createQueryRunner();
-			await runner.query('DROP INDEX "IDX_note_search_text_id"');
+			await runner.query('DROP INDEX "IDX_note_search_text"');
 			try {
-				await runner.query(`CREATE INDEX "IDX_note_search_text_id" ON note USING pgroonga (note_search_text(text, "replyId"), id pgroonga_varchar_term_search_ops_v2) WITH (normalizers = 'NormalizerNFKC150("remove_symbol", true)')`);
+				await runner.query(`CREATE INDEX "IDX_note_search_text" ON note USING pgroonga (note_search_text(text, "replyId")) WITH (normalizers = 'NormalizerNFKC150("remove_symbol", true)')`);
 				const author = await createUser(ctx);
 				const expected = await createNote(ctx, author, { text: 'c-a-f-e' });
 				expect((await ctx.service.searchNote('cafe', author, {}, { limit: 10 })).map(note => note.id)).toEqual([expected.id]);
 			} finally {
-				await runner.query('DROP INDEX IF EXISTS "IDX_note_search_text_id"');
+				await runner.query('DROP INDEX IF EXISTS "IDX_note_search_text"');
 				await applySearchMigrations(runner);
 				await runner.release();
 			}
 		});
 
-		test('migration replaces the expression index and preserves its options on rollback', async () => {
+		test('migration restores the single-column index and preserves its options on rollback', async () => {
 			const runner = ctx.db.createQueryRunner();
 			const indexes = async () => (await runner.query(`
 				SELECT indexname, indexdef FROM pg_indexes
 				WHERE indexname IN ('IDX_note_search_text', 'IDX_note_search_text_id') ORDER BY indexname
 			`)) as { indexname: string; indexdef: string }[];
 			try {
-				await runner.query('DROP INDEX "IDX_note_search_text_id"');
-				await runner.query(`CREATE INDEX "IDX_note_search_text" ON note USING pgroonga (note_search_text(text, "replyId")) WITH (normalizers = 'NormalizerNFKC150("remove_symbol", true)')`);
+				await runner.query('DROP INDEX "IDX_note_search_text"');
+				await runner.query(`CREATE INDEX "IDX_note_search_text_id" ON note USING pgroonga (note_search_text(text, "replyId"), id pgroonga_varchar_term_search_ops_v2) WITH (normalizers = 'NormalizerNFKC150("remove_symbol", true)')`);
 
-				await new NoteSearchTextIdIndex1792049504336().up(runner);
-				const upgraded = await indexes();
-				expect(upgraded.map(index => index.indexname)).toEqual(['IDX_note_search_text_id']);
-				// pg_indexes omits pgroonga_varchar_term_search_ops_v2 because it is the default opclass.
-				expect(upgraded[0].indexdef).toContain('"replyId")::text), id)');
-				expect(upgraded[0].indexdef).toContain('remove_symbol');
-
-				await new NoteSearchTextIdIndex1792049504336().down(runner);
+				await new RestoreSingleColumnNoteSearchIndex1792058058152().up(runner);
 				const restored = await indexes();
 				expect(restored.map(index => index.indexname)).toEqual(['IDX_note_search_text']);
 				expect(restored[0].indexdef).not.toContain(', id)');
 				expect(restored[0].indexdef).toContain('remove_symbol');
+
+				await new RestoreSingleColumnNoteSearchIndex1792058058152().down(runner);
+				const reverted = await indexes();
+				expect(reverted.map(index => index.indexname)).toEqual(['IDX_note_search_text_id']);
+				// pg_indexes omits pgroonga_varchar_term_search_ops_v2 because it is the default opclass.
+				expect(reverted[0].indexdef).toContain('"replyId")::text), id)');
+				expect(reverted[0].indexdef).toContain('remove_symbol');
 			} finally {
 				await runner.query('DROP INDEX IF EXISTS "IDX_note_search_text"');
 				await runner.query('DROP INDEX IF EXISTS "IDX_note_search_text_id"');
@@ -800,7 +802,7 @@ describe('SearchService', () => {
 			try {
 				await runner.query('SET LOCAL enable_seqscan = off');
 				const plan = await runner.query(`EXPLAIN (FORMAT JSON) ${sql}`, parameters);
-				expect(JSON.stringify(plan)).toContain('IDX_note_search_text_id');
+				expect(JSON.stringify(plan)).toContain('"Index Name":"IDX_note_search_text"');
 			} finally {
 				await runner.rollbackTransaction();
 				await runner.release();
