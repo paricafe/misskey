@@ -134,11 +134,15 @@ export class SignupApiService {
 			}
 		}
 
-		if (this.meta.approvalRequiredForSignup) {
-			if (reason == null || typeof reason !== 'string') {
-				reply.code(400);
-				return;
-			}
+		// Matches the varchar(1000) reason columns on user and user_pending.
+		if (reason != null && (typeof reason !== 'string' || reason.length > 1000)) {
+			reply.code(400);
+			return;
+		}
+
+		if (this.meta.approvalRequiredForSignup && (reason == null || reason.trim() === '')) {
+			reply.code(400);
+			return;
 		}
 
 		let ticket: MiRegistrationTicket | null = null;

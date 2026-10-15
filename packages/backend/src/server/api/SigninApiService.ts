@@ -143,17 +143,6 @@ export class SigninApiService {
 		const profile = await this.userProfilesRepository.findOneByOrFail({ userId: user.id });
 		const securityKeysAvailable = await this.userSecurityKeysRepository.countBy({ userId: user.id }).then(result => result >= 1);
 
-		if (!user.approved && this.meta.approvalRequiredForSignup) {
-			reply.code(403);
-			return {
-				error: {
-					message: 'The account has not been approved by an admin yet. Try again later.',
-					code: 'NOT_APPROVED',
-					id: '22d05606-fbcf-421a-a2db-b32241faft1b',
-				},
-			};
-		}
-
 		if (password == null) {
 			reply.code(200);
 			if (profile.twoFactorEnabled) {
@@ -190,6 +179,24 @@ export class SigninApiService {
 			return error(status ?? 500, failure ?? { id: '4e30e80c-e338-45a0-8c8f-44455efa3b76' });
 		};
 
+		// Check approval only after authentication so the pending state is not disclosed to others.
+		const signin = async () => {
+			if (!user.approved) {
+				if (this.meta.approvalRequiredForSignup) {
+					reply.code(403);
+					return {
+						error: {
+							message: 'The account has not been approved by an admin yet. Try again later.',
+							code: 'NOT_APPROVED',
+							id: '5d1c0b3e-8f2a-4c6d-9e7b-3a4f1b2c8d90',
+						},
+					};
+				}
+				await this.usersRepository.update(user.id, { approved: true });
+			}
+			return this.signinService.signin(request, reply, user);
+		};
+
 		if (!profile.twoFactorEnabled) {
 			if (process.env.NODE_ENV !== 'test') {
 				if (this.meta.enableHcaptcha && this.meta.hcaptchaSecretKey) {
@@ -224,8 +231,7 @@ export class SigninApiService {
 			}
 
 			if (same) {
-				if (!this.meta.approvalRequiredForSignup && !user.approved) this.usersRepository.update(user.id, { approved: true });
-				return this.signinService.signin(request, reply, user);
+				return await signin();
 			} else {
 				return await fail(403, {
 					id: '932c904e-9460-45b7-9ce6-7ed33be7eb2c',
@@ -248,9 +254,7 @@ export class SigninApiService {
 				});
 			}
 
-			if (!this.meta.approvalRequiredForSignup && !user.approved) this.usersRepository.update(user.id, { approved: true });
-
-			return this.signinService.signin(request, reply, user);
+			return await signin();
 		} else if (body.credential) {
 			if (!same && !profile.usePasswordLessLogin) {
 				return await fail(403, {
@@ -261,8 +265,7 @@ export class SigninApiService {
 			const authorized = await this.webAuthnService.verifyAuthentication(user.id, body.credential);
 
 			if (authorized) {
-				if (!this.meta.approvalRequiredForSignup && !user.approved) this.usersRepository.update(user.id, { approved: true });
-				return this.signinService.signin(request, reply, user);
+				return await signin();
 			} else {
 				return await fail(403, {
 					id: '93b86c4b-72f9-40eb-9815-798928603d1e',
