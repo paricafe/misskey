@@ -32,10 +32,22 @@ export class Routes {
 			const grant = await getAuthorization(request, this.deps.store);
 			if (!optional && (!grant || grant.kind !== 'user')) throw new HttpError(401, 'A user access token is required');
 			if (grant && scope && !(scope === 'read:accounts' && allowsScope(grant.scopes, 'profile'))) assertScope(grant.scopes, scope);
-			if (grant?.nativeToken) await this.deps.native.call('ping', {}, grant.nativeToken, { ip: request.ip });
-			return handler({ request, reply, grant, userId: grant?.userId ?? '', query: request.query as Json, body: (request.body ?? {}) as Json, params: request.params as Json,
+			// The native token may have been revoked; confirm it before answering.
+			const verified = grant?.nativeToken ? this.deps.native.call('ping', {}, grant.nativeToken, { ip: request.ip }) : undefined;
+			const run = () => handler({ request, reply, grant, userId: grant?.userId ?? '', query: request.query as Json, body: (request.body ?? {}) as Json, params: request.params as Json,
 				call: <T>(endpoint: string, body: Json = {}) => this.deps.native.call<T>(endpoint, body, grant?.nativeToken, { ip: request.ip, userAgent: request.headers['user-agent'] }),
 			});
+			if (verified == null) return run();
+			if (method !== 'GET') {
+				// Writes must not start before the token is confirmed.
+				await verified;
+				return run();
+			}
+			// Reads overlap with the check; nothing is returned until it succeeds.
+			const result = Promise.resolve().then(run);
+			result.catch(() => {});
+			await verified;
+			return result;
 		} });
 	}
 	async status(note: Json, context: RequestContext): Promise<Json> {

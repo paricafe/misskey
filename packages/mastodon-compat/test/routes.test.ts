@@ -454,3 +454,35 @@ test('account only_media does not send conflicting native options, and context c
 	assert.equal(context.statusCode, 200);
 	assert.deepEqual(context.json().descendants.map((item: Json) => item.id), ['200', '300']);
 });
+
+test('reads overlap the native token check but never answer before it, while writes wait for it', async t => {
+	let releasePing!: () => void;
+	let pingGate = new Promise<void>(resolve => { releasePing = resolve; });
+	let revoked = false;
+	const f = await fixture(t, { handler: async endpoint => {
+		if (endpoint !== 'ping') return;
+		await pingGate;
+		return revoked ? response({ error: { code: 'AUTHENTICATION_FAILED', message: 'Revoked' } }, 401) : undefined;
+	} });
+	f.notes.push(note('1000'));
+	const settled = (promise: Promise<unknown>) => { let done = false; void promise.then(() => { done = true; }); return () => done; };
+
+	const read = f.request('GET', '/api/v1/statuses/1000');
+	const readDone = settled(read);
+	for (let i = 0; i < 20 && !f.calls.some(call => call.endpoint === 'notes/show'); i++) await nextTurn();
+	assert.ok(f.calls.some(call => call.endpoint === 'notes/show'), 'a read should start while the token is being confirmed');
+	assert.equal(readDone(), false, 'a read must not answer before the token is confirmed');
+	releasePing();
+	assert.equal((await read).statusCode, 200);
+
+	pingGate = new Promise<void>(resolve => { releasePing = resolve; });
+	const write = f.request('POST', '/api/v1/statuses', { status: 'Hello' });
+	for (let i = 0; i < 20; i++) await nextTurn();
+	assert.equal(f.calls.some(call => call.endpoint === 'notes/create'), false, 'a write must wait for the token check');
+	releasePing();
+	assert.equal((await write).statusCode, 200);
+
+	revoked = true;
+	pingGate = Promise.resolve();
+	assert.equal((await f.request('GET', '/api/v1/statuses/1000')).statusCode, 401);
+});
