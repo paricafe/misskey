@@ -1,0 +1,44 @@
+packages/backend/src/core/activitypub/models/ApNoteService.test.ts
+  s_9954e39b618d28::t_484506033f7e4c 25-26
+packages/backend/src/core/NoteUpdateService.test.ts
+  s_9954e39b618d28::t_a591d886683a0b 651-652,656-657
+  s_9954e39b618d28::t_e99b0c4556d6a3 658
+packages/backend/src/models/Note.ts
+  s_9954e39b618d28::t_76b5c77a6c40ae 38,41
+packages/frontend/src/composables/use-note-capture.ts
+  s_9954e39b618d28::t_305ec5cdd083ed 394
+packages/backend/test/unit/entities/NoteEntityService.ts
+  s_9954e39b618d28::t_e7134899cb368e 55-59,225-250
+  s_9954e39b618d28::t_e88596b78c9d15 251
+packages/backend/src/server/api/endpoints/notes/show.ts
+  s_9954e39b618d28::t_b8d330efd059f0 50,84
+packages/backend/src/core/entities/NoteEntityService.ts
+  s_9954e39b618d28::t_76b5c77a6c40ae 198,375-376,427-429
+packages/misskey-js/src/autogen/types.ts
+  s_9954e39b618d28::t_c7b7b311aec41b 31724-31725
+packages/mastodon-compat/src/media-search.ts
+  s_9954e39b618d28::t_dc58f808b59503 226-227
+packages/backend/src/core/NoteUpdateService.ts
+  s_9954e39b618d28::t_b8d330efd059f0 174,251-257
+  s_9954e39b618d28::t_f8b69fb765494e 258-259
+packages/backend/src/core/activitypub/models/ApNoteService.ts
+  s_9954e39b618d28::t_b8d330efd059f0 376-378
+packages/mastodon-compat/test/media-search.test.ts
+  s_9954e39b618d28::t_54024674f92ccb 223
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "45e655fc9516a7c754f6404e098353b39fe26a2d",
+  "prompts": {},
+  "sessions": {
+    "s_9954e39b618d28": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f1c0ffe8-941f-4e8b-95d0-bd7f2756a8c1",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Natsuki-Kaede <i@pari.network>"
+    }
+  }
+}
