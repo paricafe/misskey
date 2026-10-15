@@ -743,33 +743,37 @@ export class ExportAccountDataProcessorService {
 
 		// Create archive
 		const [archivePath, archiveCleanup] = await createTemp();
-		await new Promise<void>((resolve) => {
-			const archiveStream = fs.createWriteStream(archivePath);
-			const archive = new ZipArchive({
-				zlib: { level: 0 },
+		try {
+			await new Promise<void>((resolve, reject) => {
+				const archiveStream = fs.createWriteStream(archivePath);
+				const archive = new ZipArchive({
+					zlib: { level: 0 },
+				});
+				archiveStream.on('close', resolve);
+				archiveStream.on('error', reject);
+				archive.on('error', reject);
+				archive.pipe(archiveStream);
+				archive.directory(path, false);
+				archive.finalize().catch(reject);
 			});
-			archiveStream.on('close', async () => {
-				this.logger.succ(`Exported to: ${archivePath}`);
+			this.logger.succ(`Exported to: ${archivePath}`);
 
-				const fileName = 'data-request-' + dateFormat(new Date(), 'yyyy-MM-dd-HH-mm-ss') + '.zip';
-				const driveFile = await this.driveService.addFile({ user, path: archivePath, name: fileName, force: true });
+			// Upload outside the stream callback so failures reject the job instead of hanging it.
+			const fileName = 'data-request-' + dateFormat(new Date(), 'yyyy-MM-dd-HH-mm-ss') + '.zip';
+			const driveFile = await this.driveService.addFile({ user, path: archivePath, name: fileName, force: true });
 
-				this.logger.succ(`Exported to: ${driveFile.id}`);
-				cleanup();
-				archiveCleanup();
-				if (profile.email) {
-					this.emailService.sendEmail(profile.email,
-						'Your data archive is ready',
-						`Click the following link to download the archive: ${driveFile.url}<br/>It is also available in your drive.`,
-						`Click the following link to download the archive: ${driveFile.url}\r\n\r\nIt is also available in your drive.`,
-					);
-				}
-				resolve();
-			});
-			archive.pipe(archiveStream);
-			archive.directory(path, false);
-			archive.finalize();
-		});
+			this.logger.succ(`Exported to: ${driveFile.id}`);
+			if (profile.email) {
+				this.emailService.sendEmail(profile.email,
+					'Your data archive is ready',
+					`Click the following link to download the archive: ${driveFile.url}<br/>It is also available in your drive.`,
+					`Click the following link to download the archive: ${driveFile.url}\r\n\r\nIt is also available in your drive.`,
+				);
+			}
+		} finally {
+			cleanup();
+			archiveCleanup();
+		}
 	}
 
 	private noteSerialize(note: MiNote, poll: MiPoll | null = null, files: Packed<'DriveFile'>[]): Record<string, unknown> {
