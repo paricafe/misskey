@@ -1,0 +1,22 @@
+packages/backend/test/unit/UserSearchService.ts
+  s_9954e39b618d28::t_c65f66e5a6a560 98,266-288
+  s_9954e39b618d28::t_639a9da61de025 289
+packages/backend/src/core/UserSearchService.ts
+  s_9954e39b618d28::t_f8b3d622ab3f16 233-234,269
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "40b889e1e7bb8d4f2163e618eb0d263d916aef63",
+  "prompts": {},
+  "sessions": {
+    "s_9954e39b618d28": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f1c0ffe8-941f-4e8b-95d0-bd7f2756a8c1",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Natsuki-Kaede <i@pari.network>"
+    }
+  }
+}
