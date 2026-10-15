@@ -30,7 +30,7 @@ describe('follower note notifications', () => {
 		const note = { id: 'note', userId: 'author', visibility: 'public' } as MiNote;
 		const postNoteCreated = (silent: boolean) => service['postNoteCreated'](
 			note,
-			{ id: 'author', username: 'author', host: null, isBot: false, isCat: false },
+			{ id: 'author', username: 'author', host: null, isBot: false },
 			{ text: 'hello', visibility: 'public' },
 			silent,
 			[],

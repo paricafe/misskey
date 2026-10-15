@@ -670,7 +670,7 @@ describe(NoteUpdateService, () => {
 			updatedAt: new Date('2025-02-01T00:00:00.000Z'),
 		})).rejects.toMatchObject({ id: NOTE_PROHIBITED_WORDS_ERROR_ID });
 
-		expect(notesRepository.manager.transaction).not.toHaveBeenCalled();
+		expect(notesRepository.update).not.toHaveBeenCalled();
 	});
 
 	test('rejects a local edit that adds sensitive words to a public note', async () => {
@@ -683,7 +683,7 @@ describe(NoteUpdateService, () => {
 			updatedAt: new Date('2025-02-01T00:00:00.000Z'),
 		})).rejects.toMatchObject({ id: NOTE_SENSITIVE_WORDS_ERROR_ID });
 
-		expect(notesRepository.manager.transaction).not.toHaveBeenCalled();
+		expect(notesRepository.update).not.toHaveBeenCalled();
 	});
 
 	test('allows sensitive words in a non-public note edit', async () => {
