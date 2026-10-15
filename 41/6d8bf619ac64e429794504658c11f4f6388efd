@@ -1,0 +1,19 @@
+packages/backend/src/core/activitypub/models/ApPersonService.ts
+  s_9954e39b618d28::t_3e49ed4a2181d2 369-377
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "416d8bf619ac64e429794504658c11f4f6388efd",
+  "prompts": {},
+  "sessions": {
+    "s_9954e39b618d28": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f1c0ffe8-941f-4e8b-95d0-bd7f2756a8c1",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Natsuki-Kaede <i@pari.network>"
+    }
+  }
+}
