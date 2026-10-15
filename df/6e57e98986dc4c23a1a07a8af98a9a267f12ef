@@ -1,0 +1,23 @@
+packages/backend/test/unit/chart.ts
+  s_9954e39b618d28::t_76b6475789cc52 32-33
+packages/backend/test/unit/queue/processors/CleanRemoteNotesProcessorService.ts
+  s_9954e39b618d28::t_76b6475789cc52 46
+  s_9954e39b618d28::t_4408867a468ff8 129-132,165-176
+  s_9954e39b618d28::t_3f27e7819e151e 1190-1192
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "df6e57e98986dc4c23a1a07a8af98a9a267f12ef",
+  "prompts": {},
+  "sessions": {
+    "s_9954e39b618d28": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f1c0ffe8-941f-4e8b-95d0-bd7f2756a8c1",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Natsuki-Kaede <i@pari.network>"
+    }
+  }
+}
