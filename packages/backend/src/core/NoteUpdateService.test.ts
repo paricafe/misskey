@@ -648,9 +648,13 @@ describe(NoteUpdateService, () => {
 		releaseFirstWrite();
 		await Promise.all([firstUpdate, secondUpdate]);
 
-		expect(lockedFindOne).toHaveBeenCalledTimes(2);
+		// Each transaction locks the row, then loads its history (not selected by default).
+		expect(lockedFindOne).toHaveBeenCalledTimes(4);
 		expect(lockedFindOne).toHaveBeenNthCalledWith(1, expect.objectContaining({
 			lock: { mode: 'pessimistic_write' },
+		}));
+		expect(lockedFindOne).toHaveBeenNthCalledWith(2, expect.objectContaining({
+			select: { id: true, history: true },
 		}));
 		expect(persistedNote.text).toBe('Second edit');
 		expect(persistedNote.history).toHaveLength(2);

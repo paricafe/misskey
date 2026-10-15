@@ -52,7 +52,11 @@ function setup(polls: MiPoll[] = [], votes: MiPollVote[] = [], buffers?: Map<str
 			votes.filter(v => v.userId === userId && (typeof noteId === 'string' ? v.noteId === noteId : noteId.value.includes(v.noteId)))),
 		findOneBy: vi.fn(async ({ noteId, userId }: { noteId: string; userId: string }) => votes.find(v => v.noteId === noteId && v.userId === userId) ?? null),
 	};
-	const notesRepository = { findOneOrFail: vi.fn(), find: vi.fn() };
+	const notesRepository = {
+		findOneOrFail: vi.fn(),
+		find: vi.fn(),
+		findOne: vi.fn(async ({ where }: { where: { id: string } }) => ({ id: where.id, history: [{ createdAt: '2026-01-01T00:00:00.000Z', text: 'old' }] })),
+	};
 	const buffering = Object.create(ReactionsBufferingService.prototype) as ReactionsBufferingService;
 	Object.defineProperties(buffering, {
 		get: { value: vi.fn(async (id: string) => buffers!.get(id)!) },
@@ -216,5 +220,32 @@ describe('NoteEntityService buffered reaction checkpoints', () => {
 		]);
 		const [diff] = await service.fetchDiffs(['buffered']);
 		expect(diff.reactions).toEqual({ like: 3 });
+	});
+});
+
+describe('NoteEntityService edit history', () => {
+	test('omits edit history unless it is requested', async () => {
+		const { service, notesRepository } = setup();
+		const packed = await service.pack(note('edited', { hasPoll: false }), me);
+
+		expect(packed.history).toBeUndefined();
+		expect(notesRepository.findOne).not.toHaveBeenCalled();
+	});
+
+	test('loads edit history on request', async () => {
+		const { service, notesRepository } = setup();
+		const packed = await service.pack(note('edited', { hasPoll: false }), me, { withHistory: true });
+
+		expect(packed.history).toEqual([{ createdAt: '2026-01-01T00:00:00.000Z', text: 'old' }]);
+		expect(notesRepository.findOne).toHaveBeenCalledWith({ where: { id: 'edited' }, select: { id: true, history: true } });
+	});
+
+	test('hides edit history together with the content of a hidden note', async () => {
+		const { service } = setup();
+		const hidden = note('hidden', { hasPoll: false, visibility: 'specified', visibleUserIds: [] });
+		const packed = await service.pack(hidden, me, { withHistory: true });
+
+		expect(packed.isHidden).toBe(true);
+		expect(packed.history).toBeUndefined();
 	});
 });

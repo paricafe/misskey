@@ -391,14 +391,7 @@ export function useNoteCapture(props: {
 		fileIds?: string[];
 		files?: Misskey.entities.DriveFile[];
 	}): void {
-		note.history = [
-			...(note.history || []),
-			{
-				createdAt: ctx.updatedAt,
-				cw: ctx.cw,
-				text: ctx.text,
-			},
-		];
+		// Edit history is not delivered to timelines, so only the current state is updated.
 		note.updatedAt = ctx.updatedAt;
 		note.cw = ctx.cw;
 		note.text = ctx.text;

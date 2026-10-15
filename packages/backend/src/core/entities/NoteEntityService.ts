@@ -195,6 +195,7 @@ export class NoteEntityService implements OnModuleInit {
 		packedNote.text = null;
 		packedNote.poll = undefined;
 		packedNote.cw = null;
+		packedNote.history = undefined;
 		packedNote.isHidden = true;
 		// TODO: hiddenReason みたいなのを提供しても良さそう
 	}
@@ -371,6 +372,8 @@ export class NoteEntityService implements OnModuleInit {
 			detail?: boolean;
 			skipHide?: boolean;
 			withReactionAndUserPairCache?: boolean;
+			// Edit history is excluded unless requested; it is loaded separately.
+			withHistory?: boolean;
 			_hint_?: {
 				bufferedReactions: Map<MiNote['id'], BufferedReactions> | null;
 				myReactions: Map<MiNote['id'], string | null>;
@@ -421,7 +424,9 @@ export class NoteEntityService implements OnModuleInit {
 			id: note.id,
 			createdAt: this.idService.parse(note.id).date.toISOString(),
 			updatedAt: note.updatedAt?.toISOString(),
-			history: note.history,
+			history: opts.withHistory
+				? this.notesRepository.findOne({ where: { id: note.id }, select: { id: true, history: true } }).then(row => row?.history ?? null)
+				: undefined,
 			userId: note.userId,
 			user: packedUsers?.get(note.userId) ?? this.userEntityService.pack(note.user ?? note.userId, me),
 			text: text,

@@ -47,6 +47,7 @@ export const paramDef = {
 	type: 'object',
 	properties: {
 		noteId: { type: 'string', format: 'misskey:id' },
+		withHistory: { type: 'boolean', default: false },
 	},
 	required: ['noteId'],
 } as const;
@@ -80,6 +81,7 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 
 			return await this.noteEntityService.pack(note, me, {
 				detail: true,
+				withHistory: ps.withHistory,
 			});
 		});
 	}

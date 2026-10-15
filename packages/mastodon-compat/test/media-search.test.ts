@@ -220,6 +220,7 @@ test('edit history converts native snapshots without replacing old media, poll o
 	assert.deepEqual(revisions[0].poll, { options: [{ title: 'Old option' }] });
 	assert.equal(revisions[0].emojis[0].shortcode, 'wave');
 	assert.equal(revisions[1].created_at, '2026-01-02T00:00:00.000Z');
+	assert.ok(f.calls.some(call => call.endpoint === 'notes/show' && call.body.withHistory === true), 'edit history must be requested from the native API');
 	assert.deepEqual(revisions[1].media_attachments, []);
 	assert.equal(revisions[1].poll, null);
 });

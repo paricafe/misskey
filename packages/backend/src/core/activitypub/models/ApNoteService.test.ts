@@ -22,6 +22,8 @@ function createService(originNoteOverrides: Record<string, unknown> = {}) {
 		) => NoteUpdateService.prototype.isUpdateAlreadyApplied(note as never, updatedAt)),
 		prepareUpdate: vi.fn().mockResolvedValue(preparedUpdate),
 		update: vi.fn().mockResolvedValue(undefined),
+		// The repository mock already returns the note with its history.
+		withHistory: vi.fn(async (note: unknown) => note),
 	};
 	const apImageService = { resolveImage: vi.fn() };
 	const apPersonService = {

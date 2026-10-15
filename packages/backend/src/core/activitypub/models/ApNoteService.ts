@@ -373,8 +373,9 @@ export class ApNoteService {
 		silent: boolean,
 		assertLockOwned: () => Promise<void>,
 	): Promise<void> {
-		const originNote = await this.notesRepository.findOneBy({ uri });
-		if (originNote === null) throw new Error('note is not registered');
+		const registeredNote = await this.notesRepository.findOneBy({ uri });
+		if (registeredNote === null) throw new Error('note is not registered');
+		const originNote = await this.noteUpdateService.withHistory(registeredNote);
 
 		// Process new note
 		const note = value as IPost;

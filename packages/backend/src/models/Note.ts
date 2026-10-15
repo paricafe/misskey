@@ -35,8 +35,10 @@ export class MiNote {
 	})
 	public updatedAt: Date | null;
 
+	// Not loaded by default: it can be large. Select it explicitly where edit history is needed.
 	@Column('jsonb', {
 		default: null,
+		select: false,
 	})
 	public history: {
 		createdAt: string, // ISO string

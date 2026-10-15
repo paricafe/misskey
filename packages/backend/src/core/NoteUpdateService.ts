@@ -171,7 +171,7 @@ export class NoteUpdateService {
 			if (lockedRow == null) {
 				throw new Error('note is not registered');
 			}
-			const lockedNote = { ...note, ...lockedRow };
+			const lockedNote = await this.withHistory({ ...note, ...lockedRow }, transactionalNotesRepository);
 
 			this.assertNoteOwner(user, lockedNote);
 			if (this.isUpdateAlreadyApplied(lockedNote, updatedAt)) {
@@ -246,6 +246,15 @@ export class NoteUpdateService {
 	): boolean {
 		return (note.updatedAt != null && updatedAt.getTime() <= note.updatedAt.getTime()) ||
 			(note.history?.some(revision => revision.createdAt === updatedAt.toISOString()) ?? false);
+	}
+
+	/** The history column is not selected by default; load it for edit checks and snapshots. */
+	async withHistory<T extends Pick<MiNote, 'id'>>(
+		note: T,
+		notesRepository: Pick<NotesRepository, 'findOne'> = this.notesRepository,
+	): Promise<T & Pick<MiNote, 'history'>> {
+		const row = await notesRepository.findOne({ where: { id: note.id }, select: { id: true, history: true } });
+		return { ...note, history: row?.history ?? null };
 	}
 
 	async prepareUpdate(

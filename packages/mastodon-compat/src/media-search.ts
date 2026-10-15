@@ -223,7 +223,8 @@ async function resolveOrEmpty(call: () => Promise<Json>): Promise<Json | undefin
 }
 
 async function history(routes: Routes, c: RequestContext): Promise<Json[]> {
-	const note = await routes.note(c);
+	// Native notes omit edit history unless it is requested explicitly.
+	const note = await c.call<Json>('notes/show', { noteId: String(c.params.id), withHistory: true });
 	await routes.status(note, c);
 	const revisions = [...array(note.history), { ...note, createdAt: note.updatedAt ?? note.createdAt }];
 	return revisions.map(revision => {
