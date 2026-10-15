@@ -5,9 +5,10 @@
 
 import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
 import { Test, TestingModule } from '@nestjs/testing';
-import type { DataSource } from 'typeorm';
+import type { DataSource, QueryRunner } from 'typeorm';
 import type { Index, Meilisearch } from 'meilisearch';
 import { NoteSearchText1789191974803 } from '../../migration/1789191974803-NoteSearchText.js';
+import { NoteSearchTextIdIndex1792049504336 } from '../../migration/1792049504336-NoteSearchTextIdIndex.js';
 import { type Config, loadConfig } from '@/config.js';
 import { GlobalModule } from '@/GlobalModule.js';
 import { CoreModule } from '@/core/CoreModule.js';
@@ -68,6 +69,11 @@ describe('SearchService', () => {
 		},
 	};
 
+	async function applySearchMigrations(runner: QueryRunner) {
+		await new NoteSearchText1789191974803().up(runner);
+		await new NoteSearchTextIdIndex1792049504336().up(runner);
+	}
+
 	async function buildContext(configOverride?: Config): Promise<TestContext> {
 		const builder = Test.createTestingModule({
 			imports: [
@@ -87,7 +93,7 @@ describe('SearchService', () => {
 		// Test schema synchronization does not create SQL functions or expression indexes.
 		const runner = db.createQueryRunner();
 		try {
-			await new NoteSearchText1789191974803().up(runner);
+			await applySearchMigrations(runner);
 		} finally {
 			await runner.release();
 		}
@@ -666,41 +672,101 @@ describe('SearchService', () => {
 			expect(await ctx.service.searchNote('ban 网站', me, {}, { limit: 10 })).toEqual([]);
 		});
 
-		test.each(['unrelated body', '@ban@remote.example 网站'])('rechecks a candidate edited to %j before hydration', async (text) => {
-			const author = await createUser(ctx);
-			const parent = await createNote(ctx, author, { text: 'parent' });
-			const expected = await createNote(ctx, author, { text: 'ban 网站 body' });
-			const edited = await createNote(ctx, author, { text: 'ban 网站 body', replyId: parent.id });
-			const createRunner = ctx.db.createQueryRunner.bind(ctx.db);
-			vi.spyOn(ctx.db, 'createQueryRunner').mockImplementation((mode) => {
-				const runner = createRunner(mode);
-				const runQuery = runner.query.bind(runner);
-				vi.spyOn(runner, 'query').mockImplementation(async (sql: string, parameters?: Parameters<typeof runner.query>[1], useStructuredResult?: boolean) => {
-					const result = useStructuredResult ? await runQuery(sql, parameters, true) : await runQuery(sql, parameters);
-					if (sql.startsWith('WITH "matched_note"')) {
-						await ctx.notesRepository.update(edited.id, { text });
-					}
-					return result;
-				});
-				return runner;
-			});
-
-			expect((await ctx.service.searchNote('ban 网站', author, {}, { limit: 1 })).map(note => note.id)).toEqual([expected.id]);
-		});
-
-		test('uses the same custom normalization for candidates and bounded row checks', async () => {
+		test('uses the custom normalization of the search index', async () => {
 			const runner = ctx.db.createQueryRunner();
-			await runner.query('DROP INDEX "IDX_note_search_text"');
+			await runner.query('DROP INDEX "IDX_note_search_text_id"');
 			try {
-				await runner.query(`CREATE INDEX "IDX_note_search_text" ON note USING pgroonga (note_search_text(text, "replyId")) WITH (normalizers = 'NormalizerNFKC150("remove_symbol", true)')`);
+				await runner.query(`CREATE INDEX "IDX_note_search_text_id" ON note USING pgroonga (note_search_text(text, "replyId"), id pgroonga_varchar_term_search_ops_v2) WITH (normalizers = 'NormalizerNFKC150("remove_symbol", true)')`);
 				const author = await createUser(ctx);
 				const expected = await createNote(ctx, author, { text: 'c-a-f-e' });
 				expect((await ctx.service.searchNote('cafe', author, {}, { limit: 10 })).map(note => note.id)).toEqual([expected.id]);
 			} finally {
-				await runner.query('DROP INDEX IF EXISTS "IDX_note_search_text"');
-				await new NoteSearchText1789191974803().up(runner);
+				await runner.query('DROP INDEX IF EXISTS "IDX_note_search_text_id"');
+				await applySearchMigrations(runner);
 				await runner.release();
 			}
+		});
+
+		test('migration replaces the expression index and preserves its options on rollback', async () => {
+			const runner = ctx.db.createQueryRunner();
+			const indexes = async () => (await runner.query(`
+				SELECT indexname, indexdef FROM pg_indexes
+				WHERE indexname IN ('IDX_note_search_text', 'IDX_note_search_text_id') ORDER BY indexname
+			`)) as { indexname: string; indexdef: string }[];
+			try {
+				await runner.query('DROP INDEX "IDX_note_search_text_id"');
+				await runner.query(`CREATE INDEX "IDX_note_search_text" ON note USING pgroonga (note_search_text(text, "replyId")) WITH (normalizers = 'NormalizerNFKC150("remove_symbol", true)')`);
+
+				await new NoteSearchTextIdIndex1792049504336().up(runner);
+				const upgraded = await indexes();
+				expect(upgraded.map(index => index.indexname)).toEqual(['IDX_note_search_text_id']);
+				// pg_indexes omits pgroonga_varchar_term_search_ops_v2 because it is the default opclass.
+				expect(upgraded[0].indexdef).toContain('"replyId")::text), id)');
+				expect(upgraded[0].indexdef).toContain('remove_symbol');
+
+				await new NoteSearchTextIdIndex1792049504336().down(runner);
+				const restored = await indexes();
+				expect(restored.map(index => index.indexname)).toEqual(['IDX_note_search_text']);
+				expect(restored[0].indexdef).not.toContain(', id)');
+				expect(restored[0].indexdef).toContain('remove_symbol');
+			} finally {
+				await runner.query('DROP INDEX IF EXISTS "IDX_note_search_text"');
+				await runner.query('DROP INDEX IF EXISTS "IDX_note_search_text_id"');
+				await applySearchMigrations(runner);
+				await runner.release();
+			}
+		});
+
+		function candidateQueries(logQuery: { mock: { calls: unknown[][] } }) {
+			return logQuery.mock.calls.filter(([sql]) => typeof sql === 'string' && sql.startsWith('WITH "matched_note"')) as [string, ...unknown[]][];
+		}
+
+		test('searches older ID windows until the page is filled', async () => {
+			const author = await createUser(ctx);
+			const now = Date.now();
+			const expected: MiNote[] = [];
+			for (const age of [3600_000, 10 * 86400_000, 100 * 86400_000, 1000 * 86400_000]) {
+				expected.push(await createNote(ctx, author, { text: 'window term' }, now - age));
+			}
+			await createNote(ctx, author, { text: 'unrelated' }, now - 5 * 86400_000);
+			const logQuery = vi.spyOn(ctx.db.logger, 'logQuery');
+
+			const result = await ctx.service.searchNote('window', author, {}, { limit: 10 });
+			expect(result.map(note => note.id)).toEqual(expected.map(note => note.id));
+			expect(candidateQueries(logQuery).length).toBeGreaterThan(1);
+
+			const older = await ctx.service.searchNote('window', author, {}, { limit: 2, untilId: expected[1].id });
+			expect(older.map(note => note.id)).toEqual(expected.slice(2).map(note => note.id));
+		});
+
+		test('searches newer ID windows in ascending order', async () => {
+			const author = await createUser(ctx);
+			const now = Date.now();
+			const cursor = await createNote(ctx, author, { text: 'window term' }, now - 1000 * 86400_000);
+			const expected: MiNote[] = [];
+			for (const age of [400 * 86400_000, 30 * 86400_000, 3600_000]) {
+				expected.push(await createNote(ctx, author, { text: 'window term' }, now - age));
+			}
+
+			const result = await ctx.service.searchNote('window', author, {}, { limit: 10, sinceId: cursor.id });
+			expect(result.map(note => note.id)).toEqual(expected.map(note => note.id));
+		});
+
+		test('stops at the first window when it fills the page', async () => {
+			const author = await createUser(ctx);
+			const now = Date.now();
+			const recent: MiNote[] = [];
+			for (let i = 0; i < 3; i++) {
+				recent.push(await createNote(ctx, author, { text: 'window term' }, now - (i + 1) * 60_000));
+			}
+			await createNote(ctx, author, { text: 'window term' }, now - 30 * 86400_000);
+			const logQuery = vi.spyOn(ctx.db.logger, 'logQuery');
+
+			const result = await ctx.service.searchNote('window', author, {}, { limit: 2 });
+			expect(result.map(note => note.id)).toEqual(recent.slice(0, 2).map(note => note.id));
+			const queries = candidateQueries(logQuery);
+			expect(queries).toHaveLength(1);
+			expect(queries[0][0]).toContain('"note"."id" >=');
 		});
 
 		test('materializes scoped text matches without sorting or limiting candidates', async () => {
@@ -717,12 +783,14 @@ describe('SearchService', () => {
 			expect(candidateSql).toContain('note_search_text(');
 			expect(candidateSql).toContain('"note"."userId" =');
 			expect(candidateSql).toContain('"note"."userHost" IS NULL');
+			expect(candidateSql).toContain('"note"."id" >=');
 			expect(candidateSql).not.toMatch(/ORDER BY|LIMIT/);
 			// Candidate retrieval must not merge-join the CTE against the note table.
 			expect(sql).not.toContain('JOIN');
 			const hydration = logQuery.mock.calls.find(([query]) => query.includes('"note"."id" IN ('));
 			expect(hydration).toBeDefined();
 			expect(hydration![0]).not.toContain('matched_note');
+			expect(hydration![0]).not.toContain('note_search_text(');
 			expect(hydration![1]).toContain(expected.id);
 
 			// A tiny fixture normally prefers a sequential scan. Check that the real
@@ -732,7 +800,7 @@ describe('SearchService', () => {
 			try {
 				await runner.query('SET LOCAL enable_seqscan = off');
 				const plan = await runner.query(`EXPLAIN (FORMAT JSON) ${sql}`, parameters);
-				expect(JSON.stringify(plan)).toContain('IDX_note_search_text');
+				expect(JSON.stringify(plan)).toContain('IDX_note_search_text_id');
 			} finally {
 				await runner.rollbackTransaction();
 				await runner.release();

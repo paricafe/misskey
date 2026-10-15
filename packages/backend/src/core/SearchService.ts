@@ -42,6 +42,12 @@ export type SearchOpts = {
 	rangeEndAt?: number | null;
 };
 
+// Candidate windows start at one day and grow until they reach the search bounds.
+const INITIAL_SEARCH_WINDOW_MS = 1000 * 60 * 60 * 24;
+const SEARCH_WINDOW_GROWTH = 4;
+// Time-based IDs (aid/aidx) cannot represent earlier times.
+const EARLIEST_SEARCH_WINDOW_TIME = Date.UTC(2000, 0, 1);
+
 export type SearchPagination = {
 	untilId?: MiNote['id'];
 	sinceId?: MiNote['id'];
@@ -236,17 +242,17 @@ export class SearchService {
 
 		let matches: SelectQueryBuilder<MiNote> | undefined;
 		if (this.provider === 'sqlPgroonga') {
-			const textMatch = 'note_search_text(note.text, note.replyId) &@~ (:q, NULL, \'"IDX_note_search_text"\')::pgroonga_full_text_search_condition';
+			// The index name preserves its tokenizer/normalizers for the condition.
+			const textMatch = 'note_search_text(note.text, note.replyId) &@~ (:q, NULL, \'"IDX_note_search_text_id"\')::pgroonga_full_text_search_condition';
 			// Keep ORDER BY / LIMIT out of the full-text query: otherwise the planner can
 			// scan the primary key backwards and evaluate PGroonga on every visited row.
 			// Retain the range/scope filters inside the full-text query.
+			// Hydration does not repeat the text match: it could let the planner drive
+			// the bounded ID lookup from the full-text index.
 			matches = query.clone()
 				.select('note.id', 'id')
 				.orderBy()
 				.andWhere(textMatch, { q });
-			// Recheck edits between candidate retrieval and hydration. The index name
-			// also preserves its tokenizer/normalizers when checking individual rows.
-			query.andWhere(textMatch, { q });
 		} else {
 			query.andWhere('LOWER(note_search_text(note.text, note.replyId)) LIKE :q', { q: `%${ sqlLikeEscape(q.toLowerCase()) }%` });
 		}
@@ -262,7 +268,7 @@ export class SearchService {
 		if (me == null) this.queryService.generateUgcVisibilityQueryForVisitor(query);
 		this.queryService.generateBaseNoteFilteringQuery(query, me);
 
-		if (matches) return this.fetchPgroongaNotes(matches, query, pagination);
+		if (matches) return this.fetchPgroongaNotes(matches, query, opts, pagination);
 		return query.limit(pagination.limit).getMany();
 	}
 
@@ -270,43 +276,71 @@ export class SearchService {
 	private async fetchPgroongaNotes(
 		matches: SelectQueryBuilder<MiNote>,
 		query: SelectQueryBuilder<MiNote>,
+		opts: SearchOpts,
 		pagination: SearchPagination,
 	): Promise<MiNote[]> {
 		const ascending = Boolean(pagination.sinceId && !pagination.untilId);
 		const batchSize = Math.max(100, pagination.limit);
 		const notes: MiNote[] = [];
+		// Exclusive bound on the side that has already been examined.
 		let cursor: MiNote['id'] | undefined;
 
-		while (notes.length < pagination.limit) {
-			const batchMatches = matches.clone();
-			if (cursor != null) {
-				batchMatches.andWhere(`note.id ${ascending ? '>' : '<'} :searchCursor`, { searchCursor: cursor });
+		// Search in ID windows moving away from the pagination cursor. PGroonga applies
+		// the window inside the (search text, id) index, so only matches in the window
+		// are fetched from the table; frequent terms no longer read every matching row.
+		const startId = ascending ? pagination.sinceId : pagination.untilId;
+		let edge = startId != null ? this.idService.parse(startId).date.getTime() : Date.now();
+		if (!ascending && opts.rangeEndAt != null) edge = Math.min(edge, opts.rangeEndAt);
+		if (ascending && opts.rangeStartAt != null) edge = Math.max(edge, opts.rangeStartAt);
+		const floor = Math.max(opts.rangeStartAt ?? EARLIEST_SEARCH_WINDOW_TIME, EARLIEST_SEARCH_WINDOW_TIME);
+		const ceiling = opts.rangeEndAt ?? Date.now();
+		let span = INITIAL_SEARCH_WINDOW_MS;
+
+		while (true) {
+			const farTime = ascending ? edge + span : edge - span;
+			// The last window has no far bound, so it also covers IDs outside the time scale.
+			const far = (ascending ? farTime >= ceiling : farTime <= floor) ? undefined : this.idService.gen(farTime);
+
+			while (true) {
+				const batchMatches = matches.clone();
+				if (cursor != null) {
+					batchMatches.andWhere(`note.id ${ascending ? '>' : '<'} :searchCursor`, { searchCursor: cursor });
+				}
+				if (far != null) {
+					batchMatches.andWhere(`note.id ${ascending ? '<=' : '>='} :searchWindow`, { searchWindow: far });
+				}
+
+				// Do not join the candidate CTE back to note. Its estimated cardinality can
+				// make PostgreSQL merge-join against a backward scan of the entire note PK.
+				const candidates = await this.notesRepository.manager.createQueryBuilder()
+					.addCommonTableExpression(batchMatches, 'matched_note', { materialized: true })
+					.select('matched_note.id', 'id')
+					.from('matched_note', 'matched_note')
+					.orderBy('matched_note.id', ascending ? 'ASC' : 'DESC')
+					.limit(batchSize)
+					.getRawMany<{ id: MiNote['id'] }>();
+
+				if (candidates.length > 0) {
+					const batch = await query.clone()
+						.andWhere('note.id IN (:...searchResultIds)', { searchResultIds: candidates.map(note => note.id) })
+						.limit(pagination.limit - notes.length)
+						.getMany();
+					notes.push(...batch);
+					if (notes.length >= pagination.limit) return notes;
+				}
+
+				// Advance past every examined candidate, including invisible or deleted
+				// notes, and keep fetching until the window is exhausted.
+				if (candidates.length < batchSize) break;
+				cursor = candidates[candidates.length - 1].id;
 			}
 
-			// Do not join the candidate CTE back to note. Its estimated cardinality can
-			// make PostgreSQL merge-join against a backward scan of the entire note PK.
-			const candidates = await this.notesRepository.manager.createQueryBuilder()
-				.addCommonTableExpression(batchMatches, 'matched_note', { materialized: true })
-				.select('matched_note.id', 'id')
-				.from('matched_note', 'matched_note')
-				.orderBy('matched_note.id', ascending ? 'ASC' : 'DESC')
-				.limit(batchSize)
-				.getRawMany<{ id: MiNote['id'] }>();
-			if (candidates.length === 0) break;
-
-			const batch = await query.clone()
-				.andWhere('note.id IN (:...searchResultIds)', { searchResultIds: candidates.map(note => note.id) })
-				.limit(pagination.limit - notes.length)
-				.getMany();
-			notes.push(...batch);
-
-			// Advance past every examined candidate, including invisible or deleted
-			// notes, and keep fetching until the page is full or the matches are exhausted.
-			if (candidates.length < batchSize) break;
-			cursor = candidates[candidates.length - 1].id;
+			if (far == null) return notes;
+			// The next window starts just past this window's inclusive far bound.
+			cursor = far;
+			edge = farTime;
+			span *= SEARCH_WINDOW_GROWTH;
 		}
-
-		return notes;
 	}
 
 	@bindThis
