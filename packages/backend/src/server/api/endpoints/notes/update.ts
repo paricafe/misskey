@@ -12,7 +12,7 @@ import { GetterService } from '@/server/api/GetterService.js';
 import { MAX_NOTE_FILES, MAX_NOTE_TEXT_LENGTH } from '@/const.js';
 import { ApiError } from '@/server/api/error.js';
 import { NoteEntityService } from '@/core/entities/NoteEntityService.js';
-import { NOTE_HISTORY_LIMIT_ERROR_ID, NoteUpdateService } from '@/core/NoteUpdateService.js';
+import { NOTE_HISTORY_LIMIT_ERROR_ID, NOTE_PROHIBITED_WORDS_ERROR_ID, NOTE_SENSITIVE_WORDS_ERROR_ID, NoteUpdateService } from '@/core/NoteUpdateService.js';
 import { IdentifiableError } from '@/misc/identifiable-error.js';
 
 export const meta = {
@@ -60,6 +60,18 @@ export const meta = {
 			id: NOTE_HISTORY_LIMIT_ERROR_ID,
 			kind: 'client',
 			httpStatusCode: 422,
+		},
+
+		containsProhibitedWords: {
+			message: 'Cannot update because it contains prohibited words.',
+			code: 'CONTAINS_PROHIBITED_WORDS',
+			id: 'b2f1c6a4-7d3e-4e8b-9c5a-1f6d2e8a4b70',
+		},
+
+		containsSensitiveWords: {
+			message: 'Cannot add sensitive words to a public note.',
+			code: 'CONTAINS_SENSITIVE_WORDS',
+			id: 'c4e7a2b9-1f5d-4a3c-8e6b-2d9f7a1c5e38',
 		},
 
 		noContent: {
@@ -167,8 +179,10 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				updatedAt: new Date(),
 				files,
 			}, false, me).catch(error => {
-				if (error instanceof IdentifiableError && error.id === NOTE_HISTORY_LIMIT_ERROR_ID) {
-					throw new ApiError(meta.errors.historyLimitExceeded);
+				if (error instanceof IdentifiableError) {
+					if (error.id === NOTE_HISTORY_LIMIT_ERROR_ID) throw new ApiError(meta.errors.historyLimitExceeded);
+					if (error.id === NOTE_PROHIBITED_WORDS_ERROR_ID) throw new ApiError(meta.errors.containsProhibitedWords);
+					if (error.id === NOTE_SENSITIVE_WORDS_ERROR_ID) throw new ApiError(meta.errors.containsSensitiveWords);
 				}
 				throw error;
 			});

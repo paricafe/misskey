@@ -5,10 +5,13 @@
 
 import { describe, expect, test, vi } from 'vitest';
 import type { MiNote } from '@/models/Note.js';
+import { UtilityService } from '@/core/UtilityService.js';
 import {
 	MAX_NOTE_HISTORY_BYTES,
 	MAX_NOTE_HISTORY_REVISIONS,
 	NOTE_HISTORY_LIMIT_ERROR_ID,
+	NOTE_PROHIBITED_WORDS_ERROR_ID,
+	NOTE_SENSITIVE_WORDS_ERROR_ID,
 	NoteUpdateService,
 } from './NoteUpdateService.js';
 
@@ -31,7 +34,7 @@ const oldFile = {
 	user: null,
 };
 
-function createService(lockedNote: MiNote = note) {
+function createService(lockedNote: MiNote = note, meta: { prohibitedWords?: string[]; sensitiveWords?: string[] } = {}) {
 	const notesRepository = {
 		update: vi.fn().mockResolvedValue(undefined),
 		findOneBy: vi.fn().mockResolvedValue({
@@ -122,12 +125,21 @@ function createService(lockedNote: MiNote = note) {
 		renderUpdateNote: vi.fn(),
 		addContext: vi.fn(),
 	};
+	const deliverManager = {
+		addDirectRecipe: vi.fn(),
+		addFollowersRecipe: vi.fn(),
+		execute: vi.fn().mockResolvedValue(undefined),
+	};
 	const apDeliverManagerService = {
-		createDeliverManager: vi.fn(),
+		createDeliverManager: vi.fn().mockReturnValue(deliverManager),
+	};
+	const usersRepository = {
+		findOneBy: vi.fn(async ({ id }: { id: string }) => ({ id, host: 'remote.example', inbox: `https://remote.example/users/${id}/inbox` })),
+		findOneByOrFail: vi.fn(),
 	};
 	const service = new NoteUpdateService(
 		{} as never,
-		{} as never,
+		usersRepository as never,
 		notesRepository as never,
 		{} as never,
 		pollsRepository as never,
@@ -142,7 +154,7 @@ function createService(lockedNote: MiNote = note) {
 		{} as never,
 		apRendererService as never,
 		apDeliverManagerService as never,
-		{ fetch: vi.fn().mockResolvedValue({ mediaSilencedHosts: [] }) } as never,
+		{ fetch: vi.fn().mockResolvedValue({ mediaSilencedHosts: [], prohibitedWords: [], sensitiveWords: [], ...meta }) } as never,
 		searchService as never,
 		{} as never,
 		{} as never,
@@ -151,7 +163,11 @@ function createService(lockedNote: MiNote = note) {
 		{
 			parse: vi.fn().mockReturnValue({ date: new Date('2025-01-01T00:00:00.000Z') }),
 		} as never,
-		{ isMediaSilencedHost: vi.fn().mockReturnValue(false) } as never,
+		{
+			isMediaSilencedHost: vi.fn().mockReturnValue(false),
+			isKeyWordIncluded: UtilityService.prototype.isKeyWordIncluded,
+			concatNoteContentsForKeyWordCheck: UtilityService.prototype.concatNoteContentsForKeyWordCheck,
+		} as never,
 	);
 	return {
 		service,
@@ -167,6 +183,8 @@ function createService(lockedNote: MiNote = note) {
 		relayService,
 		apRendererService,
 		apDeliverManagerService,
+		deliverManager,
+		usersRepository,
 	};
 }
 
@@ -642,5 +660,69 @@ describe(NoteUpdateService, () => {
 		]);
 		expect(globalEventService.publishNoteStream).toHaveBeenCalledTimes(2);
 		expect(searchService.indexNote).toHaveBeenCalledTimes(2);
+	});
+	test('rejects an edit that adds prohibited words before mutating the note', async () => {
+		const { service, notesRepository } = createService(note, { prohibitedWords: ['forbidden'] });
+
+		await expect(service.update(user, note, {
+			text: 'now forbidden text',
+			cw: null,
+			updatedAt: new Date('2025-02-01T00:00:00.000Z'),
+		})).rejects.toMatchObject({ id: NOTE_PROHIBITED_WORDS_ERROR_ID });
+
+		expect(notesRepository.manager.transaction).not.toHaveBeenCalled();
+	});
+
+	test('rejects a local edit that adds sensitive words to a public note', async () => {
+		const publicNote = { ...note, channelId: null } as MiNote;
+		const { service, notesRepository } = createService(publicNote, { sensitiveWords: ['spoiler'] });
+
+		await expect(service.update(user, publicNote, {
+			text: 'contains spoiler',
+			cw: null,
+			updatedAt: new Date('2025-02-01T00:00:00.000Z'),
+		})).rejects.toMatchObject({ id: NOTE_SENSITIVE_WORDS_ERROR_ID });
+
+		expect(notesRepository.manager.transaction).not.toHaveBeenCalled();
+	});
+
+	test('allows sensitive words in a non-public note edit', async () => {
+		const homeNote = { ...note, visibility: 'home', channelId: null } as MiNote;
+		const { service, notesRepository } = createService(homeNote, { sensitiveWords: ['spoiler'] });
+
+		await service.update(user, homeNote, {
+			text: 'contains spoiler',
+			cw: null,
+			updatedAt: new Date('2025-02-01T00:00:00.000Z'),
+		});
+
+		expect(notesRepository.update).toHaveBeenCalled();
+	});
+
+	test('delivers the update to remote reply and renote authors from denormalized columns', async () => {
+		const replyNote = {
+			...note,
+			localOnly: false,
+			replyId: 'reply-target',
+			replyUserId: 'reply-author',
+			replyUserHost: 'remote.example',
+			renoteUserId: 'renote-author',
+			renoteUserHost: 'remote.example',
+		} as MiNote;
+		const { service, userEntityService, deliverManager, usersRepository } = createService(replyNote);
+		userEntityService.isLocalUser.mockReturnValue(true);
+		Object.assign(userEntityService, { isRemoteUser: vi.fn().mockReturnValue(true) });
+
+		await service.update(user, replyNote, {
+			text: 'New text',
+			cw: null,
+			updatedAt: new Date('2025-02-01T00:00:00.000Z'),
+		});
+
+		await vi.waitFor(() => expect(deliverManager.execute).toHaveBeenCalled());
+		expect(usersRepository.findOneBy).toHaveBeenCalledWith({ id: 'reply-author' });
+		expect(usersRepository.findOneBy).toHaveBeenCalledWith({ id: 'renote-author' });
+		expect(deliverManager.addDirectRecipe).toHaveBeenCalledWith(expect.objectContaining({ id: 'reply-author' }));
+		expect(deliverManager.addDirectRecipe).toHaveBeenCalledWith(expect.objectContaining({ id: 'renote-author' }));
 	});
 });

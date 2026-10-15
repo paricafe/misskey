@@ -41,6 +41,9 @@ import { IdentifiableError } from '@/misc/identifiable-error.js';
 export const MAX_NOTE_HISTORY_REVISIONS = 100;
 export const MAX_NOTE_HISTORY_BYTES = 1024 * 1024;
 export const NOTE_HISTORY_LIMIT_ERROR_ID = '8a2c5b6f-8e2b-4f1d-a5d9-f2b96c5b0d34';
+// Shared with NoteCreateService so the inbox processor treats it as a rejected note.
+export const NOTE_PROHIBITED_WORDS_ERROR_ID = '689ee33f-f97c-479a-ac49-1b9f8140af99';
+export const NOTE_SENSITIVE_WORDS_ERROR_ID = '3f0e7c8a-5b2d-4c1e-9a6f-8d4b2e7c1a90';
 
 type Option = {
 	updatedAt?: Date | null;
@@ -129,6 +132,20 @@ export class NoteUpdateService {
 		}
 
 		const meta = await this.metaService.fetch();
+		if (this.utilityService.isKeyWordIncluded(
+			this.utilityService.concatNoteContentsForKeyWordCheck({ cw: data.cw, text: data.text }),
+			meta.prohibitedWords,
+		)) {
+			throw new IdentifiableError(NOTE_PROHIBITED_WORDS_ERROR_ID, 'Note contains prohibited words');
+		}
+		// An edit cannot downgrade visibility: the note may already be in public timelines.
+		if (
+			user.host == null && note.visibility === 'public' && note.channelId == null &&
+			this.utilityService.isKeyWordIncluded(data.cw ?? data.text ?? '', meta.sensitiveWords)
+		) {
+			throw new IdentifiableError(NOTE_SENSITIVE_WORDS_ERROR_ID, 'Public note contains sensitive words');
+		}
+
 		let tags = data.apHashtags;
 		let emojis = data.apEmojis;
 
@@ -363,10 +380,6 @@ export class NoteUpdateService {
 
 		const mentionedUsers = await this.extractMentionedUsers(user, combinedTokens);
 
-		if (note.reply && (user.id !== note.reply.userId) && !mentionedUsers.some(u => u.id === note.reply!.userId)) {
-			mentionedUsers.push(await this.usersRepository.findOneByOrFail({ id: note.reply.userId }));
-		}
-
 		if (note.visibility === 'specified') {
 			if (note.visibleUserIds == null) throw new Error('invalid param');
 
@@ -382,15 +395,16 @@ export class NoteUpdateService {
 			dm.addDirectRecipe(u as MiRemoteUser);
 		}
 
-		// 投稿がリプライかつ投稿者がローカルユーザーかつリプライ先の投稿の投稿者がリモートユーザーなら配送
-		if (note.reply && note.reply.userHost !== null) {
-			const u = await this.usersRepository.findOneBy({ id: note.reply.userId });
+		// The note is loaded without relations, so use the denormalized author columns.
+		// 投稿がリプライかつリプライ先の投稿の投稿者がリモートユーザーなら配送
+		if (note.replyUserId != null && note.replyUserHost != null) {
+			const u = await this.usersRepository.findOneBy({ id: note.replyUserId });
 			if (u && this.userEntityService.isRemoteUser(u)) dm.addDirectRecipe(u);
 		}
 
-		// 投稿がRenoteかつ投稿者がローカルユーザーかつRenote元の投稿の投稿者がリモートユーザーなら配送
-		if (note.renote && note.renote.userHost !== null) {
-			const u = await this.usersRepository.findOneBy({ id: note.renote.userId });
+		// 投稿がRenoteかつRenote元の投稿の投稿者がリモートユーザーなら配送
+		if (note.renoteUserId != null && note.renoteUserHost != null) {
+			const u = await this.usersRepository.findOneBy({ id: note.renoteUserId });
 			if (u && this.userEntityService.isRemoteUser(u)) dm.addDirectRecipe(u);
 		}
 
