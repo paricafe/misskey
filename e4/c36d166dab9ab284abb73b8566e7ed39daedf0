@@ -1,0 +1,23 @@
+packages/backend/src/models/User.ts
+  s_9954e39b618d28::t_225809addeb25a 11
+packages/backend/migration/1792054373419-AlignNoteEditAndDriveFileSchema.js
+  s_9954e39b618d28::t_b2cba4a0d18884 1-25
+packages/backend/src/models/UserProfile.ts
+  s_9954e39b618d28::t_225809addeb25a 16
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e4c36d166dab9ab284abb73b8566e7ed39daedf0",
+  "prompts": {},
+  "sessions": {
+    "s_9954e39b618d28": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f1c0ffe8-941f-4e8b-95d0-bd7f2756a8c1",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Natsuki-Kaede <i@pari.network>"
+    }
+  }
+}
