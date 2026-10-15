@@ -29,6 +29,8 @@ describe('Chart', () => {
 	let redisClient = {
 		set: () => Promise.resolve('OK'),
 		get: () => Promise.resolve(null),
+		// Distributed lock renewal and release scripts report the lock as owned.
+		eval: () => Promise.resolve(1),
 	} as unknown as Mocked<Redis.Redis>;
 
 	let testChart: TestChart;

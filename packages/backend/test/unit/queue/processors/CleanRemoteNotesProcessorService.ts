@@ -43,6 +43,7 @@ describe('CleanRemoteNotesProcessorService', () => {
 	let bob: MiUser;
 	// Remote user 2
 	let carol: MiUser;
+	let dave: MiUser;
 
 	const meta = new MiMeta();
 
@@ -125,8 +126,10 @@ describe('CleanRemoteNotesProcessorService', () => {
 		redisClient = app.get(DI.redis);
 
 		alice = await createUser({ username: 'alice', host: null });
-		bob = await createUser({ username: 'bob', host: 'remote1.example.com' });
-		carol = await createUser({ username: 'carol', host: 'remote2.example.com' });
+		// This instance only cleans remote notes from bot accounts.
+		bob = await createUser({ username: 'bob', host: 'remote1.example.com', isBot: true });
+		carol = await createUser({ username: 'carol', host: 'remote2.example.com', isBot: true });
+		dave = await createUser({ username: 'dave', host: 'remote3.example.com', isBot: false });
 
 		app.enableShutdownHooks();
 	});
@@ -159,6 +162,18 @@ describe('CleanRemoteNotesProcessorService', () => {
 	});
 
 	describe('basic', () => {
+		test('keeps old remote notes from accounts that are not bots', async () => {
+			const job = createMockJob();
+			const humanNote = await createNote({}, dave, Date.now() - ms(`${meta.remoteNotesCleaningExpiryDaysForEachNotes} days`) - 1000);
+			const botNote = await createNote({}, bob, Date.now() - ms(`${meta.remoteNotesCleaningExpiryDaysForEachNotes} days`) - 1000);
+
+			const result = await service.process(job as any);
+
+			expect(result.deletedCount).toBe(1);
+			expect(await notesRepository.findOneBy({ id: humanNote.id })).not.toBeNull();
+			expect(await notesRepository.findOneBy({ id: botNote.id })).toBeNull();
+		});
+
 		test('should skip cleaning when enableRemoteNotesCleaning is false', async () => {
 			meta.enableRemoteNotesCleaning = false;
 			const job = createMockJob();
@@ -1172,8 +1187,9 @@ describe('CleanRemoteNotesProcessorService', () => {
 	// region maxDuration cutoff (CleanRemoteNotesProcessorService.ts:200-204)
 	describe('advanced - maxDuration', () => {
 		test('should stop processing when maxDuration is reached', async () => {
-			// 6ms 程度。初回バッチ後にループ先頭の経過時間チェックで必ず超過する
-			meta.remoteNotesCleaningMaxProcessingDurationInMinutes = 0.0001;
+			// 0.6ms 程度。1 バッチは 1ms 以上かかるため、初回バッチ後のループ先頭の経過時間チェックで必ず超過する
+			// (6ms では高速な DB だと 2 バッチで全件処理し終えてしまうことがある)
+			meta.remoteNotesCleaningMaxProcessingDurationInMinutes = 0.00001;
 
 			const AMOUNT = 250;
 			const oldTime = Date.now() - ms(`${meta.remoteNotesCleaningExpiryDaysForEachNotes} days`) - 1000;
