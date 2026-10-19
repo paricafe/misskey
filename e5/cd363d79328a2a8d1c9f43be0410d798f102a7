@@ -1,0 +1,21 @@
+packages/frontend/src/components/MkSignupDialog.form.vue
+  s_b71694d9534cc2::t_0ffcbea47af767 291-292,296,298-299,303,305
+packages/frontend/src/components/MkSignin.vue
+  s_b71694d9534cc2::t_0ffcbea47af767 309
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e5cd363d79328a2a8d1c9f43be0410d798f102a7",
+  "prompts": {},
+  "sessions": {
+    "s_b71694d9534cc2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4acf6604-12b4-4abb-bc88-84d51cdf4e75",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Natsuki-Kaede <i@pari.network>"
+    }
+  }
+}
