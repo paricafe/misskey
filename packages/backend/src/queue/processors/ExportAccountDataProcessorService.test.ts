@@ -7,7 +7,7 @@ import * as fs from 'node:fs';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { ExportAccountDataProcessorService } from './ExportAccountDataProcessorService.js';
 
-function setup(addFile: () => Promise<unknown>) {
+function setup(addFile: () => Promise<unknown>, profile: Record<string, unknown> = { email: 'alice@example.com', emailVerified: true }) {
 	const user = { id: 'user', username: 'alice', host: null, token: 'native-token' };
 	const emptyRepository = {
 		find: vi.fn().mockResolvedValue([]),
@@ -19,7 +19,7 @@ function setup(addFile: () => Promise<unknown>) {
 	const service = new ExportAccountDataProcessorService(
 		{ host: 'local.example' } as never,
 		{ findOneBy: vi.fn().mockResolvedValue(user) } as never,
-		{ findOneBy: vi.fn().mockResolvedValue({ userId: user.id, email: 'alice@example.com' }) } as never,
+		{ findOneBy: vi.fn().mockResolvedValue({ userId: user.id, ...profile }) } as never,
 		emptyRepository as never,
 		emptyRepository as never,
 		emptyRepository as never,
@@ -72,7 +72,21 @@ describe('ExportAccountDataProcessorService archive delivery', () => {
 		await service.process({ data: { user: { id: 'user' } } } as never);
 
 		expect(driveService.addFile).toHaveBeenCalledOnce();
+		// Role upload policies must not reject the generated zip archive.
+		expect(driveService.addFile).toHaveBeenCalledWith(expect.objectContaining({ skipPolicyCheck: true }));
 		expect(emailService.sendEmail).toHaveBeenCalledOnce();
 		await vi.waitFor(() => expect(fs.existsSync(tempDir()!)).toBe(false));
+	});
+
+	test('does not email the archive link to an unverified address', async () => {
+		const { service, driveService, emailService } = setup(
+			() => Promise.resolve({ id: 'file', url: 'https://files.example/archive.zip' }),
+			{ email: 'typo@example.com', emailVerified: false },
+		);
+
+		await service.process({ data: { user: { id: 'user' } } } as never);
+
+		expect(driveService.addFile).toHaveBeenCalledOnce();
+		expect(emailService.sendEmail).not.toHaveBeenCalled();
 	});
 });

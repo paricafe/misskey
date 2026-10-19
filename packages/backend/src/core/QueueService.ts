@@ -307,7 +307,10 @@ export class QueueService implements OnModuleInit {
 			user: { id: user.id },
 		}, {
 			removeOnComplete: true,
-			removeOnFail: true,
+			removeOnFail: {
+				age: 3600 * 24 * 7, // keep up to 7 days
+				count: 100,
+			},
 		});
 	}
 

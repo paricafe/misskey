@@ -156,7 +156,7 @@ export class ExportAccountDataProcessorService {
 		};
 
 		// eslint-disable-next-line @typescript-eslint/no-unused-vars
-		const { emailVerifyCode, twoFactorBackupSecret, twoFactorSecret, password, twoFactorTempSecret, userHost, ...profileTrimmed } = profile;
+		const { emailVerifyCode, twoFactorBackupSecret, twoFactorSecret, password, twoFactorTempSecret, userHost, moderationNote, ...profileTrimmed } = profile;
 
 		await writeProfile(`{"metaVersion":1,"host":"${this.config.host}","exportedAt":"${new Date().toString()}","profile":[`);
 
@@ -760,10 +760,11 @@ export class ExportAccountDataProcessorService {
 
 			// Upload outside the stream callback so failures reject the job instead of hanging it.
 			const fileName = 'data-request-' + dateFormat(new Date(), 'yyyy-MM-dd-HH-mm-ss') + '.zip';
-			const driveFile = await this.driveService.addFile({ user, path: archivePath, name: fileName, force: true });
+			// The archive bundles every drive file and is a zip, so role upload policies would reject it for most users.
+			const driveFile = await this.driveService.addFile({ user, path: archivePath, name: fileName, force: true, skipPolicyCheck: true });
 
 			this.logger.succ(`Exported to: ${driveFile.id}`);
-			if (profile.email) {
+			if (profile.email && profile.emailVerified) {
 				this.emailService.sendEmail(profile.email,
 					'Your data archive is ready',
 					`Click the following link to download the archive: ${driveFile.url}<br/>It is also available in your drive.`,
