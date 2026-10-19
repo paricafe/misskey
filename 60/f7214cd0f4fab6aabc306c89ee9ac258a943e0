@@ -1,0 +1,19 @@
+packages/frontend/src/ui/_common_/common.vue
+  s_b71694d9534cc2::t_9a151b188a1949 180,289
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "60f7214cd0f4fab6aabc306c89ee9ac258a943e0",
+  "prompts": {},
+  "sessions": {
+    "s_b71694d9534cc2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4acf6604-12b4-4abb-bc88-84d51cdf4e75",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Natsuki-Kaede <i@pari.network>"
+    }
+  }
+}
