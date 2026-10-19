@@ -306,7 +306,7 @@ function onSigninApiError(err?: any): void {
 			showSuspendedDialog();
 			break;
 		}
-		case '2fe70810-0ed2-47db-a70b-dc3ecbf5f069': {
+		case '5d1c0b3e-8f2a-4c6d-9e7b-3a4f1b2c8d90': {
 			os.alert({
 				type: 'error',
 				title: i18n.ts.loginFailed,

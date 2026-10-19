@@ -288,20 +288,21 @@ async function onSubmit(): Promise<void> {
 	});
 
 	if (res && res.ok) {
-		if (res.status === 204 || instance.emailRequiredForSignup) {
-			os.alert({
-				type: 'success',
-				title: i18n.ts._signup.almostThere,
-				text: i18n.tsx._signup.emailSent({ email: email.value }),
-			});
-			emit('signupEmailPending');
-		} else if (instance.approvalRequiredForSignup) {
+		// The server answers 204 for both flows; email verification takes precedence over approval.
+		if (instance.approvalRequiredForSignup && !instance.emailRequiredForSignup) {
 			os.alert({
 				type: 'success',
 				title: i18n.ts._signup.almostThere,
 				text: i18n.ts._signup.approvalPending,
 			});
 			emit('approvalPending');
+		} else if (res.status === 204 || instance.emailRequiredForSignup) {
+			os.alert({
+				type: 'success',
+				title: i18n.ts._signup.almostThere,
+				text: i18n.tsx._signup.emailSent({ email: email.value }),
+			});
+			emit('signupEmailPending');
 		} else {
 			const resJson = (await res.json()) as Misskey.entities.SignupResponse;
 			if (_DEV_) console.log(resJson);
