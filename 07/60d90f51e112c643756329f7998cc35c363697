@@ -1,0 +1,26 @@
+packages/frontend/src/composables/use-note.ts
+  s_b71694d9534cc2::t_001d1dec9d1dec 31-32,172,461-479,508,520
+packages/frontend/src/components/MkSubNoteContent.vue
+  s_b71694d9534cc2::t_f278396651be09 8,56-58
+packages/frontend/src/components/MkNote.vue
+  s_b71694d9534cc2::t_f278396651be09 57,350-352
+  s_b71694d9534cc2::t_40e75baed69966 86,291,302
+packages/frontend/src/components/MkNoteDetailed.vue
+  s_b71694d9534cc2::t_40e75baed69966 107,315,331
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "0760d90f51e112c643756329f7998cc35c363697",
+  "prompts": {},
+  "sessions": {
+    "s_b71694d9534cc2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4acf6604-12b4-4abb-bc88-84d51cdf4e75",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Natsuki-Kaede <i@pari.network>"
+    }
+  }
+}
