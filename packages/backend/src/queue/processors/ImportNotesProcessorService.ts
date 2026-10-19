@@ -7,8 +7,8 @@
 import * as fs from 'node:fs';
 import * as fsp from 'node:fs/promises';
 import * as crypto from 'node:crypto';
+import { dirname, join } from 'node:path';
 import { Inject, Injectable } from '@nestjs/common';
-import { ZipReader } from 'slacc';
 import { DI } from '@/di-symbols.js';
 import type { UsersRepository, DriveFilesRepository, MiDriveFile, MiNote, NotesRepository, MiUser, DriveFoldersRepository, MiDriveFolder } from '@/models/_.js';
 import type Logger from '@/logger.js';
@@ -22,10 +22,25 @@ import { MfmService } from '@/core/MfmService.js';
 import { ApNoteService } from '@/core/activitypub/models/ApNoteService.js';
 import { extractApHashtagObjects } from '@/core/activitypub/models/tag.js';
 import { IdService } from '@/core/IdService.js';
+import { ZipExtractError, ZipFile } from '@/misc/zip.js';
 import type { Config } from '@/config.js';
 import { QueueLoggerService } from '../QueueLoggerService.js';
 import type * as Bull from 'bullmq';
 import type { DbNoteImportToDbJobData, DbNoteImportJobData, DbNoteWithParentImportToDbJobData } from '../types.js';
+
+// Archives come from any user who may import notes, so bound what one import can unpack and enqueue.
+const MAX_ZIP_ENTRIES = 100_000;
+const MAX_ZIP_ENTRY_SIZE = 256 * 1024 * 1024; // 256MB
+const MAX_ZIP_TOTAL_SIZE = 2 * 1024 * 1024 * 1024; // 2GB
+const MAX_IMPORT_NOTES = 50_000;
+// Each reply job carries its whole subtree, so payload size grows with the square of the depth.
+const MAX_IMPORT_REPLY_DEPTH = 200;
+
+const FACEBOOK_POSTS_PATH = 'your_activity_across_facebook/posts/your_posts__check_ins__photos_and_videos_1.json';
+const FACEBOOK_MEDIA_DIR = 'your_activity_across_facebook/posts/media/';
+const INSTAGRAM_POSTS_PATH = 'content/posts_1.json';
+const INSTAGRAM_MEDIA_DIR = 'media/posts/';
+const MASTODON_MEDIA_DIR = 'media_attachments/files/';
 
 @Injectable()
 export class ImportNotesProcessorService {
@@ -69,7 +84,7 @@ export class ImportNotesProcessorService {
 			} else {
 				const exists = await this.driveFilesRepository.findOneBy({ name: file, userId: user.id, folderId: folder });
 
-				if (file.endsWith('.srt')) return;
+				if (file.endsWith('.srt')) continue;
 
 				if (!exists) {
 					await this.driveService.addFile({
@@ -137,6 +152,56 @@ export class ImportNotesProcessorService {
 		return notesTree;
 	}
 
+	/**
+	 * Extracts the entries accepted by `include` within the archive limits and returns every entry name.
+	 */
+	@bindThis
+	private async extractZip(zipPath: string, outputPath: string, include: (name: string) => boolean): Promise<string[]> {
+		const names: string[] = [];
+		let totalSize = 0;
+		const zip = await ZipFile.open(zipPath);
+		try {
+			for await (const entry of zip.entries()) {
+				names.push(entry.filename);
+				if (names.length > MAX_ZIP_ENTRIES) {
+					throw new ZipExtractError(`too many entries (> ${MAX_ZIP_ENTRIES})`);
+				}
+				if (!include(entry.filename)) continue;
+
+				// ZipFile rejects absolute paths and `..`, so the entry name stays inside outputPath.
+				const destPath = join(outputPath, entry.filename);
+				await fsp.mkdir(dirname(destPath), { recursive: true });
+				await zip.extractToFile(entry, destPath, { maxBytes: Math.min(MAX_ZIP_ENTRY_SIZE, MAX_ZIP_TOTAL_SIZE - totalSize) });
+				// Count the bytes actually written, since the size in the header can be forged.
+				totalSize += (await fsp.stat(destPath)).size;
+			}
+		} finally {
+			await zip.close();
+		}
+		return names;
+	}
+
+	/**
+	 * Rejects imports whose note count or reply depth would make the queued jobs unreasonably large.
+	 */
+	@bindThis
+	private assertImportSize(roots: any[]): void {
+		let count = 0;
+		const stack: [any, number][] = roots.map(note => [note, 1]);
+		while (stack.length > 0) {
+			const [note, depth] = stack.pop()!;
+			if (++count > MAX_IMPORT_NOTES) {
+				throw new Error(`too many notes to import (> ${MAX_IMPORT_NOTES})`);
+			}
+			if (depth > MAX_IMPORT_REPLY_DEPTH) {
+				throw new Error(`reply chain is too deep to import (> ${MAX_IMPORT_REPLY_DEPTH})`);
+			}
+			for (const child of note.childNotes ?? []) {
+				stack.push([child, depth + 1]);
+			}
+		}
+	}
+
 	@bindThis
 	private isIterable(obj: any) {
 		if (obj == null) {
@@ -202,12 +267,13 @@ export class ImportNotesProcessorService {
 			const outputPath = path + '/twitter';
 			try {
 				this.logger.succ(`Unzipping to ${outputPath}`);
-				ZipReader.withDestinationPath(outputPath).viaBuffer(await fsp.readFile(destPath));
+				await this.extractZip(destPath, outputPath, name => name === 'data/tweets.js');
 
 				const unprocessedTweets = this.parseTwitterFile(await fsp.readFile(outputPath + '/data/tweets.js', 'utf-8'));
 
 				const tweets = unprocessedTweets.map(e => e.tweet);
 				const processedTweets = await this.recreateChain(['id_str'], ['in_reply_to_status_id_str'], tweets, false);
+				this.assertImportSize(processedTweets);
 				this.queueService.createImportTweetsToDbJob(job.data.user, processedTweets, null);
 			} finally {
 				cleanup();
@@ -232,9 +298,10 @@ export class ImportNotesProcessorService {
 			const outputPath = path + '/facebook';
 			try {
 				this.logger.succ(`Unzipping to ${outputPath}`);
-				ZipReader.withDestinationPath(outputPath).viaBuffer(await fsp.readFile(destPath));
-				const postsJson = await fsp.readFile(outputPath + '/your_activity_across_facebook/posts/your_posts__check_ins__photos_and_videos_1.json', 'utf-8');
+				await this.extractZip(destPath, outputPath, name => name === FACEBOOK_POSTS_PATH || name.startsWith(FACEBOOK_MEDIA_DIR));
+				const postsJson = await fsp.readFile(`${outputPath}/${FACEBOOK_POSTS_PATH}`, 'utf-8');
 				const posts = JSON.parse(postsJson);
+				this.assertImportSize(posts);
 				const facebookFolder = await this.driveFoldersRepository.findOneBy({ name: 'Facebook', userId: job.data.user.id, parentId: folder?.id });
 				if (facebookFolder == null && folder) {
 					await this.driveFoldersRepository.insert({ id: this.idService.gen(), name: 'Facebook', userId: job.data.user.id, parentId: folder.id });
@@ -265,12 +332,16 @@ export class ImportNotesProcessorService {
 			const outputPath = path + '/unknown';
 			try {
 				this.logger.succ(`Unzipping to ${outputPath}`);
-				ZipReader.withDestinationPath(outputPath).viaBuffer(await fsp.readFile(destPath));
-				const isInstagram = type === 'Instagram' || fs.existsSync(outputPath + '/instagram_live') || fs.existsSync(outputPath + '/instagram_ads_and_businesses');
-				const isOutbox = type === 'Mastodon' || fs.existsSync(outputPath + '/outbox.json');
+				// The format is only known after listing the entries, so extract what any supported format needs.
+				const entryNames = await this.extractZip(destPath, outputPath, name =>
+					name === INSTAGRAM_POSTS_PATH || name.startsWith(INSTAGRAM_MEDIA_DIR) ||
+					name === 'actor.json' || name === 'outbox.json' || name.startsWith(MASTODON_MEDIA_DIR));
+				const isInstagram = type === 'Instagram' || entryNames.some(name => name.startsWith('instagram_live/') || name.startsWith('instagram_ads_and_businesses/'));
+				const isOutbox = type === 'Mastodon' || entryNames.includes('outbox.json');
 				if (isInstagram) {
-					const postsJson = await fsp.readFile(outputPath + '/content/posts_1.json', 'utf-8');
+					const postsJson = await fsp.readFile(`${outputPath}/${INSTAGRAM_POSTS_PATH}`, 'utf-8');
 					const posts = JSON.parse(postsJson);
+					this.assertImportSize(posts);
 					const igFolder = await this.driveFoldersRepository.findOneBy({ name: 'Instagram', userId: job.data.user.id, parentId: folder?.id });
 					if (igFolder == null && folder) {
 						await this.driveFoldersRepository.insert({ id: this.idService.gen(), name: 'Instagram', userId: job.data.user.id, parentId: folder.id });
@@ -286,6 +357,7 @@ export class ImportNotesProcessorService {
 						const outboxJson = await fsp.readFile(outputPath + '/outbox.json', 'utf-8');
 						const outbox = JSON.parse(outboxJson);
 						const processedToots = await this.recreateChain(['object', 'id'], ['object', 'inReplyTo'], outbox.orderedItems.filter((x: any) => x.type === 'Create' && x.object.type === 'Note'), true);
+						this.assertImportSize(processedToots);
 						this.queueService.createImportPleroToDbJob(job.data.user, processedToots, null);
 					} else {
 						const outboxJson = await fsp.readFile(outputPath + '/outbox.json', 'utf-8');
@@ -299,6 +371,7 @@ export class ImportNotesProcessorService {
 							await this.uploadFiles(outputPath + '/media_attachments/files', user, mastoFolder.id);
 						}
 						const processedToots = await this.recreateChain(['object', 'id'], ['object', 'inReplyTo'], outbox.orderedItems.filter((x: any) => x.type === 'Create' && x.object.type === 'Note'), true);
+						this.assertImportSize(processedToots);
 						this.queueService.createImportMastoToDbJob(job.data.user, processedToots, null);
 					}
 				}
@@ -323,6 +396,7 @@ export class ImportNotesProcessorService {
 			const notesJson = await fsp.readFile(path, 'utf-8');
 			const notes = JSON.parse(notesJson);
 			const processedNotes = await this.recreateChain(['id'], ['replyId'], notes, false);
+			this.assertImportSize(processedNotes);
 			this.queueService.createImportKeyNotesToDbJob(job.data.user, processedNotes, null);
 			cleanup();
 		}
