@@ -1,0 +1,21 @@
+packages/backend/src/queue/processors/ImportNotesProcessorService.test.ts
+  s_3256a5576a456f::t_f8131a32ea4628 1-71
+packages/backend/src/queue/processors/ImportNotesProcessorService.ts
+  s_3256a5576a456f::t_6e9446a85bbca6 10,25,31-44,87,155-204,270,276,301-302,304,335-340,342,344,360,374,399
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "05c0492e4c231e3fc240a2fd2548f2c1f10399ef",
+  "prompts": {},
+  "sessions": {
+    "s_3256a5576a456f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "da155c59-f2ef-44d8-a0c6-badc5d05392b",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Natsuki-Kaede <i@pari.network>"
+    }
+  }
+}
