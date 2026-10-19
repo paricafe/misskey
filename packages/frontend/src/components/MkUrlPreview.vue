@@ -86,8 +86,8 @@ SPDX-License-Identifier: AGPL-3.0-only
 				<i class="ti ti-picture-in-picture"></i> {{ i18n.ts.openInWindow }}
 			</MkButton>
 		</div>
-		<div v-else-if="!apExpanded && apNote" :class="$style.action">
-			<MkButton :small="true" inline @click.stop="apExpanded = true">
+		<div v-else-if="!apExpanded && canExpandApNote" :class="$style.action">
+			<MkButton :small="true" inline :wait="apFetching" @click.stop="expandApNote()">
 				<i class="ti ti-world-x"></i> {{ i18n.ts.expandTweet }}
 			</MkButton>
 		</div>
@@ -111,6 +111,7 @@ import MkButton from '@/components/MkButton.vue';
 import { transformPlayerUrl } from '@/utility/url-preview.js';
 import { store } from '@/store.js';
 import { prefer } from '@/preferences.js';
+import { $i } from '@/i.js';
 
 const props = withDefaults(defineProps<{
 	url: string;
@@ -147,6 +148,7 @@ const tweetHeight = ref(150);
 const unknownUrl = ref(false);
 const apExpanded = ref(false);
 const apNote = ref<Misskey.entities.Note | null>(null);
+const apFetching = ref(false);
 
 onDeactivated(() => {
 	playerEnabled.value = false;
@@ -188,17 +190,37 @@ window.fetch(`/url?url=${encodeURIComponent(requestUrl.href)}&lang=${versatileLa
 		unknownUrl.value = false;
 
 		summalyResult.value = info;
-
-		if (info.activityPub) {
-			misskeyApi('ap/show', {
-				uri: info.activityPub,
-			}).then(res => {
-				if (res.type === 'Note') {
-					apNote.value = res.object;
-				}
-			});
-		}
 	});
+
+// Resolve the linked note only on demand, and only when it lives on the previewed host.
+const canExpandApNote = computed(() => {
+	const apUrl = summalyResult.value?.activityPub;
+	if ($i == null || apUrl == null) return false;
+	try {
+		return new URL(apUrl).host === requestUrl.host;
+	} catch {
+		return false;
+	}
+});
+
+async function expandApNote() {
+	const apUrl = summalyResult.value?.activityPub;
+	if (apNote.value == null) {
+		if (apFetching.value || apUrl == null) return;
+		apFetching.value = true;
+		const res = await misskeyApi('ap/show', { uri: apUrl }).catch(() => null);
+		apFetching.value = false;
+		if (res?.type !== 'Note') {
+			os.alert({
+				type: 'error',
+				text: i18n.ts.somethingHappened,
+			});
+			return;
+		}
+		apNote.value = res.object;
+	}
+	apExpanded.value = true;
+}
 
 function adjustTweetHeight(message: MessageEvent) {
 	if (message.origin !== 'https://platform.twitter.com') return;
