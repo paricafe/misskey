@@ -1,0 +1,20 @@
+packages/frontend/src/components/MkPostForm.vue
+  s_b71694d9534cc2::t_9f7049b65ae193 74-77,313-318,330-336,975-976,1001-1002,1131-1132,1555,1864-1868,1877-1891
+  s_b71694d9534cc2::t_d28923252644e3 1892-1893
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "ccbddea6d52999482329c46de694e7096c0a4290",
+  "prompts": {},
+  "sessions": {
+    "s_b71694d9534cc2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4acf6604-12b4-4abb-bc88-84d51cdf4e75",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Natsuki-Kaede <i@pari.network>"
+    }
+  }
+}
