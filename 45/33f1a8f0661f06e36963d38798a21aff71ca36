@@ -1,0 +1,28 @@
+packages/backend/src/queue/processors/ExportAccountDataProcessorService.ts
+  s_3256a5576a456f::t_5e916877f53635 159
+  s_3256a5576a456f::t_c962568e4533ff 763-764,767
+packages/backend/src/core/QueueService.ts
+  s_3256a5576a456f::t_c99496f3cb6f4b 310-313
+packages/backend/src/core/DriveService.ts
+  s_3256a5576a456f::t_bbd4cce535d7cd 71-72
+  s_3256a5576a456f::t_d732912fadacdd 462
+  s_3256a5576a456f::t_ca0b7e3e58696c 524
+packages/backend/src/queue/processors/ExportAccountDataProcessorService.test.ts
+  s_3256a5576a456f::t_47cb4972b43852 10,22,75-76,80-91
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "4533f1a8f0661f06e36963d38798a21aff71ca36",
+  "prompts": {},
+  "sessions": {
+    "s_3256a5576a456f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "da155c59-f2ef-44d8-a0c6-badc5d05392b",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Natsuki-Kaede <i@pari.network>"
+    }
+  }
+}
