@@ -4,7 +4,7 @@
  */
 
 import { Inject, Injectable } from '@nestjs/common';
-import { MoreThan } from 'typeorm';
+import { In, MoreThan } from 'typeorm';
 import { DI } from '@/di-symbols.js';
 import type { DriveFilesRepository, NoteReactionsRepository, PagesRepository, NotesRepository, UserProfilesRepository, UsersRepository } from '@/models/_.js';
 import type Logger from '@/logger.js';
@@ -115,10 +115,16 @@ export class DeleteAccountProcessorService {
 
 				cursor = reactions.at(-1)?.id ?? null;
 
-				for (const reaction of reactions) {
-					const note = await this.notesRepository.findOneBy({ id: reaction.noteId }) as MiNote;
+				const notes = await this.notesRepository.findBy({ id: In(reactions.map(reaction => reaction.noteId)) });
+				const noteById = new Map(notes.map(note => [note.id, note]));
 
-					await this.reactionService.delete(user, note);
+				for (const reaction of reactions) {
+					// The note may have been deleted meanwhile, which also removes its reactions.
+					const note = noteById.get(reaction.noteId);
+					if (note == null) continue;
+
+					// The account Delete has already been federated, so per-reaction Undo deliveries would only fail.
+					await this.reactionService.removeReaction(reaction, note);
 				}
 			}
 

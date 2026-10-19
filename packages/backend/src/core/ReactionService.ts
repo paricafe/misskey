@@ -320,31 +320,9 @@ export class ReactionService {
 			throw new IdentifiableError('60527ec9-b4cb-4a88-a6bd-32d3ad26817d', 'not reacted');
 		}
 
-		// Delete reaction
-		const result = await this.noteReactionsRepository.delete(exist.id);
-
-		if (result.affected !== 1) {
+		if (!await this.removeReaction(exist, note)) {
 			throw new IdentifiableError('60527ec9-b4cb-4a88-a6bd-32d3ad26817d', 'not reacted');
 		}
-
-		// Decrement reactions count
-		if (this.meta.enableReactionsBuffering) {
-			await this.reactionsBufferingService.delete(note.id, user.id, exist.reaction);
-		} else {
-			await this.notesRepository.createQueryBuilder().update()
-				.set({
-					reactions: () => `jsonb_set("reactions", ARRAY[:reaction], (COALESCE("reactions"->>:reaction, '0')::int - 1)::text::jsonb)`,
-					reactionAndUserPairCache: () => `array_remove("reactionAndUserPairCache", :pair)`,
-				})
-				.where('id = :id', { id: note.id })
-				.setParameters({ reaction: exist.reaction, pair: `${user.id}/${exist.reaction}` })
-				.execute();
-		}
-
-		this.globalEventService.publishNoteStream(note, 'unreacted', {
-			reaction: this.decodeReaction(exist.reaction).reaction,
-			userId: user.id,
-		});
 
 		//#region 配信
 		if (this.userEntityService.isLocalUser(user) && !note.localOnly) {
@@ -358,6 +336,41 @@ export class ReactionService {
 			trackPromise(dm.execute());
 		}
 		//#endregion
+	}
+
+	/**
+	 * Deletes the reaction row and decrements the note's counters without federating an Undo.
+	 * Account deletion uses this directly because the account's Delete has already been federated.
+	 * @returns false when the reaction was already removed concurrently
+	 */
+	@bindThis
+	public async removeReaction(reaction: MiNoteReaction, note: MiNote): Promise<boolean> {
+		const result = await this.noteReactionsRepository.delete(reaction.id);
+
+		if (result.affected !== 1) {
+			return false;
+		}
+
+		// Decrement reactions count
+		if (this.meta.enableReactionsBuffering) {
+			await this.reactionsBufferingService.delete(note.id, reaction.userId, reaction.reaction);
+		} else {
+			await this.notesRepository.createQueryBuilder().update()
+				.set({
+					reactions: () => `jsonb_set("reactions", ARRAY[:reaction], (COALESCE("reactions"->>:reaction, '0')::int - 1)::text::jsonb)`,
+					reactionAndUserPairCache: () => `array_remove("reactionAndUserPairCache", :pair)`,
+				})
+				.where('id = :id', { id: note.id })
+				.setParameters({ reaction: reaction.reaction, pair: `${reaction.userId}/${reaction.reaction}` })
+				.execute();
+		}
+
+		this.globalEventService.publishNoteStream(note, 'unreacted', {
+			reaction: this.decodeReaction(reaction.reaction).reaction,
+			userId: reaction.userId,
+		});
+
+		return true;
 	}
 
 	/**

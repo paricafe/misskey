@@ -117,6 +117,17 @@ describe('ReactionService conditional writes', () => {
 		expect(events.publishNoteStream).not.toHaveBeenCalled();
 	});
 
+	test('account-deletion removal decrements counters without federating an Undo', async () => {
+		const { service, repository, buffering, events, renderer, manager } = createService('❤');
+		const record = { id: 'original-reaction', noteId: 'note', userId: 'actor', reaction: '❤' } as never;
+		await expect(service.removeReaction(record, note)).resolves.toBe(true);
+		expect(repository.delete).toHaveBeenCalledWith('original-reaction');
+		expect(buffering.delete).toHaveBeenCalledWith('note', 'actor', '❤');
+		expect(events.publishNoteStream).toHaveBeenCalledOnce();
+		expect(renderer.renderUndo).not.toHaveBeenCalled();
+		expect(manager.execute).not.toHaveBeenCalled();
+	});
+
 	test('native removal still deletes any reaction when no expected value is provided', async () => {
 		const { service, repository, buffering } = createService();
 		await service.delete(actor, note);
