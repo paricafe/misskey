@@ -177,7 +177,7 @@ if ($i) {
 }
 
 function getPointerEvents() {
-	return prefer.s.notificationClickable ? undefined : 'none';
+	return prefer.s.notificationClickable ? 'auto' : 'none';
 }
 </script>
 
@@ -286,6 +286,7 @@ function getPointerEvents() {
 	position: fixed;
 	z-index: 3900000;
 	padding: 0 var(--MI-margin);
+	pointer-events: none;
 	display: flex;
 
 	&.notificationsPosition_rightTop,
