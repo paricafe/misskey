@@ -71,7 +71,10 @@ SPDX-License-Identifier: AGPL-3.0-only
 		</I18n> - <button class="_textButton" @click="cancelSchedule()">{{ i18n.ts.cancel }}</button>
 	</MkInfo>
 	<MkInfo v-if="hasNotSpecifiedMentions" warn :class="$style.hasNotSpecifiedMentions">{{ i18n.ts.notSpecifiedMentionWarning }} - <button class="_textButton" @click="addMissingMention()">{{ i18n.ts.add }}</button></MkInfo>
-	<textarea v-show="useCw" ref="cwInputEl" v-model="cw" :class="$style.cw" :placeholder="i18n.ts.annotation" @keydown="onKeydown"></textarea>
+	<div v-show="useCw" :class="$style.cwOuter">
+		<textarea ref="cwInputEl" v-model="cw" :class="$style.cw" :placeholder="i18n.ts.annotation" @keydown="onKeydown"></textarea>
+		<div v-if="maxCwTextLength - cwTextLength < 20" :class="['_acrylic', $style.cwTextCount, { [$style.cwTextOver]: cwTextLength > maxCwTextLength }]">{{ maxCwTextLength - cwTextLength }}</div>
+	</div>
 	<div :class="[$style.textOuter, { [$style.withCw]: useCw }]">
 		<div v-if="targetChannel" :class="$style.colorBar" :style="{ background: targetChannel.color }"></div>
 		<textarea ref="textareaEl" v-model="text" :class="[$style.text]" :disabled="posting || posted" :readonly="textAreaReadOnly" :placeholder="placeholder" data-testid="post-form-text" @keydown="onKeydown" @keyup="onKeyup" @paste="onPaste" @compositionupdate="onCompositionUpdate" @compositionend="onCompositionEnd"></textarea>
@@ -307,6 +310,12 @@ const maxTextLength = computed((): number => {
 	return instance ? instance.maxNoteTextLength : 1000;
 });
 
+const cwTextLength = computed((): number => {
+	return cw.value?.length ?? 0;
+});
+
+const maxCwTextLength = 100;
+
 const canPost = computed((): boolean => {
 	return !props.mock && !posting.value && !posted.value && !uploader.uploading.value && (uploader.items.value.length === 0 || uploader.readyForUpload.value) &&
 		(
@@ -318,6 +327,13 @@ const canPost = computed((): boolean => {
 			quoteId.value != null
 		) &&
 		(textLength.value <= maxTextLength.value) &&
+		(
+			useCw.value ?
+				(
+					cw.value != null && cw.value.trim() !== '' &&
+					cwTextLength.value <= maxCwTextLength
+				) : true
+		) &&
 		(files.value.length <= 16) &&
 		(!poll.value || poll.value.choices.length >= 2);
 });
@@ -956,7 +972,8 @@ type StoredDrafts = {
 };
 
 function saveDraft() {
-	if (props.instant || props.mock) return;
+	// Editing a note must not touch the draft of the regular post form, which shares the draft key.
+	if (props.instant || props.mock || props.updateMode) return;
 
 	const draftsData = JSON.parse(miLocalStorage.getItem('drafts') ?? '{}') as StoredDrafts;
 
@@ -981,6 +998,8 @@ function saveDraft() {
 }
 
 function deleteDraft() {
+	if (props.updateMode) return;
+
 	const draftsData = JSON.parse(miLocalStorage.getItem('drafts') ?? '{}') as StoredDrafts;
 
 	delete draftsData[draftKey.value];
@@ -1109,7 +1128,8 @@ async function post(ev?: PointerEvent) {
 		noteId: props.updateMode ? props.initialNote?.id : undefined,
 	};
 
-	if (withHashtags.value && hashtags.value && hashtags.value.trim() !== '') {
+	// The edited text already contains the hashtags that were appended when it was first posted.
+	if (!props.updateMode && withHashtags.value && hashtags.value && hashtags.value.trim() !== '') {
 		const hashtags_ = hashtags.value.trim().split(' ').map(x => x.startsWith('#') ? x : '#' + x).join(' ');
 		if (!postData.text) {
 			postData.text = hashtags_;
@@ -1532,7 +1552,7 @@ onMounted(() => {
 
 	nextTick(() => {
 		// 書きかけの投稿を復元
-		if (!props.instant && !props.mention && !props.specified && !props.mock) {
+		if (!props.instant && !props.mention && !props.specified && !props.mock && !props.updateMode) {
 			const draft = JSON.parse(miLocalStorage.getItem('drafts') ?? '{}')[draftKey.value] as StoredDrafts[string] | undefined;
 			if (draft != null) {
 				text.value = draft.data.text;
@@ -1841,12 +1861,34 @@ html[data-color-scheme=light] .preview {
 	}
 }
 
+.cwOuter {
+	width: 100%;
+	position: relative;
+}
+
 .cw {
 	z-index: 1;
 	padding-bottom: 8px;
 	border-bottom: solid 0.5px var(--MI_THEME-divider);
 	resize: vertical;
 	min-height: 2rem;
+}
+
+.cwTextCount {
+	position: absolute;
+	top: 0;
+	right: 2px;
+	padding: 2px 6px;
+	font-size: .9em;
+	color: var(--MI_THEME-warn);
+	border-radius: 6px;
+	max-width: 100%;
+	min-width: 1.6em;
+	text-align: center;
+
+	&.cwTextOver {
+		color: #ff2a2a;
+	}
 }
 
 .hashtags {
