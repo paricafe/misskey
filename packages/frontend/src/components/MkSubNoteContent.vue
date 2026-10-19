@@ -5,7 +5,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 
 <template>
 <div :class="[$style.root, { [$style.collapsed]: collapsed }]">
-	<div :class="[{ [$style.noteClickToOpen]: prefer.s.noteClickToOpen }]" @click.stop="prefer.s.noteClickToOpen ? noteClickToOpen(note.id) : undefined">
+	<div :class="[{ [$style.noteClickToOpen]: prefer.s.noteClickToOpen }]" @click.stop="prefer.s.noteClickToOpen ? noteClickToOpen(note.id, $event) : undefined">
 		<span v-if="note.isHidden" style="opacity: 0.5">({{ i18n.ts.private }})</span>
 		<span v-if="note.deletedAt" style="opacity: 0.5">({{ i18n.ts.deletedNote }})</span>
 		<MkA v-if="note.replyId" :class="$style.reply" :to="`/notes/${note.replyId}`" @click.stop><i class="ti ti-arrow-back-up"></i></MkA>
@@ -53,7 +53,9 @@ const props = defineProps<{
 
 const router = useRouter();
 
-function noteClickToOpen(id: string) {
+function noteClickToOpen(id: string, ev: MouseEvent) {
+	// Let links and controls inside the note handle their own clicks.
+	if (ev.target instanceof Element && ev.target.closest('a, button, [role="button"], input, textarea, summary, label') != null) return;
 	const selection = window.document.getSelection();
 	if (selection?.toString().length === 0) {
 		router.push('/notes/:noteId/:initialTab?', {

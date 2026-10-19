@@ -54,7 +54,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 		<MkAvatar :class="[$style.avatar, prefer.s.useStickyIcons ? $style.useSticky : null]" :user="appearNote.user" :link="!mock" :preview="!mock"/>
 		<div :class="$style.main">
 			<MkNoteHeader :note="appearNote" :mini="true"/>
-			<div :class="[{ [$style.noteClickToOpen]: prefer.s.noteClickToOpen }]" @click.stop="prefer.s.noteClickToOpen ? noteClickToOpen(appearNote.id) : undefined">
+			<div :class="[{ [$style.noteClickToOpen]: prefer.s.noteClickToOpen }]" @click.stop="prefer.s.noteClickToOpen ? noteClickToOpen(appearNote.id, $event) : undefined">
 				<div style="container-type: inline-size;">
 					<p v-if="appearNote.cw != null" :class="$style.cw">
 						<Mfm
@@ -83,7 +83,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 								:enableEmojiMenuReaction="true"
 								class="_selectable _textAutoSpacing"
 							/>
-							<div v-if="enableTranslateButton && appearNote.text" style="padding-top: 5px; color: var(--MI_THEME-accent);">
+							<div v-if="enableTranslateButton && canTranslate && appearNote.text" style="padding-top: 5px; color: var(--MI_THEME-accent);">
 								<button v-if="!(translating || translation)" ref="translateButton" class="_button" @click.stop="translate()"><i class="ti ti-language-hiragana"></i>{{ i18n.ts.translate }}</button>
 								<button v-else class="_button" @click.stop="translation = null">{{ i18n.ts.close }}</button>
 							</div>
@@ -223,8 +223,6 @@ import { focusPrev, focusNext } from '@/utility/focus.js';
 import number from '@/filters/number.js';
 import { DI } from '@/di.js';
 import { useRouter } from '@/router';
-import { misskeyApi } from '@/utility/misskey-api.js';
-import { miLocalStorage } from '@/local-storage.js';
 
 // コンポーネント外部の依存関係
 import MkNoteSub from '@/components/MkNoteSub.vue';
@@ -290,6 +288,7 @@ const {
 	isLong,
 	showTicker,
 	canRenote,
+	canTranslate,
 
 	renote,
 	reply,
@@ -300,6 +299,7 @@ const {
 	showMenu,
 	clip,
 	showRenoteMenu,
+	translate,
 	blur,
 } = useNote(props, {
 	rootEl,
@@ -347,7 +347,9 @@ function emitUpdReaction(emoji: string, delta: number) {
 	}
 }
 
-function noteClickToOpen(id: string) {
+function noteClickToOpen(id: string, ev: MouseEvent) {
+	// Let links and controls inside the note handle their own clicks.
+	if (ev.target instanceof Element && ev.target.closest('a, button, [role="button"], input, textarea, summary, label') != null) return;
 	const selection = window.document.getSelection();
 	if (selection?.toString().length === 0) {
 		router.push(`/notes/${id}` as any);
@@ -356,19 +358,6 @@ function noteClickToOpen(id: string) {
 
 function like() {
 	react(prefer.s.defaultLike);
-}
-
-async function translate(): Promise<void> {
-	if (translation.value != null) return;
-	collapsed.value = false;
-	translating.value = true;
-	if (props.mock) return;
-	const res = await misskeyApi('notes/translate', {
-		noteId: appearNote.id,
-		targetLang: miLocalStorage.getItem('lang') ?? navigator.language,
-	});
-	translating.value = false;
-	translation.value = res;
 }
 
 // キーボードショートカットマップ

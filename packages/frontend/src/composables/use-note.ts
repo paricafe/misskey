@@ -28,6 +28,8 @@ import { getAppearNote } from '@/utility/get-appear-note.js';
 import { prefer } from '@/preferences.js';
 import { getPluginHandlers } from '@/plugin.js';
 import { $i } from '@/i.js';
+import { instance } from '@/instance.js';
+import { miLocalStorage } from '@/local-storage.js';
 import { i18n } from '@/i18n.js';
 import { globalEvents, useGlobalEvent } from '@/events.js';
 import MkUsersTooltip from '@/components/MkUsersTooltip.vue';
@@ -167,6 +169,7 @@ export function useNote(
 	const collapsed = ref(appearNote.cw == null && isLong.value);
 	const showTicker = computed(() => (prefer.s.instanceTicker === 'always') || (prefer.s.instanceTicker === 'remote' && appearNote.user.instance));
 	const canRenote = computed(() => ['public', 'home'].includes(appearNote.visibility) || (appearNote.visibility === 'followers' && appearNote.userId === $i?.id));
+	const canTranslate = computed(() => $i != null && $i.policies.canUseTranslator && instance.translatorAvailable);
 	const renoteCollapsed = ref(
 		prefer.s.collapseEverything || (prefer.s.alwaysCollapseRenotes && isRenote) || (prefer.s.collapseRenotes && isRenote && (
 			($i && ($i.id === rawNote.userId || $i.id === appearNote.userId)) || // `||` must be `||`! See https://github.com/misskey-dev/misskey/issues/13131
@@ -455,6 +458,25 @@ export function useNote(
 		}
 	}
 
+	async function translate(): Promise<void> {
+		if (props.mock || !canTranslate.value || translating.value || translation.value != null) return;
+		collapsed.value = false;
+		translating.value = true;
+		try {
+			translation.value = await misskeyApi('notes/translate', {
+				noteId: appearNote.id,
+				targetLang: miLocalStorage.getItem('lang') ?? navigator.language,
+			});
+		} catch {
+			os.alert({
+				type: 'error',
+				text: i18n.ts.somethingHappened,
+			});
+		} finally {
+			translating.value = false;
+		}
+	}
+
 	// フォーカス制御
 	function focus() { els.rootEl?.value?.focus(); }
 
@@ -483,6 +505,7 @@ export function useNote(
 		isLong,
 		showTicker,
 		canRenote,
+		canTranslate,
 
 		// アクション関数
 		renote,
@@ -494,6 +517,7 @@ export function useNote(
 		showMenu,
 		clip,
 		showRenoteMenu,
+		translate,
 		focus,
 		blur,
 	};
