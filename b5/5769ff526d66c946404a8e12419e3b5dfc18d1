@@ -1,0 +1,33 @@
+docs/mastodon-compatibility.md
+  s_7049ef9b9aef72::t_b3d43c18109633 37,72
+packages/mastodon-compat/package.json
+  s_7049ef9b9aef72::t_3454843e6fba1b 15
+packages/mastodon-compat/src/index.ts
+  s_7049ef9b9aef72::t_549005328b058d 7,13,65,104,133
+packages/mastodon-compat/src/oauth.ts
+  s_7049ef9b9aef72::t_132938e9c2f72f 7
+packages/mastodon-compat/src/postgres-store.ts
+  s_7049ef9b9aef72::t_483139ca8f2bc5 11
+packages/mastodon-compat/test/gateway-lifecycle.test.ts
+  s_7049ef9b9aef72::t_fd9dd189d2a17e 14,25,30-31,57-58,75,79,85-89,101
+packages/mastodon-compat/test/oauth.test.ts
+  s_7049ef9b9aef72::t_b1c81e9844417b 12-13,22,25-32
+packages/mastodon-compat/test/streaming-transport.test.ts
+  s_7049ef9b9aef72::t_d83e6d5079e108 15,18-19,89-90
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b55769ff526d66c946404a8e12419e3b5dfc18d1",
+  "prompts": {},
+  "sessions": {
+    "s_7049ef9b9aef72": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "71ebfb37-548b-4952-a132-7c1d67c9d874",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Natsuki-Kaede <i@pari.network>"
+    }
+  }
+}
