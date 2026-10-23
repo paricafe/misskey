@@ -34,21 +34,7 @@ The new migration's `down()` restores the old tables, indexes, and foreign keys 
 
 Multiple gateway processes and hosts can use the same primary database. Short database transactions serialize state changes, while one-time operation consumption is atomic. Native HTTP operations run outside those transactions. Database failure fails the operation; the gateway does not fall back to a new empty file or an in-memory registry.
 
-## Standalone mode
-
-```sh
-pnpm --filter @pari/mastodon-compat build
-MASTODON_PUBLIC_URL=https://social.example \
-MISSKEY_NATIVE_URL=http://127.0.0.1:3000 \
-MASTODON_DATABASE_URL="$MISSKEY_DATABASE_URL" \
-pnpm --filter @pari/mastodon-compat start
-```
-
-Set `MISSKEY_DATABASE_URL` to the existing PostgreSQL connection URL and run the native migrations first.
-
-The gateway listens on `127.0.0.1:3100` by default (`MASTODON_HOST` and `MASTODON_PORT` override it). A same-origin reverse proxy must route Mastodon API/streaming URLs and the compatibility OAuth requests to this service, and native API, `/miauth/`, UI resources, and ActivityPub URLs to Misskey. Avoid routing every `/api/` request to the gateway: native Misskey also uses that prefix. When native OAuth is needed on the same origin, use the embedded dispatcher or an equivalent explicit routing setup for the overlapping OAuth paths.
-
-The standalone service uses real HTTP and WebSocket connections to the fixed native upstream. Embedded mode uses a small HTTP injection transport to preserve the actual caller IP for native rate limiting and still crosses the complete native API validation/authentication path. It does not call endpoint classes directly.
+The embedded gateway calls native endpoints through an HTTP injection transport. It preserves the caller IP for native rate limiting and goes through the complete native API validation and authentication path.
 
 ## Protocol coverage
 
@@ -83,7 +69,7 @@ This is a practical compatibility implementation, not a claim of complete Mastod
 
 ## Verification
 
-The independent package contains real HTTP and WebSocket transport tests, OAuth/state persistence tests, serializer/security regression cases, and route contract tests. `packages/backend/test/e2e/mastodon-api.ts` exercises the gateway against an actual Misskey service, PostgreSQL, and Redis, including MiAuth authorization, JSON/form/multipart publishing, concurrent idempotency, both pagination directions, media uploads, visibility, reactions, polls, lists, notifications, revocation, and streaming. It also checks authorization persistence across a standalone gateway restart and embedded shutdown with an active stream. The native test host recreates its PostgreSQL schema on restart, so its reset endpoint cannot establish native credential persistence.
+The independent package contains real HTTP and WebSocket transport tests, OAuth/state persistence tests, serializer/security regression cases, and route contract tests. `packages/backend/test/e2e/mastodon-api.ts` exercises the gateway against an actual Misskey service, PostgreSQL, and Redis, including MiAuth authorization, JSON/form/multipart publishing, concurrent idempotency, both pagination directions, media uploads, visibility, reactions, polls, lists, notifications, revocation, and streaming. It also checks embedded shutdown with an active stream. The native test host recreates its PostgreSQL schema on restart, so its reset endpoint cannot establish native credential persistence.
 
 ```sh
 pnpm --filter @pari/mastodon-compat test

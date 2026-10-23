@@ -12,8 +12,7 @@
 		"build": "tsc6 -p tsconfig.json",
 		"typecheck": "tsc6 -p tsconfig.json --noEmit",
 		"lint": "eslint --quiet src test",
-		"test": "pnpm build && node --test dist/test/*.test.js",
-		"start": "node dist/src/cli.js"
+		"test": "pnpm build && node --test dist/test/*.test.js"
 	},
 	"dependencies": {
 		"@fastify/cors": "11.3.0",

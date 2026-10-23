@@ -11,7 +11,7 @@ import { setImmediate } from 'node:timers/promises';
 import { test } from 'node:test';
 import Fastify from 'fastify';
 import WebSocket, { WebSocketServer } from 'ws';
-import { CompatStore, createGateway, installGateway } from '../src/index.js';
+import { CompatStore, installGateway } from '../src/index.js';
 
 async function within<T>(promise: Promise<T>, milliseconds: number): Promise<T> {
 	let timer: NodeJS.Timeout | undefined;
@@ -22,14 +22,13 @@ async function within<T>(promise: Promise<T>, milliseconds: number): Promise<T> 
 	} finally { clearTimeout(timer); }
 }
 
-for (const embedded of [false, true]) test(`${embedded ? 'embedded' : 'standalone'} gateway prunes on startup and periodically without OAuth traffic`, async t => {
+test('gateway prunes on startup and periodically without OAuth traffic', async t => {
 	t.mock.timers.enable({ apis: ['setTimeout'] });
 	const store = new CompatStore(':memory:');
 	const prunes = t.mock.method(store, 'prune');
-	const options = { publicUrl: 'https://social.example', nativeUrl: 'https://native.example', store };
 	await store.putIdempotency('alice', 'startup', { digest: 'old', expiresAt: Date.now() - 1 });
-	const app = embedded ? Fastify() : await createGateway(options);
-	if (embedded) installGateway(app, options);
+	const app = Fastify();
+	installGateway(app, { publicUrl: 'https://social.example', nativeUrl: 'https://native.example', store });
 	t.after(() => app.close());
 	await app.ready();
 	assert.equal(await store.get('idempotency', 'alice', 'startup'), undefined);
@@ -55,7 +54,8 @@ test('pruning retries after a storage error and shutdown waits for the active ba
 		if (++calls === 1) throw new Error('Storage temporarily unavailable');
 		await pending;
 	});
-	const app = await createGateway({ publicUrl: 'https://social.example', nativeUrl: 'https://native.example', store });
+	const app = Fastify();
+	installGateway(app, { publicUrl: 'https://social.example', nativeUrl: 'https://native.example', store });
 	t.after(async () => { release(); await app.close(); });
 	await app.ready();
 	t.mock.timers.tick(60000);
@@ -72,18 +72,21 @@ test('pruning retries after a storage error and shutdown waits for the active ba
 	assert.equal(calls, 2);
 });
 
-test('standalone shutdown closes active client and native WebSockets before waiting for HTTP close', async t => {
+test('shutdown closes active client and native WebSockets before waiting for HTTP close', async t => {
 	const upstream = createServer((request, response) => {
 		request.resume();
 		response.setHeader('content-type', 'application/json');
-		if (request.url?.startsWith('/api/miauth/')) response.end(JSON.stringify({ ok: true, token: 'native-alice', user: { id: 'alice' } }));
-		else if (request.url === '/api/i' && request.headers.authorization === 'Bearer native-alice') response.end(JSON.stringify({ id: 'alice' }));
+		if (request.url === '/api/i' && request.headers.authorization === 'Bearer native-alice') response.end(JSON.stringify({ id: 'alice' }));
 		else { response.statusCode = 401; response.end('{}'); }
 	});
 	const nativeWss = new WebSocketServer({ server: upstream, path: '/streaming' });
 	upstream.listen(0, '127.0.0.1');
 	await once(upstream, 'listening');
-	const gateway = await createGateway({ publicUrl: 'https://social.example', nativeUrl: `http://127.0.0.1:${(upstream.address() as AddressInfo).port}`, store: new CompatStore(':memory:') });
+	const store = new CompatStore(':memory:');
+	const { client } = await store.createClient({ name: 'Shutdown regression', redirectUris: ['gateway-test://callback'], scopes: ['read'] });
+	const { token } = await store.createGrant({ clientId: client.id, kind: 'user', userId: 'alice', nativeToken: 'native-alice', scopes: ['read'] });
+	const gateway = Fastify();
+	installGateway(gateway, { publicUrl: 'https://social.example', nativeUrl: `http://127.0.0.1:${(upstream.address() as AddressInfo).port}`, store });
 	let clientSocket: WebSocket | undefined;
 	t.after(async () => {
 		clientSocket?.terminate();
@@ -94,19 +97,8 @@ test('standalone shutdown closes active client and native WebSockets before wait
 		await new Promise<void>(resolve => upstream.close(() => resolve()));
 	});
 	await gateway.listen({ host: '127.0.0.1', port: 0 });
-	const registered = await gateway.inject({ method: 'POST', url: '/api/v1/apps', payload: { client_name: 'Shutdown regression', redirect_uris: 'gateway-test://callback', scopes: 'read' } });
-	assert.equal(registered.statusCode, 200);
-	const client = registered.json();
-	const authorize = await gateway.inject({ method: 'GET', url: `/oauth/authorize?${new URLSearchParams({ client_id: client.client_id, redirect_uri: 'gateway-test://callback', response_type: 'code', scope: 'read' })}` });
-	assert.equal(authorize.statusCode, 302);
-	const callback = new URL(new URL(String(authorize.headers.location)).searchParams.get('callback')!);
-	const accepted = await gateway.inject({ method: 'GET', url: callback.pathname + callback.search });
-	assert.equal(accepted.statusCode, 302);
-	const code = new URL(String(accepted.headers.location)).searchParams.get('code');
-	const exchange = await gateway.inject({ method: 'POST', url: '/oauth/token', payload: { grant_type: 'authorization_code', client_id: client.client_id, client_secret: client.client_secret, redirect_uri: 'gateway-test://callback', code } });
-	assert.equal(exchange.statusCode, 200);
 	const nativeConnection = once(nativeWss, 'connection');
-	clientSocket = new WebSocket(`ws://127.0.0.1:${(gateway.server.address() as AddressInfo).port}/api/v1/streaming?access_token=${exchange.json().access_token}&stream=user`);
+	clientSocket = new WebSocket(`ws://127.0.0.1:${(gateway.server.address() as AddressInfo).port}/api/v1/streaming?access_token=${token}&stream=user`);
 	clientSocket.on('error', () => undefined);
 	await once(clientSocket, 'open');
 	const [nativeSocket] = await nativeConnection as [WebSocket];

@@ -12,11 +12,11 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import Fastify, { type FastifyInstance } from 'fastify';
 import WebSocket, { WebSocketServer } from 'ws';
-import { CompatStore, createGateway, installGateway } from '../src/index.js';
+import { CompatStore, installGateway } from '../src/index.js';
 import type { Json, NativeTransport } from '../src/types.js';
 
-for (const embedded of [false, true]) for (const unix of [false, true]) {
-	test(`${embedded ? 'embedded' : 'standalone'} user streaming preserves native authentication and URLs over ${unix ? 'Unix sockets' : 'TCP'}`, { timeout: 5000 }, async t => {
+for (const unix of [false, true]) {
+	test(`user streaming preserves native authentication and URLs over ${unix ? 'Unix sockets' : 'TCP'}`, { timeout: 5000 }, async t => {
 		const nativeToken = 'native+alice/=?%:token';
 		const publicUrl = 'https://social.example';
 		const author = { id: 'bob', username: 'bob', host: null, createdAt: '2026-09-01T00:00:00.000Z', pinnedNoteIds: [] };
@@ -86,8 +86,8 @@ for (const embedded of [false, true]) for (const unix of [false, true]) {
 		const { client } = await store.createClient({ name: 'Streaming transport', redirectUris: ['https://client.example/callback'], scopes: ['read'] });
 		const { token } = await store.createGrant({ clientId: client.id, kind: 'user', userId: 'alice', nativeToken, scopes: ['read'] });
 		const options = { publicUrl, nativeUrl, nativeSocketPath, transport, store };
-		gateway = embedded ? Fastify() : await createGateway(options);
-		if (embedded) installGateway(gateway, options);
+		gateway = Fastify();
+		installGateway(gateway, options);
 		await gateway.listen({ host: '127.0.0.1', port: 0 });
 		const url = new URL(`ws://127.0.0.1:${(gateway.server.address() as AddressInfo).port}/api/v1/streaming`);
 		url.searchParams.set('access_token', token);

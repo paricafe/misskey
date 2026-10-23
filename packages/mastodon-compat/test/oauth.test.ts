@@ -9,7 +9,8 @@ import { test, type TestContext } from 'node:test';
 import Fastify from 'fastify';
 import multipart from '@fastify/multipart';
 import { CompatStore } from '../src/store.js';
-import { getAuthorization, handlesOAuth, registerOAuth } from '../src/oauth.js';
+import { dispatchHandler, getAuthorization, handlesOAuth } from '../src/oauth.js';
+import { formParameters } from '../src/parameters.js';
 import { allowsScope, assertScope, normalizeScopes, toNativePermissions } from '../src/scopes.js';
 
 async function fixture(t: TestContext, nativeResult: unknown = { ok: true, token: 'native-application-token', user: { id: 'alice' } }) {
@@ -18,10 +19,17 @@ async function fixture(t: TestContext, nativeResult: unknown = { ok: true, token
 	const store = new CompatStore(':memory:');
 	let now = 1000;
 	const calls: string[] = [];
-	registerOAuth(server, {
+	const deps = {
 		store, publicUrl: 'https://social.example', nativeUrl: 'http://127.0.0.1:3000', now: () => now,
 		native: { async call<T>(endpoint: string): Promise<T> { calls.push(endpoint); return nativeResult as T; } },
-	});
+	};
+	server.addContentTypeParser('application/x-www-form-urlencoded', { parseAs: 'string' }, (_request, body, done) => done(null, formParameters(String(body))));
+	for (const [method, url] of [
+		['POST', '/api/v1/apps'], ['GET', '/api/v1/apps/verify_credentials'], ['GET', '/oauth/authorize'],
+		['GET', '/mastodon/oauth/callback'], ['POST', '/oauth/token'], ['POST', '/oauth/revoke'],
+	] as const) {
+		server.route({ method, url, handler: (request, reply) => dispatchHandler(request, reply, deps) });
+	}
 	server.get('/inspect', async request => ({ handled: handlesOAuth(request), grant: await getAuthorization(request, store) }));
 	t.after(async () => { await server.close(); await store.close(); });
 	async function app(scopes = 'read write', redirect = 'testapp://callback') {

@@ -4,7 +4,7 @@
  */
 
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
-import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import type { FastifyReply, FastifyRequest } from 'fastify';
 import type {} from '@fastify/multipart';
 import { CompatStore, hashCredential, type AuthorizationCode, type CompatClient, type Grant } from './store.js';
 import { allowsScope, normalizeScopes, toNativePermissions } from './scopes.js';
@@ -275,24 +275,5 @@ export async function dispatchHandler(request: FastifyRequest, reply: FastifyRep
 			return reply.code(error.statusCode).send({ error: error.code, error_description: error.message });
 		}
 		throw error;
-	}
-}
-
-export function registerOAuth(fastify: FastifyInstance, deps: OAuthDependencies): void {
-	if (!fastify.hasContentTypeParser('application/x-www-form-urlencoded')) {
-		fastify.addContentTypeParser('application/x-www-form-urlencoded', { parseAs: 'string' }, (_request, body, done) => {
-			const parsed: Parameters = {};
-			for (const [key, value] of new URLSearchParams(String(body))) {
-				const previous = parsed[key];
-				parsed[key] = previous === undefined ? value : Array.isArray(previous) ? [...previous, value] : [previous, value];
-			}
-			done(null, parsed);
-		});
-	}
-	for (const [method, url] of [
-		['POST', '/api/v1/apps'], ['GET', '/api/v1/apps/verify_credentials'], ['GET', '/oauth/authorize'],
-		['GET', '/mastodon/oauth/callback'], ['POST', '/oauth/token'], ['POST', '/oauth/revoke'],
-	] as const) {
-		fastify.route({ method, url, handler: (request, reply) => dispatchHandler(request, reply, deps) });
 	}
 }

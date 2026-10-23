@@ -4,13 +4,13 @@
  */
 
 import { Readable } from 'node:stream';
-import Fastify, { type FastifyInstance } from 'fastify';
+import type { FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
 import { NativeClient, NativeError } from './native-client.js';
 import { EntityConverter } from './entities.js';
 import { CompatStore } from './store.js';
-import { dispatchHandler, handlesOAuth, registerOAuth } from './oauth.js';
+import { dispatchHandler, handlesOAuth } from './oauth.js';
 import { formParameters, HttpError, parameters } from './parameters.js';
 import { registerRoutes } from './routes.js';
 import { registerMediaSearch } from './media-search.js';
@@ -62,7 +62,7 @@ function registerPruning(app: FastifyInstance, store: CompatStore): () => Promis
 	};
 }
 
-async function setup(app: FastifyInstance, options: GatewayOptions, deps: ReturnType<typeof dependencies>, embedded: boolean): Promise<void> {
+async function setup(app: FastifyInstance, options: GatewayOptions, deps: ReturnType<typeof dependencies>): Promise<void> {
 	await app.register(cors, { origin: '*', methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'], exposedHeaders: ['Link', 'X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-RateLimit-Reset', 'Retry-After'] });
 	await app.register(multipart, { limits: { fileSize: options.maxFileSize ?? 32 * 1024 * 1024, files: 2, fields: 128, fieldSize: 65536 } });
 	app.addContentTypeParser('application/x-www-form-urlencoded', { parseAs: 'string' }, (_request, value, done) => {
@@ -101,24 +101,11 @@ async function setup(app: FastifyInstance, options: GatewayOptions, deps: Return
 		if (status === 401) reply.header('WWW-Authenticate', 'Bearer realm="Mastodon"');
 		reply.code(status).send({ error: status >= 500 ? 'The upstream service could not complete this request' : typed.message });
 	});
-	if (!embedded) registerOAuth(app, deps);
-	else for (const [method, url] of [['POST', '/api/v1/apps'], ['GET', '/api/v1/apps/verify_credentials'], ['GET', '/mastodon/oauth/callback'], ['POST', '/oauth/revoke']] as const) app.route({ method, url, handler: (request, reply) => dispatchHandler(request, reply, deps) });
+	for (const [method, url] of [['POST', '/api/v1/apps'], ['GET', '/api/v1/apps/verify_credentials'], ['GET', '/mastodon/oauth/callback'], ['POST', '/oauth/revoke']] as const) app.route({ method, url, handler: (request, reply) => dispatchHandler(request, reply, deps) });
 	const routes = registerRoutes(app, deps);
 	registerMediaSearch(routes);
 	registerFeatures(routes);
 	registerNotifications(routes);
-}
-
-/** A standalone HTTP/WebSocket server; native Misskey remains a separate upstream. */
-export async function createGateway(options: GatewayOptions): Promise<FastifyInstance> {
-	const app = Fastify({ bodyLimit: 1024 * 1024 });
-	const deps = dependencies(options);
-	try { await setup(app, options, deps, false); } catch (error) { await deps.store.close(); throw error; }
-	const streaming = attachStreaming(app.server, deps);
-	const stopPruning = registerPruning(app, deps.store);
-	app.addHook('preClose', async () => { await Promise.all([stopPruning(), streaming.close()]); });
-	app.addHook('onClose', async () => { await deps.store.close(); });
-	return app;
 }
 
 /** Install protocol routes; only OAuth's two shared URLs need dispatch before native handlers. */
@@ -143,7 +130,7 @@ export function installGateway(app: FastifyInstance, options: GatewayOptions): {
 		const encoded = JSON.stringify(body); request.headers['content-type'] = 'application/json'; request.headers['content-length'] = String(Buffer.byteLength(encoded));
 		return Readable.from([encoded]);
 	});
-	app.register(async scope => setup(scope, options, deps, true));
+	app.register(async scope => setup(scope, options, deps));
 	const streaming = attachStreaming(app.server, deps);
 	const stopPruning = registerPruning(app, deps.store);
 	app.addHook('preClose', async () => { await Promise.all([stopPruning(), streaming.close()]); });

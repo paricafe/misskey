@@ -8,7 +8,7 @@ import { Pool, type PoolClient, type PoolConfig, type QueryResultRow } from 'pg'
 import { CompatStore, type StoreAdapter, type StoreEntry, type StoreKey } from './store.js';
 
 // Stable across every gateway process sharing this database. All mutations use
-// this transaction lock, including standalone writes and one-time consumption.
+// this transaction lock, including single writes and one-time consumption.
 const lockKeys = [0x4d434f4d, 0x53544f52];
 const columns = '"namespace", "owner", "key", "value", "expiresAt"';
 interface TransactionContext { client: PoolClient; active: boolean; }

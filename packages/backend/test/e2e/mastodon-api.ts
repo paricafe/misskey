@@ -9,8 +9,6 @@ import * as assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { afterEach, beforeAll, describe, test } from 'vitest';
 import WebSocket from 'ws';
-import { createGateway, createPostgresStore } from '@pari/mastodon-compat';
-import { loadConfig } from '@/config.js';
 import { api, port, relativeFetch, sendEnvResetRequest, signup } from '../utils.js';
 import type * as misskey from 'misskey-js';
 
@@ -265,42 +263,6 @@ describe('Mastodon gateway against real Misskey HTTP and streaming APIs', () => 
 		await ok(`/api/v1/statuses/${root.id}/bookmark`, bobToken, 'POST', {});
 		assert.equal((await api('notes/favorites/delete', { noteId: root.id }, bob)).status, 204);
 		assert.equal((await ok(`/api/v1/statuses/${root.id}`, bobToken)).bookmarked, false);
-	});
-
-	test('runs as a separate service and preserves authorization across a gateway restart', async () => {
-		const config = loadConfig();
-		const newGateway = async () => createGateway({
-			publicUrl: 'http://misskey.local',
-			nativeUrl: `http://127.0.0.1:${port}`,
-			store: await createPostgresStore({ host: config.db.host, port: config.db.port, database: config.db.db, user: config.db.user, password: config.db.pass, ...config.db.extra }),
-		});
-		let gateway = await newGateway();
-		await gateway.listen({ host: '127.0.0.1', port: 0 });
-		const address = gateway.server.address(); assert.ok(address && typeof address !== 'string');
-		const base = `http://127.0.0.1:${address.port}`;
-		const fetchGateway = async (path: string, init?: RequestInit) => fetch(new URL(path, base), { ...init, redirect: 'manual' });
-		try {
-			const registered = await fetchGateway('/api/v1/apps', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ client_name: 'Standalone adapter', redirect_uris: 'gateway-test://oauth', scopes: 'read write' }) });
-			const application = await registered.json() as Json; assert.equal(registered.status, 200);
-			const authorize = await fetchGateway(`/oauth/authorize?${new URLSearchParams({ client_id: application.client_id, response_type: 'code', redirect_uri: 'gateway-test://oauth', scope: 'read write' })}`);
-			assert.equal(authorize.status, 302); const miauth = new URL(authorize.headers.get('location')!);
-			assert.equal((await api('miauth/gen-token', { session: miauth.pathname.split('/').at(-1)!, permission: miauth.searchParams.get('permission')!.split(',') }, alice)).status, 200);
-			const callbackUrl = new URL(miauth.searchParams.get('callback')!);
-			const callback = await fetchGateway(callbackUrl.pathname + callbackUrl.search); assert.equal(callback.status, 302);
-			const code = new URL(callback.headers.get('location')!).searchParams.get('code'); assert.ok(code);
-			const tokenResponse = await fetchGateway('/oauth/token', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ client_id: application.client_id, client_secret: application.client_secret, grant_type: 'authorization_code', redirect_uri: 'gateway-test://oauth', code }) });
-			const token = await tokenResponse.json() as Json; assert.equal(tokenResponse.status, 200);
-			const created = await fetchGateway('/api/v1/statuses', { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${token.access_token}` }, body: JSON.stringify({ status: 'posted through the separate HTTP gateway' }) });
-			const note = await created.json() as Json; assert.equal(created.status, 200, JSON.stringify(note));
-			assert.equal((await api('notes/show', { noteId: note.id }, alice)).body.text, 'posted through the separate HTTP gateway');
-			const mediaPage = await fetchGateway(`/api/v1/accounts/${alice.id}/statuses?only_media=true`, { headers: { authorization: `Bearer ${token.access_token}` } }); assert.equal(mediaPage.status, 200);
-			await gateway.close();
-			gateway = await newGateway();
-			await gateway.listen({ host: '127.0.0.1', port: address.port });
-			const restored = await fetchGateway('/api/v1/accounts/verify_credentials', { headers: { authorization: `Bearer ${token.access_token}` } });
-			assert.equal(restored.status, 200, await restored.clone().text());
-			assert.equal((await restored.json() as Json).id, alice.id);
-		} finally { await gateway.close(); }
 	});
 
 	test('honours narrow scopes, app tokens, OAuth revoke, and native grant revocation', async () => {
