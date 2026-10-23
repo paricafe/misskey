@@ -8,7 +8,7 @@ import type { TestContext } from 'node:test';
 import { Pool } from 'pg';
 
 /** Apply the compatibility migration history in an isolated schema, never a production table. */
-export async function postgresFixture(t: TestContext, options: { legacyOnly?: boolean } = {}): Promise<string> {
+export async function postgresFixture(t: TestContext): Promise<string> {
 	const configured = process.env.MASTODON_TEST_DATABASE_URL;
 	if (!configured) throw new Error('Set MASTODON_TEST_DATABASE_URL to an isolated test PostgreSQL database');
 	const admin = new Pool({ connectionString: configured, max: 1, statement_timeout: 5000 });
@@ -37,8 +37,8 @@ export async function postgresFixture(t: TestContext, options: { legacyOnly?: bo
 				['1783956161436-mastodon-api-compatibility.js', 'MastodonApiCompatibility1783956161436'],
 				['1784113507739-mastodon-oauth-application-tokens.js', 'MastodonOAuthApplicationTokens1784113507739'],
 				['1784221450402-mastodon-user-state.js', 'MastodonUserState1784221450402'],
+				['1789183519130-MastodonCompatEntry.js', 'MastodonCompatEntry1789183519130'],
 			];
-			if (!options.legacyOnly) migrations.push(['1789183519130-MastodonCompatEntry.js', 'MastodonCompatEntry1789183519130']);
 			for (const [file, name] of migrations) {
 				const migration = await import(new URL(`../../../backend/migration/${file}`, import.meta.url).href);
 				await new migration[name]().up({ query: (sql: string) => client.query(sql) });
