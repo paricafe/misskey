@@ -1,0 +1,19 @@
+CHANGELOG.md
+  s_7049ef9b9aef72::t_fe305c3a8adbd5 7-13,16,22,28-30
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "0e41433fb3db6d0d56dd96dbdfdca41368f4ad59",
+  "prompts": {},
+  "sessions": {
+    "s_7049ef9b9aef72": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "71ebfb37-548b-4952-a132-7c1d67c9d874",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Natsuki-Kaede <i@pari.network>"
+    }
+  }
+}
