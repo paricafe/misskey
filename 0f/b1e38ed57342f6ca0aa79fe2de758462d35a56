@@ -1,0 +1,21 @@
+packages/frontend/src/components/MkMfmWindow.vue
+  s_7049ef9b9aef72::t_51b7de873cd1eb 18,379
+packages/frontend/src/pages/admin/roles.policy-editor.vue
+  s_7049ef9b9aef72::t_040612a6a3a4b8 7-420,440
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "0fb1e38ed57342f6ca0aa79fe2de758462d35a56",
+  "prompts": {},
+  "sessions": {
+    "s_7049ef9b9aef72": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "71ebfb37-548b-4952-a132-7c1d67c9d874",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Natsuki-Kaede <i@pari.network>"
+    }
+  }
+}
