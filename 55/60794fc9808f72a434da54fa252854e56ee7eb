@@ -1,0 +1,19 @@
+packages/mastodon-compat/test/postgres-http-fixture.ts
+  s_7049ef9b9aef72::t_af80b0f436b846 11,40
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "5560794fc9808f72a434da54fa252854e56ee7eb",
+  "prompts": {},
+  "sessions": {
+    "s_7049ef9b9aef72": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "71ebfb37-548b-4952-a132-7c1d67c9d874",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Natsuki-Kaede <i@pari.network>"
+    }
+  }
+}
