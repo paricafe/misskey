@@ -3,7 +3,6 @@
 .travis
 .vscode
 .config
-.mastodon-compat
 Dockerfile
 build/
 built/

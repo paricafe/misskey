@@ -85,6 +85,3 @@ vite.config.local-dev.ts.timestamp-*
 
 # Affinity
 *.af~lock~
-
-# Private state owned by the optional Mastodon gateway
-.mastodon-compat/

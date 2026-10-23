@@ -119,7 +119,6 @@ import FormSection from '@/components/form/section.vue';
 import MkPreferenceContainer from '@/components/MkPreferenceContainer.vue';
 
 const defaultFont = getDefaultFontSettings();
-console.log(defaultFont);
 
 const fontSizeNumber = ref(Number(miLocalStorage.getItem('fontSize') ?? 1));
 const fontSizeNumberOld = ref(fontSizeNumber.value);
