@@ -4,30 +4,30 @@
 -
 
 ### Client
-- Enhance: ノートの自動スペーシングで、テキストを変更せずブラウザ標準の `text-autospace` を使用するように
-- Fix: ノートの返信・Renote数と詳細画面の返信一覧がリアルタイムに更新されない問題を修正
-- Fix: 「ノートをクリックして詳細を表示」が有効なとき、メディアのクリックやCWの展開でもノート詳細が開く問題を修正
-- Fix: ノートを編集した直後に、表示中の内容が更新されない問題を修正
-- Fix: ノートインポートの形式選択が正しく動作しない問題を修正
-- Fix: CW付きノート内のセンシティブなメディアでぼかしが表示されない問題を修正
-- Fix: 承認制登録とPari Plus設定の英語・中国語翻訳が表示されない問題を修正
+- Enhance: Note auto-spacing now uses the browser's native `text-autospace` instead of modifying the text
+- Fix: Reply and renote counts and the reply list on the note detail page now update in real time
+- Fix: With "Click a note to open its details" enabled, clicking media or expanding a CW no longer opens the note details
+- Fix: A displayed note now updates right after it is edited
+- Fix: The format selection for note imports did not work correctly
+- Fix: Sensitive media in notes with a CW were not blurred
+- Fix: English and Chinese translations for approval-based registration and Pari Plus settings were not shown
 
 ### Server
-- Fix: RSS取得APIにフィードURLの検査機構を追加
+- Fix: The RSS fetch API now validates feed URLs
 - Feat: Mastodon API compatible OAuth, REST, and streaming endpoints are now available for Mastodon clients
 - Enhance: Improve Mastodon API filters, markers, conversations, notifications, Web Push, and streaming compatibility
 - Enhance: Add stateful Mastodon compatibility for filters, markers, followed and featured tags, endorsements, collections, conversations, notification groups, notification policies and requests, Web Push subscriptions and delivery, domain blocks, and status and thread mutes
 - Enhance: Allow administrators to disable the Mastodon-compatible API with `enableMastodonApi: false`
 - Enhance: Improve Mastodon OAuth application-token support, access-token management, and core API compatibility
-- Fix: Renoteを削除した際に対象ノートのRenote数が減少しない問題を修正
+- Fix: Deleting a renote now decreases the renote count of the target note
 - Enhance: Improve Mastodon API compatibility for search, trends, suggestions, tags, and entity responses
 - Enhance: Expand Mastodon API compatibility for profiles, reports, announcements, scheduled statuses, status history, quotes, account relationships, and instance discovery
 - Fix: Prevent a duplicate Mastodon instance peers route from blocking server startup
 - Fix: Prevent `users/recommendation` from generating invalid SQL when filtering blocked users
 - Fix: Improve Mastodon API authentication, status mutation, instance metadata, and pagination compatibility
-- Fix: 一部のAPIスキーマとmisskey-jsの型定義が実装と一致していない問題を修正
-- Fix: Mastodonクライアントから言語指定付きでノートを投稿・編集できない問題を修正
-- Fix: Mastodon互換APIのステータス操作、投票、引用ページネーション、編集履歴の互換性を改善
+- Fix: Some API schemas and misskey-js type definitions did not match the implementation
+- Fix: Mastodon clients can now post and edit notes with a language specified
+- Fix: Improve Mastodon API compatibility for status actions, polls, quote pagination, and edit history
 
 ## 2026.10.0
 
