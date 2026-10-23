@@ -244,9 +244,9 @@ test('direct status idempotency is claimed atomically across routes sharing a st
 	assert.equal((await f.request('POST', '/api/v1/statuses', { ...payload, status: '@bob Different' }, undefined, 'same')).statusCode, 422);
 });
 
-test('an expired legacy idempotency key can be reused and the new receipt receives a column TTL', async t => {
+test('an expired idempotency key can be reused', async t => {
 	const f = await fixture(t);
-	await f.store.put('idempotency', 'alice', 'expired', { id: 'old-note', digest: 'old-request', expiresAt: Date.now() - 1 });
+	await f.store.putIdempotency('alice', 'expired', { id: 'old-note', digest: 'old-request', expiresAt: Date.now() - 1 });
 	const result = await f.request('POST', '/api/v1/statuses', { status: 'New request' }, undefined, 'expired');
 	assert.equal(result.statusCode, 200, result.body);
 	const [stored] = await f.store.getMany([{ namespace: 'idempotency', owner: 'alice', key: 'expired' }]);

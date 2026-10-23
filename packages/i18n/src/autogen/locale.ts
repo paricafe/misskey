@@ -6428,14 +6428,6 @@ export interface Locale extends ILocale {
          */
         "hashtagDescription": string;
         /**
-         * URL
-         */
-        "url": string;
-        /**
-         * URLを表示できます。
-         */
-        "urlDescription": string;
-        /**
          * リンク
          */
         "link": string;
@@ -6644,14 +6636,6 @@ export interface Locale extends ILocale {
          */
         "positionDescription": string;
         /**
-         * 切り抜き
-         */
-        "crop": string;
-        /**
-         * 内容を切り抜きます。
-         */
-        "cropDescription": string;
-        /**
          * 拡大縮小
          */
         "scale": string;
@@ -6667,14 +6651,6 @@ export interface Locale extends ILocale {
          * 文字の前景色を変更します。
          */
         "foregroundDescription": string;
-        /**
-         * フェード
-         */
-        "fade": string;
-        /**
-         * 文字をフェードイン・フェードアウトさせます。
-         */
-        "fadeDescription": string;
         /**
          * 背景色
          */

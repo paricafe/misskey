@@ -19,7 +19,7 @@ function deferred() {
 
 const postgresOnly = { skip: !process.env.MASTODON_TEST_DATABASE_URL };
 
-test('PostgreSQL idempotency uses the indexed TTL and reads legacy TTLs without a migration', postgresOnly, async t => {
+test('PostgreSQL idempotency uses the indexed TTL', postgresOnly, async t => {
 	const connectionString = await postgresFixture(t);
 	const store = await createPostgresStore({ connectionString });
 	const inspection = new Pool({ connectionString });
@@ -31,44 +31,32 @@ test('PostgreSQL idempotency uses the indexed TTL and reads legacy TTLs without 
 		// The column, not stale JSON left by an older process, decides expiration.
 		await inspection.query('UPDATE "mastodon_compat_entry" SET "value" = jsonb_set("value", \'{expiresAt}\', \'200\') WHERE "key" = $1', ['new']);
 		assert.equal(await store.getIdempotency('alice', 'new', 100), undefined);
-		await store.put('idempotency', 'alice', 'legacy', { digest: 'legacy', expiresAt: 100 });
-		assert.equal((await store.getIdempotency('alice', 'legacy', 99))?.digest, 'legacy');
-		assert.equal(await store.getIdempotency('alice', 'legacy', 100), undefined);
 		await store.putIdempotency('alice', 'live', { digest: 'pending', expiresAt: 200 });
 		await inspection.query('UPDATE "mastodon_compat_entry" SET "value" = jsonb_set("value", \'{expiresAt}\', \'1\') WHERE "key" = $1', ['live']);
 		assert.equal((await store.getIdempotency('alice', 'live', 100))?.expiresAt, 200);
 		await store.prune(100);
 		assert.equal(await store.get('idempotency', 'alice', 'new'), undefined);
-		assert.equal(await store.get('idempotency', 'alice', 'legacy'), undefined);
 		assert.ok(await store.getIdempotency('alice', 'live', 100));
 	} finally { await store.close(); await inspection.end(); }
 });
 
-test('PostgreSQL repairs and prunes bounded batches without deleting active or unrelated state', postgresOnly, async t => {
+test('PostgreSQL prunes bounded batches without deleting active or unrelated state', postgresOnly, async t => {
 	const connectionString = await postgresFixture(t);
 	const store = await createPostgresStore({ connectionString });
-	const inspection = new Pool({ connectionString });
 	try {
 		const { client } = await store.createClient({ name: 'App', scopes: ['read'], redirectUris: ['app://callback'] });
 		const { token } = await store.createGrant({ clientId: client.id, kind: 'user', userId: 'alice', nativeToken: 'native', scopes: ['read'] });
-		for (let index = 0; index < 3; index++) await store.put('idempotency', 'alice', `a-expired-${index}`, { digest: 'old', expiresAt: 100 });
-		await store.put('idempotency', 'alice', 'b-live-legacy', { digest: 'pending', expiresAt: 200 });
+		for (let index = 0; index < 3; index++) await store.putIdempotency('alice', `a-expired-${index}`, { digest: 'old', expiresAt: 100 });
 		await store.putIdempotency('alice', 'live', { digest: 'pending', expiresAt: 200 });
 		await store.put('status', 'alice', 'note', { sensitive: true, expiresAt: 1 });
-		await store.put('idempotency', 'alice', 'invalid-legacy', { digest: 'invalid', expiresAt: 'invalid' });
-		await store.put('idempotency', 'alice', 'large-legacy', { digest: 'invalid', expiresAt: 1e100 });
 		await store.prune(100, 2);
-		assert.equal((await inspection.query('SELECT COUNT(*) AS count FROM "mastodon_compat_entry" WHERE "namespace" = $1 AND "expiresAt" IS NULL', ['kv:idempotency'])).rows[0].count, '4');
-		assert.equal((await store.list('idempotency', 'alice')).length, 5);
+		assert.equal((await store.list('idempotency', 'alice')).length, 2);
 		await store.prune(100, 2);
-		const legacy = (await inspection.query('SELECT "expiresAt" FROM "mastodon_compat_entry" WHERE "key" = $1', ['b-live-legacy'])).rows[0];
-		assert.equal(legacy.expiresAt, '200');
-		assert.equal((await store.list('idempotency', 'alice')).length, 4);
+		assert.equal((await store.list('idempotency', 'alice')).length, 1);
 		assert.ok(await store.getIdempotency('alice', 'live', 100));
-		assert.ok(await store.getIdempotency('alice', 'b-live-legacy', 100));
 		assert.ok(await store.getGrant(token));
 		assert.deepEqual(await store.get('status', 'alice', 'note'), { sensitive: true, expiresAt: 1 });
-	} finally { await store.close(); await inspection.end(); }
+	} finally { await store.close(); }
 });
 
 test('PostgreSQL batch metadata lookup uses complete keys and excludes missing or unrelated values', postgresOnly, async t => {

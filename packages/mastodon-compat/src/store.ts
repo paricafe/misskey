@@ -75,13 +75,6 @@ const clone = <T>(value: T): T => {
 };
 const entryKey = (namespace: string, owner: string, key: string): string => JSON.stringify([namespace, owner, key]);
 
-function entryExpiration(entry: StoreEntry): number | null {
-	if (entry.expiresAt != null) return entry.expiresAt;
-	if (entry.namespace !== 'kv:idempotency' || entry.value == null || typeof entry.value !== 'object') return null;
-	const legacy = (entry.value as Partial<IdempotencyRecord>).expiresAt;
-	return typeof legacy === 'number' && Number.isSafeInteger(legacy) && legacy >= 0 ? legacy : null;
-}
-
 interface MemoryTransaction { entries: Map<string, StoreEntry>; active: boolean; }
 
 /** Explicit test storage, with the same async isolation boundary as PostgreSQL. */
@@ -167,14 +160,6 @@ class MemoryAdapter implements StoreAdapter {
 
 	async prune(now: number, limit: number): Promise<void> {
 		await this.locked(() => {
-			let repaired = 0;
-			for (const [key, entry] of this.data()) {
-				const expiresAt = entryExpiration(entry);
-				if (entry.expiresAt == null && expiresAt != null) {
-					this.data().set(key, { ...entry, expiresAt });
-					if (++repaired >= limit) break;
-				}
-			}
 			let removed = 0;
 			for (const [key, entry] of this.data()) {
 				if (['codes', 'operations', 'kv:idempotency'].includes(entry.namespace) && entry.expiresAt != null && entry.expiresAt <= now) {
@@ -273,9 +258,7 @@ export class CompatStore {
 
 	async getIdempotency(ownerId: string, key: string, now = Date.now()): Promise<IdempotencyRecord | undefined> {
 		const entry = await this.adapter.get('kv:idempotency', ownerId, key);
-		if (!entry) return undefined;
-		const expiresAt = entryExpiration(entry);
-		return expiresAt != null && expiresAt > now ? { ...entry.value as IdempotencyRecord, expiresAt } : undefined;
+		return entry?.expiresAt != null && entry.expiresAt > now ? { ...entry.value as IdempotencyRecord, expiresAt: entry.expiresAt } : undefined;
 	}
 
 	async putIdempotency(ownerId: string, key: string, value: IdempotencyRecord): Promise<void> {

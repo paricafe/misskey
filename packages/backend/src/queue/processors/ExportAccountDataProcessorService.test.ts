@@ -7,10 +7,19 @@ import * as fs from 'node:fs';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { ExportAccountDataProcessorService } from './ExportAccountDataProcessorService.js';
 
-function setup(addFile: () => Promise<unknown>, profile: Record<string, unknown> = { email: 'alice@example.com', emailVerified: true }) {
+function setup(
+	addFile: () => Promise<unknown>,
+	profile: Record<string, unknown> = { email: 'alice@example.com', emailVerified: true },
+	mutings: { id: string, muteeId: string }[] = [],
+	otherUsers: Record<string, { username: string, host: string | null }> = {},
+) {
 	const user = { id: 'user', username: 'alice', host: null, token: 'native-token' };
 	const emptyRepository = {
 		find: vi.fn().mockResolvedValue([]),
+		findBy: vi.fn().mockResolvedValue([]),
+	};
+	const mutingsRepository = {
+		find: vi.fn().mockResolvedValueOnce(mutings).mockResolvedValue([]),
 		findBy: vi.fn().mockResolvedValue([]),
 	};
 	const logger = { info: vi.fn(), succ: vi.fn(), error: vi.fn() };
@@ -18,20 +27,20 @@ function setup(addFile: () => Promise<unknown>, profile: Record<string, unknown>
 	const emailService = { sendEmail: vi.fn() };
 	const service = new ExportAccountDataProcessorService(
 		{ host: 'local.example' } as never,
-		{ findOneBy: vi.fn().mockResolvedValue(user) } as never,
+		{ findOneBy: vi.fn(({ id }: { id: string }) => Promise.resolve(id === user.id ? user : otherUsers[id] ?? null)) } as never,
 		{ findOneBy: vi.fn().mockResolvedValue({ userId: user.id, ...profile }) } as never,
 		emptyRepository as never,
 		emptyRepository as never,
 		emptyRepository as never,
 		emptyRepository as never,
+		mutingsRepository as never,
 		emptyRepository as never,
 		emptyRepository as never,
 		emptyRepository as never,
 		emptyRepository as never,
 		emptyRepository as never,
 		emptyRepository as never,
-		emptyRepository as never,
-		{} as never,
+		{ getFullApAccount: (username: string, host: string | null) => `${username}@${host ?? 'local.example'}` } as never,
 		driveService as never,
 		{} as never,
 		{} as never,
@@ -88,5 +97,21 @@ describe('ExportAccountDataProcessorService archive delivery', () => {
 
 		expect(driveService.addFile).toHaveBeenCalledOnce();
 		expect(emailService.sendEmail).not.toHaveBeenCalled();
+	});
+
+	test('writes valid JSON when a muted user no longer exists', async () => {
+		const exported: Record<string, unknown> = {};
+		const { service, tempDir } = setup(async () => {
+			const dir = tempDir()!;
+			for (const name of fs.readdirSync(dir).filter(name => name.endsWith('.json'))) {
+				exported[name] = JSON.parse(fs.readFileSync(`${dir}/${name}`, 'utf-8'));
+			}
+			return { id: 'file', url: 'https://files.example/archive.zip' };
+		}, undefined, [{ id: 'm1', muteeId: 'deleted' }, { id: 'm2', muteeId: 'bob' }], { bob: { username: 'bob', host: 'remote.example' } });
+
+		await service.process({ data: { user: { id: 'user' } } } as never);
+
+		expect(exported['mutings.json']).toMatchObject({ metaVersion: 1, host: 'local.example', mutings: ['bob@remote.example'] });
+		expect(Object.keys(exported).sort()).toEqual(['antennas.json', 'blockings.json', 'drive.json', 'favorites.json', 'followers.json', 'followings.json', 'ips.json', 'mutings.json', 'notes.json', 'profile.json', 'user.json']);
 	});
 });

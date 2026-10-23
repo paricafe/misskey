@@ -91,19 +91,6 @@ class PostgresAdapter implements StoreAdapter {
 
 	async prune(now: number, limit: number): Promise<void> {
 		await this.transaction(async () => {
-			// Older gateways stored this TTL only in JSON. Repair a bounded batch,
-			// including live reservations, without touching other metadata namespaces.
-			await this.query(`WITH legacy AS (
-				SELECT "namespace", "owner", "key", CASE
-					WHEN jsonb_typeof("value"->'expiresAt') = 'number' AND "value"->>'expiresAt' ~ '^[0-9]{1,16}$'
-					THEN ("value"->>'expiresAt')::bigint END AS expiration
-				FROM "mastodon_compat_entry" WHERE "namespace" = 'kv:idempotency' AND "expiresAt" IS NULL
-			), batch AS (
-				SELECT * FROM legacy WHERE expiration BETWEEN 0 AND 9007199254740991
-				ORDER BY "owner", "key" LIMIT $1
-			)
-			UPDATE "mastodon_compat_entry" e SET "expiresAt" = batch.expiration FROM batch
-			WHERE e."namespace" = batch."namespace" AND e."owner" = batch."owner" AND e."key" = batch."key"`, [limit]);
 			await this.query(`DELETE FROM "mastodon_compat_entry" e USING (
 				SELECT "namespace", "owner", "key" FROM "mastodon_compat_entry"
 				WHERE "namespace" IN ('codes', 'operations', 'kv:idempotency') AND "expiresAt" <= $1

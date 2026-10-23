@@ -27,7 +27,7 @@ for (const embedded of [false, true]) test(`${embedded ? 'embedded' : 'standalon
 	const store = new CompatStore(':memory:');
 	const prunes = t.mock.method(store, 'prune');
 	const options = { publicUrl: 'https://social.example', nativeUrl: 'https://native.example', store };
-	await store.put('idempotency', 'alice', 'startup', { digest: 'old', expiresAt: Date.now() - 1 });
+	await store.putIdempotency('alice', 'startup', { digest: 'old', expiresAt: Date.now() - 1 });
 	const app = embedded ? Fastify() : await createGateway(options);
 	if (embedded) installGateway(app, options);
 	t.after(() => app.close());
