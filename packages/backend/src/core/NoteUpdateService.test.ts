@@ -257,6 +257,20 @@ describe(NoteUpdateService, () => {
 		expect(noteEntityService.pack).toHaveBeenCalledTimes(1);
 	});
 
+	test('normalizes hashtags like note creation', async () => {
+		const { service, notesRepository } = createService();
+
+		await service.update(user, note, {
+			text: 'New text #FooＢａｒ',
+			cw: null,
+			files: [],
+			apEmojis: [],
+			updatedAt: new Date('2025-02-01T00:00:00.000Z'),
+		}, true);
+
+		expect(notesRepository.update.mock.calls[0]?.[1].tags).toEqual(['foobar']);
+	});
+
 	test('rebuilds a preflight snapshot from the locked note before persistence', async () => {
 		const { service, notesRepository, noteEntityService } = createService();
 		const preparedUpdate = await service.prepareUpdate(user, note);

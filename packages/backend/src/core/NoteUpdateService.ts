@@ -38,6 +38,7 @@ import { DriveFileEntityService } from "@/core/entities/DriveFileEntityService.j
 import { awaitAll } from "@/misc/prelude/await-all.js";
 import { IdentifiableError } from '@/misc/identifiable-error.js';
 import { extractUrlsForKeyWordCheck } from '@/misc/extract-urls-for-keyword-check.js';
+import { normalizeTag } from '@/misc/normalize-tag.js';
 
 export const MAX_NOTE_HISTORY_REVISIONS = 100;
 export const MAX_NOTE_HISTORY_BYTES = 1024 * 1024;
@@ -164,7 +165,7 @@ export class NoteUpdateService {
 		}
 
 		if (this.utilityService.isMediaSilencedHost(meta.mediaSilencedHosts, user.host)) emojis = [];
-		tags = tags.filter(tag => Array.from(tag).length <= 128).splice(0, 32);
+		tags = tags.filter(tag => Array.from(tag).length <= 128).splice(0, 32).map(tag => normalizeTag(tag));
 
 		// Keep this transaction DB-local. ActivityPub actor, attachment, and emoji
 		// resolution must be completed by the caller before entering it.
