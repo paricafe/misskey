@@ -154,8 +154,11 @@ export class ReactionService {
 				}
 
 				if (emoji) {
-					if (emoji.roleIdsThatCanBeUsedThisEmojiAsReaction.length === 0 || (await this.roleService.getUserRoles(user.id)).some(r => emoji.roleIdsThatCanBeUsedThisEmojiAsReaction.includes(r.id))) {
-						reaction = useLocalEmoji ? `:${name}:` : (reacterHost ? `:${name}@${reacterHost}:` : `:${name}:`);
+					const emojiHost = useLocalEmoji ? null : reacterHost;
+					const canUseLocalOnlyEmoji = note.userHost === emojiHost && (note.renoteUserHost == null || note.renoteUserHost === emojiHost);
+
+					if ((!emoji.localOnly || canUseLocalOnlyEmoji) && (emoji.roleIdsThatCanBeUsedThisEmojiAsReaction.length === 0 || (await this.roleService.getUserRoles(user.id)).some(r => emoji.roleIdsThatCanBeUsedThisEmojiAsReaction.includes(r.id)))) {
+						reaction = emojiHost ? `:${name}@${emojiHost}:` : `:${name}:`;
 
 						// センシティブ
 						if ((note.reactionAcceptance === 'nonSensitiveOnly' || note.reactionAcceptance === 'nonSensitiveOnlyForLocalLikeOnlyForRemote') && emoji.isSensitive) {

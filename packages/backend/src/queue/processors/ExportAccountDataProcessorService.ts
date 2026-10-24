@@ -5,12 +5,12 @@
  */
 
 import * as fs from 'node:fs';
+import * as nodePath from 'node:path';
 import { Inject, Injectable } from '@nestjs/common';
 import { In, IsNull, MoreThan, Not } from 'typeorm';
 import type { FindOptionsOrder, FindOptionsRelations, FindOptionsWhere, Repository } from 'typeorm';
 import { format as dateFormat } from 'date-fns';
 import mime from 'mime-types';
-import { ZipArchive } from 'archiver';
 import { DI } from '@/di-symbols.js';
 import type { AntennasRepository, BlockingsRepository, DriveFilesRepository, FollowingsRepository, MiNote, MiNoteFavorite, MiPoll, MiUser, MutingsRepository, NoteFavoritesRepository, NotesRepository, PollsRepository, SigninsRepository, UserListMembershipsRepository, UserListsRepository, UserProfilesRepository, UsersRepository } from '@/models/_.js';
 import type { Config } from '@/config.js';
@@ -19,6 +19,7 @@ import { DriveService } from '@/core/DriveService.js';
 import { IdService } from '@/core/IdService.js';
 import { DriveFileEntityService } from '@/core/entities/DriveFileEntityService.js';
 import { createTemp, createTempDir } from '@/misc/create-temp.js';
+import { ZipArchive } from '@/misc/zip.js';
 import { bindThis } from '@/decorators.js';
 import { Packed } from '@/misc/json-schema.js';
 import { UtilityService } from '@/core/UtilityService.js';
@@ -228,21 +229,20 @@ export class ExportAccountDataProcessorService {
 		// Create archive
 		const [archivePath, archiveCleanup] = await createTemp();
 		try {
-			await new Promise<void>((resolve, reject) => {
-				const archiveStream = fs.createWriteStream(archivePath);
-				const archive = new ZipArchive({
-					zlib: { level: 0 },
-				});
-				archiveStream.on('close', resolve);
-				archiveStream.on('error', reject);
-				archive.on('error', reject);
-				archive.pipe(archiveStream);
-				archive.directory(path, false);
-				archive.finalize().catch(reject);
-			});
+			const archive = await ZipArchive.create(archivePath);
+			try {
+				for (const entry of fs.readdirSync(path, { recursive: true, withFileTypes: true })) {
+					if (!entry.isFile()) continue;
+					const entryPath = nodePath.join(entry.parentPath, entry.name);
+					await archive.addFile(nodePath.relative(path, entryPath).split(nodePath.sep).join('/'), entryPath);
+				}
+			} catch (e) {
+				await archive.abort();
+				throw e;
+			}
+			await archive.close();
 			this.logger.succ(`Exported to: ${archivePath}`);
 
-			// Upload outside the stream callback so failures reject the job instead of hanging it.
 			const fileName = 'data-request-' + dateFormat(new Date(), 'yyyy-MM-dd-HH-mm-ss') + '.zip';
 			// The archive bundles every drive file and is a zip, so role upload policies would reject it for most users.
 			const driveFile = await this.driveService.addFile({ user, path: archivePath, name: fileName, force: true, skipPolicyCheck: true });

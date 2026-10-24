@@ -15,19 +15,19 @@
 		"test": "pnpm build && node --test dist/test/*.test.js"
 	},
 	"dependencies": {
-		"@fastify/cors": "11.3.0",
-		"@fastify/multipart": "10.1.1",
-		"fastify": "5.12.5",
-		"mfm-js": "0.26.0",
-		"pg": "8.23.0",
-		"ws": "8.21.3"
+		"@fastify/cors": "11.3.1",
+		"@fastify/multipart": "10.1.4",
+		"fastify": "5.12.7",
+		"mfm-js": "0.28.0",
+		"pg": "8.23.1",
+		"ws": "8.22.0"
 	},
 	"devDependencies": {
-		"@types/node": "26.4.0",
+		"@types/node": "26.6.5",
 		"@types/pg": "8.23.1",
-		"@types/ws": "8.18.1",
-		"@typescript-eslint/eslint-plugin": "8.68.0",
-		"@typescript-eslint/parser": "8.68.0",
+		"@types/ws": "8.18.2",
+		"@typescript-eslint/eslint-plugin": "8.71.2",
+		"@typescript-eslint/parser": "8.71.2",
 		"eslint": "9.39.5",
 		"typescript": "npm:@typescript/typescript6@6.0.2"
 	}

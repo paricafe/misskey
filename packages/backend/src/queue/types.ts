@@ -5,6 +5,7 @@
 
 import type { Antenna } from '@/server/api/endpoints/i/import-antennas.js';
 import type { MiDriveFile } from '@/models/DriveFile.js';
+import type { MiAnnouncement } from '@/models/Announcement.js';
 import type { MiNote } from '@/models/Note.js';
 import type { SystemWebhookEventType } from '@/models/SystemWebhook.js';
 import type { MiUser } from '@/models/User.js';
@@ -138,6 +139,11 @@ export type PostScheduledNoteJobData = {
 	noteDraftId: string;
 	// Jobs created before revisions were introduced belong to revision zero.
 	scheduleRevision?: number;
+};
+
+export type ArchiveAnnouncementJobData = {
+	announcementId: MiAnnouncement['id'];
+	autoArchiveAt: number;
 };
 
 export type SystemWebhookDeliverJobData<T extends SystemWebhookEventType = SystemWebhookEventType> = {

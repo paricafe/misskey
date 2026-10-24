@@ -37,6 +37,7 @@ import { CustomEmojiService } from "@/core/CustomEmojiService.js";
 import { DriveFileEntityService } from "@/core/entities/DriveFileEntityService.js";
 import { awaitAll } from "@/misc/prelude/await-all.js";
 import { IdentifiableError } from '@/misc/identifiable-error.js';
+import { extractUrlsForKeyWordCheck } from '@/misc/extract-urls-for-keyword-check.js';
 
 export const MAX_NOTE_HISTORY_REVISIONS = 100;
 export const MAX_NOTE_HISTORY_BYTES = 1024 * 1024;
@@ -132,16 +133,21 @@ export class NoteUpdateService {
 		}
 
 		const meta = await this.metaService.fetch();
-		if (this.utilityService.isKeyWordIncluded(
-			this.utilityService.concatNoteContentsForKeyWordCheck({ cw: data.cw, text: data.text }),
+		if (meta.prohibitedWords.length > 0 && this.utilityService.isKeyWordIncluded(
+			this.utilityService.concatNoteContentsForKeyWordCheck({
+				cw: data.cw,
+				text: data.text,
+				others: [...extractUrlsForKeyWordCheck(data.cw ?? ''), ...extractUrlsForKeyWordCheck(data.text ?? '')],
+			}),
 			meta.prohibitedWords,
 		)) {
 			throw new IdentifiableError(NOTE_PROHIBITED_WORDS_ERROR_ID, 'Note contains prohibited words');
 		}
 		// An edit cannot downgrade visibility: the note may already be in public timelines.
+		const sensitiveWordsTarget = data.cw ?? data.text ?? '';
 		if (
-			user.host == null && note.visibility === 'public' && note.channelId == null &&
-			this.utilityService.isKeyWordIncluded(data.cw ?? data.text ?? '', meta.sensitiveWords)
+			user.host == null && note.visibility === 'public' && note.channelId == null && meta.sensitiveWords.length > 0 &&
+			this.utilityService.isKeyWordIncluded([sensitiveWordsTarget, ...extractUrlsForKeyWordCheck(sensitiveWordsTarget)].join('\n'), meta.sensitiveWords)
 		) {
 			throw new IdentifiableError(NOTE_SENSITIVE_WORDS_ERROR_ID, 'Public note contains sensitive words');
 		}
