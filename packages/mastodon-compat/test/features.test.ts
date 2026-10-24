@@ -215,7 +215,7 @@ test('conversation root traversal stops at inaccessible or public parents and ha
 
 test('unavailable tag following, scheduled writes and push delivery do not claim success', async t => {
 	const f = await fixture(t);
-	assert.equal((await f.request('GET', '/api/v1/followed_tags')).statusCode, 501);
+	assert.deepEqual((await f.request('GET', '/api/v1/followed_tags')).json(), []);
 	assert.equal((await f.request('POST', '/api/v1/tags/cats/follow')).statusCode, 501);
 	assert.deepEqual((await f.request('GET', '/api/v1/scheduled_statuses')).json(), []);
 	assert.equal((await f.request('PUT', '/api/v1/scheduled_statuses/123', { scheduled_at: '2027-01-01T00:00:00Z' })).statusCode, 422);

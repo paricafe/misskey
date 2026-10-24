@@ -446,7 +446,7 @@ export function registerFeatures(routes: Routes): void {
 	});
 
 	add('GET', '/api/v1/tags/:name', undefined, c => ({ name: c.params.name, url: `${publicUrl}/tags/${encodeURIComponent(c.params.name)}`, history: [] }), true);
-	add('GET', '/api/v1/followed_tags', 'read:follows', () => { throw new HttpError(501, 'Following tags is not supported by the native server'); });
+	add('GET', '/api/v1/followed_tags', 'read:follows', () => []);
 	for (const action of ['follow', 'unfollow']) add('POST', `/api/v1/tags/:name/${action}`, 'write:follows', () => { throw new HttpError(501, 'Following tags is not supported by the native server'); });
 	add('GET', '/api/v1/scheduled_statuses', 'read:statuses', () => []);
 	add('GET', '/api/v1/scheduled_statuses/:id', 'read:statuses', () => { throw new HttpError(404, 'Record not found'); });
