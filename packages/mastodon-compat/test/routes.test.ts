@@ -170,6 +170,13 @@ test('all compatibility status inputs validate before creation, editing, metadat
 	assert.equal((await f.request('POST', '/api/v1/statuses', { status: 'Valid' }, undefined, 'invalid')).statusCode, 200);
 });
 
+test('an empty media_ids list creates a text-only note', async t => {
+	const f = await fixture(t);
+	const result = await f.request('POST', '/api/v1/statuses', { status: 'Text only', media_ids: [] });
+	assert.equal(result.statusCode, 200, result.body);
+	assert.equal('fileIds' in f.calls.find(call => call.endpoint === 'notes/create')!.body, false);
+});
+
 test('posting applies saved source defaults, supports explicit overrides and keeps omitted edit metadata', async t => {
 	const f = await fixture(t);
 	await f.store.put('account-source', 'alice', 'defaults', { privacy: 'private', sensitive: true, language: 'ja' });

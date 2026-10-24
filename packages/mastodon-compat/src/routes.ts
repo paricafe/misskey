@@ -338,7 +338,8 @@ function prepareStatusInput(input: Json, defaults: Json = {}, editing = false): 
 	if (input.media_ids !== undefined) {
 		const ids = strings(input.media_ids);
 		if (ids.length > 16 || ids.some(id => !id) || new Set(ids).size !== ids.length) throw new HttpError(422, 'Invalid media_ids');
-		native.fileIds = ids;
+		// Clients send an empty list for text-only posts; native creation rejects an empty fileIds.
+		if (ids.length || editing) native.fileIds = ids;
 	}
 	if (!editing) {
 		native.visibility = visibility(input.visibility === undefined ? defaults.privacy : input.visibility);
