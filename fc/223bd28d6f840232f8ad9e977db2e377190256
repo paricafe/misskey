@@ -1,0 +1,21 @@
+packages/frontend/test/unit/custom-emojis.test.ts
+  s_96c6ec99b76857::t_ec4d3a6988d11f 54-71
+packages/frontend/src/custom-emojis.ts
+  s_96c6ec99b76857::t_80c95f47fe5a66 24,26,28-35
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "fc223bd28d6f840232f8ad9e977db2e377190256",
+  "prompts": {},
+  "sessions": {
+    "s_96c6ec99b76857": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ab187d3f-1c7d-4fdc-9821-950f8f0195a9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Natsuki-Kaede <i@pari.network>"
+    }
+  }
+}
