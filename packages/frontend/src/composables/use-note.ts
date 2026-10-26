@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { ref, computed, reactive } from 'vue';
+import { ref, computed, shallowReactive } from 'vue';
 import type { Ref } from 'vue';
 import * as mfm from 'mfm-js';
 import * as Misskey from 'misskey-js';
@@ -135,7 +135,9 @@ export function useNote(
 			rawNote = result;
 		}
 	}
-	rawNote = reactive(rawNote);
+	// Edit events replace top-level fields of the shown note, so only that level is reactive.
+	if (Misskey.note.isPureRenote(rawNote) && rawNote.renote != null) rawNote.renote = shallowReactive(rawNote.renote);
+	else rawNote = shallowReactive(rawNote);
 
 	// 基本状態
 	const isRenote = Misskey.note.isPureRenote(rawNote);
@@ -162,13 +164,13 @@ export function useNote(
 	const hardMuted = props.withHardMute && $i ? checkNoteWordMute(appearNote, $i, $i.hardMutedWords) : false;
 
 	// 計算プロパティ (Computed)
-	const isMyRenote = computed(() => $i && ($i.id === rawNote.userId));
+	const isMyRenote = $i != null && ($i.id === rawNote.userId);
 	const parsed = computed(() => appearNote.text ? mfm.parse(appearNote.text) : null);
 	const urls = computed(() => parsed.value ? extractUrlFromMfm(parsed.value).filter((url) => appearNote.renote?.url !== url && appearNote.renote?.uri !== url) : null);
 	const isLong = computed(() => shouldCollapsed(appearNote, urls.value ?? []));
 	const collapsed = ref(appearNote.cw == null && isLong.value);
 	const showTicker = computed(() => (prefer.s.instanceTicker === 'always') || (prefer.s.instanceTicker === 'remote' && appearNote.user.instance));
-	const canRenote = computed(() => ['public', 'home'].includes(appearNote.visibility) || (appearNote.visibility === 'followers' && appearNote.userId === $i?.id));
+	const canRenote = ['public', 'home'].includes(appearNote.visibility) || (appearNote.visibility === 'followers' && appearNote.userId === $i?.id);
 	const canTranslate = computed(() => $i != null && $i.policies.canUseTranslator && instance.translatorAvailable);
 	const renoteCollapsed = ref(
 		prefer.s.collapseEverything || (prefer.s.alwaysCollapseRenotes && isRenote) || (prefer.s.collapseRenotes && isRenote && (
@@ -445,7 +447,7 @@ export function useNote(
 		menuItems.push(getCopyNoteLinkMenu(rawNote, i18n.ts.copyLinkRenote));
 		menuItems.push({ type: 'divider' });
 
-		if (isMyRenote.value) {
+		if (isMyRenote) {
 			menuItems.push(getUnrenote());
 			os.popupMenu(menuItems, els.renoteTime?.value);
 		} else {

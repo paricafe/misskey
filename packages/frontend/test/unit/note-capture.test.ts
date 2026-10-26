@@ -4,7 +4,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { createApp, defineComponent, h, nextTick } from 'vue';
+import { createApp, defineComponent, h, isReactive, nextTick } from 'vue';
 import type * as Misskey from 'misskey-js';
 import { applyNoteCaptureDiff, noteEvents, useNoteCapture } from '@/composables/use-note-capture.js';
 import { useNote } from '@/composables/use-note.js';
@@ -216,48 +216,84 @@ describe('useNoteCapture counts', () => {
 	});
 });
 
+function editableNote(id = 'note-id', data: Partial<Misskey.entities.Note> = {}): Misskey.entities.Note {
+	return {
+		...makeNote(),
+		id,
+		text: 'before',
+		cw: null,
+		userId: 'author-id',
+		user: {
+			id: 'author-id',
+			instance: null,
+		},
+		visibility: 'public',
+		localOnly: false,
+		reactionAcceptance: null,
+		tags: [],
+		emojis: {},
+		fileIds: [],
+		files: [],
+		history: null,
+		...data,
+	} as unknown as Misskey.entities.Note;
+}
+
+function mountNote(note: Misskey.entities.Note) {
+	const container = document.createElement('div');
+	let appearNote!: Misskey.entities.Note;
+	const app = createApp(defineComponent({
+		setup() {
+			({ appearNote } = useNote({ note, mock: true }));
+			return () => h('div', appearNote.text ?? '');
+		},
+	}));
+	app.mount(container);
+	mountedApps.push(app);
+	return { container, appearNote };
+}
+
+function emitUpdated(noteId: string, text: string): void {
+	noteEvents.emit(`updated:${noteId}`, {
+		cw: null,
+		text,
+		updatedAt: new Date().toISOString(),
+		tags: [],
+		emojis: {},
+		fileIds: [],
+		files: [],
+	});
+}
+
 describe('useNote edit updates', () => {
 	test('rerenders note content after an updated event', async () => {
-		const note = {
-			...makeNote(),
-			text: 'before',
-			cw: null,
-			userId: 'author-id',
-			user: {
-				id: 'author-id',
-				instance: null,
-			},
-			visibility: 'public',
-			localOnly: false,
-			reactionAcceptance: null,
-			tags: [],
-			emojis: {},
-			fileIds: [],
-			files: [],
-			history: null,
-		} as unknown as Misskey.entities.Note;
-		const container = document.createElement('div');
-		const app = createApp(defineComponent({
-			setup() {
-				const { appearNote } = useNote({ note, mock: true });
-				return () => h('div', appearNote.text ?? '');
-			},
-		}));
-		app.mount(container);
-		mountedApps.push(app);
+		const note = editableNote();
+		const { container } = mountNote(note);
 
 		expect(container.textContent).toBe('before');
-		noteEvents.emit(`updated:${note.id}`, {
-			cw: null,
-			text: 'after',
-			updatedAt: new Date().toISOString(),
-			tags: [],
-			emojis: {},
-			fileIds: [],
-			files: [],
-		});
+		emitUpdated(note.id, 'after');
 		await nextTick();
 
 		expect(container.textContent).toBe('after');
+	});
+
+	test('rerenders the renoted note of a pure renote after an updated event', async () => {
+		const target = editableNote('target-id');
+		const { container } = mountNote(editableNote('renote-id', { text: null, renoteId: target.id, renote: target }));
+
+		expect(container.textContent).toBe('before');
+		emitUpdated(target.id, 'after');
+		await nextTick();
+
+		expect(container.textContent).toBe('after');
+	});
+
+	test('keeps nested note objects out of reactivity', () => {
+		const { appearNote } = mountNote(editableNote('note-id', { files: [{ id: 'file-id' } as Misskey.entities.DriveFile] }));
+
+		expect(isReactive(appearNote)).toBe(true);
+		expect(isReactive(appearNote.user)).toBe(false);
+		expect(isReactive(appearNote.files)).toBe(false);
+		expect(isReactive(appearNote.files?.[0])).toBe(false);
 	});
 });
