@@ -286,7 +286,6 @@ const {
 	parsed,
 	urls,
 	isLong,
-	showTicker,
 	canRenote,
 	canTranslate,
 

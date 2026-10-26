@@ -47,7 +47,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 </template>
 
 <script lang="ts" setup>
-import { inject, ref } from 'vue';
+import { computed, inject, ref } from 'vue';
 import * as Misskey from 'misskey-js';
 import { i18n } from '@/i18n.js';
 import { notePage } from '@@/js/note.js';
@@ -65,7 +65,7 @@ const props = defineProps<{
 	note: Misskey.entities.Note;
 }>();
 
-const showTicker = (prefer.s.instanceTicker === 'always') || (prefer.s.instanceTicker === 'remote' && props.note.user.instance);
+const showTicker = computed(() => (prefer.s.instanceTicker === 'always') || (prefer.s.instanceTicker === 'remote' && props.note.user.instance));
 
 const mock = inject(DI.mock, false);
 </script>
