@@ -1,0 +1,19 @@
+package.json
+  s_96c6ec99b76857::t_5352450f41d907 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "be24eb6cc096b81669a2dc2ede87bf2e0e2d3580",
+  "prompts": {},
+  "sessions": {
+    "s_96c6ec99b76857": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ab187d3f-1c7d-4fdc-9821-950f8f0195a9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Natsuki-Kaede <i@pari.network>"
+    }
+  }
+}
