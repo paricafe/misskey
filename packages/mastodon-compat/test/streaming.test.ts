@@ -318,6 +318,39 @@ test('preserves full hashtag and list identities while sharing native public cha
 	await c.native.commands.take(message => message.type === 'disconnect' && message.body.id === global);
 });
 
+test('reads compatibility state once per streamed note for all matching subscriptions', async t => {
+	const f = await fixture();
+	t.after(() => f.close());
+	const c = await f.connect();
+	for (const target of [{ stream: 'public' }, { stream: 'public:remote' }, { stream: 'hashtag', tag: 'barrier' }]) {
+		c.socket.send(JSON.stringify({ type: 'subscribe', ...target }));
+	}
+	const global = await channel(c.native, 'globalTimeline');
+	await channel(c.native, 'hashtag', params => params.q[0][0] === 'barrier');
+	const reads: string[] = [];
+	const spied = f.store as unknown as Record<string, (...args: unknown[]) => Promise<unknown>>;
+	for (const method of ['get', 'getMany', 'list', 'getGrant']) {
+		const original = spied[method]!.bind(f.store);
+		spied[method] = (...args: unknown[]) => {
+			reads.push(method === 'get' || method === 'list' ? `${method}:${String(args[0])}` : method);
+			return original(...args);
+		};
+	}
+	const remote = { ...bob, host: 'remote.example' };
+	const file = { id: 'file', type: 'image/png', url: 'https://remote.example/file.png', thumbnailUrl: null, isSensitive: false, properties: {} };
+	for (const id of ['first-remote', 'second-remote']) {
+		reads.length = 0;
+		f.notes.set(id, note(id, { user: remote, fileIds: [file.id], files: [file] }));
+		emit(c.native, global, 'note', { id });
+		for (const stream of ['public', 'public:remote']) {
+			await c.messages.take(message => message.stream?.[0] === stream && JSON.parse(message.payload ?? '{}').id === id);
+		}
+		// Every native frame reads the filter revision; the remaining reads belong to this note.
+		const expected = ['getMany', ...(id === 'first-remote' ? ['list:filter'] : []), 'getGrant'];
+		assert.deepEqual(reads.filter(read => read !== 'get:filter-revision').sort(), expected.sort());
+	}
+});
+
 test('reloads edited notes, sends deletes only for delivered IDs, and suppresses hidden notifications', async t => {
 	const f = await fixture();
 	t.after(() => f.close());

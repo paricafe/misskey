@@ -9,11 +9,11 @@ import { EntityConverter } from './entities.js';
 import { NativeClient, NativeError } from './native-client.js';
 import { getAuthorization } from './oauth.js';
 import { allowsScope, assertScope, toNativePermissions } from './scopes.js';
-import { CompatStore, type Grant, type StoreKey } from './store.js';
+import { CompatStore, type Grant } from './store.js';
 import { array, boolean, compareIds, HttpError, integer, pageRows, pagination, string, strings } from './parameters.js';
 import type { Json } from './types.js';
 import { applyFilters, type FilterContext } from './features.js';
-import { decorateStatus, hydrateStatus, liveReblog } from './metadata.js';
+import { decorateStatus, hydrateStatus, liveReblog, preloadedStatusStore, statusStoreKeys, type StatusStore } from './metadata.js';
 
 export interface RouteDependencies { native: NativeClient; entities: EntityConverter; store: CompatStore; publicUrl: string; }
 export interface RequestContext {
@@ -21,8 +21,6 @@ export interface RequestContext {
 	call: <T = Json>(endpoint: string, body?: Json) => Promise<T>;
 }
 export type RouteHandler = (context: RequestContext) => unknown | Promise<unknown>;
-type StatusStore = Pick<CompatStore, 'get' | 'list' | 'delete'>;
-const storeKey = (key: StoreKey): string => JSON.stringify([key.namespace, key.owner, key.key]);
 
 export class Routes {
 	private readonly readCache = new WeakMap<RequestContext, Map<string, Promise<Json>>>();
@@ -69,35 +67,13 @@ export class Routes {
 			return status ? [status] : [];
 		});
 		if (statuses.length === 0) return [];
-		const keys = new Map<string, StoreKey>();
-		const authors = new Set<string>();
-		const add = (namespace: string, owner: string, key: string) => {
-			const lookup = { namespace, owner, key }; keys.set(storeKey(lookup), lookup);
-		};
-		const collect = (status: Json) => {
-			const owner = String(status.account.id);
-			authors.add(owner);
-			add('status', owner, status.id);
-			if (context.userId) add('reblog', context.userId, status.id);
-			for (const file of status.media_attachments) add('media', owner, file.id);
-			if (status.reblog) collect(status.reblog);
-			if (status.quote?.quoted_status) collect(status.quote.quoted_status);
-		};
-		statuses.forEach(collect);
+		const { keys, authors } = statusStoreKeys(statuses, context.userId || undefined);
 		const [entries, filters] = await Promise.all([
-			this.deps.store.getMany([...keys.values()]),
+			this.deps.store.getMany(keys),
 			context.userId ? this.deps.store.list('filter', context.userId) : [],
-			this.prefetchAuthors(context, [...authors]),
+			this.prefetchAuthors(context, authors),
 		]);
-		const values = new Map(entries.map(entry => [storeKey(entry), entry.value]));
-		const store: StatusStore = {
-			get: async <T>(namespace: string, owner: string, key: string) => values.get(storeKey({ namespace, owner, key })) as T | undefined,
-			list: async <T>() => filters as Array<{ key: string; value: T }>,
-			delete: async (namespace, owner, key) => {
-				values.delete(storeKey({ namespace, owner, key }));
-				return this.deps.store.delete(namespace, owner, key);
-			},
-		};
+		const store = preloadedStatusStore(this.deps.store, entries, filters);
 		// Bound native state lookups while preserving the source timeline order.
 		const result: Array<Json | null> = Array(statuses.length).fill(null);
 		let next = 0;

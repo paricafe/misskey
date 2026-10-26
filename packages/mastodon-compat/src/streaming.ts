@@ -9,7 +9,7 @@ import type { Duplex } from 'node:stream';
 import WebSocket, { WebSocketServer } from 'ws';
 import type { EntityConverter } from './entities.js';
 import { applyFilters, conversationFromNote, conversationState, latestConversationNote } from './features.js';
-import { decorateStatus, hydrateStatus } from './metadata.js';
+import { decorateStatus, hydrateStatus, preloadedStatusStore, statusStoreKeys, type StatusStore } from './metadata.js';
 import { NativeError } from './native-client.js';
 import type { NativeClient } from './native-client.js';
 import { allowsScope, toNativePermissions } from './scopes.js';
@@ -141,6 +141,7 @@ class StreamingSession {
 	private readonly channelsById = new Map<string, NativeChannel>();
 	private readonly delivered = new Map<string, Delivery>();
 	private readonly nativeNoteIds = new Map<string, Set<string>>();
+	private filterCache?: { revision: unknown; filters: Array<{ key: string; value: unknown }> };
 	private channelSequence = 0;
 	private queue: Promise<void> = Promise.resolve();
 	private pendingEvents = 0;
@@ -294,8 +295,10 @@ class StreamingSession {
 	private enqueue(action: () => Promise<void>): void {
 		if (this.ended) return;
 		if (++this.pendingEvents > MAX_PENDING_EVENTS) { this.close(1013, 'Too many pending streaming events'); return; }
+		// Each action confirms the grant itself immediately before it emits.
 		this.queue = this.queue.then(async () => {
-			if (await this.currentGrant()) { await this.checkFilters(); if (!this.ended) await action(); }
+			await this.checkFilters();
+			if (!this.ended) await action();
 		}).catch(async error => {
 			if (error instanceof NativeError && [401, 403].includes(error.status)) this.close(1008, 'The native authorization is unavailable');
 			else if (error instanceof StreamError) await this.sendError(error);
@@ -318,9 +321,31 @@ class StreamingSession {
 		}
 	}
 
+	/** Every filter write changes the revision, so the list is reloaded only after checkFilters sees a new one. */
+	private async filters(): Promise<Array<{ key: string; value: unknown }>> {
+		const revision = this.filterRevision;
+		if (!this.filterCache || this.filterCache.revision !== revision) {
+			this.filterCache = { revision, filters: await this.deps.store.list('filter', this.grant.userId) };
+		}
+		return this.filterCache.filters;
+	}
+
+	private async statusStore(status: Json): Promise<StatusStore> {
+		const [entries, filters] = await Promise.all([
+			this.deps.store.getMany(statusStoreKeys([status], this.grant.userId).keys),
+			this.filters(),
+		]);
+		return preloadedStatusStore(this.deps.store, entries, filters);
+	}
+
 	private async send(target: Subscription, event: string, payload?: Json | string): Promise<boolean> {
 		const grant = await this.currentGrant();
-		if (!grant || this.desiredSubscriptions.get(target.key) !== target || this.subscriptions.get(target.key) !== target || this.client.readyState !== WebSocket.OPEN) return false;
+		return grant != null && this.emit(grant, target, event, payload);
+	}
+
+	/** The caller must have confirmed the grant after its last asynchronous read. */
+	private emit(grant: UserGrant, target: Subscription, event: string, payload?: Json | string): boolean {
+		if (this.ended || this.desiredSubscriptions.get(target.key) !== target || this.subscriptions.get(target.key) !== target || this.client.readyState !== WebSocket.OPEN) return false;
 		const required = event === 'notification' ? 'read:notifications' : 'read:statuses';
 		if (event !== 'filters_changed' && !allowsScope(grant.scopes, required)) return false;
 		if (this.client.bufferedAmount > MAX_BUFFERED_BYTES) { this.close(1013, 'The streaming client is too slow'); return false; }
@@ -372,7 +397,9 @@ class StreamingSession {
 	private async deliverNote(note: Json, keys: string[], event: 'update' | 'status.update'): Promise<void> {
 		const status = this.deps.entities.status(note, { viewerId: this.grant.userId });
 		if (!status) return;
+		let store: StatusStore | undefined;
 		let hydrated: Json | undefined;
+		const updates: Array<[Subscription, Json]> = [];
 		for (const key of keys) {
 			const target = this.subscriptions.get(key);
 			if (!target || !this.matches(target, note)) continue;
@@ -382,15 +409,21 @@ class StreamingSession {
 				if (conversation && await this.send(target, 'conversation', conversation)) this.remember(note, target, conversation);
 			} else {
 				const context = target.stream.startsWith('public') || target.stream.startsWith('hashtag') ? 'public' : 'home';
-				hydrated ??= await this.hydratedStatus(status);
-				const decorated = await applyFilters(this.deps.store, this.grant.userId, hydrated, context);
-				if (await this.send(target, event, decorated)) this.remember(note, target);
+				store ??= await this.statusStore(status);
+				hydrated ??= await this.hydratedStatus(status, store);
+				updates.push([target, await applyFilters(store, this.grant.userId, hydrated, context)]);
 			}
+		}
+		if (updates.length === 0) return;
+		const grant = await this.currentGrant();
+		if (!grant) return;
+		for (const [target, payload] of updates) {
+			if (this.emit(grant, target, event, payload)) this.remember(note, target);
 		}
 	}
 
 	private async notification(channel: NativeChannel, source: Json): Promise<void> {
-		if (!allowsScope((await this.currentGrant())?.scopes ?? [], 'read:notifications')) return;
+		if (!allowsScope(this.grant.scopes, 'read:notifications')) return;
 		let note: Json | null = null;
 		if (object(source.note)) {
 			if (!identifier(source.note.id)) return;
@@ -402,11 +435,14 @@ class StreamingSession {
 		if (note) {
 			const status = this.deps.entities.status(note, { viewerId: this.grant.userId });
 			if (!status) return;
-			converted.status = await applyFilters(this.deps.store, this.grant.userId, await this.hydratedStatus(status), 'notifications');
+			const store = await this.statusStore(status);
+			converted.status = await applyFilters(store, this.grant.userId, await this.hydratedStatus(status, store), 'notifications');
 		}
+		const grant = await this.currentGrant();
+		if (!grant) return;
 		for (const key of channel.targets) {
 			const target = this.subscriptions.get(key);
-			if (target && ['user', 'user:notification'].includes(target.stream)) await this.send(target, 'notification', converted);
+			if (target && ['user', 'user:notification'].includes(target.stream)) this.emit(grant, target, 'notification', converted);
 		}
 	}
 
@@ -499,15 +535,15 @@ class StreamingSession {
 
 	private async conversation(note: Json, status: Json): Promise<Json | null> {
 		const conversation = await conversationFromNote(this.deps.store, this.grant.userId, note, this.native.bind(this), this.deps.entities, { status: await decorateStatus(this.deps.store, status, this.grant.userId) });
-		if (conversation?.last_status) conversation.last_status = await this.hydratedStatus(conversation.last_status);
+		if (conversation?.last_status) conversation.last_status = await this.hydratedStatus(conversation.last_status, await this.statusStore(conversation.last_status));
 		return conversation;
 	}
 
-	private async hydratedStatus(status: Json): Promise<Json> {
-		const grant = await this.currentGrant();
-		if (!grant) throw new StreamError(401, 'The access token is invalid');
+	/** Grants are insert-only, so the session grant still holds the current scopes. */
+	private async hydratedStatus(status: Json, store: StatusStore): Promise<Json> {
+		const grant = this.grant;
 		const reads = new Map<string, Promise<Json>>();
-		return await hydrateStatus(this.deps.store, await decorateStatus(this.deps.store, status, grant.userId), grant.userId, toNativePermissions(grant.scopes).includes('read:account'), (endpoint, body) => {
+		return await hydrateStatus(store, await decorateStatus(store, status, grant.userId), grant.userId, toNativePermissions(grant.scopes).includes('read:account'), (endpoint, body) => {
 			const key = JSON.stringify([endpoint, body]);
 			let response = reads.get(key);
 			if (!response) { response = this.native<Json>(endpoint, body); reads.set(key, response); }

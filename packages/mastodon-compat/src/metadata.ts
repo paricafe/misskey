@@ -3,9 +3,45 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import type { CompatStore } from './store.js';
+import type { CompatStore, StoreEntry, StoreKey } from './store.js';
 import type { Json } from './types.js';
 import { NativeError } from './native-client.js';
+
+export type StatusStore = Pick<CompatStore, 'get' | 'list' | 'delete'>;
+const storeKey = (key: StoreKey): string => JSON.stringify([key.namespace, key.owner, key.key]);
+
+/** Lists the compatibility records that decorating and hydrating these statuses reads. */
+export function statusStoreKeys(statuses: Json[], userId: string | undefined): { keys: StoreKey[]; authors: string[] } {
+	const keys = new Map<string, StoreKey>();
+	const authors = new Set<string>();
+	const add = (namespace: string, owner: string, key: string) => {
+		const lookup = { namespace, owner, key }; keys.set(storeKey(lookup), lookup);
+	};
+	const collect = (status: Json) => {
+		const owner = String(status.account.id);
+		authors.add(owner);
+		add('status', owner, status.id);
+		if (userId) add('reblog', userId, status.id);
+		for (const file of status.media_attachments) add('media', owner, file.id);
+		if (status.reblog) collect(status.reblog);
+		if (status.quote?.quoted_status) collect(status.quote.quoted_status);
+	};
+	statuses.forEach(collect);
+	return { keys: [...keys.values()], authors: [...authors] };
+}
+
+/** Serves reads from preloaded entries and filters; deletes still reach the store. */
+export function preloadedStatusStore(store: Pick<CompatStore, 'delete'>, entries: StoreEntry[], filters: Array<{ key: string; value: unknown }>): StatusStore {
+	const values = new Map(entries.map(entry => [storeKey(entry), entry.value]));
+	return {
+		get: async <T>(namespace: string, owner: string, key: string) => values.get(storeKey({ namespace, owner, key })) as T | undefined,
+		list: async <T>() => filters as Array<{ key: string; value: T }>,
+		delete: async (namespace, owner, key) => {
+			values.delete(storeKey({ namespace, owner, key }));
+			return store.delete(namespace, owner, key);
+		},
+	};
+}
 
 /** Shared by REST and streaming; only compatibility-owned properties come from this store. */
 export async function decorateStatus(store: Pick<CompatStore, 'get'>, status: Json, userId?: string): Promise<Json> {
