@@ -85,6 +85,14 @@ function canReact(reaction: string) {
 watch([() => props.reactions, () => props.maxNumber], ([newSource, maxNumber]) => {
 	hasMoreReactions.value = Object.keys(newSource).length > maxNumber;
 
+	// Shown reactions keep their place so that the buttons do not move under the pointer.
+	const newReactions: [string, number][] = [];
+	for (const [reaction] of _reactions.value) {
+		if (reaction in newSource && newSource[reaction] !== 0) {
+			newReactions.push([reaction, newSource[reaction]]);
+		}
+	}
+
 	const sorted = Object.entries(newSource).filter(([, count]) => count !== 0);
 	if (prefer.s.showAvailableReactionsFirstInNote) {
 		// ソートの比較関数内で評価すると同じ絵文字に対して何度も実行されるため、事前に1回だけ評価しておく
@@ -102,7 +110,9 @@ watch([() => props.reactions, () => props.maxNumber], ([newSource, maxNumber]) =
 		sorted.sort(([, countA], [, countB]) => countB - countA);
 	}
 
-	const newReactions = sorted.slice(0, props.maxNumber);
+	const shownNames = new Set(newReactions.map(([x]) => x));
+	newReactions.push(...sorted.filter(([y], i) => i < maxNumber && !shownNames.has(y)));
+	newReactions.splice(maxNumber);
 
 	if (props.myReaction && !newReactions.some(([x]) => x === props.myReaction) && props.myReaction in newSource && newSource[props.myReaction] > 0) {
 		newReactions.push([props.myReaction, newSource[props.myReaction]]);
