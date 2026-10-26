@@ -1,0 +1,21 @@
+packages/frontend/src/composables/use-note.ts
+  s_96c6ec99b76857::t_a4376292f8771e 6,138-140,167,173,450
+packages/frontend/test/unit/note-capture.test.ts
+  s_96c6ec99b76857::t_26e5dbb0669747 7,219-267,270-271,274-285,290-298
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "3535c9a71187354e55bcd88b7e2634d554357a0b",
+  "prompts": {},
+  "sessions": {
+    "s_96c6ec99b76857": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ab187d3f-1c7d-4fdc-9821-950f8f0195a9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Natsuki-Kaede <i@pari.network>"
+    }
+  }
+}
