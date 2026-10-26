@@ -1,0 +1,23 @@
+packages/frontend/test/unit/reactions-viewer.test.ts
+  s_96c6ec99b76857::t_7120aa57ea457a 1-63
+packages/frontend/src/components/MkReactionsViewer.vue
+  s_96c6ec99b76857::t_e8d1df248e3030 115
+  s_96c6ec99b76857::t_130a477c965ff1 113-114
+  s_96c6ec99b76857::t_31d671c3324a39 88-95
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "1051834a308b5963cf2dae76eead6165be59e0c2",
+  "prompts": {},
+  "sessions": {
+    "s_96c6ec99b76857": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ab187d3f-1c7d-4fdc-9821-950f8f0195a9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Natsuki-Kaede <i@pari.network>"
+    }
+  }
+}
