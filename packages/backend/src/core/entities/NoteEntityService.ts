@@ -569,12 +569,23 @@ export class NoteEntityService implements OnModuleInit {
 			// パフォーマンスのためノートが作成されてから2秒以上経っていない場合はリアクションを取得しない
 			const oldId = this.idService.gen(Date.now() - 2000);
 
-			for (const note of notes) {
-				const reactionNote = isPureRenote(note) ? note.renote : note;
-				if (!isPureRenote(note) && note.id >= oldId) {
-					myReactionsMap.set(note.id, null);
-					continue;
+			// Renotes are packed with detail, so quoted notes in the renote chain need a reaction too.
+			const reactionNotes: MiNote[] = [];
+			const visited = new Set<MiNote['id']>();
+			for (const root of notes) {
+				let note: MiNote | null = root;
+				while (note != null && !visited.has(note.id)) {
+					visited.add(note.id);
+					if (note === root && !isPureRenote(note) && note.id >= oldId) {
+						myReactionsMap.set(note.id, null);
+					} else if (!isPureRenote(note)) {
+						reactionNotes.push(note);
+					}
+					note = note.renote;
 				}
+			}
+
+			for (const reactionNote of reactionNotes) {
 				const buffered = bufferedReactions?.get(reactionNote.id);
 				const deltas = buffered ? this.reactionsBufferingService.getDeltas(reactionNote, buffered) : {};
 				const reactionsCount = Object.values(this.reactionsBufferingService.mergeReactions(reactionNote.reactions, deltas)).reduce((a, b) => a + b, 0);

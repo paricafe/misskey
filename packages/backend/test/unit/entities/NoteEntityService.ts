@@ -6,7 +6,7 @@
 import { describe, expect, test, vi } from 'vitest';
 import { EntityNotFoundError, In } from 'typeorm';
 import type { ModuleRef } from '@nestjs/core';
-import type { ChannelsRepository, FollowingsRepository, MiMeta, MiNote, MiPoll, MiPollVote, NoteReactionsRepository, NotesRepository, PollsRepository, PollVotesRepository, UsersRepository } from '@/models/_.js';
+import type { ChannelsRepository, FollowingsRepository, MiMeta, MiNote, MiNoteReaction, MiPoll, MiPollVote, NoteReactionsRepository, NotesRepository, PollsRepository, PollVotesRepository, UsersRepository } from '@/models/_.js';
 import { NoteEntityService } from '@/core/entities/NoteEntityService.js';
 import { ReactionsBufferingService } from '@/core/ReactionsBufferingService.js';
 import type { BufferedReactions } from '@/core/ReactionsBufferingService.js';
@@ -38,7 +38,7 @@ function vote(noteId: string, choice: number): MiPollVote {
 	return { noteId, choice, userId: 'viewer' } as MiPollVote;
 }
 
-function setup(polls: MiPoll[] = [], votes: MiPollVote[] = [], buffers?: Map<string, BufferedReactions>) {
+function setup(polls: MiPoll[] = [], votes: MiPollVote[] = [], buffers?: Map<string, BufferedReactions>, reactions: MiNoteReaction[] = []) {
 	const pollsRepository = {
 		findBy: vi.fn(async ({ noteId }: { noteId: { value: string[] } }) => polls.filter(p => noteId.value.includes(p.noteId))),
 		findOneByOrFail: vi.fn(async ({ noteId }: { noteId: string }) => {
@@ -56,6 +56,10 @@ function setup(polls: MiPoll[] = [], votes: MiPollVote[] = [], buffers?: Map<str
 		findOneOrFail: vi.fn(),
 		find: vi.fn(),
 		findOne: vi.fn(async ({ where }: { where: { id: string } }) => ({ id: where.id, history: [{ createdAt: '2026-01-01T00:00:00.000Z', text: 'old' }] })),
+	};
+	const noteReactionsRepository = {
+		findBy: vi.fn(async ({ noteId, userId }: { noteId: { value: string[] }; userId: string }) => reactions.filter(r => r.userId === userId && noteId.value.includes(r.noteId))),
+		findOneBy: vi.fn(async () => null),
 	};
 	const buffering = Object.create(ReactionsBufferingService.prototype) as ReactionsBufferingService;
 	Object.defineProperties(buffering, {
@@ -89,11 +93,11 @@ function setup(polls: MiPoll[] = [], votes: MiPollVote[] = [], buffers?: Map<str
 		{} as FollowingsRepository,
 		pollsRepository as unknown as PollsRepository,
 		pollVotesRepository as unknown as PollVotesRepository,
-		{} as NoteReactionsRepository,
+		noteReactionsRepository as unknown as NoteReactionsRepository,
 		{} as ChannelsRepository,
 	);
 	service.onModuleInit();
-	return { service, pollsRepository, pollVotesRepository, notesRepository };
+	return { service, pollsRepository, pollVotesRepository, notesRepository, noteReactionsRepository };
 }
 
 const me = { id: 'viewer' };
@@ -187,6 +191,21 @@ describe('NoteEntityService poll packing', () => {
 	});
 });
 
+describe('NoteEntityService viewer reactions', () => {
+	test('batches the viewer reaction of a quoted note with its quote', async () => {
+		// More reactions than cached pairs make both notes read the database.
+		const crowded = { hasPoll: false, reactions: { like: 2 }, reactionAndUserPairCache: [] };
+		const quoted = note('quoted', crowded);
+		const quote = note('quote', { ...crowded, renoteId: quoted.id, renote: quoted });
+		const { service, noteReactionsRepository } = setup([], [], undefined, [{ noteId: quoted.id, userId: me.id, reaction: 'like' } as MiNoteReaction]);
+		const [packed] = await service.packMany([quote], me);
+
+		expect(packed.myReaction).toBeUndefined();
+		expect(packed.renote?.myReaction).toBe('like');
+		expect(noteReactionsRepository.findBy).toHaveBeenCalledExactlyOnceWith({ userId: me.id, noteId: In([quote.id, quoted.id]) });
+		expect(noteReactionsRepository.findOneBy).not.toHaveBeenCalled();
+	});
+});
 
 describe('NoteEntityService buffered reaction checkpoints', () => {
 	test.each([null, 'committed-batch'])('packs pending/live reactions once with database checkpoint %s', async checkpoint => {
