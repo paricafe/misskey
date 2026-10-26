@@ -1,0 +1,22 @@
+packages/backend/src/core/NoteUpdateService.ts
+  s_d3d1ae67bf48b6::t_ca83dfb510b9f6 402-407
+  s_d3d1ae67bf48b6::t_43dbedc80fbf3c 8
+packages/backend/src/core/NoteUpdateService.test.ts
+  s_d3d1ae67bf48b6::t_5b3e56ea61fc75 747-770
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "81b7d797978f5935382c268ae4129c858e73c135",
+  "prompts": {},
+  "sessions": {
+    "s_d3d1ae67bf48b6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "574cf0ea-c82f-4ec2-a747-46a742e45ed2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Natsuki-Kaede <i@pari.network>"
+    }
+  }
+}
