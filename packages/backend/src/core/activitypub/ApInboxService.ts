@@ -15,6 +15,7 @@ import { NotePiningService } from '@/core/NotePiningService.js';
 import { UserBlockingService } from '@/core/UserBlockingService.js';
 import { NoteDeleteService } from '@/core/NoteDeleteService.js';
 import { NoteCreateService } from '@/core/NoteCreateService.js';
+import { NOTE_HISTORY_LIMIT_ERROR_ID, NOTE_NO_CONTENT_ERROR_ID, NOTE_NOT_FOUND_ERROR_ID } from '@/core/NoteUpdateService.js';
 import { acquireApObjectLock } from '@/misc/distributed-lock.js';
 import { concat, toArray, toSingle, unique } from '@/misc/prelude/array.js';
 import type Logger from '@/logger.js';
@@ -30,7 +31,7 @@ import type { MiRemoteUser } from '@/models/User.js';
 import { GlobalEventService } from '@/core/GlobalEventService.js';
 import { AbuseReportService } from '@/core/AbuseReportService.js';
 import { IdentifiableError } from '@/misc/identifiable-error.js';
-import { getApHrefNullable, getApId, getApIds, getApType, getOneApId, isAccept, isActor, isAdd, isAnnounce, isBlock, isCollection, isCollectionOrOrderedCollection, isCreate, isDelete, isFlag, isFollow, isLike, isMove, isPost, isReject, isRemove, isTombstone, isUndo, isUpdate, validActor, validPost } from './type.js';
+import { getApHrefNullable, getApId, getApIds, getApType, isAccept, isActor, isAdd, isAnnounce, isBlock, isCollection, isCollectionOrOrderedCollection, isCreate, isDelete, isFlag, isFollow, isLike, isMove, isPost, isReject, isRemove, isTombstone, isUndo, isUpdate, validActor, validPost } from './type.js';
 import { ApNoteService } from './models/ApNoteService.js';
 import { ApLoggerService } from './ApLoggerService.js';
 import { ApDbResolverService } from './ApDbResolverService.js';
@@ -791,11 +792,12 @@ export class ApInboxService {
 			this.logger.error(`Resolution failed: ${e}`);
 			throw e;
 		});
-		if (
-			(getApType(object) === 'Question' || isPost(object)) &&
-			(object.attributedTo == null || actor.uri !== getOneApId(object.attributedTo))
-		) {
-			return 'skip: actor does not match object author';
+		if (getApType(object) === 'Question' || isPost(object)) {
+			const author = object.attributedTo == null ? undefined : toArray(object.attributedTo)[0];
+			const authorUri = typeof author === 'string' ? author : author?.id;
+			if (authorUri == null || actor.uri !== authorUri) {
+				return 'skip: actor does not match object author';
+			}
 		}
 
 		if (isActor(object)) {
@@ -805,8 +807,18 @@ export class ApInboxService {
 			await this.apQuestionService.updateQuestion(object, actor, resolver).catch(err => console.error(err));
 			return 'ok: Question updated';
 		} else if (isPost(object)) {
-			await this.apNoteService.updateNote(object, resolver);
-			return 'ok: Post updated';
+			try {
+				return await this.apNoteService.updateNote(object, resolver) ?? 'ok: Post updated';
+			} catch (err) {
+				// These edits can never apply, so retrying the job cannot succeed.
+				if (err instanceof IdentifiableError && [NOTE_NOT_FOUND_ERROR_ID, NOTE_NO_CONTENT_ERROR_ID, NOTE_HISTORY_LIMIT_ERROR_ID].includes(err.id)) {
+					return `skip: ${err.message}`;
+				}
+				if (err instanceof StatusError && !err.isRetryable) {
+					return `skip: ${err.statusCode}`;
+				}
+				throw err;
+			}
 		} else {
 			return `skip: Unknown type: ${getApType(object)}`;
 		}

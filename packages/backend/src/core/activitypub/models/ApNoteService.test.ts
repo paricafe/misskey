@@ -119,6 +119,30 @@ describe(ApNoteService, () => {
 		expect(noteUpdateService.update).not.toHaveBeenCalled();
 	});
 
+	test('skips an ActivityPub update for a note that is not stored before resolving its author', async () => {
+		const { service, notesRepository, apPersonService, noteUpdateService } = createService();
+		notesRepository.findOneBy.mockResolvedValueOnce(null);
+
+		await expect(service.updateNote(update as never)).resolves.toBe('skip: note is not registered');
+
+		expect(apPersonService.resolvePerson).not.toHaveBeenCalled();
+		expect(noteUpdateService.update).not.toHaveBeenCalled();
+	});
+
+	test.each([
+		['missing', undefined],
+		['malformed', 'not a date'],
+	])('rejects an ActivityPub update with a %s updated timestamp as an invalid Note', async (_label, updated) => {
+		const { service, apPersonService, noteUpdateService } = createService();
+
+		await expect(service.updateNote({ ...update, updated } as never)).rejects.toMatchObject({
+			id: 'd450b8a9-48e4-4dab-ae36-f4db763fda7c',
+		});
+
+		expect(apPersonService.resolvePerson).not.toHaveBeenCalled();
+		expect(noteUpdateService.update).not.toHaveBeenCalled();
+	});
+
 	test('preserves attachments when an ActivityPub update omits attachment', async () => {
 		const { service, noteUpdateService, apImageService, originNote } = createService();
 

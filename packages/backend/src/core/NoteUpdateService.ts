@@ -46,6 +46,8 @@ export const NOTE_HISTORY_LIMIT_ERROR_ID = '8a2c5b6f-8e2b-4f1d-a5d9-f2b96c5b0d34
 // Shared with NoteCreateService so the inbox processor treats it as a rejected note.
 export const NOTE_PROHIBITED_WORDS_ERROR_ID = '689ee33f-f97c-479a-ac49-1b9f8140af99';
 export const NOTE_SENSITIVE_WORDS_ERROR_ID = '3f0e7c8a-5b2d-4c1e-9a6f-8d4b2e7c1a90';
+export const NOTE_NOT_FOUND_ERROR_ID = '512d8fe8-453e-463c-bf87-5b795293dc0c';
+export const NOTE_NO_CONTENT_ERROR_ID = '238ea885-ef3d-489f-8a93-76b4709c3b5e';
 
 type Option = {
 	updatedAt?: Date | null;
@@ -176,7 +178,7 @@ export class NoteUpdateService {
 				lock: { mode: 'pessimistic_write' },
 			});
 			if (lockedRow == null) {
-				throw new Error('note is not registered');
+				throw new IdentifiableError(NOTE_NOT_FOUND_ERROR_ID, 'note is not registered');
 			}
 			const lockedNote = await this.withHistory({ ...note, ...lockedRow }, transactionalNotesRepository);
 
@@ -189,7 +191,7 @@ export class NoteUpdateService {
 				? [...lockedNote.fileIds]
 				: data.files?.map(file => file.id) ?? [];
 			if ((data.text == null || data.text.length === 0) && fileIds.length === 0) {
-				throw new Error('Note must have text or files');
+				throw new IdentifiableError(NOTE_NO_CONTENT_ERROR_ID, 'Note must have text or files');
 			}
 
 			const preparedUpdate = await this.prepareUpdate(user, lockedNote);

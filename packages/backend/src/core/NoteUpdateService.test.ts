@@ -10,6 +10,7 @@ import {
 	MAX_NOTE_HISTORY_BYTES,
 	MAX_NOTE_HISTORY_REVISIONS,
 	NOTE_HISTORY_LIMIT_ERROR_ID,
+	NOTE_NO_CONTENT_ERROR_ID,
 	NOTE_PROHIBITED_WORDS_ERROR_ID,
 	NOTE_SENSITIVE_WORDS_ERROR_ID,
 	NoteUpdateService,
@@ -456,7 +457,7 @@ describe(NoteUpdateService, () => {
 			cw: null,
 			files: [],
 			updatedAt: new Date('2025-02-01T00:00:00.000Z'),
-		}, true)).rejects.toThrow('Note must have text or files');
+		}, true)).rejects.toMatchObject({ id: NOTE_NO_CONTENT_ERROR_ID });
 
 		expect(notesRepository.update).not.toHaveBeenCalled();
 	});

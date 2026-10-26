@@ -351,7 +351,10 @@ export class ApNoteService {
 	}
 
 	@bindThis
-	public async updateNote(value: string | IObject, resolver?: Resolver, silent = false): Promise<void> {
+	/**
+	 * @returns a skip reason when the update cannot apply to any stored note
+	 */
+	public async updateNote(value: string | IObject, resolver?: Resolver, silent = false): Promise<string | undefined> {
 		const uri = typeof value === 'string' ? value : value.id;
 		if (uri == null) throw new Error('uri is null');
 
@@ -360,7 +363,7 @@ export class ApNoteService {
 
 		const unlock = await acquireApObjectLock(this.redisClient, uri);
 		try {
-			await this.updateNoteLocked(value, uri, resolver, silent, unlock.assertOwned);
+			return await this.updateNoteLocked(value, uri, resolver, silent, unlock.assertOwned);
 		} finally {
 			await unlock();
 		}
@@ -372,27 +375,28 @@ export class ApNoteService {
 		resolver: Resolver | undefined,
 		silent: boolean,
 		assertLockOwned: () => Promise<void>,
-	): Promise<void> {
+	): Promise<string | undefined> {
 		const registeredNote = await this.notesRepository.findOneBy({ uri });
-		if (registeredNote === null) throw new Error('note is not registered');
+		// Notes received before following, or never received, have nothing to update.
+		if (registeredNote === null) return 'skip: note is not registered';
 		const originNote = await this.noteUpdateService.withHistory(registeredNote);
 
 		// Process new note
 		const note = value as IPost;
 
 		// Check updated timestamp
-		if (!note.updated) {
-			throw new Error('note.updated field is required');
+		const updatedAt = typeof note.updated === 'string' ? new Date(note.updated) : null;
+		if (updatedAt == null || Number.isNaN(updatedAt.getTime())) {
+			throw new IdentifiableError('d450b8a9-48e4-4dab-ae36-f4db763fda7c', 'invalid Note: updated timestamp is missing or malformed');
 		}
-		const updatedAt = new Date(note.updated);
 
 		// Fetch note author
 		if (!note.attributedTo) {
-			throw new Error('invalid note.attributedTo: ' + note.attributedTo);
+			throw new IdentifiableError('d450b8a9-48e4-4dab-ae36-f4db763fda7c', 'invalid Note: attributedTo is missing');
 		}
 		const actor = await this.apPersonService.resolvePerson(getOneApId(note.attributedTo), resolver) as MiRemoteUser;
 		if (actor.id !== originNote.userId) {
-			throw new Error('note author does not match the cached note owner');
+			throw new IdentifiableError('d450b8a9-48e4-4dab-ae36-f4db763fda7c', 'invalid Note: note author does not match the cached note owner');
 		}
 
 		if (this.noteUpdateService.isUpdateAlreadyApplied(originNote, updatedAt)) return;
@@ -444,6 +448,7 @@ export class ApNoteService {
 			apEmojis,
 			updatedAt,
 		}, silent);
+		return undefined;
 	}
 
 	/**

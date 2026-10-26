@@ -12,7 +12,7 @@ import { GetterService } from '@/server/api/GetterService.js';
 import { MAX_NOTE_FILES, MAX_NOTE_TEXT_LENGTH } from '@/const.js';
 import { ApiError } from '@/server/api/error.js';
 import { NoteEntityService } from '@/core/entities/NoteEntityService.js';
-import { NOTE_HISTORY_LIMIT_ERROR_ID, NOTE_PROHIBITED_WORDS_ERROR_ID, NOTE_SENSITIVE_WORDS_ERROR_ID, NoteUpdateService } from '@/core/NoteUpdateService.js';
+import { NOTE_HISTORY_LIMIT_ERROR_ID, NOTE_NO_CONTENT_ERROR_ID, NOTE_NOT_FOUND_ERROR_ID, NOTE_PROHIBITED_WORDS_ERROR_ID, NOTE_SENSITIVE_WORDS_ERROR_ID, NoteUpdateService } from '@/core/NoteUpdateService.js';
 import { IdentifiableError } from '@/misc/identifiable-error.js';
 
 export const meta = {
@@ -183,6 +183,8 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 					if (error.id === NOTE_HISTORY_LIMIT_ERROR_ID) throw new ApiError(meta.errors.historyLimitExceeded);
 					if (error.id === NOTE_PROHIBITED_WORDS_ERROR_ID) throw new ApiError(meta.errors.containsProhibitedWords);
 					if (error.id === NOTE_SENSITIVE_WORDS_ERROR_ID) throw new ApiError(meta.errors.containsSensitiveWords);
+					if (error.id === NOTE_NOT_FOUND_ERROR_ID) throw new ApiError(meta.errors.noSuchNote);
+					if (error.id === NOTE_NO_CONTENT_ERROR_ID) throw new ApiError(meta.errors.noContent);
 				}
 				throw error;
 			});
