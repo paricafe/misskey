@@ -1,0 +1,41 @@
+packages/backend/src/core/activitypub/ApInboxService.ts
+  s_d3d1ae67bf48b6::t_d3e3897bb4762c 18
+  s_d3d1ae67bf48b6::t_39fbd35227c445 34
+  s_d3d1ae67bf48b6::t_3d4ce4f44d03c2 795-800
+  s_d3d1ae67bf48b6::t_a0934aa24d5de8 810-821
+packages/backend/src/server/api/endpoints/notes/update.ts
+  s_d3d1ae67bf48b6::t_c74d272a07ce57 15
+  s_d3d1ae67bf48b6::t_4c2471f337db9d 186-187
+packages/backend/src/core/activitypub/models/ApNoteService.ts
+  s_d3d1ae67bf48b6::t_ba87c3baa2e955 451
+  s_d3d1ae67bf48b6::t_002437d6c1cab3 366
+  s_d3d1ae67bf48b6::t_2cc521a9bbf8ab 354-357
+  s_d3d1ae67bf48b6::t_0b44ce1ba8cf65 378,380-381,388-390,395,399
+packages/backend/src/core/activitypub/ApInboxService.test.ts
+  s_d3d1ae67bf48b6::t_9a1f6cd468f5e0 7-9
+  s_d3d1ae67bf48b6::t_fff997386d3b9a 135-209
+packages/backend/src/core/NoteUpdateService.ts
+  s_d3d1ae67bf48b6::t_0abab5850d8cb1 194
+  s_d3d1ae67bf48b6::t_fcd7cc08841866 49-50
+  s_d3d1ae67bf48b6::t_5943a056638db4 181
+packages/backend/src/core/NoteUpdateService.test.ts
+  s_d3d1ae67bf48b6::t_f63541b0ccd14b 13,460
+packages/backend/src/core/activitypub/models/ApNoteService.test.ts
+  s_d3d1ae67bf48b6::t_63e985c125b3f9 122-145
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "dd78af12522f330d2becd1e1342faa962e594b7b",
+  "prompts": {},
+  "sessions": {
+    "s_d3d1ae67bf48b6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "574cf0ea-c82f-4ec2-a747-46a742e45ed2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Natsuki-Kaede <i@pari.network>"
+    }
+  }
+}
