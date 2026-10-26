@@ -1,0 +1,19 @@
+packages/frontend/src/components/MkNoteHeader.vue
+  s_96c6ec99b76857::t_588505818a467e 50,68
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2a9192e2cbe12d8be113d2a4a2718876fe6f0858",
+  "prompts": {},
+  "sessions": {
+    "s_96c6ec99b76857": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ab187d3f-1c7d-4fdc-9821-950f8f0195a9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Natsuki-Kaede <i@pari.network>"
+    }
+  }
+}
