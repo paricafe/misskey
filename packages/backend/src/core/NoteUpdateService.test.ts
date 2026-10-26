@@ -744,4 +744,28 @@ describe(NoteUpdateService, () => {
 		expect(deliverManager.addDirectRecipe).toHaveBeenCalledWith(expect.objectContaining({ id: 'reply-author' }));
 		expect(deliverManager.addDirectRecipe).toHaveBeenCalledWith(expect.objectContaining({ id: 'renote-author' }));
 	});
+
+	test('delivers the update to remote users whose mention the edit removed', async () => {
+		const mentioningNote = {
+			...note,
+			localOnly: false,
+			text: 'Hello @alice@remote.example',
+			mentions: ['removed-remote-user'],
+		} as MiNote;
+		const { service, userEntityService, deliverManager, usersRepository } = createService(mentioningNote);
+		userEntityService.isLocalUser.mockReturnValue(true);
+		Object.assign(userEntityService, { isRemoteUser: vi.fn((u: { host: string | null }) => u.host != null) });
+		Object.assign(usersRepository, {
+			findBy: vi.fn().mockResolvedValue([{ id: 'removed-remote-user', host: 'remote.example' }]),
+		});
+
+		await service.update(user, mentioningNote, {
+			text: 'Hello everyone',
+			cw: null,
+			updatedAt: new Date('2025-02-01T00:00:00.000Z'),
+		});
+
+		await vi.waitFor(() => expect(deliverManager.execute).toHaveBeenCalled());
+		expect(deliverManager.addDirectRecipe).toHaveBeenCalledWith(expect.objectContaining({ id: 'removed-remote-user' }));
+	});
 });

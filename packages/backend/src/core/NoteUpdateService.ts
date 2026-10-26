@@ -5,6 +5,7 @@
  */
 
 import { Injectable, Inject } from '@nestjs/common';
+import { In } from 'typeorm';
 import * as mfm from 'mfm-js';
 import type { MiUser, MiLocalUser, MiRemoteUser } from '@/models/User.js';
 import { MiNote } from '@/models/Note.js';
@@ -397,6 +398,12 @@ export class NoteUpdateService {
 		const combinedTokens = tokens.concat(cwTokens);
 
 		const mentionedUsers = await this.extractMentionedUsers(user, combinedTokens);
+
+		// Users mentioned before this edit already have the note, so they need the Update too.
+		const previouslyMentionedIds = note.mentions.filter(id => !mentionedUsers.some(u => u.id === id));
+		if (previouslyMentionedIds.length > 0) {
+			mentionedUsers.push(...await this.usersRepository.findBy({ id: In(previouslyMentionedIds) }));
+		}
 
 		if (note.visibility === 'specified') {
 			if (note.visibleUserIds == null) throw new Error('invalid param');
