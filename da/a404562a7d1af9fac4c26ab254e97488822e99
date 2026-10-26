@@ -1,0 +1,24 @@
+packages/backend/test/unit/NoteCreateService.ts
+  s_598ae6023bad38::t_010ede0a2a53be 6,148-230
+  s_598ae6023bad38::t_40a9ae289b96cf 231
+packages/backend/src/core/NoteCreateService.ts
+  s_598ae6023bad38::t_c7301c40a78137 200
+  s_598ae6023bad38::t_66e6b192c6535a 59-60,276,278,644-646,763-769,975-1008
+  s_598ae6023bad38::t_ac58760d0c15c1 1009-1010
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "daa404562a7d1af9fac4c26ab254e97488822e99",
+  "prompts": {},
+  "sessions": {
+    "s_598ae6023bad38": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b102dfdb-d584-4cc0-9196-450925241839",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Natsuki-Kaede <i@pari.network>"
+    }
+  }
+}
