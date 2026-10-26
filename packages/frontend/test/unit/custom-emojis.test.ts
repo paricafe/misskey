@@ -51,6 +51,24 @@ describe('custom emoji bootstrap', () => {
 		expect(mocks.set).toHaveBeenCalledWith('emojis', customEmojis.value);
 	});
 
+	test('refreshing the catalog notifies only lookups of changed emojis', async () => {
+		const other = (url: string) => ({ ...emoji(url), name: 'other' });
+		const removed = { ...emoji('https://example.com/removed.png'), name: 'removed' };
+		mocks.cache = [emoji('https://example.com/same.png'), other('https://example.com/old.png'), removed];
+		const { customEmojis, customEmojisMap } = await import('@/custom-emojis.js');
+		const reads = { test: 0, other: 0, removed: 0 };
+		const lookups = (Object.keys(reads) as Array<keyof typeof reads>).map(name => computed(() => {
+			reads[name]++;
+			return customEmojisMap.has(name) ? customEmojisMap.get(name)!.url : null;
+		}));
+		lookups.forEach(lookup => lookup.value);
+
+		customEmojis.value = [emoji('https://example.com/same.png'), other('https://example.com/new.png')];
+		await nextTick();
+		expect(lookups.map(lookup => lookup.value)).toEqual(['https://example.com/same.png', 'https://example.com/new.png', null]);
+		expect(reads).toEqual({ test: 1, other: 2, removed: 2 });
+	});
+
 	test('treats an empty cached catalog as usable', async () => {
 		mocks.cache = [];
 		mocks.fetch.mockReturnValue(new Promise(() => {}));

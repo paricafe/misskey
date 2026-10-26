@@ -21,10 +21,18 @@ export const customEmojiCategories = computed<[ ...string[], null ]>(() => {
 });
 
 export const customEmojisMap = shallowReactive(new Map<string, Misskey.entities.EmojiSimple>());
+// Every rendered emoji and MFM block reads this map, so only names whose emoji changed are written.
 watch(customEmojis, emojis => {
-	customEmojisMap.clear();
+	const names = new Set<string>();
 	for (const emoji of emojis) {
-		customEmojisMap.set(emoji.name, emoji);
+		names.add(emoji.name);
+		const current = customEmojisMap.get(emoji.name);
+		if (current == null || JSON.stringify(current) !== JSON.stringify(emoji)) {
+			customEmojisMap.set(emoji.name, emoji);
+		}
+	}
+	for (const name of customEmojisMap.keys()) {
+		if (!names.has(name)) customEmojisMap.delete(name);
 	}
 }, { immediate: true });
 
