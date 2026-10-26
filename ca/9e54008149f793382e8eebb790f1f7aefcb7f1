@@ -1,0 +1,26 @@
+packages/mastodon-compat/test/streaming.test.ts
+  s_96c6ec99b76857::t_5718e2e2996553 321-347,351-353
+  s_96c6ec99b76857::t_fad8adad59bf93 348-350
+packages/mastodon-compat/src/metadata.ts
+  s_96c6ec99b76857::t_9169d281f22dd8 6,10-45
+packages/mastodon-compat/src/routes.ts
+  s_96c6ec99b76857::t_0cc3277ab04844 12,16,70,72,74,76
+packages/mastodon-compat/src/streaming.ts
+  s_96c6ec99b76857::t_7c0199e7e5d998 12,144,298,300-301,324-340,343-348,400,402,412-414,417-422,426,438-439,441-442,445,538,542-544,546
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "ca9e54008149f793382e8eebb790f1f7aefcb7f1",
+  "prompts": {},
+  "sessions": {
+    "s_96c6ec99b76857": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ab187d3f-1c7d-4fdc-9821-950f8f0195a9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Natsuki-Kaede <i@pari.network>"
+    }
+  }
+}
