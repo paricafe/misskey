@@ -364,18 +364,6 @@ export class ApPersonService implements OnModuleInit {
 			});
 		//#endregion
 
-		//#region resolve counts
-		const _resolver = resolver ?? this.apResolverService.createResolver();
-		// Only the counts are used; fetch the collections concurrently and tolerate failures.
-		const resolveCount = (collection: string | IObject | undefined) => collection == null
-			? Promise.resolve(null)
-			: _resolver.resolveCollection(collection).catch(() => null);
-		const [outboxcollection, followerscollection, followingcollection] = await Promise.all([
-			resolveCount(person.outbox),
-			resolveCount(person.followers),
-			resolveCount(person.following),
-		]);
-
 		try {
 			// Start transaction
 			await this.db.transaction(async transactionalEntityManager => {
@@ -396,9 +384,6 @@ export class ApPersonService implements OnModuleInit {
 					host,
 					inbox: person.inbox,
 					sharedInbox: person.sharedInbox ?? person.endpoints?.sharedInbox ?? null,
-					notesCount: outboxcollection?.totalItems ?? 0,
-					followersCount: followerscollection?.totalItems ?? 0,
-					followingCount: followingcollection?.totalItems ?? 0,
 					followersUri: person.followers ? getApId(person.followers) : undefined,
 					featured: person.featured ? getApId(person.featured) : undefined,
 					uri: person.id,
@@ -731,15 +716,14 @@ export class ApPersonService implements OnModuleInit {
 		if (!isCollectionOrOrderedCollection(collection)) throw new Error('Object is not Collection or OrderedCollection');
 
 		// Resolve to Object(may be Note) arrays
+		// Limit before resolving: each item costs a request from the shared resolver budget.
 		const unresolvedItems = isCollection(collection) ? collection.items : collection.orderedItems;
-		const items = await Promise.all(toArray(unresolvedItems).map(x => _resolver.resolve(x)));
+		const items = await Promise.all(toArray(unresolvedItems).slice(0, 5).map(x => _resolver.resolve(x)));
 
 		// Resolve and regist Notes
 		const limit = promiseLimit<MiNote | null>(2);
-		const maxPinned = (await this.roleService.getUserPolicies(user.id)).pinLimit;
 		const featuredNotes = await Promise.all(items
 			.filter(item => getApType(item) === 'Note')	// TODO: Noteでなくてもいいかも
-			.slice(0, maxPinned)
 			.map(item => limit(() => this.apNoteService.resolveNote(item, {
 				resolver: _resolver,
 				sentFrom: new URL(user.uri),

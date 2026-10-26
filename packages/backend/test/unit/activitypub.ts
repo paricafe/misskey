@@ -338,9 +338,8 @@ describe('ActivityPub', () => {
 
 			await personService.createPerson(actor.id, resolver);
 
-			// All notes in `featured` are same-origin, no need to fetch notes again.
-			// The outbox is fetched once for the actor's note count.
-			assert.deepStrictEqual(resolver.remoteGetTrials(), [actor.id, actor.outbox, actor.featured]);
+			// All notes in `featured` are same-origin, no need to fetch notes again
+			assert.deepStrictEqual(resolver.remoteGetTrials(), [actor.id, actor.featured]);
 
 			// Created notes without resolving anything
 			for (const item of featured.items as IPost[]) {
@@ -349,6 +348,26 @@ describe('ActivityPub', () => {
 				assert.strictEqual(note.text, 'test test foo');
 				assert.strictEqual(note.uri, item.id);
 			}
+		});
+
+		test('Fetch only the first five featured items from IActor', async () => {
+			const actor = createRandomActor();
+			actor.featured = `${actor.id}/collections/featured`;
+
+			const notes = createRandomNotes(actor, 7);
+			const featured = createRandomFeaturedCollection(actor, 0);
+			featured.items = notes.map(note => note.id);
+
+			resolver.register(actor.id, actor);
+			resolver.register(actor.featured, featured);
+			for (const note of notes) resolver.register(note.id, note);
+
+			await personService.createPerson(actor.id, resolver);
+
+			assert.deepStrictEqual(
+				resolver.remoteGetTrials(),
+				[actor.id, actor.featured, ...notes.slice(0, 5).map(note => note.id)],
+			);
 		});
 
 		test('Fetch featured notes from IActor pointing to another remote server', async () => {
@@ -370,11 +389,10 @@ describe('ActivityPub', () => {
 
 			await personService.createPerson(actor1.id, resolver);
 
-			// actor2Note is from a different server and needs to be fetched again.
-			// Each new actor's outbox is fetched once for its note count.
+			// actor2Note is from a different server and needs to be fetched again
 			assert.deepStrictEqual(
 				resolver.remoteGetTrials(),
-				[actor1.id, actor1.outbox, actor1.featured, actor2Note.id, actor2.id, actor2.outbox],
+				[actor1.id, actor1.featured, actor2Note.id, actor2.id],
 			);
 
 			const note = await noteService.fetchNote(actor2Note.id);
