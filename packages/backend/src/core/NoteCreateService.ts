@@ -59,6 +59,8 @@ import { isUserRelated } from '@/misc/is-user-related.js';
 import { IdentifiableError } from '@/misc/identifiable-error.js';
 import { CollapsedQueue } from '@/misc/collapsed-queue.js';
 import { CacheService } from '@/core/CacheService.js';
+import { LoggerService } from '@/core/LoggerService.js';
+import type Logger from '@/logger.js';
 import { isQuote, isRenote } from '@/misc/is-renote.js';
 import { shouldCountRenote } from '@/misc/should-count-renote.js';
 import { extractUrlsForKeyWordCheck } from '@/misc/extract-urls-for-keyword-check.js';
@@ -203,6 +205,7 @@ export class ScheduledNoteNotReadyError extends Error {}
 export class NoteCreateService implements OnApplicationShutdown {
 	#shutdownController = new AbortController();
 	private updateNotesCountQueue: CollapsedQueue<MiNote['id'], number>;
+	private logger: Logger;
 
 	constructor(
 		@Inject(DI.config)
@@ -278,7 +281,9 @@ export class NoteCreateService implements OnApplicationShutdown {
 		private utilityService: UtilityService,
 		private userBlockingService: UserBlockingService,
 		private cacheService: CacheService,
+		private loggerService: LoggerService,
 	) {
+		this.logger = this.loggerService.getLogger('note-create');
 		this.updateNotesCountQueue = new CollapsedQueue(process.env.NODE_ENV !== 'test' ? 60 * 1000 * 5 : 0, this.collapseNotesCount, this.performUpdateNotesCount);
 	}
 
@@ -646,7 +651,8 @@ export class NoteCreateService implements OnApplicationShutdown {
 		const note = await this.insertNote(user, data, tags, emojis, mentionedUsers);
 
 		setImmediate('post created', { signal: this.#shutdownController.signal }).then(
-			() => this.postNoteCreated(note, user, data, silent, tags!, mentionedUsers!),
+			() => this.postNoteCreated(note, user, data, silent, tags!, mentionedUsers!)
+				.catch(error => this.logPostCreatedError(note, 'postNoteCreated', error)),
 			() => { /* aborted, ignore this */ },
 		);
 
@@ -791,6 +797,12 @@ export class NoteCreateService implements OnApplicationShutdown {
 		host: MiUser['host'];
 		isBot: MiUser['isBot'];
 	}, data: Option, silent: boolean, tags: string[], mentionedUsers: MinimumUser[]) {
+		// Start federation first: the counters and notifications below must not prevent it.
+		if (!silent && !data.localOnly && this.userEntityService.isLocalUser(user)) {
+			trackPromise(this.deliverNote(note, user, data, mentionedUsers)
+				.catch(error => this.logPostCreatedError(note, 'deliver', error)));
+		}
+
 		this.notesChart.update(note, true);
 		if (note.visibility !== 'specified' && (this.meta.enableChartsForRemoteUser || (user.host == null))) {
 			this.perUserNotesChart.update(user, note, true);
@@ -826,13 +838,15 @@ export class NoteCreateService implements OnApplicationShutdown {
 		const childTargets = new Map<MiNote['id'], MiNote>();
 
 		if (data.reply) {
-			await this.incrementReplyCountAndPublish(data.reply);
+			await this.incrementReplyCountAndPublish(data.reply)
+				.catch(error => this.logPostCreatedError(note, 'repliesCount', error));
 			childTargets.set(data.reply.id, data.reply);
 		}
 
 		if (this.isRenote(data)) {
 			if (shouldCountRenote(data.renote, user)) {
-				await this.incrementRenoteCountAndPublish(data.renote);
+				await this.incrementRenoteCountAndPublish(data.renote)
+					.catch(error => this.logPostCreatedError(note, 'renoteCount', error));
 			}
 			if (this.isQuote(data)) childTargets.set(data.renote.id, data.renote);
 		}
@@ -913,22 +927,14 @@ export class NoteCreateService implements OnApplicationShutdown {
 			if (data.reply) {
 				// 通知
 				if (data.reply.userHost === null) {
-					const isThreadMuted = await this.noteThreadMutingsRepository.exists({
-						where: {
-							userId: data.reply.userId,
-							threadId: data.reply.threadId ?? data.reply.id,
-						},
-					});
+					// Without the muting state, skipping is safer than notifying a muting user.
+					const muted = await this.isMutedByRecipient(data.reply.userId, data.reply.threadId ?? data.reply.id, note)
+						.catch(error => {
+							this.logPostCreatedError(note, 'replyNotification', error);
+							return true;
+						});
 
-					const [
-						userIdsWhoMeMuting,
-					] = data.reply.userId ? await Promise.all([
-						this.cacheService.userMutingsCache.fetch(data.reply.userId),
-					]) : [new Set<string>()];
-
-					const muted = isUserRelated(note, userIdsWhoMeMuting);
-
-					if (!isThreadMuted && !muted) {
+					if (!muted) {
 						nm.push(data.reply.userId, 'reply');
 						this.globalEventService.publishMainStream(data.reply.userId, 'reply', noteObj);
 						this.webhookService.enqueueUserWebhook(data.reply.userId, 'reply', { note: noteObj });
@@ -942,71 +948,26 @@ export class NoteCreateService implements OnApplicationShutdown {
 
 				// Notify
 				if (data.renote.userHost === null) {
-					const isThreadMuted = await this.noteThreadMutingsRepository.exists({
-						where: {
-							userId: data.renote.userId,
-							threadId: data.renote.threadId ?? data.renote.id,
-						},
-					});
+					// null means the muting state is unknown; then skip everything that reaches the recipient.
+					const muted = await this.isMutedByRecipient(data.renote.userId, data.renote.threadId ?? data.renote.id, note)
+						.catch(error => {
+							this.logPostCreatedError(note, 'renoteNotification', error);
+							return null;
+						});
 
-					const [
-						userIdsWhoMeMuting,
-					] = data.renote.userId ? await Promise.all([
-						this.cacheService.userMutingsCache.fetch(data.renote.userId),
-					]) : [new Set<string>()];
-
-					const muted = isUserRelated(note, userIdsWhoMeMuting);
-
-					if (!isThreadMuted && !muted) {
+					if (muted === false) {
 						nm.push(data.renote.userId, type);
 					}
-				}
 
-				// Publish event
-				if ((user.id !== data.renote.userId) && data.renote.userHost === null) {
-					this.globalEventService.publishMainStream(data.renote.userId, 'renote', noteObj);
-					this.webhookService.enqueueUserWebhook(data.renote.userId, 'renote', { note: noteObj });
+					// Publish event
+					if (muted !== null && user.id !== data.renote.userId) {
+						this.globalEventService.publishMainStream(data.renote.userId, 'renote', noteObj);
+						this.webhookService.enqueueUserWebhook(data.renote.userId, 'renote', { note: noteObj });
+					}
 				}
 			}
 
 			nm.notify();
-
-			//#region AP deliver
-			if (!data.localOnly && this.userEntityService.isLocalUser(user)) {
-				(async () => {
-					const noteActivity = await this.renderNoteOrRenoteActivity(data, note);
-					const dm = this.apDeliverManagerService.createDeliverManager(user, noteActivity);
-
-					// メンションされたリモートユーザーに配送
-					for (const u of mentionedUsers.filter(u => this.userEntityService.isRemoteUser(u))) {
-						dm.addDirectRecipe(u as MiRemoteUser);
-					}
-
-					// 投稿がリプライかつ投稿者がローカルユーザーかつリプライ先の投稿の投稿者がリモートユーザーなら配送
-					if (data.reply && data.reply.userHost !== null) {
-						const u = await this.usersRepository.findOneBy({ id: data.reply.userId });
-						if (u && this.userEntityService.isRemoteUser(u)) dm.addDirectRecipe(u);
-					}
-
-					// 投稿がRenoteかつ投稿者がローカルユーザーかつRenote元の投稿の投稿者がリモートユーザーなら配送
-					if (data.renote && data.renote.userHost !== null) {
-						const u = await this.usersRepository.findOneBy({ id: data.renote.userId });
-						if (u && this.userEntityService.isRemoteUser(u)) dm.addDirectRecipe(u);
-					}
-
-					// フォロワーに配送
-					if (['public', 'home', 'followers'].includes(note.visibility)) {
-						dm.addFollowersRecipe();
-					}
-
-					if (['public'].includes(note.visibility)) {
-						this.relayService.deliverToRelays(user, noteActivity);
-					}
-
-					trackPromise(dm.execute());
-				})();
-			}
-			//#endregion
 		}
 
 		if (data.channel) {
@@ -1080,36 +1041,87 @@ export class NoteCreateService implements OnApplicationShutdown {
 	}
 
 	@bindThis
+	private async deliverNote(note: MiNote, user: { id: MiUser['id']; host: null; }, data: Option, mentionedUsers: MinimumUser[]): Promise<void> {
+		const noteActivity = await this.renderNoteOrRenoteActivity(data, note);
+		const dm = this.apDeliverManagerService.createDeliverManager(user, noteActivity);
+
+		// メンションされたリモートユーザーに配送
+		for (const u of mentionedUsers.filter(u => this.userEntityService.isRemoteUser(u))) {
+			dm.addDirectRecipe(u as MiRemoteUser);
+		}
+
+		// 投稿がリプライかつ投稿者がローカルユーザーかつリプライ先の投稿の投稿者がリモートユーザーなら配送
+		if (data.reply && data.reply.userHost !== null) {
+			const u = await this.usersRepository.findOneBy({ id: data.reply.userId });
+			if (u && this.userEntityService.isRemoteUser(u)) dm.addDirectRecipe(u);
+		}
+
+		// 投稿がRenoteかつ投稿者がローカルユーザーかつRenote元の投稿の投稿者がリモートユーザーなら配送
+		if (data.renote && data.renote.userHost !== null) {
+			const u = await this.usersRepository.findOneBy({ id: data.renote.userId });
+			if (u && this.userEntityService.isRemoteUser(u)) dm.addDirectRecipe(u);
+		}
+
+		// フォロワーに配送
+		if (['public', 'home', 'followers'].includes(note.visibility)) {
+			dm.addFollowersRecipe();
+		}
+
+		// A relay failure must not stop delivery to followers and direct recipients.
+		if (['public'].includes(note.visibility)) {
+			this.relayService.deliverToRelays(user, noteActivity)
+				.catch(error => this.logPostCreatedError(note, 'relay', error));
+		}
+
+		await dm.execute();
+	}
+
+	/** Whether the recipient muted the thread, or a user the note relates to. */
+	@bindThis
+	private async isMutedByRecipient(recipientId: MiUser['id'], threadId: MiNote['id'], note: MiNote): Promise<boolean> {
+		const [isThreadMuted, userIdsWhoMeMuting] = await Promise.all([
+			this.noteThreadMutingsRepository.exists({
+				where: {
+					userId: recipientId,
+					threadId,
+				},
+			}),
+			this.cacheService.userMutingsCache.fetch(recipientId),
+		]);
+
+		return isThreadMuted || isUserRelated(note, userIdsWhoMeMuting);
+	}
+
+	@bindThis
+	private logPostCreatedError(note: MiNote, stage: string, error: unknown): void {
+		this.logger.error({
+			message: `Post-create processing failed at ${stage}`,
+			attributes: { noteId: note.id, stage },
+			error,
+		});
+	}
+
+	@bindThis
 	private async createMentionedEvents(mentionedUsers: MinimumUser[], note: MiNote, nm: NotificationManager) {
 		for (const u of mentionedUsers.filter(u => this.userEntityService.isLocalUser(u))) {
-			const isThreadMuted = await this.noteThreadMutingsRepository.exists({
-				where: {
-					userId: u.id,
-					threadId: note.threadId ?? note.id,
-				},
-			});
+			// One recipient's failure must not stop the mention events of the others.
+			try {
+				if (await this.isMutedByRecipient(u.id, note.threadId ?? note.id, note)) {
+					continue;
+				}
 
-			const [
-				userIdsWhoMeMuting,
-			] = u.id ? await Promise.all([
-				this.cacheService.userMutingsCache.fetch(u.id),
-			]) : [new Set<string>()];
+				const detailPackedNote = await this.noteEntityService.pack(note, u, {
+					detail: true,
+				});
 
-			const muted = isUserRelated(note, userIdsWhoMeMuting);
+				this.globalEventService.publishMainStream(u.id, 'mention', detailPackedNote);
+				this.webhookService.enqueueUserWebhook(u.id, 'mention', { note: detailPackedNote });
 
-			if (isThreadMuted || muted) {
-				continue;
+				// Create notification
+				nm.push(u.id, 'mention');
+			} catch (error) {
+				this.logPostCreatedError(note, 'mentionNotification', error);
 			}
-
-			const detailPackedNote = await this.noteEntityService.pack(note, u, {
-				detail: true,
-			});
-
-			this.globalEventService.publishMainStream(u.id, 'mention', detailPackedNote);
-			this.webhookService.enqueueUserWebhook(u.id, 'mention', { note: detailPackedNote });
-
-			// Create notification
-			nm.push(u.id, 'mention');
 		}
 	}
 
