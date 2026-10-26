@@ -1,0 +1,21 @@
+packages/backend/src/core/entities/NoteEntityService.ts
+  s_96c6ec99b76857::t_973671b6cf9c7a 572-584,586-588
+packages/backend/test/unit/entities/NoteEntityService.ts
+  s_96c6ec99b76857::t_c28f234327248c 9,41,60-63,96,100,194-208
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "1fd7a7dada99e8672f74d37e3a8bb0f5de77c1ed",
+  "prompts": {},
+  "sessions": {
+    "s_96c6ec99b76857": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ab187d3f-1c7d-4fdc-9821-950f8f0195a9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Natsuki-Kaede <i@pari.network>"
+    }
+  }
+}
