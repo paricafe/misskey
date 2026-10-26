@@ -1,0 +1,19 @@
+packages/mastodon-compat/src/routes.ts
+  s_96c6ec99b76857::t_a52289e45bae37 408,410,413,418-422,430
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "ddf87974a3b2db55978a47b9ea7f705f0c1d50b0",
+  "prompts": {},
+  "sessions": {
+    "s_96c6ec99b76857": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ab187d3f-1c7d-4fdc-9821-950f8f0195a9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Natsuki-Kaede <i@pari.network>"
+    }
+  }
+}
