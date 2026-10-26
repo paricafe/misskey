@@ -405,21 +405,21 @@ async function createStatus(routes: Routes, c: RequestContext): Promise<Json> {
 }
 
 async function replyDescendants(routes: Routes, context: RequestContext, rootId: string): Promise<Json[]> {
-	const pending = [rootId], seen = new Set(pending), result: Json[] = [];
+	const pending = [rootId], seen = new Set(pending), notes: Json[] = [];
 	let requests = 0;
-	while (pending.length && result.length < 100 && requests < 200) {
+	while (pending.length && notes.length < 100 && requests < 200) {
 		const parentId = pending.shift()!;
 		let untilId: string | undefined;
-		while (result.length < 100 && requests++ < 200) {
+		while (notes.length < 100 && requests++ < 200) {
 			const rows = await context.call<Json[]>('notes/children', { noteId: parentId, limit: 100, ...(untilId ? { untilId } : {}) });
 			for (const note of rows) {
 				if (note.replyId !== parentId || seen.has(note.id)) continue;
 				seen.add(note.id);
-				try {
-					result.push(await routes.status(note, context));
-					pending.push(note.id);
-				} catch (error) { if (!(error instanceof HttpError && error.statusCode === 404)) throw error; }
-				if (result.length >= 100) break;
+				// Hidden replies are skipped together with their subtrees.
+				if (!routes.deps.entities.status(note, { viewerId: context.userId || null, allowLocalOnly: true })) continue;
+				notes.push(note);
+				pending.push(note.id);
+				if (notes.length >= 100) break;
 			}
 			if (rows.length < 100) break;
 			const oldest = rows.map(row => string(row.id)).sort(compareIds)[0];
@@ -427,7 +427,7 @@ async function replyDescendants(routes: Routes, context: RequestContext, rootId:
 			untilId = oldest;
 		}
 	}
-	return result;
+	return routes.statuses(notes, context);
 }
 
 function registerMarkers(routes: Routes): void {
