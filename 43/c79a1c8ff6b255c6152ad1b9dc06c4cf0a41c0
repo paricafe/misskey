@@ -1,0 +1,22 @@
+packages/backend/src/core/NoteUpdateService.ts
+  s_5f28fc384d4647::t_40aa1be9c407cb 377,394-397
+packages/backend/src/core/NoteUpdateService.test.ts
+  s_5f28fc384d4647::t_2fb2b4fcb9df3b 141-143,158,192,775-802
+  s_5f28fc384d4647::t_d43198ad0292f6 803
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "43c79a1c8ff6b255c6152ad1b9dc06c4cf0a41c0",
+  "prompts": {},
+  "sessions": {
+    "s_5f28fc384d4647": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a185bb-88e3-7573-b27c-b77944e286d9",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Natsuki-Kaede <i@pari.network>"
+    }
+  }
+}
