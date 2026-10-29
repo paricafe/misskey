@@ -1,0 +1,22 @@
+packages/backend/src/core/activitypub/ApInboxService.ts
+  s_5f28fc384d4647::t_40aa1be9c407cb 791-800
+packages/backend/src/core/activitypub/ApInboxService.test.ts
+  s_5f28fc384d4647::t_2fb2b4fcb9df3b 136,141,173-192
+  s_5f28fc384d4647::t_73f64255850a74 193
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "67309c2472b654d8de619edc56cf0dfcfe10fc06",
+  "prompts": {},
+  "sessions": {
+    "s_5f28fc384d4647": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a185bb-88e3-7573-b27c-b77944e286d9",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Natsuki-Kaede <i@pari.network>"
+    }
+  }
+}
