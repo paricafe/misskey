@@ -788,10 +788,16 @@ export class ApInboxService {
 		// eslint-disable-next-line no-param-reassign
 		resolver ??= await this.apResolverService.createResolver();
 
-		const object = await resolver.resolve(activity.object).catch(e => {
-			this.logger.error(`Resolution failed: ${e}`);
-			throw e;
-		});
+		let object: IObject;
+		try {
+			object = await resolver.resolve(activity.object);
+		} catch (err) {
+			if (err instanceof StatusError && !err.isRetryable) {
+				return `skip: ${err.statusCode}`;
+			}
+			this.logger.error(`Resolution failed: ${err}`);
+			throw err;
+		}
 		if (getApType(object) === 'Question' || isPost(object)) {
 			const author = object.attributedTo == null ? undefined : toArray(object.attributedTo)[0];
 			const authorUri = typeof author === 'string' ? author : author?.id;

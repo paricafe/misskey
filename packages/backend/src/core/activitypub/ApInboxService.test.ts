@@ -133,12 +133,12 @@ describe(ApInboxService, () => {
 		expect(apQuestionService.updateQuestion).not.toHaveBeenCalled();
 	});
 
-	function createPostUpdate(object: Record<string, unknown>, updateNote: ReturnType<typeof vi.fn>) {
+	function createPostUpdate(object: Record<string, unknown>, updateNote: ReturnType<typeof vi.fn>, resolve = vi.fn().mockResolvedValue(object)) {
 		const service = Object.create(ApInboxService.prototype) as ApInboxService;
 		Object.assign(service, {
 			apResolverService: {
 				createResolver: vi.fn().mockResolvedValue({
-					resolve: vi.fn().mockResolvedValue(object),
+					resolve,
 				}),
 			},
 			apNoteService: { updateNote },
@@ -169,6 +169,27 @@ describe(ApInboxService, () => {
 		updated: '2025-02-01T00:00:00.000Z',
 		content: '<p>edited</p>',
 	};
+
+	test.each([404, 410])('skips an Update whose object URI resolves to HTTP %s', async (status) => {
+		const updateNote = vi.fn();
+		const resolve = vi.fn().mockRejectedValue(new StatusError('Not available', status));
+
+		await expect(createPostUpdate(post, updateNote, resolve)()).resolves.toBe(`skip: ${status}`);
+		expect(resolve).toHaveBeenCalledWith(post.id);
+		expect(updateNote).not.toHaveBeenCalled();
+	});
+
+	test.each([
+		['HTTP 429', new StatusError('Too Many Requests', 429)],
+		['HTTP 503', new StatusError('Service Unavailable', 503)],
+		['an unknown error', new Error('connection failed')],
+	])('keeps an Update retryable when object resolution fails with %s', async (_label, error) => {
+		const updateNote = vi.fn();
+		const resolve = vi.fn().mockRejectedValue(error);
+
+		await expect(createPostUpdate(post, updateNote, resolve)()).rejects.toBe(error);
+		expect(updateNote).not.toHaveBeenCalled();
+	});
 
 	test('skips a Post update whose attributedTo has no author id', async () => {
 		const updateNote = vi.fn();
