@@ -374,7 +374,7 @@ export class NoteUpdateService {
 	private async extractMentionedUsers(user: { host: MiUser['host']; }, tokens: mfm.MfmNode[]): Promise<MiUser[]> {
 		if (tokens == null) return [];
 
-		const mentions = extractMentions(tokens);
+		const mentions = [...new Map(extractMentions(tokens).map(mention => [mention.acct.toLowerCase(), mention])).values()];
 		let mentionedUsers = (await Promise.all(mentions.map(m =>
 			this.remoteUserResolveService.resolveUser(m.username, m.host ?? user.host).catch(() => null),
 		))).filter(x => x != null) as MiUser[];
@@ -391,13 +391,10 @@ export class NoteUpdateService {
 	private async deliverToConcerned(user: { id: MiLocalUser['id']; host: null; }, note: MiNote, noteActivity: any) {
 		const dm = this.apDeliverManagerService.createDeliverManager(user, noteActivity);
 
-		// Parse MFM if needed
-		const tokens = (note.text ? mfm.parse(note.text)! : []);
-		const cwTokens = note.cw ? mfm.parse(note.cw)! : [];
-
-		const combinedTokens = tokens.concat(cwTokens);
-
-		const mentionedUsers = await this.extractMentionedUsers(user, combinedTokens);
+		// Earlier edits may have delivered the note to users who are no longer mentioned.
+		const tokens = [note, ...(note.history ?? [])].flatMap(revision =>
+			[revision.text, revision.cw].flatMap(text => text ? mfm.parse(text) : []));
+		const mentionedUsers = await this.extractMentionedUsers(user, tokens);
 
 		// Users mentioned before this edit already have the note, so they need the Update too.
 		const previouslyMentionedIds = note.mentions.filter(id => !mentionedUsers.some(u => u.id === id));

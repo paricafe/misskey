@@ -138,6 +138,9 @@ function createService(lockedNote: MiNote = note, meta: { prohibitedWords?: stri
 		findOneBy: vi.fn(async ({ id }: { id: string }) => ({ id, host: 'remote.example', inbox: `https://remote.example/users/${id}/inbox` })),
 		findOneByOrFail: vi.fn(),
 	};
+	const remoteUserResolveService = {
+		resolveUser: vi.fn().mockRejectedValue(new Error('user not found')),
+	};
 	const service = new NoteUpdateService(
 		{} as never,
 		usersRepository as never,
@@ -152,7 +155,7 @@ function createService(lockedNote: MiNote = note, meta: { prohibitedWords?: stri
 		globalEventService as never,
 		relayService as never,
 		{} as never,
-		{} as never,
+		remoteUserResolveService as never,
 		apRendererService as never,
 		apDeliverManagerService as never,
 		{ fetch: vi.fn().mockResolvedValue({ mediaSilencedHosts: [], prohibitedWords: [], sensitiveWords: [], ...meta }) } as never,
@@ -186,6 +189,7 @@ function createService(lockedNote: MiNote = note, meta: { prohibitedWords?: stri
 		apDeliverManagerService,
 		deliverManager,
 		usersRepository,
+		remoteUserResolveService,
 	};
 }
 
@@ -767,5 +771,34 @@ describe(NoteUpdateService, () => {
 
 		await vi.waitFor(() => expect(deliverManager.execute).toHaveBeenCalled());
 		expect(deliverManager.addDirectRecipe).toHaveBeenCalledWith(expect.objectContaining({ id: 'removed-remote-user' }));
+	});
+
+	test.each(['text', 'cw'] as const)('keeps delivering later edits after removing a remote mention added in %s', async (field) => {
+		let storedNote = { ...note, localOnly: false, text: 'Initial text', cw: null } as MiNote;
+		const { service, lockedNotesRepository, notesRepository, userEntityService, deliverManager, remoteUserResolveService } = createService(storedNote);
+		lockedNotesRepository.findOne.mockImplementation(async () => storedNote);
+		notesRepository.update.mockImplementation(async (_where, changes) => {
+			storedNote = { ...storedNote, ...changes };
+		});
+		userEntityService.isLocalUser.mockReturnValue(true);
+		Object.assign(userEntityService, { isRemoteUser: vi.fn((u: { host: string | null }) => u.host != null) });
+		const recipient = { id: 'added-remote-user', host: 'remote.example' };
+		remoteUserResolveService.resolveUser.mockResolvedValue(recipient);
+
+		for (let edit = 1; edit <= 4; edit++) {
+			deliverManager.addDirectRecipe.mockClear();
+			deliverManager.execute.mockClear();
+			remoteUserResolveService.resolveUser.mockClear();
+			await service.update(user, storedNote, {
+				text: `Edit ${edit}`,
+				cw: null,
+				...(edit <= 2 ? { [field]: 'Hello @bob@remote.example' } : {}),
+				updatedAt: new Date(`2025-02-0${edit}T00:00:00.000Z`),
+			});
+
+			await vi.waitFor(() => expect(deliverManager.execute).toHaveBeenCalledOnce());
+			expect(deliverManager.addDirectRecipe).toHaveBeenCalledWith(recipient);
+			expect(remoteUserResolveService.resolveUser).toHaveBeenCalledExactlyOnceWith('bob', 'remote.example');
+		}
 	});
 });
