@@ -7,9 +7,14 @@ import { createApp, defineAsyncComponent } from 'vue';
 import { common } from './common.js';
 import { emojiPicker } from '@/utility/emoji-picker.js';
 import UiMinimum from '@/ui/minimum.vue';
+import { $i } from '@/i.js';
+import { preloadInteractiveComponents } from '@/utility/interactive-components.js';
 
 export async function subBoot() {
-	const { isClientUpdated } = await common(async () => createApp(UiMinimum));
+	const { isClientUpdated } = await common(async () => {
+		if ($i) await preloadInteractiveComponents();
+		return createApp(UiMinimum);
+	});
 
 	emojiPicker.init();
 }

@@ -29,9 +29,11 @@ import { prefer } from '@/preferences.js';
 import { updateCurrentAccount } from '@/accounts.js';
 import { unisonReload } from '@/utility/unison-reload.js';
 import { isBirthday } from '@/utility/is-birthday.js';
+import { preloadInteractiveComponents } from '@/utility/interactive-components.js';
 
 export async function mainBoot() {
 	const { isClientUpdated, lastVersion } = await common(async () => {
+		const interactiveReady = $i ? preloadInteractiveComponents() : Promise.resolve();
 		let uiStyle = ui;
 		const searchParams = new URLSearchParams(window.location.search);
 
@@ -41,6 +43,9 @@ export async function mainBoot() {
 		if (uiStyle === 'deck' && prefer.s['deck.useSimpleUiForNonRootPages'] && window.location.pathname !== '/') uiStyle = 'zen';
 
 		if (searchParams.has('ui')) uiStyle = searchParams.get('ui');
+		const timelineReady = $i && uiStyle !== 'deck' && ['/', '/timeline'].includes(window.location.pathname)
+			? import('@/pages/timeline.vue')
+			: Promise.resolve();
 
 		let rootComponent: Component;
 		switch (uiStyle) {
@@ -58,6 +63,7 @@ export async function mainBoot() {
 				break;
 		}
 
+		await Promise.all([interactiveReady, timelineReady]);
 		return createApp(rootComponent);
 	});
 

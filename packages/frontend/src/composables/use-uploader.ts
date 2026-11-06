@@ -4,8 +4,6 @@
  */
 
 import * as Misskey from 'misskey-js';
-import { readAndCompressImage } from '@misskey-dev/browser-image-resizer';
-import isAnimated from 'is-file-animated';
 import { EventEmitter } from 'eventemitter3';
 import { computed, markRaw, onUnmounted, ref, triggerRef } from 'vue';
 import type { MenuItem } from '@/types/menu.js';
@@ -757,7 +755,9 @@ export function useUploader(options: {
 
 			signal.throwIfAborted();
 			const compressionSettings = getCompressionSettings(item.compressionLevel);
-			const needsCompress = item.compressionLevel !== 0 && compressionSettings && IMAGE_EDITING_SUPPORTED_TYPES.includes(preprocessedFile.type) && !(await isAnimated(preprocessedFile));
+			const canCompress = item.compressionLevel !== 0 && compressionSettings && IMAGE_EDITING_SUPPORTED_TYPES.includes(preprocessedFile.type);
+			const isAnimated = canCompress ? (await import('is-file-animated')).default : null;
+			const needsCompress = canCompress && isAnimated && !(await isAnimated(preprocessedFile));
 			signal.throwIfAborted();
 
 			if (needsCompress) {
@@ -769,6 +769,7 @@ export function useUploader(options: {
 				};
 
 				try {
+					const { readAndCompressImage } = await import('@misskey-dev/browser-image-resizer');
 					const result = await readAndCompressImage(preprocessedFile, config);
 					signal.throwIfAborted();
 					if (result.size < preprocessedFile.size || preprocessedFile.type === 'image/webp') {

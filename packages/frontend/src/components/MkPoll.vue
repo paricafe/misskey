@@ -27,7 +27,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 </template>
 
 <script lang="ts" setup>
-import { computed, ref, watch } from 'vue';
+import { computed, inject, ref, watch } from 'vue';
 import * as Misskey from 'misskey-js';
 import { host } from '@@/js/config.js';
 import type { OpenOnRemoteOptions } from '@/utility/please-login.js';
@@ -37,6 +37,7 @@ import * as os from '@/os.js';
 import { misskeyApi } from '@/utility/misskey-api.js';
 import { i18n } from '@/i18n.js';
 import { useLowresTime } from '@@/js/use-lowres-time.js';
+import { DI } from '@/di.js';
 
 const props = defineProps<{
 	noteId: string;
@@ -71,7 +72,9 @@ const timer = computed(() => i18n.tsx._poll[
 	d: Math.floor(remaining.value / 86400),
 }));
 
-const showResult = ref(props.readOnly || isVoted.value || closed.value);
+const cachedResults = inject(DI.notePollResults, null);
+const showResult = cachedResults?.get(props.noteId) ?? ref(props.readOnly || isVoted.value || closed.value);
+cachedResults?.set(props.noteId, showResult);
 
 if (!closed.value) {
 	const closedWatchStop = watch(closed, (isNowClosed) => {

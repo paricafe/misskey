@@ -256,8 +256,6 @@ export async function common(createVue: () => Promise<App<Element>>) {
 	}
 	//#endregion
 
-	const customEmojisReady = fetchCustomEmojisForBoot();
-
 	// analytics
 	fetchInstanceMetaPromise.then(async () => {
 		await initAnalytics(instance);
@@ -271,7 +269,7 @@ export async function common(createVue: () => Promise<App<Element>>) {
 		});
 	});
 
-	const [app] = await Promise.all([createVue(), customEmojisReady]);
+	const app = await createVue();
 
 	if (_DEV_) {
 		app.config.performance = true;
@@ -299,14 +297,6 @@ export async function common(createVue: () => Promise<App<Element>>) {
 		return root;
 	})();
 
-	await initTelemetry(instance, app);
-
-	try {
-		await launchPlugins();
-	} catch (error) {
-		console.error('Failed to launch plugins:', error);
-	}
-
 	app.mount(rootEl);
 
 	// boot.jsのやつを解除
@@ -314,6 +304,15 @@ export async function common(createVue: () => Promise<App<Element>>) {
 	window.onunhandledrejection = null;
 
 	removeSplash();
+
+	// Let the shell paint before optional network, instrumentation and plugin work.
+	const initializeExtras = () => {
+		void fetchCustomEmojisForBoot();
+		void initTelemetry(instance, app).catch(error => console.error('Failed to initialize telemetry:', error));
+		void launchPlugins();
+	};
+	if (window.requestIdleCallback) window.requestIdleCallback(initializeExtras, { timeout: 1000 });
+	else window.setTimeout(initializeExtras, 0);
 
 	//#region Self-XSS 対策メッセージ
 	if (!_DEV_) {

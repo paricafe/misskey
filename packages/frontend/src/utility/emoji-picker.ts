@@ -4,7 +4,7 @@
  */
 
 import { shallowRef, ref, watch } from 'vue';
-import MkEmojiPickerDialog from '@/components/MkEmojiPickerDialog.vue';
+import { getEmojiPicker, loadEmojiPicker } from '@/utility/interactive-components.js';
 import { popup } from '@/os.js';
 import { prefer } from '@/preferences.js';
 
@@ -33,7 +33,9 @@ class EmojiPicker {
 		anchorElement: HTMLElement,
 		onChosen?: (emoji: string) => void,
 		onClosed?: () => void,
-	) {
+	): void | Promise<void> {
+		const MkEmojiPickerDialog = getEmojiPicker();
+		if (!MkEmojiPickerDialog) return loadEmojiPicker().then(() => { this.show(anchorElement, onChosen, onClosed); });
 		const anchorRef = shallowRef(anchorElement);
 
 		// defineAsyncComponentはiOS等でユーザーアクティベーションが失われてfocusが効かなくなるため使用不可

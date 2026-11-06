@@ -19,17 +19,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 			<div :class="$style.newBg2"></div>
 			<button class="_button" :class="$style.newButton" @click="releaseQueue()"><i class="ti ti-circle-arrow-up"></i> {{ i18n.ts.newNote }}</button>
 		</div>
-		<component
-			:is="prefer.s.animation ? TransitionGroup : 'div'"
-			:class="$style.notes"
-			:enterActiveClass="$style.transition_x_enterActive"
-			:leaveActiveClass="$style.transition_x_leaveActive"
-			:enterFromClass="$style.transition_x_enterFrom"
-			:leaveToClass="$style.transition_x_leaveTo"
-			:moveClass="$style.transition_x_move"
-			tag="div"
-		>
-			<template v-for="(note, i) in paginator.items.value" :key="note.id">
+		<MkVirtualList v-slot="{ item: note, index: i }" :items="[...paginator.items.value]" :class="$style.notes">
 				<div v-if="i > 0 && isSeparatorNeeded(paginator.items.value[i -1].createdAt, note.createdAt)" :data-scroll-anchor="note.id">
 					<div :class="$style.date">
 						<span><i class="ti ti-chevron-up"></i> {{ getSeparatorInfo(paginator.items.value[i -1].createdAt, note.createdAt)?.prevText }}</span>
@@ -45,9 +35,15 @@ SPDX-License-Identifier: AGPL-3.0-only
 					</div>
 				</div>
 				<MkNote v-else :class="$style.note" :note="note" :withHardMute="true" :data-scroll-anchor="note.id"/>
-			</template>
-		</component>
-		<button v-show="paginator.canFetchOlder.value" key="_more_" v-appear="prefer.s.enableInfiniteScroll ? paginator.fetchOlder : null" :disabled="paginator.fetchingOlder.value" class="_button" :class="$style.more" @click="paginator.fetchOlder">
+		</MkVirtualList>
+		<div
+			v-if="prefer.s.enableInfiniteScroll && paginator.canFetchOlder.value"
+			:key="paginator.items.value.at(-1)?.id"
+			v-appear="paginator.fetchOlder"
+			aria-hidden="true"
+			style="height: 1px"
+		></div>
+		<button v-show="paginator.canFetchOlder.value" key="_more_" :disabled="paginator.fetchingOlder.value" class="_button" :class="$style.more" @click="paginator.fetchOlder">
 			<div v-if="!paginator.fetchingOlder.value">{{ i18n.ts.loadMore }}</div>
 			<MkLoading v-else :inline="true"/>
 		</button>
@@ -56,7 +52,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 </template>
 
 <script lang="ts" setup>
-import { computed, watch, onUnmounted, provide, useTemplateRef, TransitionGroup, onMounted, shallowRef, ref, markRaw } from 'vue';
+import { computed, watch, onUnmounted, provide, useTemplateRef, onMounted, shallowRef, ref, markRaw } from 'vue';
 import * as Misskey from 'misskey-js';
 import { useInterval } from '@@/js/use-interval.js';
 import { useDocumentVisibility } from '@@/js/use-document-visibility.js';
@@ -72,9 +68,11 @@ import { instance } from '@/instance.js';
 import { prefer } from '@/preferences.js';
 import { store } from '@/store.js';
 import MkNote from '@/components/MkNote.vue';
+import MkVirtualList from '@/components/MkVirtualList.vue';
 import MkButton from '@/components/MkButton.vue';
 import { i18n } from '@/i18n.js';
 import { DI } from '@/di.js';
+import { useNoteViewStateCache } from '@/composables/use-note-view-cache.js';
 import { globalEvents, useGlobalEvent } from '@/events.js';
 import { isSeparatorNeeded, getSeparatorInfo } from '@/utility/timeline-date-separate.js';
 import { Paginator } from '@/utility/paginator.js';
@@ -184,6 +182,8 @@ if (props.src === 'antenna') {
 } else {
 	throw new Error('Unrecognized timeline type: ' + props.src);
 }
+
+provide(DI.noteViewStateCache, useNoteViewStateCache(paginator.items));
 
 onMounted(() => {
 	paginator.init();
@@ -434,40 +434,6 @@ defineExpose({
 </script>
 
 <style lang="scss" module>
-.transition_x_move {
-	transition: transform 0.7s cubic-bezier(0.23, 1, 0.32, 1);
-}
-
-.transition_x_enterActive {
-	transition: transform 0.7s cubic-bezier(0.23, 1, 0.32, 1), opacity 0.7s cubic-bezier(0.23, 1, 0.32, 1);
-
-	&.note,
-	.note {
-		/* Skip Note Rendering有効時、TransitionGroupでnoteを追加するときに一瞬がくっとなる問題を抑制する */
-		content-visibility: visible !important;
-	}
-}
-
-.transition_x_leaveActive {
-	transition: height 0.2s cubic-bezier(0,.5,.5,1), opacity 0.2s cubic-bezier(0,.5,.5,1);
-}
-
-.transition_x_enterFrom {
-	opacity: 0;
-	transform: translateY(max(-64px, -100%));
-}
-
-@supports (interpolate-size: allow-keywords) {
-	.transition_x_leaveTo {
-		interpolate-size: allow-keywords; // heightのtransitionを動作させるために必要
-		height: 0;
-	}
-}
-
-.transition_x_leaveTo {
-	opacity: 0;
-}
-
 .notes {
 	container-type: inline-size;
 	background: var(--MI_THEME-panel);

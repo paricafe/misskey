@@ -32,7 +32,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 		</div>
 	</button>
 
-	<button :class="[$style.item, $style.post]" class="_button" @click="os.post()">
+	<button :class="[$style.item, $style.post]" class="_button" data-testid="open-post-form" @click="os.post()">
 		<div :class="$style.itemInner">
 			<i :class="$style.itemIcon" class="ti ti-pencil"></i>
 		</div>

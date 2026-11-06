@@ -76,19 +76,19 @@ describe('custom emoji bootstrap', () => {
 		await expect(fetchCustomEmojisForBoot()).resolves.toBeUndefined();
 	});
 
-	test.each([undefined, {}])('waits for the initial catalog when cache is %s', async (cache) => {
+	test.each([undefined, {}])('starts without waiting for the initial catalog when cache is %s', async (cache) => {
 		mocks.cache = cache;
 		const response = Promise.withResolvers<{ emojis: Misskey.entities.EmojiSimple[] }>();
 		mocks.fetch.mockReturnValue(response.promise);
-		const { customEmojis, fetchCustomEmojisForBoot } = await import('@/custom-emojis.js');
-		let ready = false;
-		const boot = fetchCustomEmojisForBoot().then(() => { ready = true; });
-		await nextTick();
-		expect(ready).toBe(false);
+		const { customEmojis, customEmojisMap, fetchCustomEmojisForBoot } = await import('@/custom-emojis.js');
+		await expect(fetchCustomEmojisForBoot()).resolves.toBeUndefined();
+		expect(mocks.fetch).toHaveBeenCalledOnce();
+		expect(customEmojisMap.has('test')).toBe(false);
 		response.resolve({ emojis: [emoji('https://example.com/new.png')] });
-		await boot;
-		expect(ready).toBe(true);
+		await response.promise;
+		await nextTick();
 		expect(customEmojis.value).toEqual([emoji('https://example.com/new.png')]);
+		expect(customEmojisMap.get('test')?.url).toBe('https://example.com/new.png');
 	});
 
 	test('allows startup when fetching the initial catalog fails', async () => {

@@ -18,7 +18,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 					<Mfm v-if="note.cw != ''" style="margin-right: 8px;" :text="note.cw" :author="note.user" :nyaize="'respect'" class="_textAutoSpacing"/>
 					<MkCwButton v-model="showContent" :text="note.text" :files="note.files" :poll="note.poll"/>
 				</p>
-				<div v-show="note.cw == null || showContent">
+				<div v-if="note.cw == null || showContent">
 					<MkSubNoteContent :class="$style.text" :note="note"/>
 				</div>
 			</div>

@@ -56,7 +56,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 </template>
 
 <script lang="ts" setup>
-import { onMounted, onUnmounted, ref, useTemplateRef } from 'vue';
+import { onMounted, onBeforeUnmount, onActivated, onDeactivated, ref, useTemplateRef } from 'vue';
 import { genId } from '@/utility/id.js';
 
 const particles = ref<{
@@ -71,45 +71,86 @@ const el = useTemplateRef('el');
 const width = ref(0);
 const height = ref(0);
 const colors = ['#FF1493', '#00FFFF', '#FFE202', '#FFE202', '#FFE202'];
-let stop = false;
-let ro: ResizeObserver | undefined;
+let active = false;
+let visible = false;
+let running = false;
+let ro: ResizeObserver | null = null;
+let intersection: IntersectionObserver | null = null;
+const timers = new Set<number>();
 
-onMounted(() => {
-	ro = new ResizeObserver((entries, observer) => {
-		if (el.value == null) return;
+function later(callback: () => void, delay: number) {
+	const timer = window.setTimeout(() => {
+		timers.delete(timer);
+		callback();
+	}, delay);
+	timers.add(timer);
+}
+
+function add() {
+	if (!running) return;
+	const sizeFactor = Math.random();
+	const particle = {
+		id: genId(),
+		x: Math.random() * (width.value - 64),
+		y: Math.random() * (height.value - 64),
+		size: 0.2 + ((sizeFactor / 10) * 3),
+		dur: 1000 + (sizeFactor * 1000),
+		color: colors[Math.floor(Math.random() * colors.length)],
+	};
+	particles.value.push(particle);
+	later(() => {
+		particles.value = particles.value.filter(x => x.id !== particle.id);
+	}, particle.dur - 100);
+	later(add, 500 + Math.random() * 500);
+}
+
+function pause() {
+	running = false;
+	for (const timer of timers) window.clearTimeout(timer);
+	timers.clear();
+	particles.value = [];
+}
+
+function syncVisibility() {
+	const shouldRun = active && visible && window.document.visibilityState === 'visible';
+	if (shouldRun && !running) {
+		running = true;
+		add();
+	} else if (!shouldRun && running) {
+		pause();
+	}
+}
+
+function start() {
+	if (active || !el.value) return;
+	active = true;
+	ro = new ResizeObserver(() => {
+		if (!el.value) return;
 		width.value = el.value.offsetWidth + 64;
 		height.value = el.value.offsetHeight + 64;
 	});
-	if (el.value) ro.observe(el.value);
-	const add = () => {
-		if (stop) return;
-		const x = (Math.random() * (width.value - 64));
-		const y = (Math.random() * (height.value - 64));
-		const sizeFactor = Math.random();
-		const particle = {
-			id: genId(),
-			x,
-			y,
-			size: 0.2 + ((sizeFactor / 10) * 3),
-			dur: 1000 + (sizeFactor * 1000),
-			color: colors[Math.floor(Math.random() * colors.length)],
-		};
-		particles.value.push(particle);
-		window.setTimeout(() => {
-			particles.value = particles.value.filter(x => x.id !== particle.id);
-		}, particle.dur - 100);
+	intersection = new IntersectionObserver(entries => {
+		visible = entries.some(entry => entry.isIntersecting);
+		syncVisibility();
+	});
+	ro.observe(el.value);
+	intersection.observe(el.value);
+	window.document.addEventListener('visibilitychange', syncVisibility);
+}
 
-		window.setTimeout(() => {
-			add();
-		}, 500 + (Math.random() * 500));
-	};
-	add();
-});
+function stop() {
+	active = false;
+	visible = false;
+	pause();
+	ro?.disconnect();
+	intersection?.disconnect();
+	window.document.removeEventListener('visibilitychange', syncVisibility);
+}
 
-onUnmounted(() => {
-	if (ro) ro.disconnect();
-	stop = true;
-});
+onMounted(start);
+onActivated(start);
+onDeactivated(stop);
+onBeforeUnmount(stop);
 </script>
 
 <style lang="scss" module>

@@ -22,7 +22,7 @@ import type MkEmojiPickerDialog_TypeReferenceOnly from '@/components/MkEmojiPick
 import { misskeyApi } from '@/utility/misskey-api.js';
 import { prefer } from '@/preferences.js';
 import { i18n } from '@/i18n.js';
-import MkPostFormDialog from '@/components/MkPostFormDialog.vue';
+import { getPostForm, loadPostForm } from '@/utility/interactive-components.js';
 import MkWaitingDialog from '@/components/MkWaitingDialog.vue';
 import MkPageWindow from '@/components/MkPageWindow.vue';
 import MkToast from '@/components/MkToast.vue';
@@ -690,6 +690,7 @@ export async function post(props: PostFormProps = {}): Promise<void> {
 		} : undefined),
 	});
 	if (!isLoggedIn) return;
+	const MkPostFormDialog = getPostForm() ?? (await loadPostForm()).default;
 
 	showMovedDialog();
 	return new Promise(resolve => {

@@ -4,10 +4,12 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { createApp, defineComponent, h, isReactive, nextTick } from 'vue';
+import { createApp, defineComponent, h, isReactive, nextTick, provide, ref, shallowRef } from 'vue';
 import type * as Misskey from 'misskey-js';
 import { applyNoteCaptureDiff, noteEvents, useNoteCapture } from '@/composables/use-note-capture.js';
 import { useNote } from '@/composables/use-note.js';
+import { useNoteViewStateCache } from '@/composables/use-note-view-cache.js';
+import { DI } from '@/di.js';
 
 const mocks = vi.hoisted(() => {
 	const listeners = new Map<string, Set<(data?: unknown) => void>>();
@@ -86,6 +88,7 @@ function makeNote(createdAt = new Date().toISOString()): Misskey.entities.Note {
 function mountCapture(options: {
 	note?: Misskey.entities.Note;
 	mock?: boolean;
+	retain?: boolean;
 	onChildrenChanged?: ChildrenChangedHandler;
 } = {}) {
 	const note = options.note ?? makeNote();
@@ -93,7 +96,7 @@ function mountCapture(options: {
 	let capture!: ReturnType<typeof useNoteCapture>;
 	const app = createApp(defineComponent({
 		setup() {
-			capture = useNoteCapture({ note, parentNote: null, mock: options.mock ?? true, onChildrenChanged });
+			capture = useNoteCapture({ note, parentNote: null, mock: options.mock ?? true, retain: options.retain, onChildrenChanged });
 			return () => h('div');
 		},
 	}));
@@ -112,6 +115,26 @@ afterEach(() => {
 });
 
 describe('useNoteCapture counts', () => {
+	test('retains event and stream updates after unmount until explicitly disposed', () => {
+		mocks.realtimeMode = true;
+		const { note, state, capture, app } = mountCapture({ mock: false, retain: true });
+		app.unmount();
+		mountedApps.splice(mountedApps.indexOf(app), 1);
+		try {
+			mocks.connection.emit('noteUpdated', { id: note.id, type: 'reacted', body: { userId: 'other', reaction: '❤️' } });
+			emitUpdated(note.id, 'while hidden');
+			expect(state.reactionCount).toBe(1);
+			expect(note.text).toBe('while hidden');
+			capture.dispose();
+			expect(mocks.connection.send).toHaveBeenCalledWith('un', { id: note.id });
+			mocks.connection.emit('noteUpdated', { id: note.id, type: 'reacted', body: { userId: 'another', reaction: '❤️' } });
+			emitUpdated(note.id, 'after dispose');
+			expect(state.reactionCount).toBe(1);
+			expect(note.text).toBe('while hidden');
+		} finally {
+			capture.dispose();
+		}
+	});
 	test('initializes and applies bidirectional count events with a zero floor', () => {
 		const { note, state } = mountCapture();
 		const emit = noteEvents.emit.bind(noteEvents) as (event: string, body: unknown) => boolean;
@@ -296,4 +319,61 @@ describe('useNote edit updates', () => {
 		expect(isReactive(appearNote.files)).toBe(false);
 		expect(isReactive(appearNote.files?.[0])).toBe(false);
 	});
+});
+
+test('retains note capture and translation across remount, then disposes entries with their owner', async () => {
+	const first = editableNote('first-cache');
+	const second = editableNote('second-cache');
+	const notes = shallowRef([first, second]);
+	const visible = ref(true);
+	const views: ReturnType<typeof useNote>[] = [];
+	let cache!: ReturnType<typeof useNoteViewStateCache>;
+	const child = defineComponent({
+		setup() {
+			views.push(useNote({ note: first, mock: true }));
+			views.push(useNote({ note: second, mock: true }));
+			return () => h('div');
+		},
+	});
+	const app = createApp(defineComponent({
+		setup() {
+			cache = useNoteViewStateCache(notes);
+			provide(DI.noteViewStateCache, cache);
+			return () => visible.value ? h(child) : null;
+		},
+	}));
+	app.mount(document.createElement('div'));
+	mountedApps.push(app);
+	const firstView = views[0];
+	const translation = { text: 'translated', sourceLang: 'en' } as Misskey.entities.NotesTranslateResponse;
+	firstView.showContent.value = true;
+	firstView.translating.value = true;
+	visible.value = false;
+	await nextTick();
+	noteEvents.emit(`reacted:${first.id}`, { userId: 'other', reaction: '❤️' });
+	emitUpdated(first.id, 'hidden update');
+	firstView.translation.value = translation;
+	firstView.translating.value = false;
+	visible.value = true;
+	await nextTick();
+	const remounted = views[2];
+	expect(remounted.appearNote).toBe(firstView.appearNote);
+	expect(remounted.$appearNote).toBe(firstView.$appearNote);
+	expect(remounted.$appearNote.reactionCount).toBe(1);
+	expect(remounted.appearNote.text).toBe('hidden update');
+	expect(remounted.translation).toBe(firstView.translation);
+	expect(remounted.translation.value).toEqual(translation);
+	expect(remounted.translating.value).toBe(false);
+	expect(remounted.showContent.value).toBe(true);
+	visible.value = false;
+	await nextTick();
+	notes.value = [second];
+	await nextTick();
+	expect(cache.has(first)).toBe(false);
+	expect(noteEvents.listenerCount(`reacted:${first.id}`)).toBe(0);
+	expect(noteEvents.listenerCount(`reacted:${second.id}`)).toBe(1);
+	app.unmount();
+	mountedApps.splice(mountedApps.indexOf(app), 1);
+	expect(cache.size).toBe(0);
+	expect(noteEvents.listenerCount(`reacted:${second.id}`)).toBe(0);
 });

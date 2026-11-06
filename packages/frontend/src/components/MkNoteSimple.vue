@@ -13,7 +13,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 				<Mfm v-if="note.cw != ''" style="margin-right: 8px;" :text="note.cw" :isBlock="true" :author="note.user" :nyaize="'respect'" :emojiUrls="note.emojis" class="_textAutoSpacing" @click.stop/>
 				<MkCwButton v-model="showContent" :text="note.text" :files="note.files" :poll="note.poll" @click.stop/>
 			</p>
-			<div v-show="note.cw == null || showContent">
+			<div v-if="note.cw == null || showContent">
 				<MkSubNoteContent :class="$style.text" :note="note"/>
 			</div>
 		</div>

@@ -40,6 +40,8 @@ export type AiScriptPluginMeta = {
 
 let _parser: Parser | null = null;
 
+export const pluginsReady = ref(isSafeMode || !prefer.s.plugins.some(plugin => plugin.active));
+
 async function getParser(): Promise<Parser> {
 	const { Parser } = await import('@syuilo/aiscript');
 	_parser ??= new Parser();
@@ -235,14 +237,19 @@ function addPluginHandler<K extends keyof HandlerDef>(installId: Plugin['install
 	pluginHandlers.push({ pluginInstallId: installId, type, ctx });
 }
 
-export function launchPlugins() {
-	return Promise.all(prefer.s.plugins.map(plugin => {
-		if (plugin.active) {
-			return launchPlugin(plugin.installId);
-		} else {
-			return Promise.resolve();
-		}
-	}));
+export async function launchPlugins(): Promise<void> {
+	try {
+		await Promise.allSettled(prefer.s.plugins.filter(plugin => plugin.active).map(async plugin => {
+			try {
+				await launchPlugin(plugin.installId);
+			} catch (error) {
+				abortPlugin(plugin, false);
+				console.error('Failed to launch plugin:', plugin.name, error);
+			}
+		}));
+	} finally {
+		pluginsReady.value = true;
+	}
 }
 
 async function launchPlugin(id: Plugin['installId']): Promise<void> {
@@ -297,7 +304,16 @@ async function launchPlugin(id: Plugin['installId']): Promise<void> {
 	pluginContexts.set(plugin.installId, aiscript);
 
 	const parser = await getParser();
-	await aiscript.exec(parser.parse(plugin.src)).then(
+	let timeout: number | undefined;
+	await Promise.race([
+		aiscript.exec(parser.parse(plugin.src)),
+		new Promise<never>((_, reject) => {
+			timeout = window.setTimeout(() => {
+				aiscript.abort();
+				reject(new Error('Plugin startup exceeded 5000ms'));
+			}, 5000);
+		}),
+	]).finally(() => window.clearTimeout(timeout)).then(
 		() => {
 			console.info('Plugin installed:', plugin.name, 'v' + plugin.version);
 			systemLog('Plugin started');
@@ -310,13 +326,13 @@ async function launchPlugin(id: Plugin['installId']): Promise<void> {
 	);
 }
 
-export function abortPlugin(plugin: Plugin): void {
+export function abortPlugin(plugin: Plugin, clearLogs = true): void {
 	const pluginContext = pluginContexts.get(plugin.installId);
 	if (!pluginContext) return;
 
 	pluginContext.abort();
 	pluginContexts.delete(plugin.installId);
-	pluginLogs.value.delete(plugin.installId);
+	if (clearLogs) pluginLogs.value.delete(plugin.installId);
 	pluginHandlers = pluginHandlers.filter(x => x.pluginInstallId !== plugin.installId);
 }
 

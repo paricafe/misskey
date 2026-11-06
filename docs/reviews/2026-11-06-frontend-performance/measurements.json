@@ -1,0 +1,378 @@
+{
+  "date": "2026-11-06",
+  "branch": "pari-dev",
+  "baselineCommit": "9b8e742302e83ff37fc33282dbf471d9211bcd20",
+  "target": "working tree",
+  "changedFrontendFiles": 50,
+  "changedFrontendFilesSha256": "85ee5afaf18dfcfdae0a6b045f51b2518bc50aba1008f57ae8629a5004b521f1",
+  "environment": {
+    "os": "macOS 27.2",
+    "arch": "arm64",
+    "node": "24.19.0",
+    "chrome": "156.0.8078.80",
+    "frontendBuildMode": "production",
+    "bundleLocale": "ja-JP"
+  },
+  "bundles": {
+    "base": {
+      "visitor": {
+        "roots": [
+          "src/_boot_.ts",
+          "src/boot/main-boot.ts",
+          "src/ui/visitor.vue",
+          "src/pages/welcome.vue"
+        ],
+        "files": 66,
+        "raw": 1071375,
+        "gzip": 346703,
+        "brotli": 286826
+      },
+      "authenticated": {
+        "roots": [
+          "src/_boot_.ts",
+          "src/boot/main-boot.ts",
+          "src/ui/universal.vue",
+          "src/pages/timeline.vue",
+          "src/components/MkPostFormDialog.vue",
+          "src/components/MkEmojiPickerDialog.vue"
+        ],
+        "files": 61,
+        "raw": 1039982,
+        "gzip": 334920,
+        "brotli": 276594
+      }
+    },
+    "head": {
+      "visitor": {
+        "roots": [
+          "src/_boot_.ts",
+          "src/boot/main-boot.ts",
+          "src/ui/visitor.vue",
+          "src/pages/welcome.vue"
+        ],
+        "files": 16,
+        "raw": 1042084,
+        "gzip": 326738,
+        "brotli": 267678
+      },
+      "authenticated": {
+        "roots": [
+          "src/_boot_.ts",
+          "src/boot/main-boot.ts",
+          "src/ui/universal.vue",
+          "src/pages/timeline.vue",
+          "src/components/MkPostFormDialog.vue",
+          "src/components/MkEmojiPickerDialog.vue"
+        ],
+        "files": 13,
+        "raw": 1014330,
+        "gzip": 316527,
+        "brotli": 258904
+      }
+    }
+  },
+  "artifactConsistency": {
+    "language": "ja-JP",
+    "checkedFiles": 22,
+    "mismatches": [],
+    "productionManifestSha256": "79a8059f4b1f614e853539b88d09733982cd450be9571d7338a9a8c6045d659f"
+  },
+  "runtime": {
+    "loadedNotes": 500,
+    "roundsPerPhase": 3,
+    "phaseOrder": [
+      "base",
+      "head",
+      "head",
+      "base",
+      "base",
+      "head"
+    ],
+    "median": {
+      "base": {
+        "initial": {
+          "articles": 500,
+          "elements": 19805,
+          "heapUsedBytes": 47794160,
+          "domNodes": 46559,
+          "jsEventListeners": 15759
+        },
+        "afterScroll": {
+          "articles": 500,
+          "elements": 19805,
+          "heapUsedBytes": 47809000,
+          "domNodes": 46559,
+          "jsEventListeners": 15759
+        }
+      },
+      "head": {
+        "initial": {
+          "articles": 8,
+          "elements": 593,
+          "heapUsedBytes": 7496344,
+          "domNodes": 1320,
+          "jsEventListeners": 523
+        },
+        "afterScroll": {
+          "articles": 8,
+          "elements": 592,
+          "heapUsedBytes": 10079404,
+          "domNodes": 1319,
+          "jsEventListeners": 523
+        }
+      }
+    },
+    "samples": [
+      {
+        "phase": "base",
+        "round": 0,
+        "initial": {
+          "articles": 500,
+          "elements": 19805,
+          "heapUsedBytes": 47794160,
+          "domNodes": 46559,
+          "jsEventListeners": 15767
+        },
+        "afterScroll": {
+          "articles": 500,
+          "elements": 19805,
+          "heapUsedBytes": 47820660,
+          "domNodes": 46559,
+          "jsEventListeners": 15759
+        },
+        "errors": []
+      },
+      {
+        "phase": "head",
+        "round": 0,
+        "initial": {
+          "articles": 8,
+          "elements": 593,
+          "heapUsedBytes": 7496344,
+          "domNodes": 1320,
+          "jsEventListeners": 523
+        },
+        "afterScroll": {
+          "articles": 8,
+          "elements": 592,
+          "heapUsedBytes": 10103004,
+          "domNodes": 1319,
+          "jsEventListeners": 523
+        },
+        "errors": []
+      },
+      {
+        "phase": "head",
+        "round": 1,
+        "initial": {
+          "articles": 8,
+          "elements": 593,
+          "heapUsedBytes": 7505872,
+          "domNodes": 1320,
+          "jsEventListeners": 523
+        },
+        "afterScroll": {
+          "articles": 8,
+          "elements": 592,
+          "heapUsedBytes": 10079404,
+          "domNodes": 1319,
+          "jsEventListeners": 523
+        },
+        "errors": []
+      },
+      {
+        "phase": "base",
+        "round": 1,
+        "initial": {
+          "articles": 500,
+          "elements": 19805,
+          "heapUsedBytes": 47793292,
+          "domNodes": 46559,
+          "jsEventListeners": 15759
+        },
+        "afterScroll": {
+          "articles": 500,
+          "elements": 19805,
+          "heapUsedBytes": 47806496,
+          "domNodes": 46559,
+          "jsEventListeners": 15759
+        },
+        "errors": []
+      },
+      {
+        "phase": "base",
+        "round": 2,
+        "initial": {
+          "articles": 500,
+          "elements": 19805,
+          "heapUsedBytes": 47796368,
+          "domNodes": 46559,
+          "jsEventListeners": 15759
+        },
+        "afterScroll": {
+          "articles": 500,
+          "elements": 19805,
+          "heapUsedBytes": 47809000,
+          "domNodes": 46559,
+          "jsEventListeners": 15759
+        },
+        "errors": []
+      },
+      {
+        "phase": "head",
+        "round": 2,
+        "initial": {
+          "articles": 8,
+          "elements": 593,
+          "heapUsedBytes": 7488976,
+          "domNodes": 1320,
+          "jsEventListeners": 523
+        },
+        "afterScroll": {
+          "articles": 8,
+          "elements": 592,
+          "heapUsedBytes": 10076808,
+          "domNodes": 1319,
+          "jsEventListeners": 523
+        },
+        "errors": []
+      }
+    ]
+  },
+  "functional": {
+    "stats": {
+      "startTime": "2026-11-06T11:54:40.100Z",
+      "duration": 32345.321,
+      "expected": 6,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "runs": [
+      {
+        "title": "keeps three Deck timelines independent with 500 loaded notes each",
+        "repetition": 1,
+        "status": "passed",
+        "durationMs": 1992,
+        "metrics": [
+          {
+            "loadedPerColumn": 500,
+            "mounted": [
+              19,
+              13,
+              13
+            ]
+          }
+        ]
+      },
+      {
+        "title": "bounds mounted notes and retains state at 1280px",
+        "repetition": 1,
+        "status": "passed",
+        "durationMs": 4853,
+        "metrics": [
+          {
+            "viewport": {
+              "width": 1280,
+              "height": 900
+            },
+            "loaded": 500,
+            "maximumMounted": 11,
+            "errors": []
+          }
+        ]
+      },
+      {
+        "title": "bounds mounted notes and retains state at 390px",
+        "repetition": 1,
+        "status": "passed",
+        "durationMs": 8989,
+        "metrics": [
+          {
+            "viewport": {
+              "width": 390,
+              "height": 844
+            },
+            "loaded": 500,
+            "maximumMounted": 9,
+            "errors": []
+          }
+        ]
+      },
+      {
+        "title": "keeps three Deck timelines independent with 500 loaded notes each",
+        "repetition": 2,
+        "status": "passed",
+        "durationMs": 1838,
+        "metrics": [
+          {
+            "loadedPerColumn": 500,
+            "mounted": [
+              19,
+              13,
+              13
+            ]
+          }
+        ]
+      },
+      {
+        "title": "bounds mounted notes and retains state at 1280px",
+        "repetition": 2,
+        "status": "passed",
+        "durationMs": 4391,
+        "metrics": [
+          {
+            "viewport": {
+              "width": 1280,
+              "height": 900
+            },
+            "loaded": 500,
+            "maximumMounted": 11,
+            "errors": []
+          }
+        ]
+      },
+      {
+        "title": "bounds mounted notes and retains state at 390px",
+        "repetition": 2,
+        "status": "passed",
+        "durationMs": 8708,
+        "metrics": [
+          {
+            "viewport": {
+              "width": 390,
+              "height": 844
+            },
+            "loaded": 500,
+            "maximumMounted": 9,
+            "errors": []
+          }
+        ]
+      }
+    ]
+  },
+  "validation": {
+    "frontendUnit": {
+      "status": "PASS",
+      "files": 44,
+      "tests": 302
+    },
+    "frontendTypecheck": "PASS",
+    "frontendProductionBuild": "PASS",
+    "frontendEmbedBuild": "PASS",
+    "serviceWorkerProductionBuild": "PASS",
+    "changedFileLint": "PASS",
+    "SPDX": "PASS",
+    "localeSafety": "PASS",
+    "diffWhitespace": "PASS",
+    "vueChecklist": "PASS"
+  },
+  "scope": [
+    "Runtime samples use a deterministic 500-note plain-text fixture and explicit garbage collection. Heap is JavaScript heap, not browser process memory.",
+    "Bundle totals sum unique required JavaScript files from each manifest static-import closure; optional dynamic widgets, CSS, fonts, images and HTTP overhead are outside this total.",
+    "Mobile validation uses a 390x844 Chrome viewport. Physical iOS keyboard behavior and production deployment were not tested."
+  ],
+  "branchHeadAtAcceptance": "b1ca204d39a20b01d2b3a054c96c3ee851a7fdaa",
+  "baselineCommittedFrontendTree": "7678af9c95538377ffce7a4369ce1ff38b357e37",
+  "branchHeadCommittedFrontendTree": "7678af9c95538377ffce7a4369ce1ff38b357e37"
+}

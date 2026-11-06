@@ -69,9 +69,8 @@ export async function fetchCustomEmojis(force = false) {
 }
 
 export async function fetchCustomEmojisForBoot(): Promise<void> {
-	// Cached emojis can render immediately while the catalog refreshes in the background.
-	const fetching = fetchCustomEmojis().catch(() => {});
-	if (!Array.isArray(storageCache)) await fetching;
+	// The shell and text fallback can render before the catalog, including on the first visit.
+	void fetchCustomEmojis().catch(error => console.error('Failed to refresh emojis:', error));
 }
 
 let cachedTags: string[] | null = null;

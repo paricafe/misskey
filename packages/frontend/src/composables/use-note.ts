@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { ref, computed, shallowReactive } from 'vue';
+import { ref, computed, shallowReactive, inject, provide, onBeforeUnmount } from 'vue';
 import type { Ref } from 'vue';
 import * as mfm from 'mfm-js';
 import * as Misskey from 'misskey-js';
@@ -36,7 +36,9 @@ import MkUsersTooltip from '@/components/MkUsersTooltip.vue';
 import MkReactionsViewerDetails from '@/components/MkReactionsViewer.details.vue';
 import MkRippleEffect from '@/components/MkRippleEffect.vue';
 import { notePage } from '@@/js/note.js';
+import { DI } from '@/di.js';
 import type { DI as DIType } from '@/di.js';
+import type { NoteCapture } from '@/composables/use-note-capture.js';
 import type { ExtractInjectedType } from '@/types/misc.js';
 import type { MenuItem } from '@/types/menu.js';
 import type { WordMuteResult } from '@/utility/check-word-mute.js';
@@ -67,6 +69,19 @@ export interface UseNoteOptions {
 	onChildrenChanged?: (event: { action: 'added' | 'removed'; childId: Misskey.entities.Note['id'] }) => void;
 	forceNoteCapture?: boolean;
 }
+
+export type NoteViewState = {
+	note: Misskey.entities.Note;
+	capture: NoteCapture;
+	hideByPlugin: boolean;
+	showContent: boolean;
+	collapsed: boolean;
+	renoteCollapsed: boolean;
+	muted: WordMuteResult | 'sensitiveMute' | false;
+	translation: Ref<Misskey.entities.NotesTranslateResponse | null>;
+	translating: Ref<boolean>;
+	pollResults: Map<string, Ref<boolean>>;
+};
 
 export function checkNoteWordMute(
 	noteToCheck: Misskey.entities.Note,
@@ -111,9 +126,12 @@ export function useNote(
 	const currentAntenna = options.currentAntenna ?? null;
 
 	// プラグインの割り込み処理
-	let rawNote = deepClone(props.note);
-	let hideByPlugin = false;
-	const noteViewInterruptors = getPluginHandlers('note_view_interruptor');
+	const providedCache = inject(DI.noteViewStateCache, null);
+	const viewStateCache = options.onChildrenChanged ? null : providedCache;
+	const savedState = viewStateCache?.get(props.note);
+	let rawNote = savedState?.note ?? deepClone(props.note);
+	let hideByPlugin = savedState?.hideByPlugin ?? false;
+	const noteViewInterruptors = savedState ? [] : getPluginHandlers('note_view_interruptor');
 
 	if (noteViewInterruptors.length > 0) {
 		let result: Misskey.entities.Note | null = deepClone(rawNote);
@@ -144,23 +162,27 @@ export function useNote(
 	const appearNote = getAppearNote(rawNote) ?? rawNote;
 
 	// キャプチャ（ストリーム購読）
-	const { $note: $appearNote, subscribe: subscribeManuallyToNoteCapture } = useNoteCapture({
+	const capture = savedState?.capture ?? useNoteCapture({
 		note: appearNote,
 		parentNote: rawNote,
 		mock: props.mock,
 		onChildrenChanged: options.onChildrenChanged,
 		forceCapture: options.forceNoteCapture,
+		retain: viewStateCache != null,
 	});
+	const { $note: $appearNote, subscribe: subscribeManuallyToNoteCapture } = capture;
 
 	// 各種フラグ状態
-	const showContent = ref(false);
+	const showContent = ref(savedState?.showContent ?? false);
 	const isDeleted = ref(false);
-	const translating = ref(false);
-	const translation = ref<Misskey.entities.NotesTranslateResponse | null>(null);
+	const translating = savedState?.translating ?? ref(false);
+	const translation = savedState?.translation ?? ref<Misskey.entities.NotesTranslateResponse | null>(null);
+	const pollResults = savedState?.pollResults ?? new Map<string, Ref<boolean>>();
+	provide(DI.notePollResults, pollResults);
 
 	// ミュート判定
 	// mutedはミュート解除の操作で書き換わるのでrefだが、hardMutedは解除できないのでリアクティブにしない
-	const muted = ref($i ? checkNoteWordMute(appearNote, $i, $i.mutedWords) || checkBuiltinSoftMute(appearNote, inTimeline && !tl_withSensitive.value) : false);
+	const muted = ref(savedState?.muted ?? ($i ? checkNoteWordMute(appearNote, $i, $i.mutedWords) || checkBuiltinSoftMute(appearNote, inTimeline && !tl_withSensitive.value) : false));
 	const hardMuted = props.withHardMute && $i ? checkNoteWordMute(appearNote, $i, $i.hardMutedWords) : false;
 
 	// 計算プロパティ (Computed)
@@ -168,16 +190,34 @@ export function useNote(
 	const parsed = computed(() => appearNote.text ? mfm.parse(appearNote.text) : null);
 	const urls = computed(() => parsed.value ? extractUrlFromMfm(parsed.value).filter((url) => appearNote.renote?.url !== url && appearNote.renote?.uri !== url) : null);
 	const isLong = computed(() => shouldCollapsed(appearNote, urls.value ?? []));
-	const collapsed = ref(appearNote.cw == null && isLong.value);
+	const collapsed = ref(savedState?.collapsed ?? (appearNote.cw == null && isLong.value));
 	const showTicker = (prefer.s.instanceTicker === 'always') || (prefer.s.instanceTicker === 'remote' && appearNote.user.instance);
 	const canRenote = ['public', 'home'].includes(appearNote.visibility) || (appearNote.visibility === 'followers' && appearNote.userId === $i?.id);
 	const canTranslate = computed(() => $i != null && $i.policies.canUseTranslator && instance.translatorAvailable);
 	const renoteCollapsed = ref(
-		prefer.s.collapseEverything || (prefer.s.alwaysCollapseRenotes && isRenote) || (prefer.s.collapseRenotes && isRenote && (
+		savedState?.renoteCollapsed ?? (prefer.s.collapseEverything || (prefer.s.alwaysCollapseRenotes && isRenote) || (prefer.s.collapseRenotes && isRenote && (
 			($i && ($i.id === rawNote.userId || $i.id === appearNote.userId)) || // `||` must be `||`! See https://github.com/misskey-dev/misskey/issues/13131
 			($appearNote.myReaction != null)
-		)),
+		))),
 	);
+
+	// Retain data and user choices; all component watchers and DOM are still unmounted.
+	if (viewStateCache) {
+		const save = () => viewStateCache.set(props.note, {
+			note: rawNote,
+			capture,
+			hideByPlugin,
+			showContent: showContent.value,
+			collapsed: collapsed.value,
+			renoteCollapsed: renoteCollapsed.value,
+			muted: muted.value,
+			translation,
+			translating,
+			pollResults,
+		});
+		save();
+		onBeforeUnmount(save);
+	}
 
 	const pleaseLoginContext: OpenOnRemoteOptions = {
 		type: 'lookup',

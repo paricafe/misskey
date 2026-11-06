@@ -4,7 +4,7 @@
  */
 
 import { afterEach, assert, describe, test } from 'vitest';
-import { cleanup, render } from '@testing-library/vue';
+import { cleanup, fireEvent, render } from '@testing-library/vue';
 import { defineComponent } from 'vue';
 import * as Misskey from 'misskey-js';
 import Mfm from '@/components/global/MkMfm.js';
@@ -19,7 +19,7 @@ describe('note auto spacing scope', () => {
 		cleanup();
 	});
 
-	test('applies auto spacing to note MFM but not header UI', () => {
+	test('applies auto spacing to note MFM but not header UI', async () => {
 		const result = render(MkNotePreview, {
 			props: {
 				text: '\u65e5\u672c\u8a9eEnglish',
@@ -40,11 +40,13 @@ describe('note auto spacing scope', () => {
 				stubs: {
 					MkAvatar: true,
 					MkUserName: UserNameStub,
-					MkCwButton: true,
+					MkCwButton: { template: '<button data-testid="expand" @click="$emit(\'update:modelValue\', true)">expand</button>' },
 				},
 			},
 		});
 
+		assert.strictEqual(result.container.querySelectorAll('._textAutoSpacing').length, 1);
+		await fireEvent.click(result.getByTestId('expand'));
 		const mfmElements = Array.from(result.container.querySelectorAll('._textAutoSpacing'));
 		assert.strictEqual(mfmElements.length, 2);
 		assert.strictEqual(result.getByTestId('user-name').closest('._textAutoSpacing'), null);

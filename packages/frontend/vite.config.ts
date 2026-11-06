@@ -16,6 +16,7 @@ import pluginJson5 from './lib/vite-plugin-json5.js';
 import type { Options as SearchIndexOptions } from './lib/vite-plugin-create-search-index.js';
 import pluginCreateSearchIndex from './lib/vite-plugin-create-search-index.js';
 import pluginWatchLocales from './lib/vite-plugin-watch-locales.js';
+import { createClientChunkGroup } from './lib/client-chunks.js';
 import { pluginRemoveUnrefI18n } from '../frontend-builder/rollup-plugin-remove-unref-i18n.js';
 import { Features } from 'lightningcss';
 
@@ -225,7 +226,7 @@ export function getConfig(): UserConfig {
 							name: 'i18n',
 							includeDependenciesRecursively: false,
 							test: /i18n\.ts|locale\.ts/,
-						}],
+						}, createClientChunkGroup(__dirname)],
 					},
 					entryFileNames: `scripts/${localesHash}-[hash:8].js`,
 					chunkFileNames: `scripts/${localesHash}-[hash:8].js`,

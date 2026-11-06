@@ -6,11 +6,15 @@
 import type { InjectionKey, Ref, ComputedRef } from 'vue';
 import type { PageMetadata } from '@/page.js';
 import type { Router } from '@/router.js';
+import type { NoteViewState } from '@/composables/use-note.js';
+import type * as Misskey from 'misskey-js';
 
 export const DI = {
 	routerCurrentDepth: Symbol() as InjectionKey<number>,
 	router: Symbol() as InjectionKey<Router>,
 	mock: Symbol() as InjectionKey<boolean>,
+	noteViewStateCache: Symbol() as InjectionKey<Map<Misskey.entities.Note, NoteViewState>>,
+	notePollResults: Symbol() as InjectionKey<Map<string, Ref<boolean>>>,
 	pageMetadata: Symbol() as InjectionKey<Ref<PageMetadata | null>>,
 	viewId: Symbol() as InjectionKey<string>,
 	currentStickyTop: Symbol() as InjectionKey<Ref<number>>,

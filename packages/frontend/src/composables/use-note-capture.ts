@@ -268,16 +268,20 @@ export function applyNoteCaptureDiff($note: ReactiveNoteData, data: NoteCaptureD
 
 const noReaction = Symbol();
 
+export type NoteCapture = {
+	$note: Reactive<ReactiveNoteData>;
+	subscribe: () => void;
+	dispose: () => void;
+};
+
 export function useNoteCapture(props: {
 	note: Misskey.entities.Note;
 	parentNote: Misskey.entities.Note | null;
 	mock?: boolean;
 	onChildrenChanged?: (event: { action: 'added' | 'removed'; childId: Misskey.entities.Note['id'] }) => void;
 	forceCapture?: boolean;
-}): {
-	$note: Reactive<ReactiveNoteData>;
-	subscribe: () => void;
-} {
+	retain?: boolean;
+}): NoteCapture {
 	const { note, parentNote, mock } = props;
 	let unsubscribeCapture: (() => void) | null = null;
 
@@ -417,7 +421,7 @@ export function useNoteCapture(props: {
 		}
 	}
 
-	onUnmounted(() => {
+	function dispose(): void {
 		unsubscribeCapture?.();
 		unsubscribeCapture = null;
 		noteEvents.off(`reacted:${note.id}`, onReacted);
@@ -427,7 +431,9 @@ export function useNoteCapture(props: {
 		noteEvents.off(`renoteCountChanged:${note.id}`, onRenoteCountChanged);
 		noteEvents.off(`childrenChanged:${note.id}`, onChildrenChanged);
 		noteEvents.off(`updated:${note.id}`, onUpdated);
-	});
+	}
+
+	if (!props.retain) onUnmounted(dispose);
 
 	// 投稿からある程度経過している(=タイムラインを遡って表示した)ノートは、イベントが発生する可能性が低いためそもそも購読しない
 	// ただし「リノートされたばかりの過去のノート」(= parentNoteが存在し、かつparentNoteの投稿日時が最近)はイベント発生が考えられるため購読する
@@ -439,6 +445,7 @@ export function useNoteCapture(props: {
 				return {
 					$note,
 					subscribe,
+					dispose,
 				};
 			}
 		} else {
@@ -447,6 +454,7 @@ export function useNoteCapture(props: {
 				return {
 					$note,
 					subscribe,
+					dispose,
 				};
 			}
 		}
@@ -457,5 +465,6 @@ export function useNoteCapture(props: {
 	return {
 		$note,
 		subscribe,
+		dispose,
 	};
 }

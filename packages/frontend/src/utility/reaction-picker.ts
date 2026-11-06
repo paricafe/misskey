@@ -5,7 +5,7 @@
 
 import * as Misskey from 'misskey-js';
 import { shallowRef, ref, watch } from 'vue';
-import MkEmojiPickerDialog from '@/components/MkEmojiPickerDialog.vue';
+import { getEmojiPicker, loadEmojiPicker } from '@/utility/interactive-components.js';
 import { popup } from '@/os.js';
 import { prefer } from '@/preferences.js';
 
@@ -29,7 +29,9 @@ class ReactionPicker {
 		targetNote: Misskey.entities.Note | null,
 		onChosen?: (reaction: string) => void,
 		onClosed?: () => void,
-	) {
+	): void | Promise<void> {
+		const MkEmojiPickerDialog = getEmojiPicker();
+		if (!MkEmojiPickerDialog) return loadEmojiPicker().then(() => { this.show(anchorElement, targetNote, onChosen, onClosed); });
 		const anchorRef = shallowRef(anchorElement);
 		const targetNoteRef = ref(targetNote);
 
