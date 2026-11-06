@@ -1,0 +1,21 @@
+packages/misskey-js/package.json
+  s_49c5ea6482edd7::t_37e26f41ea9135 4
+CHANGELOG.md
+  s_49c5ea6482edd7::t_37e26f41ea9135 1
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a37ea2f025cc09583079f740182153c70e1a5b95",
+  "prompts": {},
+  "sessions": {
+    "s_49c5ea6482edd7": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1aee8-800c-78f1-970f-e286c241afc3",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Natsuki-Kaede <i@pari.network>"
+    }
+  }
+}
