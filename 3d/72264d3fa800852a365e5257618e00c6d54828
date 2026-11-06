@@ -1,0 +1,188 @@
+packages/frontend/src/composables/use-note.ts
+  s_49c5ea6482edd7::t_3cac2d494b192a 41,75,81-83,132,165,171,173,178-181,204-208,214-216,218-220
+  s_49c5ea6482edd7::t_eb39df42b08d1d 6
+  s_49c5ea6482edd7::t_f0050f1dd13a38 39,73-74,76-80,84-85,131,133-134,176,185,193,198,201,209-213,217
+  s_49c5ea6482edd7::t_688187339c236b 129-130
+  s_49c5ea6482edd7::t_4c1a38a735141a 221
+packages/frontend/.storybook/generate.tsx
+  s_49c5ea6482edd7::t_77e9e764783d16 463-465
+packages/frontend/src/utility/interactive-components.ts
+  s_49c5ea6482edd7::t_4bf5bba85add5a 8-9,11-18,20-23,30-33
+  s_49c5ea6482edd7::t_e9e928071cdebb 1-7,10,19,24-29,34-42
+packages/frontend/test/unit/note-plugin-startup.test.ts
+  s_49c5ea6482edd7::t_1ed32d7c476851 18-19
+  s_49c5ea6482edd7::t_27d692e36e2c72 9,13-16,31
+  s_49c5ea6482edd7::t_59d51106e665e1 27-28
+  s_49c5ea6482edd7::t_74447517e72b61 1-8,10-12,17,20-26,29-30,32-36
+packages/frontend/test/unit/interactive-components.test.ts
+  s_49c5ea6482edd7::t_90a681124ea138 7,9-10,14,16-18,26-27,30-36
+  s_49c5ea6482edd7::t_8f9d8c0a3170bf 8
+  s_49c5ea6482edd7::t_4698907e3a5444 1-6,11-13,15,19-25,28-29,37
+packages/frontend/src/components/MkVirtualList.vue
+  s_49c5ea6482edd7::t_688187339c236b 56-57
+  s_49c5ea6482edd7::t_8ae0b0240f5f62 96,99,134,138,140
+  s_49c5ea6482edd7::t_6475ec564dd190 7
+  s_49c5ea6482edd7::t_eb39df42b08d1d 8-10,16-17,20-22,53-55,58-68,70-73
+  s_49c5ea6482edd7::t_498857f7dfa9ff 1-6,11-15,18-19,23-26,28-42,44-52,75-95,97-98,100-133,135-137,139,141-176
+  s_49c5ea6482edd7::t_d7d21ab5189263 27,69
+  s_49c5ea6482edd7::t_82934be023a692 43
+  s_49c5ea6482edd7::t_ccaa0a7c938f65 74
+packages/frontend/test/unit/sparkle.test.ts
+  s_49c5ea6482edd7::t_9cb6dae10eae25 59
+  s_49c5ea6482edd7::t_b146d1cabb448b 54
+  s_49c5ea6482edd7::t_977f1c33ff70c2 62
+  s_49c5ea6482edd7::t_da11dfdf246821 1-53,57-58,60,63-90,94-120
+  s_49c5ea6482edd7::t_280e1672e3bb63 61
+  s_49c5ea6482edd7::t_68b1b8c08bb3bf 55-56,91-93
+packages/frontend/src/components/MkNoteSimple.vue
+  s_49c5ea6482edd7::t_be028d33a1ed27 16
+packages/frontend/src/components/MkNoteDetailed.vue
+  s_49c5ea6482edd7::t_06b4a38febe021 7-8,14-15
+  s_49c5ea6482edd7::t_464ccddabd33d4 12-13,17,20
+packages/frontend/test/unit/note-capture.test.ts
+  s_49c5ea6482edd7::t_2dab3be8ad3db1 7,11-12,91,99,118-137,323-378
+  s_49c5ea6482edd7::t_c9b63fcfdcc5e5 379
+packages/frontend/src/plugin.ts
+  s_49c5ea6482edd7::t_861b1d63f5bc67 43,251
+  s_49c5ea6482edd7::t_1c0124ee627da1 44,240-250,252,307-316,329,335
+packages/frontend/test/unit/note-auto-spacing.test.ts
+  s_49c5ea6482edd7::t_21b0ec3368dee9 7,22,43,48-49
+packages/frontend/src/utility/virtual-list.ts
+  s_49c5ea6482edd7::t_498857f7dfa9ff 1-79
+packages/frontend/src/utility/reaction-picker.ts
+  s_49c5ea6482edd7::t_4bf5bba85add5a 8,32-34
+packages/frontend/test/e2e/timeline-performance.spec.ts
+  s_49c5ea6482edd7::t_e2c519fec29716 1-18,61-99,101-102,111-117,128-133,136-139,142-145,147-160,162-170,172-173,195,198,200-202
+  s_49c5ea6482edd7::t_8af1627bfc28a2 161
+  s_49c5ea6482edd7::t_45772488ee5322 19-60
+  s_49c5ea6482edd7::t_3745c5ffe8844b 174-194,197
+  s_49c5ea6482edd7::t_77e9e764783d16 100
+  s_49c5ea6482edd7::t_0aa798f44d6275 103-110,199
+  s_49c5ea6482edd7::t_b7baab163c8085 146
+  s_49c5ea6482edd7::t_d4c17e6745fafa 196
+  s_49c5ea6482edd7::t_4c127c3415f344 118-127,140-141
+  s_49c5ea6482edd7::t_4acf5c13e24194 171
+  s_49c5ea6482edd7::t_6475ec564dd190 134-135
+packages/frontend/src/boot/common.ts
+  s_49c5ea6482edd7::t_464ccddabd33d4 272,308-315
+  s_49c5ea6482edd7::t_6138cb6ee288dc 316
+packages/frontend/lib/client-chunks.ts
+  s_49c5ea6482edd7::t_20fec44ab7abd5 27,34-36,41
+  s_49c5ea6482edd7::t_b62ee2f72a97f6 1-26,28-33,37-40,42,44-47
+  s_49c5ea6482edd7::t_4c127c3415f344 43
+packages/frontend/test/unit/custom-emojis.test.ts
+  s_49c5ea6482edd7::t_3b73cbb4ac6298 79,83-86,88-89,91
+packages/frontend/src/components/MkNotePreview.vue
+  s_49c5ea6482edd7::t_be028d33a1ed27 18
+packages/frontend/src/components/MkNotesTimeline.vue
+  s_49c5ea6482edd7::t_8c932f144393f3 11,34,41,45-46
+  s_49c5ea6482edd7::t_d7d21ab5189263 47,64
+  s_49c5ea6482edd7::t_af8d72bb7dda2f 65
+packages/frontend/src/composables/use-note-capture.ts
+  s_49c5ea6482edd7::t_3cac2d494b192a 271-276,283-284,424,434-436
+  s_49c5ea6482edd7::t_d7d21ab5189263 448,457,468
+packages/frontend/src/components/MkPoll.vue
+  s_49c5ea6482edd7::t_3cac2d494b192a 30,40,75-77
+packages/frontend/vite.config.ts
+  s_49c5ea6482edd7::t_b62ee2f72a97f6 19,229
+packages/frontend/test/unit/client-chunks.test.ts
+  s_49c5ea6482edd7::t_183f786a0a9991 18
+  s_49c5ea6482edd7::t_2715d42a7e73ca 28-59
+  s_49c5ea6482edd7::t_8e8aed5521efbb 1-14,16-17,19-27,60-114
+  s_49c5ea6482edd7::t_0004693f3b8dc7 15
+packages/frontend/src/components/MkNoteSub.vue
+  s_49c5ea6482edd7::t_be028d33a1ed27 21
+packages/frontend/src/utility/emoji-picker.ts
+  s_49c5ea6482edd7::t_4bf5bba85add5a 7,36-38
+packages/frontend/src/composables/use-note-view-cache.ts
+  s_49c5ea6482edd7::t_3cac2d494b192a 1-27
+packages/frontend/test/setup.unit.ts
+  s_49c5ea6482edd7::t_892746398ccf66 64
+  s_49c5ea6482edd7::t_4bb4d59858f19b 61
+packages/frontend/src/components/MkVirtualList.stories.impl.ts
+  s_49c5ea6482edd7::t_e9e928071cdebb 8,14,21
+  s_49c5ea6482edd7::t_f0050f1dd13a38 1-7,9-13,15-20
+packages/frontend/src/composables/use-uploader.ts
+  s_49c5ea6482edd7::t_e9e928071cdebb 758-760,772
+packages/frontend/test/unit/virtual-list.test.ts
+  s_49c5ea6482edd7::t_6b2808c65232f3 1-21,28-70
+  s_49c5ea6482edd7::t_30202d8da5485e 22-27
+docs/reviews/2026-11-06-frontend-performance/README.md
+  s_49c5ea6482edd7::t_b19af108d16d10 1-4,6,9-87
+  s_49c5ea6482edd7::t_544226ac8de570 5,7
+  s_49c5ea6482edd7::t_fdc07b59c4ee1b 8
+packages/frontend/src/components/MkNote.body.vue
+  s_49c5ea6482edd7::t_464ccddabd33d4 1-895
+packages/frontend/src/di.ts
+  s_49c5ea6482edd7::t_3cac2d494b192a 16-17
+  s_49c5ea6482edd7::t_f0050f1dd13a38 9-10
+packages/frontend/src/components/MkStreamingNotesTimeline.vue
+  s_49c5ea6482edd7::t_6475ec564dd190 39-46
+  s_49c5ea6482edd7::t_8c932f144393f3 22,38,55,71
+  s_49c5ea6482edd7::t_d7d21ab5189263 75,186
+  s_49c5ea6482edd7::t_fb26a75c489eaf 187
+packages/frontend/src/components/MkNoteDetailed.body.vue
+  s_49c5ea6482edd7::t_464ccddabd33d4 1-814
+packages/frontend/test/unit/plugin-startup.test.ts
+  s_49c5ea6482edd7::t_6c4794208f00e8 22
+  s_49c5ea6482edd7::t_6127eb17feea70 38,50-51
+  s_49c5ea6482edd7::t_4b09eb207646a0 24,26-27,29-30,41,47-48,52
+  s_49c5ea6482edd7::t_d3790379e31d91 33,39
+  s_49c5ea6482edd7::t_27d692e36e2c72 34,40,43,45
+  s_49c5ea6482edd7::t_497ed4ec1235a5 37,49
+  s_49c5ea6482edd7::t_1bef60d243eb21 15
+  s_49c5ea6482edd7::t_b6455f65dc62cc 1-14,16-21,23,25,28,31-32,35-36,42,44,46
+packages/frontend/test/unit/note-cw-mount.test.ts
+  s_49c5ea6482edd7::t_da11dfdf246821 1-34
+packages/frontend/test/unit/boot-deferred.test.ts
+  s_49c5ea6482edd7::t_4741f2ed8b9a77 1-81
+  s_49c5ea6482edd7::t_27e1e85aca9849 82-101
+packages/frontend/src/components/MkNoteDetailed.body.stories.impl.ts
+  s_49c5ea6482edd7::t_634126f7c7e0ff 6,12-18
+  s_49c5ea6482edd7::t_464ccddabd33d4 1-5,7-11,19-20
+packages/frontend/test/unit/virtual-list-component.test.ts
+  s_49c5ea6482edd7::t_f36f74f9f2f7c9 1-157
+packages/frontend/src/ui/_common_/mobile-footer-menu.vue
+  s_49c5ea6482edd7::t_322ffd8f49628c 35
+packages/frontend/src/os.ts
+  s_49c5ea6482edd7::t_4bf5bba85add5a 25,693
+packages/frontend/src/components/MkNote.body.stories.impl.ts
+  s_49c5ea6482edd7::t_464ccddabd33d4 1-5,7-11,19-20
+  s_49c5ea6482edd7::t_634126f7c7e0ff 6,12-18
+packages/frontend/src/components/MkSparkle.vue
+  s_49c5ea6482edd7::t_be028d33a1ed27 59,74-79,81-128,132-139,141-148,150-153
+packages/frontend/src/_boot_.ts
+  s_49c5ea6482edd7::t_3297137e2b0332 10-12,14-19
+docs/reviews/2026-11-06-frontend-performance/measurements.json
+  s_49c5ea6482edd7::t_d5efc486b62145 4,374-377
+  s_49c5ea6482edd7::t_76e3b5178f53db 1-3,5-373,378
+packages/frontend/src/boot/main-boot.ts
+  s_49c5ea6482edd7::t_e9e928071cdebb 32,36
+  s_49c5ea6482edd7::t_0f8872c62b3347 46-48,66
+packages/frontend/src/custom-emojis.ts
+  s_49c5ea6482edd7::t_464ccddabd33d4 72-73
+packages/frontend/src/router.definition.ts
+  s_49c5ea6482edd7::t_0f8872c62b3347 23
+  s_49c5ea6482edd7::t_427c9e87cb1715 24
+packages/frontend/src/boot/sub-boot.ts
+  s_49c5ea6482edd7::t_e9e928071cdebb 10-11,14-17
+packages/frontend/src/components/MkNote.vue
+  s_49c5ea6482edd7::t_464ccddabd33d4 12-13,17,22
+  s_49c5ea6482edd7::t_06b4a38febe021 7-8,14-15
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "3d72264d3fa800852a365e5257618e00c6d54828",
+  "prompts": {},
+  "sessions": {
+    "s_49c5ea6482edd7": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1aee8-800c-78f1-970f-e286c241afc3",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Natsuki-Kaede <i@pari.network>"
+    }
+  }
+}
