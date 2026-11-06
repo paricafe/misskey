@@ -12,10 +12,10 @@ const mocks = vi.hoisted(() => ({
 	listeners: [] as ((message: Message) => void)[],
 }));
 
-vi.mock('broadcast-channel', () => ({
-	BroadcastChannel: class {
-		addEventListener(_event: string, listener: (message: Message) => void) {
-			mocks.listeners.push(listener);
+vi.mock('@/utility/typed-broadcast-channel.js', () => ({
+	TypedBroadcastChannel: class {
+		addEventListener(_event: string, listener: (event: { data: Message }) => void) {
+			mocks.listeners.push(message => listener({ data: message }));
 		}
 	},
 }));

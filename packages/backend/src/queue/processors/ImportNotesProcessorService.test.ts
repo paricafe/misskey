@@ -80,10 +80,11 @@ describe('Pleroma import visibility', () => {
 	] as const)('maps to=%j cc=%j to %s without widening the audience', async (to, cc, visibility) => {
 		const service = Object.create(ImportNotesProcessorService.prototype) as ImportNotesProcessorService;
 		const importNote = vi.fn().mockResolvedValue({ id: 'imported' });
+		const fromHtml = vi.fn().mockResolvedValue('Original text');
 		Object.assign(service, {
 			usersRepository: { findOneBy: vi.fn().mockResolvedValue({ id: 'alice' }) },
 			driveFoldersRepository: { findOneBy: vi.fn().mockResolvedValue({ id: 'imports' }) },
-			mfmService: { fromHtml: vi.fn().mockResolvedValue('Original text') },
+			mfmService: { fromHtml },
 			noteCreateService: { import: importNote },
 		});
 		await service.processPleroToDb({ data: { user: { id: 'alice' }, target: {
@@ -91,6 +92,9 @@ describe('Pleroma import visibility', () => {
 			object: { type: 'Note', published: '2026-01-01T00:00:00Z', content: '<p>Original text</p>', to, cc },
 		} } } as never);
 		if (visibility == null) expect(importNote).not.toHaveBeenCalled();
-		else expect(importNote).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ text: 'Original text', visibility }));
+		else {
+			expect(fromHtml).toHaveBeenCalledWith('<p>Original text</p>', { hashtagNames: [] });
+			expect(importNote).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ text: 'Original text', visibility }));
+		}
 	});
 });

@@ -722,7 +722,7 @@ export class UserEntityService implements OnModuleInit {
 	): Promise<Packed<S>[]> {
 		if (users.length === 0) return [];
 
-		const schema = options?.schema ?? 'UserLite';
+		const schema = (options?.schema ?? 'UserLite') as S;
 
 		// -- IDのみの要素を補完して完全なエンティティ一覧を作る
 
@@ -749,10 +749,10 @@ export class UserEntityService implements OnModuleInit {
 
 			const meId = me ? me.id : null;
 			if (meId) {
-				userMemos = await this.userMemosRepository.findBy({ userId: meId, targetUserId: In(_userIds) })
-					.then(memos => new Map(memos.map(memo => [memo.targetUserId, memo.memo])));
-
 				if (_userIds.length > 0) {
+					userMemos = await this.userMemosRepository.findBy({ userId: meId, targetUserId: In(_userIds) })
+						.then(memos => new Map(memos.map(memo => [memo.targetUserId, memo.memo])));
+
 					userRelations = await this.getRelations(meId, _userIds);
 				}
 			}
@@ -784,6 +784,7 @@ export class UserEntityService implements OnModuleInit {
 				me,
 				{
 					...options,
+					schema,
 					userProfile: profilesMap?.get(u.id),
 					userRelations: userRelations,
 					userMemos: userMemos,

@@ -61,15 +61,14 @@ function createService(originNoteOverrides: Record<string, unknown> = {}) {
 	const notesRepository = {
 		findOneBy: vi.fn().mockResolvedValue(originNote),
 	};
+	const apMfmService = { htmlToMfm: vi.fn().mockReturnValue('edited text') };
 	const apMentionService = { extractApMentions: vi.fn().mockResolvedValue([]) };
 	const service = Object.create(ApNoteService.prototype) as ApNoteService;
 	Object.assign(service, {
 		config: { url: 'https://local.example' },
 		redisClient,
 		notesRepository,
-		apMfmService: {
-			htmlToMfm: vi.fn().mockReturnValue('edited text'),
-		},
+		apMfmService,
 		apPersonService,
 		apResolverService: { createResolver: vi.fn().mockResolvedValue({}) },
 		apMentionService,
@@ -87,6 +86,7 @@ function createService(originNoteOverrides: Record<string, unknown> = {}) {
 		apImageService,
 		apPersonService,
 		apMentionService,
+		apMfmService,
 		extractEmojis,
 		originNote,
 		preparedUpdate,
@@ -179,6 +179,13 @@ describe(ApNoteService, () => {
 
 		expect(apMentionService.extractApMentions).toHaveBeenCalledWith(tag, expect.anything());
 		expect(noteUpdateService.update.mock.calls[0]?.[2]).toMatchObject({ apMentions: [mentioned] });
+	});
+
+	test('passes hashtag and quote options when converting an edited ActivityPub note', async () => {
+		const { service, apMfmService } = createService();
+		const tag = [{ type: 'Hashtag', name: '#example' }];
+		await service.updateNote({ ...update, tag, quoteUrl: 'https://other.example/notes/quoted' } as never);
+		expect(apMfmService.htmlToMfm).toHaveBeenCalledWith(update.content, { tag, hasQuote: true });
 	});
 
 	test.each([
