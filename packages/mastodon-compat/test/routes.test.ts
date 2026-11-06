@@ -118,6 +118,20 @@ test('timeline pages batch metadata and authors with bounded state reads and fre
 	assert.equal(next.json()[0].pinned, true);
 });
 
+test('local hashtag timelines apply the native local filter before pagination', async t => {
+	const rows = [note('102', { user: user('remote', { host: 'remote.example' }) }), note('101')];
+	const f = await fixture(t, { handler: async (endpoint, body) => {
+		if (endpoint !== 'notes/search-by-tag') return;
+		return response(rows.filter(item => !body.localHostOnly || item.user.host == null).slice(0, body.limit));
+	} });
+	const result = await f.request('GET', '/api/v1/timelines/tag/test?local=true&limit=1');
+	assert.equal(result.statusCode, 200, result.body);
+	assert.deepEqual(result.json().map((item: Json) => item.id), ['101']);
+	assert.equal(f.calls.find(call => call.endpoint === 'notes/search-by-tag')?.body.localHostOnly, true);
+	const combined = await f.request('GET', '/api/v1/timelines/tag/test?limit=1');
+	assert.deepEqual(combined.json().map((item: Json) => item.id), ['102']);
+});
+
 test('batch timeline reads preserve nested boost metadata and filters', async t => {
 	const f = await fixture(t);
 	const original = note('100', { files: [{ id: 'file', type: 'image/png', url: 'https://social.test/file.png' }] });

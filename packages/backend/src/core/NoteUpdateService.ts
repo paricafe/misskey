@@ -29,7 +29,7 @@ import { SearchService } from '@/core/SearchService.js';
 import { ModerationLogService } from '@/core/ModerationLogService.js';
 import { IdService } from '@/core/IdService.js';
 import { trackPromise } from '@/misc/promise-tracker.js';
-import { extractMentions } from '@/misc/extract-mentions.js';
+import { resolveNoteMentions } from '@/misc/resolve-note-mentions.js';
 import { RemoteUserResolveService } from '@/core/RemoteUserResolveService.js';
 import { extractHashtags } from "@/misc/extract-hashtags.js";
 import { extractCustomEmojisFromMfm } from "@/misc/extract-custom-emojis-from-mfm.js";
@@ -57,6 +57,7 @@ type Option = {
 	cw: string | null;
 	apHashtags?: string[] | null;
 	apEmojis?: string[] | null;
+	apMentions?: MiUser[];
 };
 
 type PollSnapshot = {
@@ -169,6 +170,22 @@ export class NoteUpdateService {
 
 		if (this.utilityService.isMediaSilencedHost(meta.mediaSilencedHosts, user.host)) emojis = [];
 		tags = tags.filter(tag => Array.from(tag).length <= 128).splice(0, 32).map(tag => normalizeTag(tag));
+		const pollChoices = note.hasPoll && data.apMentions == null
+			? (await this.pollsRepository.findOneByOrFail({ noteId: note.id })).choices
+			: [];
+		const mentionTokens = [data.text, data.cw, ...pollChoices].flatMap(text => text ? mfm.parse(text) : []);
+		let mentionedUsers = data.apMentions ?? await resolveNoteMentions(user.host, mentionTokens, this.remoteUserResolveService.resolveUser);
+		// The reply author and direct recipients remain part of the immutable audience.
+		const audienceIds = [...new Set([...(note.visibleUserIds ?? []), ...(note.replyUserId && note.replyUserId !== user.id ? [note.replyUserId] : [])])];
+		const missingAudienceIds = audienceIds.filter(id => !mentionedUsers.some(mentioned => mentioned.id === id));
+		if (missingAudienceIds.length > 0) mentionedUsers.push(...await this.usersRepository.findBy({ id: In(missingAudienceIds) }));
+		if (note.visibility === 'specified') mentionedUsers = mentionedUsers.filter(mentioned => audienceIds.includes(mentioned.id));
+		const mentions = mentionedUsers.map(mentioned => mentioned.id);
+		const mentionedRemoteUsers = JSON.stringify(mentionedUsers.filter(mentioned => mentioned.host != null).map(mentioned => ({
+			uri: mentioned.uri,
+			username: mentioned.username,
+			host: mentioned.host,
+		})));
 
 		// Keep this transaction DB-local. ActivityPub actor, attachment, and emoji
 		// resolution must be completed by the caller before entering it.
@@ -191,8 +208,8 @@ export class NoteUpdateService {
 			const fileIds = data.files === undefined
 				? [...lockedNote.fileIds]
 				: data.files?.map(file => file.id) ?? [];
-			if ((data.text == null || data.text.length === 0) && fileIds.length === 0) {
-				throw new IdentifiableError(NOTE_NO_CONTENT_ERROR_ID, 'Note must have text or files');
+			if ((data.text == null || data.text.length === 0) && fileIds.length === 0 && !lockedNote.hasPoll) {
+				throw new IdentifiableError(NOTE_NO_CONTENT_ERROR_ID, 'Note must have text, files, or a poll');
 			}
 
 			const preparedUpdate = await this.prepareUpdate(user, lockedNote);
@@ -204,6 +221,8 @@ export class NoteUpdateService {
 				updatedAt,
 				tags,
 				emojis,
+				mentions,
+				mentionedRemoteUsers,
 				fileIds,
 				history,
 			};
@@ -216,6 +235,8 @@ export class NoteUpdateService {
 				text: data.text,
 				tags,
 				emojis,
+				mentions,
+				mentionedRemoteUsers,
 			});
 
 			return { updatedNote: newNote, changed: true };
@@ -318,6 +339,7 @@ export class NoteUpdateService {
 			createdAt: (note.updatedAt || this.idService.parse(note.id).date).toISOString(),
 			cw: note.cw,
 			text: note.text,
+			mentions: [...note.mentions],
 			fileIds: [...note.fileIds],
 			files,
 			sensitive: files.some(file => file.isSensitive) || packed.channel?.isSensitive === true,
@@ -371,33 +393,18 @@ export class NoteUpdateService {
 	}
 
 	@bindThis
-	private async extractMentionedUsers(user: { host: MiUser['host']; }, tokens: mfm.MfmNode[]): Promise<MiUser[]> {
-		if (tokens == null) return [];
-
-		const mentions = [...new Map(extractMentions(tokens).map(mention => [mention.acct.toLowerCase(), mention])).values()];
-		let mentionedUsers = (await Promise.all(mentions.map(m =>
-			this.remoteUserResolveService.resolveUser(m.username, m.host ?? user.host).catch(() => null),
-		))).filter(x => x != null) as MiUser[];
-
-		// Drop duplicate users
-		mentionedUsers = mentionedUsers.filter((u, i, self) =>
-			i === self.findIndex(u2 => u.id === u2.id),
-		);
-
-		return mentionedUsers;
-	}
-
-	@bindThis
 	private async deliverToConcerned(user: { id: MiLocalUser['id']; host: null; }, note: MiNote, noteActivity: any) {
 		const dm = this.apDeliverManagerService.createDeliverManager(user, noteActivity);
 
 		// Earlier edits may have delivered the note to users who are no longer mentioned.
-		const tokens = [note, ...(note.history ?? [])].flatMap(revision =>
+		const legacyRevisions = (note.history ?? []).filter(revision => revision.mentions == null);
+		const tokens = legacyRevisions.flatMap(revision =>
 			[revision.text, revision.cw].flatMap(text => text ? mfm.parse(text) : []));
-		const mentionedUsers = await this.extractMentionedUsers(user, tokens);
+		const mentionedUsers = await resolveNoteMentions(user.host, tokens, this.remoteUserResolveService.resolveUser);
 
 		// Users mentioned before this edit already have the note, so they need the Update too.
-		const previouslyMentionedIds = note.mentions.filter(id => !mentionedUsers.some(u => u.id === id));
+		const mentionIds = new Set([...note.mentions, ...(note.history ?? []).flatMap(revision => revision.mentions ?? [])]);
+		const previouslyMentionedIds = [...mentionIds].filter(id => !mentionedUsers.some(u => u.id === id));
 		if (previouslyMentionedIds.length > 0) {
 			mentionedUsers.push(...await this.usersRepository.findBy({ id: In(previouslyMentionedIds) }));
 		}

@@ -137,6 +137,7 @@ function createService(lockedNote: MiNote = note, meta: { prohibitedWords?: stri
 	const usersRepository = {
 		findOneBy: vi.fn(async ({ id }: { id: string }) => ({ id, host: 'remote.example', inbox: `https://remote.example/users/${id}/inbox` })),
 		findOneByOrFail: vi.fn(),
+		findBy: vi.fn().mockResolvedValue([]),
 	};
 	const remoteUserResolveService = {
 		resolveUser: vi.fn().mockRejectedValue(new Error('user not found')),
@@ -454,9 +455,10 @@ describe(NoteUpdateService, () => {
 	});
 
 	test('rejects a final state with neither text nor files', async () => {
-		const { service, notesRepository } = createService();
+		const emptyNote = { ...note, hasPoll: false } as MiNote;
+		const { service, notesRepository } = createService(emptyNote);
 
-		await expect(service.update(user, note, {
+		await expect(service.update(user, emptyNote, {
 			text: null,
 			cw: null,
 			files: [],
@@ -464,6 +466,41 @@ describe(NoteUpdateService, () => {
 		}, true)).rejects.toMatchObject({ id: NOTE_NO_CONTENT_ERROR_ID });
 
 		expect(notesRepository.update).not.toHaveBeenCalled();
+	});
+
+	test('allows changing the CW of a poll with no text or files', async () => {
+		const pollNote = { ...note, text: null, fileIds: [], hasPoll: true } as MiNote;
+		const { service, notesRepository } = createService(pollNote);
+		await service.update(user, pollNote, { text: null, cw: 'New warning', files: [], updatedAt: new Date('2025-02-01') }, true);
+		expect(notesRepository.update).toHaveBeenCalledWith({ id: note.id }, expect.objectContaining({ text: null, cw: 'New warning', fileIds: [] }));
+	});
+
+	test('replaces current mention metadata and snapshots the previous recipients', async () => {
+		const original = { ...note, mentions: ['alice'], text: '@alice@remote.example', mentionedRemoteUsers: '[]' } as MiNote;
+		const { service, remoteUserResolveService, notesRepository } = createService(original);
+		remoteUserResolveService.resolveUser.mockResolvedValue({ id: 'bob', username: 'bob', host: 'remote.example', uri: 'https://remote.example/users/bob' });
+		const result = await service.update(user, original, { text: '@bob@remote.example', cw: null, updatedAt: new Date('2025-02-01') }, true);
+		expect(result.mentions).toEqual(['bob']);
+		expect(JSON.parse(result.mentionedRemoteUsers)).toEqual([{ username: 'bob', host: 'remote.example', uri: 'https://remote.example/users/bob' }]);
+		expect(notesRepository.update.mock.calls[0]?.[1]).toMatchObject({ mentions: ['bob'], history: [expect.objectContaining({ mentions: ['alice'] })] });
+	});
+
+	test('preserves mentions in the unchanged poll choices when editing the text', async () => {
+		const { service, pollsRepository, remoteUserResolveService } = createService(note);
+		pollsRepository.findOneByOrFail.mockResolvedValue({ noteId: note.id, choices: ['@alice@remote.example', 'Other'], votes: [0, 0], multiple: false, expiresAt: null });
+		remoteUserResolveService.resolveUser.mockResolvedValue({ id: 'alice', username: 'alice', host: 'remote.example', uri: 'https://remote.example/users/alice' });
+		const result = await service.update(user, note, { text: 'Edited text', cw: null, updatedAt: new Date('2025-02-01') }, true);
+		expect(result.mentions).toEqual(['alice']);
+	});
+
+	test('keeps direct recipients and does not add a recipient through an edited mention', async () => {
+		const directNote = { ...note, visibility: 'specified', visibleUserIds: ['alice'], mentions: ['alice'] } as MiNote;
+		const { service, remoteUserResolveService, usersRepository } = createService(directNote);
+		remoteUserResolveService.resolveUser.mockResolvedValue({ id: 'bob', host: 'remote.example' });
+		usersRepository.findBy.mockResolvedValue([{ id: 'alice', username: 'alice', host: 'remote.example', uri: 'https://remote.example/users/alice' }]);
+		const result = await service.update(user, directNote, { text: '@bob@remote.example', cw: null, updatedAt: new Date('2025-02-01') }, true);
+		expect(result.mentions).toEqual(['alice']);
+		expect(result.visibleUserIds).toEqual(['alice']);
 	});
 
 	test('allows the history revision count boundary', async () => {
@@ -775,7 +812,7 @@ describe(NoteUpdateService, () => {
 
 	test.each(['text', 'cw'] as const)('keeps delivering later edits after removing a remote mention added in %s', async (field) => {
 		let storedNote = { ...note, localOnly: false, text: 'Initial text', cw: null } as MiNote;
-		const { service, lockedNotesRepository, notesRepository, userEntityService, deliverManager, remoteUserResolveService } = createService(storedNote);
+		const { service, lockedNotesRepository, notesRepository, userEntityService, deliverManager, remoteUserResolveService, usersRepository } = createService(storedNote);
 		lockedNotesRepository.findOne.mockImplementation(async () => storedNote);
 		notesRepository.update.mockImplementation(async (_where, changes) => {
 			storedNote = { ...storedNote, ...changes };
@@ -784,6 +821,7 @@ describe(NoteUpdateService, () => {
 		Object.assign(userEntityService, { isRemoteUser: vi.fn((u: { host: string | null }) => u.host != null) });
 		const recipient = { id: 'added-remote-user', host: 'remote.example' };
 		remoteUserResolveService.resolveUser.mockResolvedValue(recipient);
+		usersRepository.findBy.mockResolvedValue([recipient]);
 
 		for (let edit = 1; edit <= 4; edit++) {
 			deliverManager.addDirectRecipe.mockClear();
@@ -798,7 +836,8 @@ describe(NoteUpdateService, () => {
 
 			await vi.waitFor(() => expect(deliverManager.execute).toHaveBeenCalledOnce());
 			expect(deliverManager.addDirectRecipe).toHaveBeenCalledWith(recipient);
-			expect(remoteUserResolveService.resolveUser).toHaveBeenCalledExactlyOnceWith('bob', 'remote.example');
+			if (edit <= 2) expect(remoteUserResolveService.resolveUser).toHaveBeenCalledExactlyOnceWith('bob', 'remote.example');
+			else expect(remoteUserResolveService.resolveUser).not.toHaveBeenCalled();
 		}
 	});
 });

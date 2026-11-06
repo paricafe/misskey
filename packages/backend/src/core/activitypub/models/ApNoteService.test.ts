@@ -61,6 +61,7 @@ function createService(originNoteOverrides: Record<string, unknown> = {}) {
 	const notesRepository = {
 		findOneBy: vi.fn().mockResolvedValue(originNote),
 	};
+	const apMentionService = { extractApMentions: vi.fn().mockResolvedValue([]) };
 	const service = Object.create(ApNoteService.prototype) as ApNoteService;
 	Object.assign(service, {
 		config: { url: 'https://local.example' },
@@ -70,6 +71,8 @@ function createService(originNoteOverrides: Record<string, unknown> = {}) {
 			htmlToMfm: vi.fn().mockReturnValue('edited text'),
 		},
 		apPersonService,
+		apResolverService: { createResolver: vi.fn().mockResolvedValue({}) },
+		apMentionService,
 		apImageService,
 		noteUpdateService,
 		logger: { info: vi.fn() },
@@ -83,6 +86,7 @@ function createService(originNoteOverrides: Record<string, unknown> = {}) {
 		noteUpdateService,
 		apImageService,
 		apPersonService,
+		apMentionService,
 		extractEmojis,
 		originNote,
 		preparedUpdate,
@@ -163,6 +167,18 @@ describe(ApNoteService, () => {
 		const option = noteUpdateService.update.mock.calls[0]?.[2];
 		expect(option.files).toEqual([]);
 		expect(apImageService.resolveImage).not.toHaveBeenCalled();
+	});
+
+	test('passes resolved ActivityPub Mention tags to the update service', async () => {
+		const { service, noteUpdateService, apMentionService } = createService();
+		const mentioned = { id: 'mentioned-user', username: 'bob', host: 'other.example' };
+		const tag = [{ type: 'Mention', href: 'https://other.example/users/bob', name: '@bob@other.example' }];
+		apMentionService.extractApMentions.mockResolvedValue([mentioned]);
+
+		await service.updateNote({ ...update, tag } as never);
+
+		expect(apMentionService.extractApMentions).toHaveBeenCalledWith(tag, expect.anything());
+		expect(noteUpdateService.update.mock.calls[0]?.[2]).toMatchObject({ apMentions: [mentioned] });
 	});
 
 	test.each([

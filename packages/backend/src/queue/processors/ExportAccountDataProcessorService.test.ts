@@ -24,6 +24,8 @@ function setup(
 	};
 	const logger = { info: vi.fn(), succ: vi.fn(), error: vi.fn() };
 	const driveService = { addFile: vi.fn(addFile) };
+	const driveFilesRepository = { findBy: vi.fn().mockResolvedValue([]) };
+	const downloadService = { downloadUrl: vi.fn(async (url: string, path: string) => fs.promises.writeFile(path, url)) };
 	const emailService = { sendEmail: vi.fn() };
 	const service = new ExportAccountDataProcessorService(
 		{ host: 'local.example' } as never,
@@ -35,7 +37,7 @@ function setup(
 		emptyRepository as never,
 		mutingsRepository as never,
 		emptyRepository as never,
-		emptyRepository as never,
+		driveFilesRepository as never,
 		emptyRepository as never,
 		emptyRepository as never,
 		emptyRepository as never,
@@ -44,7 +46,7 @@ function setup(
 		driveService as never,
 		{} as never,
 		{} as never,
-		{} as never,
+		downloadService as never,
 		emailService as never,
 		{ logger: { createSubLogger: () => logger } } as never,
 	);
@@ -52,7 +54,7 @@ function setup(
 		const message = logger.info.mock.calls.map(([text]) => String(text)).find(text => text.startsWith('Temp dir is '));
 		return message?.slice('Temp dir is '.length);
 	};
-	return { service, driveService, emailService, tempDir };
+	return { service, driveService, emailService, tempDir, driveFilesRepository, downloadService };
 }
 
 describe('ExportAccountDataProcessorService archive delivery', () => {
@@ -113,5 +115,25 @@ describe('ExportAccountDataProcessorService archive delivery', () => {
 
 		expect(exported['mutings.json']).toMatchObject({ metaVersion: 1, host: 'local.example', mutings: ['bob@remote.example'] });
 		expect(Object.keys(exported).sort()).toEqual(['antennas.json', 'blockings.json', 'drive.json', 'favorites.json', 'followers.json', 'followings.json', 'ips.json', 'mutings.json', 'notes.json', 'profile.json', 'user.json']);
+	});
+
+	test('exports distinct bytes for same-named files in different folders', async () => {
+		let exported: Array<{ fileName: string; file: { id: string; name: string } }> = [];
+		const contents = new Map<string, string>();
+		const { service, tempDir, driveFilesRepository } = setup(async () => {
+			const dir = tempDir()!;
+			exported = JSON.parse(fs.readFileSync(`${dir}/drive.json`, 'utf8')).drive;
+			for (const entry of exported) contents.set(entry.file.id, fs.readFileSync(`${dir}/files/${entry.fileName}`, 'utf8'));
+			return { id: 'archive', url: 'https://files.example/archive.zip' };
+		});
+		driveFilesRepository.findBy.mockResolvedValue([
+			{ id: 'first', name: 'photo.jpg', type: 'image/jpeg', folderId: 'folder-a', url: 'https://files.example/first' },
+			{ id: 'second', name: 'photo.jpg', type: 'image/jpeg', folderId: 'folder-b', url: 'https://files.example/second' },
+		] as never);
+		await service.process({ data: { user: { id: 'user' } } } as never);
+		expect(new Set(exported.map(entry => entry.fileName)).size).toBe(2);
+		expect(exported.map(entry => entry.file.name)).toEqual(['photo.jpg', 'photo.jpg']);
+		expect(contents.get('first')).toBe('https://files.example/first');
+		expect(contents.get('second')).toBe('https://files.example/second');
 	});
 });

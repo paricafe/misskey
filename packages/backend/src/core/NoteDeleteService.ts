@@ -5,6 +5,7 @@
 
 import { Brackets, DataSource, In, IsNull, Not } from 'typeorm';
 import { Injectable, Inject } from '@nestjs/common';
+import * as mfm from 'mfm-js';
 import type { MiUser, MiLocalUser, MiRemoteUser } from '@/models/User.js';
 import { MiNote, type IMentionedRemoteUsers } from '@/models/Note.js';
 import type { InstancesRepository, MiMeta, NotesRepository, UsersRepository } from '@/models/_.js';
@@ -24,6 +25,8 @@ import { SearchService } from '@/core/SearchService.js';
 import { ModerationLogService } from '@/core/ModerationLogService.js';
 import { isQuote, isRenote } from '@/misc/is-renote.js';
 import { shouldCountRenote } from '@/misc/should-count-renote.js';
+import { resolveNoteMentions } from '@/misc/resolve-note-mentions.js';
+import { RemoteUserResolveService } from '@/core/RemoteUserResolveService.js';
 
 @Injectable()
 export class NoteDeleteService {
@@ -57,6 +60,7 @@ export class NoteDeleteService {
 		private notesChart: NotesChart,
 		private perUserNotesChart: PerUserNotesChart,
 		private instanceChart: InstanceChart,
+		private remoteUserResolveService: RemoteUserResolveService,
 	) {}
 
 	/**
@@ -77,6 +81,7 @@ export class NoteDeleteService {
 		const renoteTarget = note.renoteId == null ? null : relatedNotes.find(target => target.id === note.renoteId) ?? null;
 		const mutation = await this.deleteNoteAndUpdateCounters(user, note, replyTarget, renoteTarget);
 		if (!mutation.deleted) return;
+		note = mutation.deletedNote!;
 
 		if (replyTarget != null && mutation.replyCountChanged) {
 			this.globalEventService.publishNoteStream(replyTarget, 'repliesCountChanged', { delta: -1 });
@@ -158,11 +163,19 @@ export class NoteDeleteService {
 		renoteTarget: MiNote | null,
 	): Promise<{
 		deleted: boolean;
+		deletedNote: MiNote | null;
 		replyCountChanged: boolean;
 		renoteCountChanged: boolean;
 		childTargetIds: MiNote['id'][];
 	}> {
 		return this.db.transaction(async transactionalEntityManager => {
+			// Capture the last committed edit, including history, before deleting it.
+			const snapshot = await transactionalEntityManager.findOne(MiNote, {
+				where: { id: note.id, userId: user.id },
+				select: { id: true, text: true, cw: true, mentions: true, mentionedRemoteUsers: true, history: true },
+				lock: { mode: 'pessimistic_write' },
+			});
+			if (snapshot == null) return { deleted: false, deletedNote: null, replyCountChanged: false, renoteCountChanged: false, childTargetIds: [] };
 			const deletion = await transactionalEntityManager.delete(MiNote, {
 				id: note.id,
 				userId: user.id,
@@ -170,6 +183,7 @@ export class NoteDeleteService {
 			if (deletion.affected !== 1) {
 				return {
 					deleted: false,
+					deletedNote: null,
 					replyCountChanged: false,
 					renoteCountChanged: false,
 					childTargetIds: [],
@@ -200,6 +214,14 @@ export class NoteDeleteService {
 
 			return {
 				deleted: true,
+				deletedNote: {
+					...note,
+					text: snapshot.text,
+					cw: snapshot.cw,
+					mentions: snapshot.mentions,
+					mentionedRemoteUsers: snapshot.mentionedRemoteUsers,
+					history: snapshot.history,
+				},
 				replyCountChanged,
 				renoteCountChanged,
 				childTargetIds: [...childTargetIds],
@@ -218,6 +240,13 @@ export class NoteDeleteService {
 				{ uri: In(uris) },
 			);
 		}
+		const history = note.history ?? [];
+		const legacyRevisions = history.filter(revision => revision.mentions == null);
+		const tokens = (legacyRevisions.length > 0 ? [note, ...legacyRevisions] : []).flatMap(revision =>
+			[revision.text, revision.cw].flatMap(text => text ? mfm.parse(text) : []));
+		const resolved = await resolveNoteMentions(note.userHost, tokens, this.remoteUserResolveService.resolveUser);
+		const mentionIds = [...new Set([...note.mentions, ...history.flatMap(revision => revision.mentions ?? []), ...resolved.map(user => user.id)])];
+		if (mentionIds.length > 0) where.push({ id: In(mentionIds), host: Not(IsNull()) });
 
 		// renote / quote
 		if (note.renoteUserId) {

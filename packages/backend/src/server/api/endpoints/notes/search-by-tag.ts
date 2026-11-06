@@ -109,11 +109,12 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 					query.andWhere(':tag <@ note.tags', { tag: [normalizeTag(ps.tag)] });
 				} else {
 					query.andWhere(new Brackets(qb => {
-						for (const tags of ps.query) {
+						for (const [groupIndex, tags] of ps.query.entries()) {
 							qb.orWhere(new Brackets(qb => {
-								for (const tag of tags) {
+								for (const [tagIndex, tag] of tags.entries()) {
 									if (!safeForSql(normalizeTag(tag))) throw new Error('Injection');
-									qb.andWhere(':tag <@ note.tags', { tag: [normalizeTag(tag)] });
+									const parameter = `tag_${groupIndex}_${tagIndex}`;
+									qb.andWhere(`:${parameter} <@ note.tags`, { [parameter]: [normalizeTag(tag)] });
 								}
 							}));
 						}

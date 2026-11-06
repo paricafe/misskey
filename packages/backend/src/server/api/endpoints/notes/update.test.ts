@@ -9,7 +9,7 @@ import { IdentifiableError } from '@/misc/identifiable-error.js';
 import NoteUpdateEndpoint, { meta } from './update.js';
 
 function createEndpoint(
-	note: { id: string; userId: string; text: string | null; cw: string | null; fileIds: string[] },
+	note: { id: string; userId: string; text: string | null; cw: string | null; fileIds: string[]; hasPoll?: boolean },
 	noteUpdateService: { update: ReturnType<typeof vi.fn> },
 ) {
 	return new NoteUpdateEndpoint(
@@ -24,7 +24,7 @@ function createEndpoint(
 describe('api:notes/update', () => {
 	test('declares and returns the no-content error when nullable text and files are both empty', async () => {
 		expect(meta.errors.noContent).toMatchObject({
-			message: 'A note must have text or files.',
+			message: 'A note must have text, files, or a poll.',
 			code: 'NO_CONTENT',
 			kind: 'client',
 			httpStatusCode: 400,
@@ -50,6 +50,13 @@ describe('api:notes/update', () => {
 			fileIds: [],
 		}, { id: 'userid' } as never, null)).rejects.toMatchObject(meta.errors.noContent);
 		expect(noteUpdateService.update).not.toHaveBeenCalled();
+	});
+
+	test('forwards a CW edit for a poll-only note', async () => {
+		const note = { id: 'noteid', userId: 'userid', text: null, cw: null, fileIds: [], hasPoll: true };
+		const noteUpdateService = { update: vi.fn().mockResolvedValue({ ...note, cw: 'New warning' }) };
+		await createEndpoint(note, noteUpdateService).exec({ noteId: note.id, text: null, cw: 'New warning' }, { id: note.userId } as never, null);
+		expect(noteUpdateService.update).toHaveBeenCalledOnce();
 	});
 
 	test('maps the core history bound to a stable native 422 error', async () => {

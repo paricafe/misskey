@@ -529,6 +529,16 @@ export class ImportNotesProcessorService {
 		}
 
 		if (post.directMessage) return;
+		const audience = post.object.to ?? post.to ?? [];
+		const cc = post.object.cc ?? post.cc ?? [];
+		const recipients = Array.isArray(audience) ? audience : [audience];
+		const copiedRecipients = Array.isArray(cc) ? cc : [cc];
+		const publicAddress = 'https://www.w3.org/ns/activitystreams#Public';
+		// Do not widen private exports whose audience cannot be represented locally.
+		const visibility = recipients.includes(publicAddress) ? 'public'
+			: copiedRecipients.includes(publicAddress) ? 'home'
+				: recipients.some((uri: unknown) => typeof uri === 'string' && uri.endsWith('/followers')) ? 'followers' : null;
+		if (visibility == null) return;
 
 		const date = new Date(post.object.published);
 		let text = undefined;
@@ -597,7 +607,7 @@ export class ImportNotesProcessorService {
 			}
 		}
 
-		const createdNote = await this.noteCreateService.import(user, { createdAt: date, text: text, files: files, apMentions: new Array(0), cw: post.object.sensitive ? post.object.summary : null, reply: reply });
+		const createdNote = await this.noteCreateService.import(user, { createdAt: date, text: text, files: files, visibility, apMentions: new Array(0), cw: post.object.sensitive ? post.object.summary : null, reply: reply });
 		if (post.childNotes) this.queueService.createImportPleroToDbJob(user, post.childNotes, createdNote.id);
 	}
 

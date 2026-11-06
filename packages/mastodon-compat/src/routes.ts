@@ -185,7 +185,7 @@ export function registerRoutes(app: FastifyInstance, deps: RouteDependencies): R
 
 	for (const [path, endpoint, scope] of [['home', 'notes/timeline', 'statuses'], ['public', 'notes/global-timeline', 'statuses'], ['tag/:tag', 'notes/search-by-tag', 'statuses'], ['list/:id', 'notes/user-list-timeline', 'lists']]) {
 		add('GET', `/api/v1/timelines/${path}`, `read:${scope}`, async c => {
-			const parameters = { ...(path.startsWith('tag') ? { tag: c.params.tag, local: boolean(c.query.local) } : {}), ...(path.startsWith('list') ? { listId: c.params.id } : {}), withFiles: boolean(c.query.only_media) };
+			const parameters = { ...(path.startsWith('tag') ? { tag: c.params.tag, localHostOnly: boolean(c.query.local) } : {}), ...(path.startsWith('list') ? { listId: c.params.id } : {}), withFiles: boolean(c.query.only_media) };
 			const selected = path === 'public' && boolean(c.query.local) ? 'notes/local-timeline' : endpoint;
 			const notes = await routes.readPage(c, selected, parameters);
 			const filtered = notes.filter(note => (!boolean(c.query.remote) || note.user?.host) && (!boolean(c.query.only_media) || array(note.files).length));

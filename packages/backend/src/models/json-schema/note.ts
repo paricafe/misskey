@@ -42,6 +42,15 @@ export const packedNoteSchema = {
 						type: 'string',
 						optional: true, nullable: true,
 					},
+					mentions: {
+						type: 'array',
+						optional: true, nullable: false,
+						items: {
+							type: 'string',
+							optional: false, nullable: false,
+							format: 'id',
+						},
+					},
 					fileIds: {
 						type: 'array',
 						optional: true, nullable: false,

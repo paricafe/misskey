@@ -156,7 +156,8 @@ export class ExportAccountDataProcessorService {
 
 		await this.writeJsonExport(path, 'drive', async push => {
 			for (const file of await this.driveFilesRepository.findBy({ userId: user.id })) {
-				const fileName = file.name + '.' + mime.extension(file.type);
+				const extension = mime.extension(file.type);
+				const fileName = extension ? `${file.id}.${extension}` : file.id;
 				const filePath = path + '/files/' + fileName;
 				try {
 					await this.downloadService.downloadUrl(file.url, filePath);

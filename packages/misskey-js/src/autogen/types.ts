@@ -4507,6 +4507,7 @@ export type components = {
                 createdAt: string;
                 text: string | null;
                 cw?: string | null;
+                mentions?: string[];
                 fileIds?: string[];
                 files?: components['schemas']['DriveFile'][];
                 sensitive?: boolean;

@@ -439,6 +439,8 @@ export class ApNoteService {
 
 		const apEmojis = emojis.map(emoji => emoji.name);
 
+		resolver ??= await this.apResolverService.createResolver();
+		const apMentions = await this.apMentionService.extractApMentions(note.tag, resolver);
 		await assertLockOwned();
 		await this.noteUpdateService.update(actor, originNote, {
 			files,
@@ -446,6 +448,7 @@ export class ApNoteService {
 			text,
 			apHashtags,
 			apEmojis,
+			apMentions,
 			updatedAt,
 		}, silent);
 		return undefined;

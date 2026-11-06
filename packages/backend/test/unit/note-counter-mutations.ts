@@ -76,7 +76,7 @@ describe('note counter mutations', () => {
 			.mockResolvedValueOnce({ affected: 1 })
 			.mockResolvedValueOnce({ affected: 0 });
 		const decrement = vi.fn().mockResolvedValue({ affected: 1 });
-		const manager = { delete: deleteResult, decrement };
+		const manager = { findOne: vi.fn().mockResolvedValue(reply), delete: deleteResult, decrement };
 		const transaction = vi.fn(async (callback: (entityManager: typeof manager) => unknown) => callback(manager));
 		Object.assign(service, { db: { transaction } });
 
@@ -91,6 +91,7 @@ describe('note counter mutations', () => {
 	test('does not mark a missing reply target as changed or publishable', async () => {
 		const service = Object.create(NoteDeleteService.prototype) as NoteDeleteService;
 		const manager = {
+			findOne: vi.fn().mockResolvedValue(reply),
 			delete: vi.fn().mockResolvedValue({ affected: 1 }),
 			decrement: vi.fn().mockResolvedValue({ affected: 0 }),
 		};

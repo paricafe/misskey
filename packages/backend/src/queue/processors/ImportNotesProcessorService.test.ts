@@ -69,3 +69,28 @@ describe('ImportNotesProcessorService archive limits', () => {
 		expect(queueService.createImportTweetsToDbJob).not.toHaveBeenCalled();
 	});
 });
+
+describe('Pleroma import visibility', () => {
+	test.each([
+		[['https://www.w3.org/ns/activitystreams#Public'], [], 'public'],
+		[['https://remote.example/users/alice/followers'], ['https://www.w3.org/ns/activitystreams#Public'], 'home'],
+		[['https://remote.example/users/alice/followers'], [], 'followers'],
+		[['https://remote.example/users/bob'], [], null],
+		[[], [], null],
+	] as const)('maps to=%j cc=%j to %s without widening the audience', async (to, cc, visibility) => {
+		const service = Object.create(ImportNotesProcessorService.prototype) as ImportNotesProcessorService;
+		const importNote = vi.fn().mockResolvedValue({ id: 'imported' });
+		Object.assign(service, {
+			usersRepository: { findOneBy: vi.fn().mockResolvedValue({ id: 'alice' }) },
+			driveFoldersRepository: { findOneBy: vi.fn().mockResolvedValue({ id: 'imports' }) },
+			mfmService: { fromHtml: vi.fn().mockResolvedValue('Original text') },
+			noteCreateService: { import: importNote },
+		});
+		await service.processPleroToDb({ data: { user: { id: 'alice' }, target: {
+			type: 'Create',
+			object: { type: 'Note', published: '2026-01-01T00:00:00Z', content: '<p>Original text</p>', to, cc },
+		} } } as never);
+		if (visibility == null) expect(importNote).not.toHaveBeenCalled();
+		else expect(importNote).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ text: 'Original text', visibility }));
+	});
+});

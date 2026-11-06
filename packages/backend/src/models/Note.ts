@@ -44,6 +44,7 @@ export class MiNote {
 		createdAt: string, // ISO string
 		text: string | null,
 		cw?: string | null,
+		mentions?: MiUser['id'][],
 		fileIds?: string[],
 		files?: Packed<'DriveFile'>[],
 		sensitive?: boolean,
