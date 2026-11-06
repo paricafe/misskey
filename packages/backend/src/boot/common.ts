@@ -9,6 +9,7 @@ import { NestLogger } from '@/NestLogger.js';
 import { envOption } from '@/env.js';
 import type { Config } from '@/config.js';
 import { manageApplication } from './application-lifecycle.js';
+import type { DynamicModule, Type } from '@nestjs/common';
 
 let slaccInitialized = false;
 
@@ -22,49 +23,66 @@ export function initExtraThreadPool(config: Config) {
 	slaccInitialized = true;
 }
 
-export async function server() {
-	const managed = await manageApplication(async () => {
-		const { MainModule } = await import('../MainModule.js');
-		const { ServerService } = await import('../server/ServerService.js');
+type ApplicationMode = 'server' | 'queue' | 'combined';
 
-		const app = await NestFactory.createApplicationContext(MainModule, {
+async function startApplication(mode: ApplicationMode) {
+	const managed = await manageApplication(async () => {
+		let module: Type<unknown> | DynamicModule;
+		if (mode === 'server') {
+			module = (await import('../MainModule.js')).MainModule;
+		} else if (mode === 'queue') {
+			module = (await import('../queue/QueueProcessorModule.js')).QueueProcessorModule;
+		} else {
+			const [{ MainModule }, { QueueProcessorModule }] = await Promise.all([
+				import('../MainModule.js'), import('../queue/QueueProcessorModule.js'),
+			]);
+			module = { module: MainModule, imports: [QueueProcessorModule] };
+		}
+
+		const app = await NestFactory.createApplicationContext(module, {
 			logger: new NestLogger(),
 		});
 
-		const serverService = app.get(ServerService);
-		await serverService.launch();
+		const serverService = mode !== 'queue' ? app.get((await import('../server/ServerService.js')).ServerService) : undefined;
+		const queueService = mode !== 'server' ? app.get((await import('../queue/QueueProcessorService.js')).QueueProcessorService) : undefined;
+		await serverService?.launch();
+		queueService?.start();
 
-		if (process.env.NODE_ENV !== 'test' && !envOption.noDaemons) {
+		if (!envOption.noDaemons && (queueService != null || process.env.NODE_ENV !== 'test')) {
 			const { ChartManagementService } = await import('../core/chart/ChartManagementService.js');
-			const { QueueStatsService } = await import('../daemons/QueueStatsService.js');
-			const { ServerStatsService } = await import('../daemons/ServerStatsService.js');
-
 			app.get(ChartManagementService).start();
-			app.get(QueueStatsService).start();
-			app.get(ServerStatsService).start();
+			if (serverService != null && process.env.NODE_ENV !== 'test') {
+				const { QueueStatsService } = await import('../daemons/QueueStatsService.js');
+				const { ServerStatsService } = await import('../daemons/ServerStatsService.js');
+				app.get(QueueStatsService).start();
+				app.get(ServerStatsService).start();
+			}
 		}
 
-		return { app, drain: () => serverService.dispose(), close: () => app.close() };
+		return {
+			app,
+			drain: async () => {
+				// Both consumers must finish before their shared database/Redis close,
+				// even if one consumer reports a drain failure.
+				const results = await Promise.allSettled([serverService?.dispose(), queueService?.stop()]);
+				const errors = results.flatMap(result => result.status === 'rejected' ? [result.reason] : []);
+				if (errors.length > 0) throw new AggregateError(errors, 'Application drain failed');
+			},
+			close: () => app.close(),
+		};
 	});
 	return managed.app;
 }
 
-export async function jobQueue() {
-	const managed = await manageApplication(async () => {
-		const { QueueProcessorModule } = await import('../queue/QueueProcessorModule.js');
-		const { QueueProcessorService } = await import('../queue/QueueProcessorService.js');
-		const { ChartManagementService } = await import('../core/chart/ChartManagementService.js');
+export function server() {
+	return startApplication('server');
+}
 
-		const jobQueue = await NestFactory.createApplicationContext(QueueProcessorModule, {
-			logger: new NestLogger(),
-		});
+export function jobQueue() {
+	return startApplication('queue');
+}
 
-		jobQueue.get(QueueProcessorService).start();
-		if (!envOption.noDaemons) {
-			jobQueue.get(ChartManagementService).start();
-		}
-
-		return { app: jobQueue, drain: () => jobQueue.get(QueueProcessorService).stop(), close: () => jobQueue.close() };
-	});
-	return managed.app;
+/** Share CoreModule, caches and connection pools in a single-process deployment. */
+export function serverAndQueue() {
+	return startApplication('combined');
 }

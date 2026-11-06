@@ -86,4 +86,36 @@ describe('native streaming shutdown', () => {
 			await new Promise<void>(resolve => server.close(() => resolve()));
 		}
 	});
+
+	test('routes targeted messages and broadcasts to the correct WebSocket subscribers', async () => {
+		const { redis, stream, service, server, client } = await setup();
+		let next = 0;
+		stream.listen.mockImplementation(async (subscriber: EventEmitter, socket: WebSocket) => {
+			const channel = `mainStream:${next++}`;
+			const send = (message: unknown) => socket.send(JSON.stringify(message));
+			subscriber.on(channel, send);
+			subscriber.on('broadcast', send);
+		});
+		let second: WebSocket | undefined;
+		try {
+			await once(client, 'open');
+			second = new WebSocket(client.url);
+			await once(second, 'open');
+			const firstMessages: unknown[] = [];
+			const secondMessages: unknown[] = [];
+			client.on('message', data => firstMessages.push(JSON.parse(data.toString())));
+			second.on('message', data => secondMessages.push(JSON.parse(data.toString())));
+			redis.emit('message', 'test', JSON.stringify({ channel: 'mainStream:0', message: { type: 'private' } }));
+			redis.emit('message', 'test', JSON.stringify({ channel: 'broadcast', message: { type: 'public' } }));
+			await vi.waitFor(() => {
+				expect(firstMessages).toEqual([{ type: 'private' }, { type: 'public' }]);
+				expect(secondMessages).toEqual([{ type: 'public' }]);
+			});
+		} finally {
+			await service.detach();
+			client.terminate();
+			second?.terminate();
+			await new Promise<void>(resolve => server.close(() => resolve()));
+		}
+	});
 });

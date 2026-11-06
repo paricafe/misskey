@@ -16,7 +16,7 @@ import type { LogFormat } from '@/logging/types.js';
 import { showMachineInfo } from '@/misc/show-machine-info.js';
 import { envOption } from '@/env.js';
 import { initTelemetry, shutdownTelemetry } from '@/core/telemetry/telemetry-registry.js';
-import { initExtraThreadPool, jobQueue, server } from './common.js';
+import { initExtraThreadPool, jobQueue, server, serverAndQueue } from './common.js';
 import { installShutdownSignalHandlers, isShutdownInProgress } from './shutdown-handler.js';
 import { shutdownApplications } from './application-lifecycle.js';
 import { forceStopClusterWorkers, shutdownClusterWorkers } from './cluster-shutdown.js';
@@ -131,8 +131,7 @@ export async function masterMain() {
 		} else if (envOption.onlyQueue) {
 			await jobQueue();
 		} else {
-			await server();
-			await jobQueue();
+			await serverAndQueue();
 		}
 	}
 

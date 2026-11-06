@@ -169,7 +169,8 @@ describe('Streaming', () => {
 
 				const bot = await signup({ username: 'streambot' });
 				const botUpdate = await api('i/update', { isBot: true }, bot);
-				assert.strictEqual(botUpdate.status, 204);
+				assert.strictEqual(botUpdate.status, 200);
+				assert.strictEqual(botUpdate.body.isBot, true);
 				const botRenoteAdded = await captureNoteUpdatedEvents(kyoko, target.id, () => post(bot, { renoteId: target.id }));
 				assert.strictEqual(botRenoteAdded.events.some(event => event.type === 'renoteCountChanged'), false);
 				const botRenoteRemoved = await captureNoteUpdatedEvents(kyoko, target.id, () => api('notes/delete', {
@@ -222,7 +223,7 @@ describe('Streaming', () => {
 
 			test('フォローしているユーザーの投稿が流れる', async () => {
 				const fired = await waitFire(
-					ayano, 'homeTimeline',		// ayano:home
+					ayano, 'homeTimeline',	// ayano:home
 					() => api('notes/create', { text: 'foo' }, kyoko),	// kyoko posts
 					msg => msg.type === 'note' && msg.body.userId === kyoko.id,	// wait kyoko
 				);
@@ -232,7 +233,7 @@ describe('Streaming', () => {
 
 			test('フォローしているユーザーの visibility: followers な投稿が流れる', async () => {
 				const fired = await waitFire(
-					ayano, 'homeTimeline',		// ayano:home
+					ayano, 'homeTimeline',	// ayano:home
 					() => api('notes/create', { text: 'foo', visibility: 'followers' }, kyoko),	// kyoko posts
 					msg => msg.type === 'note' && msg.body.userId === kyoko.id,	// wait kyoko
 				);
@@ -244,7 +245,7 @@ describe('Streaming', () => {
 				const note = await post(kyoko, { text: 'foo', visibility: 'followers' });
 
 				const fired = await waitFire(
-					ayano, 'homeTimeline',		// ayano:home
+					ayano, 'homeTimeline',	// ayano:home
 					() => api('notes/create', { text: 'bar', visibility: 'followers', replyId: note.id }, kyoko),	// kyoko posts
 					msg => msg.type === 'note' && msg.body.userId === kyoko.id && msg.body.replyId === note.id,
 				);
@@ -651,7 +652,7 @@ describe('Streaming', () => {
 
 			test('withReplies = falseでフォローしてる人によるリプライが流れてくる', async () => {
 				const fired = await waitFire(
-					ayano, 'globalTimeline',		// ayano:Global
+					ayano, 'globalTimeline',	// ayano:Global
 					() => api('notes/create', { text: 'foo', replyId: kanakoNote.id }, kyoko),	// kyoko posts
 					msg => msg.type === 'note' && msg.body.userId === kyoko.id,	// wait kyoko
 				);

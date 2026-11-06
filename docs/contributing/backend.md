@@ -4,6 +4,9 @@
 
 [Contribution guide](../../CONTRIBUTING.md)
 
+[Backend performance](backend-performance.md) describes opt-in process metrics,
+repeatable local workloads, and measured optimization results.
+
 ## Nest
 
 ### Nest Service Circular dependency / Nestでサービスの循環参照でエラーが起きた場合

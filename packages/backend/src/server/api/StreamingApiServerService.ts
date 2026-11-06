@@ -3,7 +3,6 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { EventEmitter } from 'events';
 import { Inject, Injectable } from '@nestjs/common';
 import * as Redis from 'ioredis';
 import * as WebSocket from 'ws';
@@ -15,6 +14,7 @@ import type { MiLocalUser } from '@/models/User.js';
 import { UserService } from '@/core/UserService.js';
 import { AuthenticateService, AuthenticationError } from './AuthenticateService.js';
 import MainStreamConnection, { ConnectionRequest } from './stream/Connection.js';
+import { ChannelEventBus } from './stream/ChannelEventBus.js';
 import type * as http from 'node:http';
 import type { Duplex } from 'node:stream';
 
@@ -137,11 +137,11 @@ export class StreamingApiServerService {
 		};
 		server.on('upgrade', this.#upgradeListener);
 
-		const globalEv = new EventEmitter();
+		const events = new ChannelEventBus();
 
 		this.#redisListener = (_: string, data: string) => {
 			const parsed = JSON.parse(data);
-			globalEv.emit('message', parsed);
+			events.emit(parsed.channel, parsed.message);
 		};
 		this.redisForSub.on('message', this.#redisListener);
 
@@ -152,13 +152,7 @@ export class StreamingApiServerService {
 		}) => {
 			const { stream, user } = ctx;
 
-			const ev = new EventEmitter();
-
-			function onRedisMessage(data: any): void {
-				ev.emit(data.channel, data.message);
-			}
-
-			globalEv.on('message', onRedisMessage);
+			const ev = events.createSubscriber();
 
 			this.#connections.set(connection, Date.now());
 
@@ -167,7 +161,6 @@ export class StreamingApiServerService {
 			connection.once('close', () => {
 				ev.removeAllListeners();
 				stream.dispose();
-				globalEv.off('message', onRedisMessage);
 				this.#connections.delete(connection);
 				if (user) this.onUserDisconnected(user);
 			});
