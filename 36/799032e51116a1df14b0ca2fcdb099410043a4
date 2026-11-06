@@ -1,0 +1,94 @@
+packages/backend/src/core/NoteDeleteService.ts
+  s_49c5ea6482edd7::t_de6c29b595fdf7 8,28-29,63,84,166,172-178,186,243-249
+  s_49c5ea6482edd7::t_4c913961b07752 217-224
+packages/backend/src/queue/processors/ImportNotesProcessorService.test.ts
+  s_49c5ea6482edd7::t_7c03d890d7b0c0 72-96
+packages/backend/src/queue/processors/ImportNotesProcessorService.ts
+  s_49c5ea6482edd7::t_ffff25742ecd54 532-541,610
+packages/frontend/src/components/MkPostForm.vue
+  s_49c5ea6482edd7::t_0081a0dd63965f 17,23,35,58,60,73,603,627,743,1178-1186
+packages/backend/test/e2e/note-edit.ts
+  s_49c5ea6482edd7::t_a8a3534750bafe 1-57,63-83
+  s_49c5ea6482edd7::t_e7b36daf5218b4 58-62
+packages/backend/src/models/json-schema/note.ts
+  s_49c5ea6482edd7::t_de6c29b595fdf7 45-53
+packages/backend/src/server/api/endpoints/notes/update.test.ts
+  s_49c5ea6482edd7::t_d41a9895237ffa 12,27,55-59
+  s_49c5ea6482edd7::t_08195297bed914 60-61
+packages/mastodon-compat/test/routes.test.ts
+  s_49c5ea6482edd7::t_7c03d890d7b0c0 121-134
+packages/backend/src/server/api/endpoints/notes/update.ts
+  s_49c5ea6482edd7::t_ffff25742ecd54 78,160
+packages/backend/src/core/activitypub/models/ApNoteService.ts
+  s_49c5ea6482edd7::t_b675ec1f1c4a88 442-443,451
+packages/backend/src/queue/processors/ExportAccountDataProcessorService.test.ts
+  s_49c5ea6482edd7::t_7c03d890d7b0c0 27-28,40,49,57,119-137
+  s_34b26d1ea79cb9::t_a5dbef704c79c5 138
+packages/backend/src/core/activitypub/models/ApNoteService.test.ts
+  s_49c5ea6482edd7::t_d41a9895237ffa 74
+  s_49c5ea6482edd7::t_a4ff180fa0ef51 64,75,89,172-181
+  s_b19e2d4048a33c::t_c054cbacbb80e2 182-183
+packages/backend/src/core/NoteUpdateService.ts
+  s_49c5ea6482edd7::t_b675ec1f1c4a88 32,60,177-178,180-188,211-212,224-225,238-239,403
+  s_49c5ea6482edd7::t_a4ff180fa0ef51 173-176,179
+  s_49c5ea6482edd7::t_de6c29b595fdf7 342,400-401,406-407
+packages/backend/src/queue/processors/ExportAccountDataProcessorService.ts
+  s_49c5ea6482edd7::t_ffff25742ecd54 159-160
+packages/mastodon-compat/src/routes.ts
+  s_49c5ea6482edd7::t_ffff25742ecd54 188
+packages/backend/src/misc/resolve-note-mentions.ts
+  s_49c5ea6482edd7::t_b675ec1f1c4a88 1-18
+packages/backend/src/core/NoteUpdateService.test.ts
+  s_49c5ea6482edd7::t_d41a9895237ffa 140,458-459,461,471-487,496-505,815,824,839-840
+  s_49c5ea6482edd7::t_a4ff180fa0ef51 488-495
+packages/frontend/test/unit/post-form-edit.test.ts
+  s_49c5ea6482edd7::t_1b1a0ed03fb10a 1-10,12,14-38,40-54,56-89,97-98
+  s_49c5ea6482edd7::t_2c407ae578ba76 39
+  s_49c5ea6482edd7::t_a2d295b641f6a4 11,55,90-96
+  s_49c5ea6482edd7::t_0cb0d096951f0c 13
+packages/backend/src/server/api/endpoints/notes/search-by-tag.ts
+  s_49c5ea6482edd7::t_ffff25742ecd54 112,114,116-117
+packages/backend/src/core/NoteDeleteService.test.ts
+  s_49c5ea6482edd7::t_02929b2c329bd7 1-18,20-22,26-40,42-46,48-50
+  s_49c5ea6482edd7::t_4c913961b07752 19,23-25,41,47
+packages/backend/src/models/Note.ts
+  s_49c5ea6482edd7::t_de6c29b595fdf7 47
+packages/misskey-js/src/autogen/types.ts
+  s_49c5ea6482edd7::t_c39d3ae52e9db5 4510
+packages/backend/test/unit/note-counter-mutations.ts
+  s_49c5ea6482edd7::t_d41a9895237ffa 79,94
+packages/backend/src/server/api/endpoints/notes/search-by-tag.test.ts
+  s_49c5ea6482edd7::t_02929b2c329bd7 1-32
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "36799032e51116a1df14b0ca2fcdb099410043a4",
+  "prompts": {},
+  "sessions": {
+    "s_34b26d1ea79cb9": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a17bf8-ae01-7521-9bbb-711035f881b5",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Natsuki-Kaede <i@pari.network>"
+    },
+    "s_49c5ea6482edd7": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1aee8-800c-78f1-970f-e286c241afc3",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Natsuki-Kaede <i@pari.network>"
+    },
+    "s_b19e2d4048a33c": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a18ab9-06f2-7a32-a77f-7571ee321e0b",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Natsuki-Kaede <i@pari.network>"
+    }
+  }
+}
