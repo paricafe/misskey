@@ -6535,7 +6535,7 @@ export interface Locale extends ILocale {
          */
         "inlineCode": string;
         /**
-         * プログラムコードをインラインでシンタックスハイライト表示します。
+         * プログラムコードを行内に表示します。
          */
         "inlineCodeDescription": string;
         /**
@@ -12908,47 +12908,47 @@ export interface Locale extends ILocale {
      */
     "registerApprovalEmailRecommended": string;
     /**
-     * Pari Cafe使用のブランチは、原版に対してカスタマイズを行っています。
+     * Pari Cafeで使用しているMisskeyは、オリジナル版をカスタマイズしたものです。
      */
     "pariMisskeyAbout": string;
     /**
-     * Time Travel
+     * タイムトラベル
      */
     "timeTravel": string;
     /**
-     * Show posts before this date.
+     * 指定した日時より前のノートを表示します。
      */
     "timeTravelDescription": string;
     /**
-     * Undo
+     * 元に戻す
      */
     "undoPostForm": string;
     /**
-     * Clear
+     * クリア
      */
     "clearPostForm": string;
     /**
-     * Pari Plus! customized Misskey~!
+     * Pari Plus!でカスタマイズしたMisskey
      */
     "pariPlusInfo": string;
     /**
-     * Pari Plus! system settings
+     * Pari Plus!のシステム設定
      */
     "pariPlusSystemSettings": string;
     /**
-     * Pari Plus! note settings
+     * Pari Plus!のノート設定
      */
     "pariPlusNoteSettings": string;
     /**
-     * Pari Plus! appearance settings
+     * Pari Plus!の外観設定
      */
     "pariPlusAppearanceSettings": string;
     /**
-     * Default fonts
+     * デフォルトのフォント
      */
     "pariPlusFontPicker": string;
     /**
-     * Enable rendering optimization
+     * 描画の最適化を有効にする
      */
     "enableRenderingOptimization": string;
     /**
@@ -12956,88 +12956,88 @@ export interface Locale extends ILocale {
      */
     "enableTranslateButton": string;
     /**
-     * Hover the timestamp of the note to expand the detailed time
+     * ノートの投稿日時にマウスポインターを合わせると、正確な日時を表示する
      */
     "showDetailTimeWhenHover": string;
     /**
-     * Click to open note details
+     * ノートをクリックして詳細を開く
      */
     "noteClickToOpen": string;
     /**
-     * Enable fallback reaction button
+     * 予備のリアクションボタンを表示する
      */
     "enableFallbackReactButton": string;
     /**
-     * Enable MFM Cheatsheet in post form
+     * 投稿フォームにMFMの早見表を表示する
      */
     "enableMFMCheatsheet": string;
     /**
-     * Enable undo & clear button in post form
+     * 投稿フォームに元に戻す・クリアボタンを表示する
      */
     "enableUndoClearPostForm": string;
     /**
-     * 返信したノートを折りたたむ
+     * 返信先のノートのプレビューを折りたたむ
      */
     "collapseNotesRepliedTo": string;
     /**
-     * Always collapse renotes
+     * リノートを常に折りたたむ
      */
     "alwaysCollapseRenotes": string;
     /**
-     * Collapse everything
+     * すべてのノートを折りたたむ
      */
     "collapseEverything": string;
     /**
-     * Collapse all notes when enabled, click to expand
+     * 有効にすると、すべてのノートを折りたたんで表示します。クリックすると展開できます。
      */
     "collapseEverythingDescription": string;
     /**
-     * Disable emoji reactions viewer
+     * ノートの絵文字リアクションを非表示にする
      */
     "disableReactionsViewer": string;
     /**
-     * Collapse notes using unexpected languages
+     * 想定外の言語のノートを折りたたむ
      */
     "collapsedUnexpectedLangs": string;
     /**
-     * Automatically add spaces when inserting emoji
+     * 絵文字の挿入時に自動で空白を追加する
      */
     "emojiAutoSpacing": string;
     /**
-     * Auto Spacing
+     * 文字間隔の自動調整
      */
     "autoSpacing": string;
     /**
-     * ブラウザの機能を使用して、CJK文字と英数字の間隔を視覚的に調整します
+     * ブラウザの機能で、CJK文字と英数字の間に表示上の間隔を追加します。
      */
     "autoSpacingDescription": string;
     /**
-     * Click InstanceTicker to show instance info
+     * サーバーラベルをクリックしてサーバー情報を表示する
      */
     "clickToShowInstanceTickerWindow": string;
     /**
-     * Default like reaction
+     * 「いいね」で使用する既定のリアクション
      */
     "defaultLike": string;
     "_dataRequest": {
         /**
-         * Data Export
+         * データのエクスポート
          */
         "lable": string;
         /**
-         * Request Data
+         * アカウントデータをリクエスト
          */
         "title": string;
         /**
-         * Data requests are only possible every 3 days.
+         * データのリクエストは3日ごとに1回のみ行えます。
          */
         "warn": string;
         /**
-         * Once the data is ready to download, an email will be sent to the email address registered to this account.
+         * データのダウンロード準備ができると、このアカウントに登録されたメールアドレスに通知が届きます。
          */
         "text": string;
         /**
-         * Request
+         * エクスポートをリクエスト
          */
         "button": string;
     };
