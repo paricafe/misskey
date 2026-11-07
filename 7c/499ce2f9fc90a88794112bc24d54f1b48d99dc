@@ -1,0 +1,26 @@
+packages/i18n/src/custom-locales.ts
+  s_49c5ea6482edd7::t_a685f7c12fb684 10-83,88-91,94,96,112-116,122,129,134,138-146,149-224,229-232,235,237,253-257,263,270,275,279-287,290-363,368-371,374,376,392-396,402,409,414,418-426
+locales/ja-JP.yml
+  s_49c5ea6482edd7::t_44326468210d9a 1654,3444-3454,3456-3471,3473-3477
+packages/frontend/test/unit/custom-locales.test.ts
+  s_49c5ea6482edd7::t_b891562543caa8 20
+  s_49c5ea6482edd7::t_df32a37f3ea734 1-19,21-141
+packages/i18n/src/autogen/locale.ts
+  s_49c5ea6482edd7::t_4e06f25a20a59e 6538,12911,12915,12919,12923,12927,12931,12935,12939,12943,12947,12951,12959,12963,12967,12971,12975,12979,12983,12987,12991,12995,12999,13003,13007,13011,13015,13019,13024,13028,13032,13036,13040
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "7c499ce2f9fc90a88794112bc24d54f1b48d99dc",
+  "prompts": {},
+  "sessions": {
+    "s_49c5ea6482edd7": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1aee8-800c-78f1-970f-e286c241afc3",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Natsuki-Kaede <i@pari.network>"
+    }
+  }
+}
