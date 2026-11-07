@@ -730,14 +730,23 @@ export class ApPersonService implements OnModuleInit {
 			}))));
 
 		await this.db.transaction(async transactionalEntityManager => {
+			// Serialize replacements across workers, including when the user has no pins.
+			await transactionalEntityManager.findOneOrFail(MiUser, {
+				where: { id: user.id, isDeleted: false },
+				lock: { mode: 'pessimistic_write' },
+			});
 			await transactionalEntityManager.delete(MiUserNotePining, { userId: user.id });
 
 			// とりあえずidを別の時間で生成して順番を維持
+			const now = Date.now();
 			let td = 0;
+			const pinnedNoteIds = new Set<MiNote['id']>();
 			for (const note of featuredNotes.filter(x => x != null)) {
+				if (pinnedNoteIds.has(note.id)) continue;
+				pinnedNoteIds.add(note.id);
 				td -= 1000;
-				transactionalEntityManager.insert(MiUserNotePining, {
-					id: this.idService.gen(Date.now() + td),
+				await transactionalEntityManager.insert(MiUserNotePining, {
+					id: this.idService.gen(now + td),
 					userId: user.id,
 					noteId: note.id,
 				});

@@ -37,6 +37,12 @@ type UpdateInstanceJob = {
 	shouldUnsuspend: boolean,
 };
 
+function isUnrecoverableJsonLdError(error: unknown): boolean {
+	return error instanceof JsonLdError || (error instanceof Error && (
+		error.name === 'jsonld.ValidationError' || error.name === 'jsonld.SyntaxError'
+	));
+}
+
 @Injectable()
 export class InboxProcessorService implements OnApplicationShutdown {
 	private logger: Logger;
@@ -113,12 +119,10 @@ export class InboxProcessorService implements OnApplicationShutdown {
 				authUser = await this.apDbResolverService.getAuthUserFromApId(getApId(activity.actor));
 			} catch (err) {
 				// 対象が4xxならスキップ
-				if (err instanceof StatusError) {
-					if (!err.isRetryable) {
-						throw new Bull.UnrecoverableError(`skip: Ignored deleted actors on both ends ${getApId(activity.actor)} - ${err.statusCode}`);
-					}
-					throw new Error(`Error in actor ${getApId(activity.actor)} - ${err.statusCode}`);
+				if (err instanceof StatusError && !err.isRetryable) {
+					throw new Bull.UnrecoverableError(`skip: Ignored deleted actors on both ends ${getApId(activity.actor)} - ${err.statusCode}`);
 				}
+				throw err;
 			}
 		}
 
@@ -167,7 +171,10 @@ export class InboxProcessorService implements OnApplicationShutdown {
 				try {
 					activity = await jsonLd.compact(activity) as IActivity;
 				} catch (error) {
-					throw new Bull.UnrecoverableError(`skip: failed to compact activity: ${error}`);
+					if (isUnrecoverableJsonLdError(error)) {
+						throw new Bull.UnrecoverableError(`skip: failed to compact activity: ${error}`);
+					}
+					throw error;
 				}
 				try {
 					jsonLd.checkForForbiddenDirectives(activity);
@@ -193,7 +200,7 @@ export class InboxProcessorService implements OnApplicationShutdown {
 						throw new Bull.UnrecoverableError('skip: LD-Signatureの検証に失敗しました');
 					}
 				} catch (error) {
-					if (error instanceof JsonLdError) {
+					if (isUnrecoverableJsonLdError(error)) {
 						throw new Bull.UnrecoverableError(`skip: encountered a JSON-LD error while verifying signature: ${error}`);
 					} else {
 						throw error;
@@ -261,6 +268,9 @@ export class InboxProcessorService implements OnApplicationShutdown {
 				return result;
 			}
 		} catch (e) {
+			if (e instanceof StatusError && !e.isRetryable) {
+				throw new Bull.UnrecoverableError(`skip: activity object is unavailable - ${e.statusCode}`);
+			}
 			if (e instanceof IdentifiableError) {
 				switch (e.id) {
 					case '689ee33f-f97c-479a-ac49-1b9f8140af99':

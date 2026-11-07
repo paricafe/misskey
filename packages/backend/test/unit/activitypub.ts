@@ -27,6 +27,7 @@ import { CoreModule } from '@/core/CoreModule.js';
 import { FederatedInstanceService } from '@/core/FederatedInstanceService.js';
 import { LoggerService } from '@/core/LoggerService.js';
 import { MiMeta, MiNote, UserProfilesRepository } from '@/models/_.js';
+import type { UserNotePiningsRepository } from '@/models/_.js';
 import { DI } from '@/di-symbols.js';
 import { secureRndstr } from '@/misc/secure-rndstr.js';
 import { DownloadService } from '@/core/DownloadService.js';
@@ -94,6 +95,7 @@ async function createRandomRemoteUser(
 
 describe('ActivityPub', () => {
 	let userProfilesRepository: UserProfilesRepository;
+	let userNotePiningsRepository: UserNotePiningsRepository;
 	let imageService: ApImageService;
 	let noteService: ApNoteService;
 	let personService: ApPersonService;
@@ -146,6 +148,7 @@ describe('ActivityPub', () => {
 		app.enableShutdownHooks();
 
 		userProfilesRepository = app.get(DI.userProfilesRepository);
+		userNotePiningsRepository = app.get(DI.userNotePiningsRepository);
 
 		noteService = app.get<ApNoteService>(ApNoteService);
 		personService = app.get<ApPersonService>(ApPersonService);
@@ -327,6 +330,47 @@ describe('ActivityPub', () => {
 	});
 
 	describe('Featured', () => {
+		test('stores duplicate featured items once and completes their writes before returning', async () => {
+			const actor = createRandomActor();
+			actor.featured = `${actor.id}/collections/featured`;
+			const featured = createRandomFeaturedCollection(actor, 2);
+			const [first, second] = featured.items as IPost[];
+			featured.items = [first, first, second];
+			resolver.register(actor.id, actor);
+			resolver.register(actor.featured, featured);
+
+			const user = await personService.createPerson(actor.id, resolver);
+			const pins = await userNotePiningsRepository.find({
+				where: { userId: user.id }, order: { id: 'DESC' }, relations: { note: true },
+			});
+			assert.deepStrictEqual(pins.map(pin => pin.note?.uri), [first.id, second.id]);
+		});
+
+		test('concurrent featured replacements commit one complete ordered set', async () => {
+			const actor = createRandomActor();
+			actor.featured = `${actor.id}/collections/featured`;
+			const featured = createRandomFeaturedCollection(actor, 4);
+			resolver.register(actor.id, actor);
+			resolver.register(actor.featured, featured);
+			const user = await personService.createPerson(actor.id, resolver);
+			const notes = featured.items as IPost[];
+			const firstSet = notes.slice(0, 2);
+			const secondSet = notes.slice(2);
+			vi.spyOn(resolver, 'resolveCollection')
+				.mockResolvedValueOnce({ ...featured, items: [firstSet[0], firstSet[0], firstSet[1]] })
+				.mockResolvedValueOnce({ ...featured, items: secondSet });
+
+			await Promise.all([
+				personService.updateFeatured(user.id, resolver),
+				personService.updateFeatured(user.id, resolver),
+			]);
+			const pins = await userNotePiningsRepository.find({
+				where: { userId: user.id }, order: { id: 'DESC' }, relations: { note: true },
+			});
+			const uris = pins.map(pin => pin.note?.uri);
+			assert.ok([firstSet, secondSet].some(set => JSON.stringify(set.map(note => note.id)) === JSON.stringify(uris)));
+		});
+
 		test('Fetch featured notes from IActor', async () => {
 			const actor = createRandomActor();
 			actor.featured = `${actor.id}/collections/featured`;

@@ -133,7 +133,9 @@ export class ApInboxService {
 			if (actor.lastFetchedAt == null || Date.now() - actor.lastFetchedAt.getTime() > 1000 * 60 * 60 * 24) {
 				setImmediate(() => {
 					// 同一ユーザーの情報を再度処理するので、使用済みのresolverを再利用してはいけない
-					this.apPersonService.updatePerson(actor.uri);
+					void this.apPersonService.updatePerson(actor.uri).catch(err => {
+						this.logger.warn(`Failed to refresh remote actor ${actor.uri}: ${err}`);
+					});
 				});
 			}
 		}

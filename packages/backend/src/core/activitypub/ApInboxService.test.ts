@@ -8,8 +8,27 @@ import { IdentifiableError } from '@/misc/identifiable-error.js';
 import { StatusError } from '@/misc/status-error.js';
 import { NOTE_HISTORY_LIMIT_ERROR_ID, NOTE_NO_CONTENT_ERROR_ID, NOTE_NOT_FOUND_ERROR_ID } from '@/core/NoteUpdateService.js';
 import { ApInboxService } from './ApInboxService.js';
+import type { MiRemoteUser } from '@/models/User.js';
 
 describe(ApInboxService, () => {
+	test('keeps a successful activity independent of a rejected background actor refresh', async () => {
+		const refresh = Promise.withResolvers<void>();
+		const updatePerson = vi.fn().mockReturnValue(refresh.promise);
+		const warn = vi.fn();
+		const service = Object.create(ApInboxService.prototype) as ApInboxService;
+		Object.assign(service, { apPersonService: { updatePerson }, logger: { warn } });
+		Object.defineProperty(service, 'performOneActivity', { value: vi.fn().mockResolvedValue('ok') });
+		const actor = { uri: 'https://remote.example/users/alice', lastFetchedAt: null } as MiRemoteUser;
+
+		await expect(service.performActivity(actor, { type: 'Create' })).resolves.toBe('ok');
+		await new Promise<void>(resolve => setImmediate(resolve));
+		expect(updatePerson).toHaveBeenCalledWith(actor.uri);
+
+		refresh.reject(new StatusError('410 Gone', 410));
+		await vi.waitFor(() => expect(warn).toHaveBeenCalledWith(expect.stringContaining('410')));
+		expect(warn).toHaveBeenCalledTimes(1);
+	});
+
 	test('rejects a Post update whose attributed author differs from the signed activity actor', async () => {
 		const apNoteService = {
 			updateNote: vi.fn(),
