@@ -1,0 +1,40 @@
+packages/frontend/test/e2e/timeline-pagination.spec.ts
+  s_49c5ea6482edd7::t_782f60831ed8c2 82-83,97,111,121
+  s_49c5ea6482edd7::t_cefe4dfd11c6d8 80
+  s_49c5ea6482edd7::t_ffc2eece49736f 42-48,124,126,128-134
+  s_49c5ea6482edd7::t_ef170ae96f4e27 1-5,7-9,19,24-41,49-64,66,68-79,81,88-96,98-110,112-116,122-123,135-136
+  s_49c5ea6482edd7::t_a7c20dc8912251 6,10-18,84-87,117-120,127
+  s_49c5ea6482edd7::t_1423dd9440dc7c 20-23,65,67,125
+packages/frontend/src/components/MkNotesTimeline.vue
+  s_49c5ea6482edd7::t_1f5c464de44208 7,80-84
+packages/frontend/test/unit/virtual-list-component.test.ts
+  s_49c5ea6482edd7::t_f9f7475acc4915 13,32,35-37,44-52,61-62,152-158,166-170,190-197,218-226,230-231,233-248,250-266,268-269,271-272
+  s_49c5ea6482edd7::t_055977d62fe62e 171-189
+  s_49c5ea6482edd7::t_61948908883645 227-229,232,249,267,270
+  s_49c5ea6482edd7::t_e9ef862950267c 73-74,78,83,198-217
+  s_49c5ea6482edd7::t_bbcf960bf59f8d 14,33-34,159-165
+  s_49c5ea6482edd7::t_945d61da61dbea 273
+packages/frontend/test/e2e/timeline-performance.spec.ts
+  s_49c5ea6482edd7::t_91ba328c2de074 132-136
+packages/frontend/src/components/MkVirtualList.vue
+  s_49c5ea6482edd7::t_564cab2ea6aff4 37,42,78,117-162,167-170,204
+packages/frontend/src/components/MkStreamingNotesTimeline.vue
+  s_49c5ea6482edd7::t_564cab2ea6aff4 22
+  s_49c5ea6482edd7::t_1f5c464de44208 16,437-441
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "8f9fab3a3d09124eadc9f606cba7208c1cf6ba1c",
+  "prompts": {},
+  "sessions": {
+    "s_49c5ea6482edd7": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1aee8-800c-78f1-970f-e286c241afc3",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Natsuki-Kaede <i@pari.network>"
+    }
+  }
+}
