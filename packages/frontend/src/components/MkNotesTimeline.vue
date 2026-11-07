@@ -4,7 +4,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 -->
 
 <template>
-<MkPagination :paginator="paginator" :direction="direction" :autoLoad="autoLoad" :pullToRefresh="pullToRefresh" :withControl="withControl" :forceDisableInfiniteScroll="forceDisableInfiniteScroll">
+<MkPagination :paginator="paginator" :direction="direction" :autoLoad="autoLoad" :pullToRefresh="pullToRefresh" :withControl="withControl" :forceDisableInfiniteScroll="forceDisableInfiniteScroll" :class="$style.pagination">
 	<template #empty><MkResult type="empty" :text="i18n.ts.noNotes"/></template>
 
 	<template #default="{ items: notes }">
@@ -77,6 +77,11 @@ defineExpose({
 </script>
 
 <style lang="scss" module>
+.pagination {
+	// Footer buttons must not become browser scroll anchors when virtual rows change.
+	overflow-anchor: none;
+}
+
 .root {
 	container-type: inline-size;
 

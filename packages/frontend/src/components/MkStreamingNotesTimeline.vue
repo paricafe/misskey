@@ -13,13 +13,13 @@ SPDX-License-Identifier: AGPL-3.0-only
 		<slot name="empty"><MkResult type="empty" :text="i18n.ts.noNotes"/></slot>
 	</div>
 
-	<div v-else ref="rootEl">
+	<div v-else ref="rootEl" :class="$style.root">
 		<div v-if="paginator.queuedAheadItemsCount.value > 0" :class="$style.new">
 			<div :class="$style.newBg1"></div>
 			<div :class="$style.newBg2"></div>
 			<button class="_button" :class="$style.newButton" @click="releaseQueue()"><i class="ti ti-circle-arrow-up"></i> {{ i18n.ts.newNote }}</button>
 		</div>
-		<MkVirtualList v-slot="{ item: note, index: i }" :items="[...paginator.items.value]" :class="$style.notes">
+		<MkVirtualList v-slot="{ item: note, index: i }" :items="[...paginator.items.value]" :animate="prefer.s.animation" :class="$style.notes">
 				<div v-if="i > 0 && isSeparatorNeeded(paginator.items.value[i -1].createdAt, note.createdAt)" :data-scroll-anchor="note.id">
 					<div :class="$style.date">
 						<span><i class="ti ti-chevron-up"></i> {{ getSeparatorInfo(paginator.items.value[i -1].createdAt, note.createdAt)?.prevText }}</span>
@@ -434,6 +434,11 @@ defineExpose({
 </script>
 
 <style lang="scss" module>
+.root {
+	// The virtual list owns scroll compensation, including its pagination controls.
+	overflow-anchor: none;
+}
+
 .notes {
 	container-type: inline-size;
 	background: var(--MI_THEME-panel);

@@ -34,10 +34,12 @@ const props = withDefaults(defineProps<{
 	estimatedHeight?: number;
 	overscan?: number;
 	gap?: number;
+	animate?: boolean;
 }>(), {
 	estimatedHeight: 200,
 	overscan: 600,
 	gap: 0,
+	animate: false,
 });
 
 defineSlots<{ default?: (props: { item: T; index: number }) => void }>();
@@ -73,6 +75,7 @@ function onFocusOut(event: FocusEvent) {
 }
 
 const elements = new Map<string, HTMLElement>();
+const animations = new Map<HTMLElement, Animation>();
 let scrollContainer: HTMLElement | null = null;
 let observer: ResizeObserver | null = null;
 let frame: number | null = null;
@@ -111,12 +114,60 @@ function changeLayout(change: () => boolean | void) {
 	}
 }
 
-watch(() => props.items, items => changeLayout(() => layout.update(items.map(item => item.id))), { immediate: true });
+function cancelAnimations() {
+	for (const animation of animations.values()) animation.cancel();
+	animations.clear();
+}
+
+function animateElement(el: HTMLElement, keyframes: Keyframe[]) {
+	const animation = el.animate(keyframes, { duration: 700, easing: 'cubic-bezier(0.23, 1, 0.32, 1)' });
+	animations.set(el, animation);
+	animation.onfinish = animation.oncancel = () => {
+		if (animations.get(el) === animation) animations.delete(el);
+	};
+}
+
+watch(() => props.items, (items, previous = []) => {
+	const previousHead = previous[0]?.id;
+	const prependCount = previousHead == null ? 0 : items.findIndex(item => item.id === previousHead);
+	// Animate data inserted ahead of existing records, never rows mounted while scrolling or paging.
+	const positions = active && props.animate && prependCount > 0
+		? new Map([...elements].map(([id, el]) => [id, el.getBoundingClientRect().top]))
+		: null;
+	if (positions) cancelAnimations();
+	changeLayout(() => layout.update(items.map(item => item.id)));
+	if (!positions) return;
+	const prepended = new Set(items.slice(0, prependCount).map(item => item.id));
+	nextTick(() => {
+		if (!active || !props.animate) return;
+		for (const [id, el] of elements) {
+			const rect = el.getBoundingClientRect();
+			if (prepended.has(id)) {
+				animateElement(el, [
+					{ opacity: 0, transform: `translateY(${-Math.min(64, rect.height)}px)` },
+					{ opacity: 1, transform: 'translateY(0)' },
+				]);
+			} else {
+				const before = positions.get(id);
+				if (before != null && before !== rect.top) {
+					animateElement(el, [{ transform: `translateY(${before - rect.top}px)` }, { transform: 'translateY(0)' }]);
+				}
+			}
+		}
+	});
+}, { immediate: true });
+
+watch(() => props.animate, enabled => {
+	if (!enabled) cancelAnimations();
+});
 
 function setItemElement(id: string, el: Element | ComponentPublicInstance | null) {
 	const previous = elements.get(id);
 	if (previous === el) return;
-	if (previous) observer?.unobserve(previous);
+	if (previous) {
+		observer?.unobserve(previous);
+		animations.get(previous)?.cancel();
+	}
 	if (el instanceof HTMLElement) {
 		elements.set(id, el);
 		if (active) observer?.observe(el);
@@ -150,6 +201,7 @@ function start() {
 
 function stop() {
 	active = false;
+	cancelAnimations();
 	observer?.disconnect();
 	observer = null;
 	(scrollContainer ?? window).removeEventListener('scroll', scheduleViewport);

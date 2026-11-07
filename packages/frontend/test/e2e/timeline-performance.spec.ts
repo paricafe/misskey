@@ -129,8 +129,11 @@ for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 844 
 		let maximumMounted = 0;
 		for (let pass = 0; loaded < notes.length && pass < 30; pass++) {
 			const previous = loaded;
-			await scrollList(page, true);
-			await expect.poll(() => loaded).toBeGreaterThan(previous);
+			await expect.poll(async () => {
+				// Measured rows can move the end while approaching it; keep scrolling until the request starts.
+				if (loaded === previous) await scrollList(page, true);
+				return loaded;
+			}).toBeGreaterThan(previous);
 			await expect.poll(async () => Number(await page.locator('[data-virtual-list]').first().getAttribute('data-total-items')) === loaded).toBe(true);
 			await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 			maximumMounted = Math.max(maximumMounted, await page.locator('[data-virtual-item]').count());
