@@ -1,0 +1,38 @@
+package.json
+  s_371083a04bea65::t_8a28f9a1b01976 3
+packages/backend/src/core/activitypub/ApInboxService.test.ts
+  s_371083a04bea65::t_e3a56c181d8085 27
+  s_371083a04bea65::t_031e9575209dc5 11,14-26,28-31
+packages/backend/src/core/activitypub/models/ApPersonService.test.ts
+  s_371083a04bea65::t_8722e22371a4ca 52-53,57
+  s_371083a04bea65::t_031e9575209dc5 1-51,54-56,58-98
+packages/backend/src/queue/processors/InboxProcessorService.test.ts
+  s_371083a04bea65::t_f088ea872aa520 60-65,82-95,97-113
+  s_371083a04bea65::t_031e9575209dc5 1-59,66-81,96,114-136
+packages/backend/test/unit/activitypub.ts
+  s_371083a04bea65::t_adec6c42e30b58 30,98,151,333-373
+packages/backend/src/queue/processors/InboxProcessorService.ts
+  s_371083a04bea65::t_f088ea872aa520 40-45,174-177,203
+  s_371083a04bea65::t_a1d3ce1a24bd60 122-123,125,271-273
+packages/backend/src/core/activitypub/ApInboxService.ts
+  s_371083a04bea65::t_a1d3ce1a24bd60 136-138
+packages/backend/src/core/activitypub/models/ApPersonService.ts
+  s_371083a04bea65::t_a1d3ce1a24bd60 733-737,743,745-746,748
+  s_371083a04bea65::t_8722e22371a4ca 741,749
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b91ad75f4c110006452f979b03036bada7093280",
+  "prompts": {},
+  "sessions": {
+    "s_371083a04bea65": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1b06a-ce06-77a3-b070-3b936db343f2",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Natsuki-Kaede <i@pari.network>"
+    }
+  }
+}
