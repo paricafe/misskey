@@ -1,0 +1,666 @@
+packages/backend/src/server/file/FileServerProxyHandler.ts
+  a9881cb2263f7e3b 16,215,219,221-223
+packages/backend/src/core/activitypub/ApInboxService.ts
+  a9881cb2263f7e3b 329,504-505,509
+packages/frontend/src/utility/get-account-from-id.ts
+  a9881cb2263f7e3b 6-7,11
+packages/backend/src/server/FileServerService.ts
+  a9881cb2263f7e3b 51
+packages/frontend/src/boot/common.ts
+  a9881cb2263f7e3b 19,97
+packages/backend/test/e2e/federation-consistency.ts
+  a9881cb2263f7e3b 1-138
+packages/backend/src/server/file/FileServerUtils.test.ts
+  a9881cb2263f7e3b 1-67
+packages/frontend/src/store.ts
+  a9881cb2263f7e3b 101-104
+packages/backend/src/server/ActivityPubServerService.test.ts
+  a9881cb2263f7e3b 1-65
+packages/backend/src/core/RoleService.ts
+  a9881cb2263f7e3b 557,600
+packages/frontend/test/e2e/timeline-pagination.spec.ts
+  a9881cb2263f7e3b 33,61
+packages/backend/test/unit/RoleService.ts
+  a9881cb2263f7e3b 1121-1135
+packages/misskey-js/etc/misskey-js.api.md
+  a9881cb2263f7e3b 3811
+packages/backend/src/queue/processors/DeliverProcessorService.test.ts
+  a9881cb2263f7e3b 1-52
+packages/backend/test/unit/server/FileServerService.ts
+  a9881cb2263f7e3b 245,302,376-401,434-440
+packages/backend/src/server/api/stream/channels/chat-room.test.ts
+  a9881cb2263f7e3b 1-114
+packages/backend/src/server/file/FileServerUtils.ts
+  a9881cb2263f7e3b 9,21-26,28-30,61-69
+packages/backend/test/e2e/streaming.ts
+  a9881cb2263f7e3b 9,853-900
+packages/backend/src/queue/processors/InboxProcessorService.ts
+  a9881cb2263f7e3b 287-289
+scripts/check-shipping.mjs
+  a9881cb2263f7e3b 7
+packages/backend/src/core/PollVoteService.ts
+  a9881cb2263f7e3b 12,84,171,175-176
+packages/backend/src/server/api/StreamingApiServerService.test.ts
+  a9881cb2263f7e3b 23,29,38,40,43-168
+packages/sw/src/scripts/get-account-from-id.ts
+  a9881cb2263f7e3b 7,9-14
+packages/frontend/test/unit/signout.test.ts
+  a9881cb2263f7e3b 1-73
+packages/backend/src/core/ChatService.ts
+  a9881cb2263f7e3b 756
+packages/frontend/src/preferences/utility.ts
+  a9881cb2263f7e3b 142,152
+packages/frontend/src/utility/watermark/watermark.glsl
+  a9881cb2263f7e3b 11-28,63,71,107,123,127,129
+packages/backend/src/core/GlobalEventService.ts
+  a9881cb2263f7e3b 243-244,339-342,371,376,383-384
+packages/backend/src/core/FederatedInstanceService.ts
+  a9881cb2263f7e3b 10,15,93
+scripts/dev.mjs
+  a9881cb2263f7e3b 24-27,62-65,87-89,112,129-130
+packages/backend/src/core/QueueService.ts
+  a9881cb2263f7e3b 665
+packages/frontend/test/unit/account-storage.test.ts
+  a9881cb2263f7e3b 1-144
+packages/backend/src/server/api/AuthenticateService.test.ts
+  a9881cb2263f7e3b 1-58
+.claude/skills/working-on-backend/scripts/prepare-generate.mjs
+  a9881cb2263f7e3b 1
+packages/backend/test/e2e/endpoints.ts
+  a9881cb2263f7e3b 1162,1164-1168
+scripts/check-spdx.mjs
+  a9881cb2263f7e3b 7
+packages/backend/src/server/api/endpoints/i/regenerate-token.ts
+  a9881cb2263f7e3b 57
+packages/backend/src/core/QueueService.test.ts
+  a9881cb2263f7e3b 1-27
+packages/backend/src/server/api/stream/channels/chat-room.ts
+  a9881cb2263f7e3b 23-26,46-47,50,57,62-87,91-92,96,104-106
+packages/frontend/test/unit/boot-deferred.test.ts
+  a9881cb2263f7e3b 19
+packages/backend/src/queue/processors/DeliverProcessorService.ts
+  a9881cb2263f7e3b 55-58
+packages/backend/src/queue/processors/DeleteAccountProcessorService.ts
+  a9881cb2263f7e3b 16,54,193,195
+packages/backend/test/e2e/block.ts
+  a9881cb2263f7e3b 58
+packages/backend/src/core/activitypub/ApInboxService.test.ts
+  a9881cb2263f7e3b 11,252-324
+packages/backend/src/server/ActivityPubServerService.ts
+  a9881cb2263f7e3b 104,172
+packages/backend/test-federation/test/block.test.ts
+  a9881cb2263f7e3b 14-20,54,56,58-63,111,160,162,166-169
+packages/backend/src/queue/QueueProcessorService.ts
+  a9881cb2263f7e3b 355,391
+packages/backend/src/server/api/endpoints/i/revoke-token.ts
+  a9881cb2263f7e3b 11,57-58,80
+packages/backend/src/server/api/AuthenticateService.ts
+  a9881cb2263f7e3b 44,50-51,71-75,77-79,82-83
+scripts/start.mjs
+  a9881cb2263f7e3b 116
+packages/backend/src/core/PollService.ts
+  a9881cb2263f7e3b 8
+packages/backend/src/queue/QueueProcessorService.test.ts
+  a9881cb2263f7e3b 1-52
+packages/backend/src/core/ChannelFollowingService.ts
+  a9881cb2263f7e3b 6,18,21,50-51,138,142,151
+packages/backend/src/core/activitypub/models/ApNoteService.test.ts
+  a9881cb2263f7e3b 497-523
+packages/backend/src/server/api/stream/channel.ts
+  a9881cb2263f7e3b 131
+packages/backend/src/server/api/stream/Connection.test.ts
+  a9881cb2263f7e3b 1-64
+packages/frontend-shared/js/stored-accounts.ts
+  a9881cb2263f7e3b 1-31
+packages/frontend/src/utility/image-compositor-functions/distort.glsl
+  a9881cb2263f7e3b 19
+packages/backend/test-federation/test/user.test.ts
+  a9881cb2263f7e3b 489,504-505,525-526
+packages/frontend/src/accounts.ts
+  a9881cb2263f7e3b 9-10,24-37,58-59,68,71,162,164-167,169,205-207,213,273,294
+packages/sw/src/sw.ts
+  a9881cb2263f7e3b 14,203
+packages/frontend/test/e2e/timeline-performance.spec.ts
+  a9881cb2263f7e3b 26,41
+packages/frontend/src/utility/image-compositor-functions/blockNoise.glsl
+  a9881cb2263f7e3b 20
+packages/backend/src/core/activitypub/models/ApNoteService.ts
+  a9881cb2263f7e3b 22,77,275
+packages/frontend/test/e2e/note-realtime.spec.ts
+  a9881cb2263f7e3b 69,76,79,86,89
+packages/backend/src/server/api/StreamingApiServerService.ts
+  a9881cb2263f7e3b 15,21,36-38,66,104,109-133,140,143,145-146,148,150,152,156-159,176-184,193,195,205,226-228,231-246,288-290
+packages/backend/src/queue/processors/DeleteAccountProcessorService.test.ts
+  a9881cb2263f7e3b 1-71
+packages/backend/src/server/api/stream/Connection.ts
+  a9881cb2263f7e3b 131-133,155,163-164,174-176,262,315-319,371,379
+packages/backend/test/e2e/antennas.ts
+  a9881cb2263f7e3b 59,96-98,504,507-515,518-522
+packages/backend/src/server/api/TokenRevocation.test.ts
+  a9881cb2263f7e3b 1-45
+packages/backend/src/server/oauth/OAuth2ProviderService.ts
+  a9881cb2263f7e3b 31,364,456,460-466,667
+packages/frontend/src/signout.ts
+  a9881cb2263f7e3b 21-29
+packages/frontend/test/e2e/account-session.spec.ts
+  a9881cb2263f7e3b 1-124
+packages/backend/src/core/PollVoteService.test.ts
+  a9881cb2263f7e3b 21,27,469-503
+packages/backend/test/e2e/users.ts
+  a9881cb2263f7e3b 32,154,301
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8-ntes.10",
+  "base_commit_sha": "2edface7ab141be50eac66caa030700564013a44",
+  "prompts": {
+    "a9881cb2263f7e3b": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1d92c-ea12-7fa2-a8c3-ea3031e978fa",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "Natsuki-Kaede",
+      "messages": [],
+      "total_additions": 3993,
+      "total_deletions": 559,
+      "accepted_lines": 2624,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "packages/backend/src/server/api/stream/channels/chat-room.test.ts": {
+          "additions": 119,
+          "deletions": 5,
+          "accepted_lines": 114
+        },
+        "test/e2e/antennas.ts": {
+          "additions": 793
+        },
+        "packages/frontend/src/utility/image-compositor-functions/blur.glsl": {
+          "deletions": 1
+        },
+        "packages/backend/test/e2e/users.ts": {
+          "additions": 3,
+          "deletions": 2,
+          "accepted_lines": 3
+        },
+        "packages/frontend/src/boot/common.ts": {
+          "additions": 2,
+          "deletions": 1,
+          "accepted_lines": 2
+        },
+        "packages/frontend-shared/js/stored-accounts.ts": {
+          "additions": 33,
+          "deletions": 2,
+          "accepted_lines": 31
+        },
+        "packages/frontend/test/e2e/timeline-pagination.spec.ts": {
+          "additions": 2,
+          "deletions": 1,
+          "accepted_lines": 2
+        },
+        "packages/backend/src/queue/QueueProcessorService.test.ts": {
+          "additions": 52,
+          "accepted_lines": 52
+        },
+        ".codex/reviews/2026-11-14-pari-dev/frontend.md": {
+          "additions": 51,
+          "accepted_lines": 51
+        },
+        "packages/frontend/src/utility/image-compositor-functions/zoomLines.glsl": {
+          "deletions": 2
+        },
+        "packages/frontend/src/utility/image-compositor-functions/colorAdjust.glsl": {
+          "deletions": 2
+        },
+        "packages/backend/src/server/ActivityPubServerService.ts": {
+          "additions": 2,
+          "deletions": 2,
+          "accepted_lines": 2
+        },
+        ".codex/runtime/regression-redis.pid": {
+          "additions": 1
+        },
+        "src/server/api/stream/channels/chat-room.ts": {
+          "additions": 108
+        },
+        "packages/backend/src/server/api/endpoints/users/following.ts": {
+          "deletions": 1
+        },
+        "packages/frontend/test/unit/signout.test.ts": {
+          "additions": 73,
+          "accepted_lines": 73
+        },
+        "packages/backend/test-federation/test/user.test.ts": {
+          "additions": 5,
+          "deletions": 15,
+          "accepted_lines": 5
+        },
+        ".codex/reviews/2026-11-14-pari-dev/misskey-api-review-probe.cjs": {
+          "additions": 30,
+          "accepted_lines": 30
+        },
+        "packages/backend/src/queue/QueueProcessorService.ts": {
+          "additions": 2,
+          "deletions": 2,
+          "accepted_lines": 2
+        },
+        "packages/frontend/src/utility/image-compositor-functions/colorClamp.glsl": {
+          "deletions": 3
+        },
+        "packages/frontend/test/e2e/timeline-performance.spec.ts": {
+          "additions": 2,
+          "deletions": 1,
+          "accepted_lines": 2
+        },
+        "packages/backend/src/server/api/AuthenticateService.ts": {
+          "additions": 14,
+          "deletions": 13,
+          "accepted_lines": 13
+        },
+        "packages/backend/src/server/file/FileServerUtils.test.ts": {
+          "additions": 67,
+          "accepted_lines": 67
+        },
+        ".codex/reviews/2026-11-14-pari-dev/README.md": {
+          "additions": 103,
+          "deletions": 1,
+          "accepted_lines": 102
+        },
+        "packages/sw/src/sw.ts": {
+          "additions": 2,
+          "deletions": 2,
+          "accepted_lines": 2
+        },
+        ".codex/runtime/env.sh": {
+          "additions": 1,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/server/api/stream/Connection.ts": {
+          "additions": 17,
+          "deletions": 8,
+          "accepted_lines": 17
+        },
+        "packages/frontend/src/utility/get-account-from-id.ts": {
+          "additions": 3,
+          "deletions": 2,
+          "accepted_lines": 3
+        },
+        "packages/frontend/src/signout.ts": {
+          "additions": 9,
+          "deletions": 1,
+          "accepted_lines": 9
+        },
+        "packages/backend/src/core/PollVoteService.ts": {
+          "additions": 5,
+          "deletions": 5,
+          "accepted_lines": 5
+        },
+        "packages/backend/test/e2e/federation-consistency.ts": {
+          "additions": 140,
+          "deletions": 2,
+          "accepted_lines": 138
+        },
+        "packages/backend/src/server/api/endpoints/i/regenerate-token.ts": {
+          "additions": 1,
+          "deletions": 1,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/core/GlobalEventService.ts": {
+          "additions": 10,
+          "deletions": 4,
+          "accepted_lines": 10
+        },
+        "packages/backend/test/unit/RoleService.ts": {
+          "additions": 15,
+          "accepted_lines": 15
+        },
+        "packages/backend/src/core/activitypub/ApInboxService.ts": {
+          "additions": 5,
+          "deletions": 4,
+          "accepted_lines": 4
+        },
+        "packages/frontend/src/utility/image-compositor-functions/blockNoise.glsl": {
+          "additions": 1,
+          "deletions": 1,
+          "accepted_lines": 1
+        },
+        "packages/frontend/src/store.ts": {
+          "additions": 4,
+          "accepted_lines": 4
+        },
+        "packages/backend/test-federation/test/block.test.ts": {
+          "additions": 22,
+          "deletions": 45,
+          "accepted_lines": 22
+        },
+        ".codex/reviews/2026-11-14-pari-dev/backend.md": {
+          "additions": 83,
+          "accepted_lines": 83
+        },
+        "scripts/check-spdx.mjs": {
+          "additions": 1,
+          "deletions": 43,
+          "accepted_lines": 1
+        },
+        "scripts/check-shipping.mjs": {
+          "additions": 1,
+          "deletions": 35,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/core/ChatService.ts": {
+          "additions": 2,
+          "deletions": 1,
+          "accepted_lines": 1
+        },
+        ".codex/runtime/browser-redis.pid": {
+          "additions": 1
+        },
+        "packages/backend/src/queue/processors/DeleteAccountProcessorService.ts": {
+          "additions": 4,
+          "deletions": 2,
+          "accepted_lines": 4
+        },
+        ".codex/runtime/node-shasums.txt": {
+          "additions": 34,
+          "accepted_lines": 34
+        },
+        "packages/backend/test/unit/server/FileServerService.ts": {
+          "additions": 38,
+          "deletions": 13,
+          "accepted_lines": 37
+        },
+        "packages/backend/src/core/ChannelFollowingService.ts": {
+          "additions": 8,
+          "deletions": 5,
+          "accepted_lines": 8
+        },
+        "packages/backend/test/e2e/endpoints.ts": {
+          "additions": 6,
+          "deletions": 1,
+          "accepted_lines": 6
+        },
+        ".codex/runtime/bin/pnpm": {
+          "additions": 2,
+          "accepted_lines": 2
+        },
+        "packages/backend/src/core/QueueService.ts": {
+          "additions": 1,
+          "accepted_lines": 1
+        },
+        "packages/frontend/src/utility/image-compositor-functions/distort.glsl": {
+          "additions": 1,
+          "deletions": 1,
+          "accepted_lines": 1
+        },
+        ".codex/runtime/final-unit-redis.pid": {
+          "additions": 1
+        },
+        "packages/backend/src/server/api/StreamingApiServerService.ts": {
+          "additions": 88,
+          "deletions": 19,
+          "accepted_lines": 80
+        },
+        "packages/backend/src/core/activitypub/models/ApNoteService.test.ts": {
+          "additions": 27,
+          "accepted_lines": 27
+        },
+        ".codex/reviews/2026-11-14-pari-dev/fixes.md": {
+          "additions": 74,
+          "deletions": 3,
+          "accepted_lines": 71
+        },
+        "packages/backend/test-server/coverage.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/server/api/TokenRevocation.test.ts": {
+          "additions": 45,
+          "accepted_lines": 45
+        },
+        ".codex/runtime/federation/daemon.cjs": {
+          "additions": 8,
+          "deletions": 2,
+          "accepted_lines": 6
+        },
+        "packages/backend/test/e2e/streaming.ts": {
+          "additions": 51,
+          "deletions": 1,
+          "accepted_lines": 51
+        },
+        "packages/backend/src/server/api/StreamingApiServerService.test.ts": {
+          "additions": 134,
+          "deletions": 7,
+          "accepted_lines": 131
+        },
+        ".codex/reviews/2026-11-14-pari-dev/api.md": {
+          "additions": 65,
+          "accepted_lines": 65
+        },
+        ".codex/reviews/2026-11-14-pari-dev/misskey-frontend-review-probe.cjs": {
+          "additions": 57,
+          "accepted_lines": 57
+        },
+        "packages/frontend/src/accounts.ts": {
+          "additions": 34,
+          "deletions": 16,
+          "accepted_lines": 32
+        },
+        "packages/frontend/src/utility/image-compositor-functions/fill.glsl": {
+          "deletions": 2
+        },
+        "packages/frontend/src/components/grid/MkDataCell.vue": {
+          "deletions": 1
+        },
+        "packages/backend/src/queue/processors/DeliverProcessorService.ts": {
+          "additions": 4,
+          "deletions": 15,
+          "accepted_lines": 4
+        },
+        "packages/backend/src/core/activitypub/ApInboxService.test.ts": {
+          "additions": 79,
+          "deletions": 5,
+          "accepted_lines": 74
+        },
+        "packages/backend/src/queue/processors/DeliverProcessorService.test.ts": {
+          "additions": 52,
+          "accepted_lines": 52
+        },
+        "packages/backend/src/queue/processors/InboxProcessorService.ts": {
+          "additions": 5,
+          "deletions": 3,
+          "accepted_lines": 4
+        },
+        "packages/backend/src/server/FileServerService.ts": {
+          "additions": 1,
+          "deletions": 1,
+          "accepted_lines": 1
+        },
+        ".codex/runtime/regression.yml": {
+          "additions": 20,
+          "deletions": 1,
+          "accepted_lines": 19
+        },
+        "packages/backend/src/server/oauth/OAuth2ProviderService.ts": {
+          "additions": 15,
+          "deletions": 3,
+          "accepted_lines": 14
+        },
+        "packages/backend/src/queue/processors/DeleteAccountProcessorService.test.ts": {
+          "additions": 71,
+          "accepted_lines": 71
+        },
+        "packages/frontend/test/unit/account-storage.test.ts": {
+          "additions": 154,
+          "deletions": 10,
+          "accepted_lines": 144
+        },
+        "scripts/dev.mjs": {
+          "additions": 14,
+          "deletions": 27,
+          "accepted_lines": 14
+        },
+        "packages/backend/src/server/api/AuthenticateService.test.ts": {
+          "additions": 58,
+          "accepted_lines": 58
+        },
+        "packages/backend/src/core/activitypub/models/ApNoteService.ts": {
+          "additions": 3,
+          "deletions": 5,
+          "accepted_lines": 3
+        },
+        "packages/frontend/src/utility/watermark/watermark.glsl": {
+          "additions": 24,
+          "deletions": 31,
+          "accepted_lines": 24
+        },
+        ".codex/runtime/browser.yml": {
+          "additions": 19,
+          "accepted_lines": 19
+        },
+        "packages/backend/src/core/RoleService.ts": {
+          "additions": 2,
+          "deletions": 2,
+          "accepted_lines": 2
+        },
+        "packages/sw/src/scripts/get-account-from-id.ts": {
+          "additions": 7,
+          "deletions": 8,
+          "accepted_lines": 7
+        },
+        "packages/misskey-js/etc/misskey-js.api.md": {
+          "additions": 1,
+          "deletions": 1,
+          "accepted_lines": 1
+        },
+        "packages/backend/test/e2e/block.ts": {
+          "additions": 1,
+          "deletions": 1,
+          "accepted_lines": 1
+        },
+        "packages/frontend/test/unit/boot-deferred.test.ts": {
+          "additions": 1,
+          "deletions": 1,
+          "accepted_lines": 1
+        },
+        ".codex/reviews/2026-11-14-pari-dev/misskey-comment-parity.cjs": {
+          "additions": 20,
+          "accepted_lines": 20
+        },
+        "packages/misskey-js/src/streaming.ts": {
+          "deletions": 1
+        },
+        "packages/frontend/src/preferences/utility.ts": {
+          "additions": 2,
+          "deletions": 2,
+          "accepted_lines": 2
+        },
+        ".codex/reviews/2026-11-14-pari-dev/misskey-backend-review-repro.cjs": {
+          "additions": 53,
+          "accepted_lines": 53
+        },
+        "scripts/lib/git.mjs": {
+          "deletions": 14
+        },
+        "scripts/start.mjs": {
+          "additions": 1,
+          "deletions": 7,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/server/api/stream/Connection.test.ts": {
+          "additions": 64,
+          "accepted_lines": 64
+        },
+        "packages/backend/src/server/api/stream/channels/chat-room.ts": {
+          "additions": 48,
+          "deletions": 14,
+          "accepted_lines": 43
+        },
+        "packages/backend/test/e2e/antennas.ts": {
+          "additions": 22,
+          "deletions": 6,
+          "accepted_lines": 21
+        },
+        ".codex/reviews/2026-11-14-pari-dev/validation-final/api-fixes.md": {
+          "additions": 44,
+          "accepted_lines": 44
+        },
+        "packages/frontend/test/e2e/note-realtime.spec.ts": {
+          "additions": 6,
+          "deletions": 5,
+          "accepted_lines": 5
+        },
+        "packages/backend/src/core/QueueService.test.ts": {
+          "additions": 27,
+          "accepted_lines": 27
+        },
+        "packages/frontend/src/utility/image-compositor-functions/pixelate.glsl": {
+          "additions": 1,
+          "deletions": 1,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/server/file/FileServerProxyHandler.ts": {
+          "additions": 8,
+          "deletions": 21,
+          "accepted_lines": 6
+        },
+        "packages/backend/src/server/file/FileServerUtils.ts": {
+          "additions": 20,
+          "deletions": 8,
+          "accepted_lines": 19
+        },
+        ".codex/reviews/2026-11-14-pari-dev/validation-final/api-mechanical-review.json": {
+          "additions": 20,
+          "accepted_lines": 20
+        },
+        ".codex/runtime/final-unit.yml": {
+          "additions": 19,
+          "accepted_lines": 19
+        },
+        ".claude/skills/working-on-backend/scripts/prepare-generate.mjs": {
+          "additions": 2,
+          "deletions": 18,
+          "accepted_lines": 2
+        },
+        "packages/backend/src/server/ActivityPubServerService.test.ts": {
+          "additions": 65,
+          "accepted_lines": 65
+        },
+        "packages/frontend/test/e2e/account-session.spec.ts": {
+          "additions": 127,
+          "deletions": 3,
+          "accepted_lines": 124
+        },
+        "packages/backend/src/server/api/stream/channel.ts": {
+          "additions": 1,
+          "deletions": 1,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/core/PollVoteService.test.ts": {
+          "additions": 40,
+          "deletions": 2,
+          "accepted_lines": 39
+        },
+        "packages/backend/src/core/FederatedInstanceService.ts": {
+          "additions": 3,
+          "deletions": 2,
+          "accepted_lines": 3
+        },
+        "src/server/api/stream/Connection.ts": {
+          "additions": 399
+        },
+        "packages/backend/src/core/PollService.ts": {
+          "additions": 1,
+          "deletions": 57,
+          "accepted_lines": 1
+        },
+        ".vitest/json/output.json": {
+          "additions": 1
+        },
+        "packages/backend/src/server/api/endpoints/i/revoke-token.ts": {
+          "additions": 5,
+          "deletions": 1,
+          "accepted_lines": 4
+        }
+      }
+    }
+  }
+}
