@@ -11,10 +11,8 @@ window.onload = async () => {
 
 	const api = (endpoint, data = {}) => {
 		const promise = new Promise((resolve, reject) => {
-			// Append a credential
 			if (i) data.i = i;
 
-			// Send request
 			fetch(endpoint.indexOf('://') > -1 ? endpoint : `/api/${endpoint}`, {
 				headers: {
 					'Content-Type': 'application/json'

@@ -4,8 +4,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 -->
 
 <template>
-<!-- このコンポーネントの要素のclassは親から利用されるのでむやみに弄らないこと -->
-<!-- フォルダの中にはカスタム絵文字だけ（Unicode絵文字もこっち） -->
 <section v-if="!hasChildSection" v-panel style="border-radius: 6px; border-bottom: 0.5px solid var(--MI_THEME-divider);">
 	<header class="_acrylic" @click="shown = !shown">
 		<i class="toggle ti-fw" :class="shown ? 'ti ti-chevron-down' : 'ti ti-chevron-up'"></i>
@@ -31,7 +29,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 		</button>
 	</div>
 </section>
-<!-- フォルダの中にはカスタム絵文字やフォルダがある -->
 <section v-else v-panel style="border-radius: 6px; border-bottom: 0.5px solid var(--MI_THEME-divider);">
 	<header class="_acrylic" @click="shown = !shown">
 		<i class="toggle ti-fw" :class="shown ? 'ti ti-chevron-down' : 'ti ti-chevron-up'"></i> <slot></slot> (<i class="ti ti-folder ti-fw"></i>:{{ customEmojiTree?.length }} <i class="ti ti-icons ti-fw"></i>:{{ emojis.length }})
@@ -92,7 +89,6 @@ const emojiExample = computed(() => emojis.value.at(0));
 
 const shown = ref(!!props.initialShown);
 
-/** @see MkEmojiPicker.vue */
 function computeButtonTitle(ev: PointerEvent): void {
 	const elm = ev.target as HTMLElement;
 	const emoji = elm.dataset.emoji as string;

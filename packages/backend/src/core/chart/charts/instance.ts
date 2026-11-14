@@ -18,9 +18,6 @@ import { ChartLoggerService } from '../ChartLoggerService.js';
 import { name, schema } from './entities/instance.js';
 import type { KVs } from '../core.js';
 
-/**
- * インスタンスごとのチャート
- */
 @Injectable()
 export default class InstanceChart extends Chart<typeof schema> { // eslint-disable-line import/no-default-export
 	constructor(

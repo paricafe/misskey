@@ -30,7 +30,6 @@ export class HomeTimelineChannel extends Channel {
 		private noteStreamingHidingService: NoteStreamingHidingService,
 	) {
 		super(request);
-		//this.onNote = this.onNote.bind(this);
 	}
 
 	@bindThis
@@ -48,12 +47,10 @@ export class HomeTimelineChannel extends Channel {
 		if (this.withFiles && (note.fileIds == null || note.fileIds.length === 0)) return;
 
 		if (note.channelId) {
-			// そのチャンネルをフォローしていない
 			if (!this.followingChannels.has(note.channelId)) {
 				return;
 			}
 		} else {
-			// その投稿のユーザーをフォローしていなかったら弾く
 			if (!isMe && !Object.hasOwn(this.following, note.userId)) return;
 		}
 
@@ -62,20 +59,16 @@ export class HomeTimelineChannel extends Channel {
 		if (note.reply) {
 			const reply = note.reply;
 			if (this.following[note.userId]?.withReplies) {
-				// 自分のフォローしていないユーザーの visibility: followers な投稿への返信は弾く
 				if (reply.visibility === 'followers' && !Object.hasOwn(this.following, reply.userId) && reply.userId !== this.user!.id) return;
 			} else {
-				// 「チャンネル接続主への返信」でもなければ、「チャンネル接続主が行った返信」でもなければ、「投稿者の投稿者自身への返信」でもない場合
 				if (reply.userId !== this.user!.id && !isMe && reply.userId !== note.userId) return;
 			}
 		}
 
-		// 純粋なリノート（引用リノートでないリノート）の場合
 		if (isRenotePacked(note) && !isQuotePacked(note) && note.renote) {
 			if (!this.withRenotes) return;
 			if (note.renote.reply) {
 				const reply = note.renote.reply;
-				// 自分のフォローしていないユーザーの visibility: followers な投稿への返信のリノートは弾く
 				if (reply.visibility === 'followers' && !Object.hasOwn(this.following, reply.userId) && reply.userId !== this.user!.id) return;
 			}
 		}
@@ -92,7 +85,6 @@ export class HomeTimelineChannel extends Channel {
 
 	@bindThis
 	public dispose() {
-		// Unsubscribe events
 		this.subscriber.off('notesStream', this.onNote);
 	}
 }

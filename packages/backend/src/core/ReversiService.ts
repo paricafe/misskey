@@ -25,7 +25,7 @@ import { Serialized } from '@/types.js';
 import { ReversiGameEntityService } from './entities/ReversiGameEntityService.js';
 import type { OnApplicationShutdown, OnModuleInit } from '@nestjs/common';
 
-const INVITATION_TIMEOUT_MS = 1000 * 20; // 20sec
+const INVITATION_TIMEOUT_MS = 1000 * 20;
 
 @Injectable()
 export class ReversiService implements OnApplicationShutdown, OnModuleInit {
@@ -67,9 +67,6 @@ export class ReversiService implements OnApplicationShutdown, OnModuleInit {
 		return {
 			startedAt: game.startedAt,
 			endedAt: game.endedAt,
-			// ゲームの途中からユーザーが変わることは無いので
-			//user1Id: game.user1Id,
-			//user2Id: game.user2Id,
 			user1Ready: game.user1Ready,
 			user2Ready: game.user2Ready,
 			black: game.black,
@@ -97,7 +94,6 @@ export class ReversiService implements OnApplicationShutdown, OnModuleInit {
 		}
 
 		if (!multiple) {
-			// 既にマッチしている対局が無いか探す(3分以内)
 			const games = await this.reversiGamesRepository.find({
 				where: [
 					{ id: MoreThan(this.idService.gen(Date.now() - 1000 * 60 * 3)), user1Id: me.id, user2Id: targetUser.id, isStarted: false },
@@ -111,7 +107,6 @@ export class ReversiService implements OnApplicationShutdown, OnModuleInit {
 			}
 		}
 
-		//#region 相手から既に招待されてないか確認
 		const invitations = await this.redisClient.zrange(
 			`reversi:matchSpecific:${me.id}`,
 			Date.now() - INVITATION_TIMEOUT_MS,
@@ -127,7 +122,6 @@ export class ReversiService implements OnApplicationShutdown, OnModuleInit {
 
 			return game;
 		}
-		//#endregion
 
 		const redisPipeline = this.redisClient.pipeline();
 		redisPipeline.zadd(`reversi:matchSpecific:${targetUser.id}`, Date.now(), me.id);
@@ -144,7 +138,6 @@ export class ReversiService implements OnApplicationShutdown, OnModuleInit {
 	@bindThis
 	public async matchAnyUser(me: MiUser, options: { noIrregularRules: boolean }, multiple = false): Promise<MiReversiGame | null> {
 		if (!multiple) {
-			// 既にマッチしている対局が無いか探す(3分以内)
 			const games = await this.reversiGamesRepository.find({
 				where: [
 					{ id: MoreThan(this.idService.gen(Date.now() - 1000 * 60 * 3)), user1Id: me.id, isStarted: false },
@@ -158,7 +151,6 @@ export class ReversiService implements OnApplicationShutdown, OnModuleInit {
 			}
 		}
 
-		//#region まず自分宛ての招待を探す
 		const invitations = await this.redisClient.zrange(
 			`reversi:matchSpecific:${me.id}`,
 			Date.now() - INVITATION_TIMEOUT_MS,
@@ -175,12 +167,11 @@ export class ReversiService implements OnApplicationShutdown, OnModuleInit {
 
 			return game;
 		}
-		//#endregion
 
 		const matchings = await this.redisClient.zrange(
 			'reversi:matchAny',
 			0,
-			2, // 自分自身のIDが入っている場合もあるので2つ取得
+			2,
 			'REV');
 
 		const items = matchings.filter(id => !id.startsWith(me.id));
@@ -269,7 +260,6 @@ export class ReversiService implements OnApplicationShutdown, OnModuleInit {
 		}
 
 		if (isBothReady) {
-			// 3秒後、両者readyならゲーム開始
 			setTimeout(async () => {
 				const freshGame = await this.get(game.id);
 				if (freshGame == null || freshGame.isStarted || freshGame.isEnded) return;
@@ -339,12 +329,10 @@ export class ReversiService implements OnApplicationShutdown, OnModuleInit {
 			.returning('*')
 			.execute()
 			.then((response) => response.raw[0]);
-		// キャッシュ効率化のためにユーザー情報は再利用
 		updatedGame.user1 = game.user1;
 		updatedGame.user2 = game.user2;
 		this.cacheGame(updatedGame);
 
-		//#region 盤面に最初から石がないなどして始まった瞬間に勝敗が決定する場合があるのでその処理
 		if (engine.isEnded) {
 			let winnerId;
 			if (engine.winner === true) {
@@ -359,7 +347,6 @@ export class ReversiService implements OnApplicationShutdown, OnModuleInit {
 
 			return;
 		}
-		//#endregion
 
 		this.redisClient.setex(`reversi:game:turnTimer:${game.id}:1`, updatedGame.timeLimitForEachTurn, '');
 
@@ -383,7 +370,6 @@ export class ReversiService implements OnApplicationShutdown, OnModuleInit {
 			.returning('*')
 			.execute()
 			.then((response) => response.raw[0]);
-		// キャッシュ効率化のためにユーザー情報は再利用
 		updatedGame.user1 = game.user1;
 		updatedGame.user2 = game.user2;
 		this.cacheGame(updatedGame);
@@ -577,7 +563,6 @@ export class ReversiService implements OnApplicationShutdown, OnModuleInit {
 	public async get(id: MiReversiGame['id']): Promise<MiReversiGame | null> {
 		const cached = await this.redisClient.get(`reversi:game:cache:${id}`);
 		if (cached != null) {
-			// TODO: この辺りのデシリアライズ処理をどこか別のサービスに切り出したい
 			const parsed = JSON.parse(cached) as Serialized<MiReversiGame>;
 			return {
 				...parsed,

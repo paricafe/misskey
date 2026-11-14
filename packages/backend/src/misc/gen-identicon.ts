@@ -3,17 +3,12 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-/**
- * Identicon generator
- * https://en.wikipedia.org/wiki/Identicon
- */
-
 import * as zlib from 'node:zlib';
 import gen from 'random-seed';
 
-const size = 128; // px
-const n = 5; // resolution
-const margin = 34; // size - margin * 2 / 整数でないといけないので明示
+const size = 128;
+const n = 5;
+const margin = 34;
 const colors = [
 	['#FF512F', '#DD2476'],
 	['#FF61D2', '#FE9090'],
@@ -41,22 +36,19 @@ const actualSize = size - (margin * 2);
 const cellSize = actualSize / n;
 const sideN = Math.floor(n / 2);
 
-// 背景のグラデーションは x + y の値だけで決まるので、パレットの 0 〜 (size * 2 - 2) 番に
-// x + y ごとの色を、末尾に白を割り当てたインデックスカラーで表現する
 const gradientSteps = (size * 2) - 1;
 const whiteIndex = gradientSteps;
-const paletteSize = gradientSteps + 1; // 256色に収まる必要がある
+const paletteSize = gradientSteps + 1;
 
-// 各行の先頭にフィルタタイプの1バイトを持つ生データ
 const stride = 1 + size;
 const paethFilter = 4;
 
 const pngSignature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 const pngHeader = Buffer.alloc(13);
-pngHeader.writeUInt32BE(size, 0); // width
-pngHeader.writeUInt32BE(size, 4); // height
-pngHeader[8] = 8; // bit depth
-pngHeader[9] = 3; // color type: indexed-color
+pngHeader.writeUInt32BE(size, 0);
+pngHeader.writeUInt32BE(size, 4);
+pngHeader[8] = 8;
+pngHeader[9] = 3;
 
 function parseHexColor(color: string): [number, number, number] {
 	return [
@@ -85,24 +77,18 @@ function paethPredictor(a: number, b: number, c: number): number {
 	return c;
 }
 
-/**
- * Generate buffer of an identicon by seed
- */
 export function genIdenticon(seed: string): Buffer {
 	const rand = gen.create(seed);
 
 	const [bgFrom, bgTo] = colors[rand(colors.length)].map(parseHexColor);
 
-	// side bitmap (filled by false)
 	const side: boolean[][] = new Array(sideN);
 	for (let i = 0; i < side.length; i++) {
 		side[i] = new Array(n).fill(false);
 	}
 
-	// 1*n (filled by false)
 	const center: boolean[] = new Array(n).fill(false);
 
-	// eslint:disable-next-line:prefer-for-of
 	for (let x = 0; x < side.length; x++) {
 		for (let y = 0; y < side[x].length; y++) {
 			side[x][y] = rand(3) === 0;
@@ -113,7 +99,6 @@ export function genIdenticon(seed: string): Buffer {
 		center[i] = rand(3) === 0;
 	}
 
-	// 左上から右下への線形グラデーション (ピクセル中心で評価)
 	const palette = Buffer.alloc(paletteSize * 3, 0xff);
 	for (let i = 0; i < gradientSteps; i++) {
 		const t = (i + 1) / (size * 2);
@@ -129,7 +114,6 @@ export function genIdenticon(seed: string): Buffer {
 		}
 	}
 
-	// Draw
 	for (let x = 0; x < n; x++) {
 		for (let y = 0; y < n; y++) {
 			const isXCenter = x === ((n - 1) / 2);
@@ -149,7 +133,6 @@ export function genIdenticon(seed: string): Buffer {
 		}
 	}
 
-	// グラデーション部分はPaethフィルタでほぼ0になり、よく圧縮される
 	const scanlines = Buffer.alloc(stride * size);
 	for (let y = 0; y < size; y++) {
 		scanlines[y * stride] = paethFilter;

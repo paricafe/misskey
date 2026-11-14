@@ -3,7 +3,6 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-/** ドキュメントがアクティブになっていない間は実行を止めるsetInterval。戻り値の関数でdisposeする */
 export function createVisibilityAwareInterval(fn: () => void, interval: number, options: {
 	immediate?: boolean;
 } = {}): () => void {
@@ -24,8 +23,6 @@ export function createVisibilityAwareInterval(fn: () => void, interval: number, 
 				lastCalledAt = Date.now();
 			}
 		} else if (Date.now() - lastCalledAt >= interval) {
-			// もし前回の呼び出しからinterval以上の時間が経過していたら、即座に呼び出す
-			// （非アクティブ→アクティブに戻った場合など）
 			tick();
 		}
 		intervalId = window.setInterval(tick, interval);

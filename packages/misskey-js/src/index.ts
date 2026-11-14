@@ -17,9 +17,6 @@ export const rolePolicies = consts.rolePolicies;
 export const queueTypes = consts.queueTypes;
 export const reversiUpdateKeys = consts.reversiUpdateKeys;
 
-// api extractor not supported yet
-//export * as api from './api.js';
-//export * as entities from './entities.js';
 import * as api from './api.js';
 import * as entities from './entities.js';
 import * as acct from './acct.js';
@@ -27,7 +24,6 @@ import * as note from './note.js';
 import { nyaize } from './nyaize.js';
 export { api, entities, acct, note, nyaize };
 
-//#region standalone types
 import type { Endpoints } from './api.types.js';
 import type { StreamEvents, IStream, IChannelConnection } from './streaming.js';
 import type { Channels } from './streaming.types.js';
@@ -41,4 +37,3 @@ export type {
 	IStream,
 	IChannelConnection,
 };
-//#endregion

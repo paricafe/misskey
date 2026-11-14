@@ -260,12 +260,10 @@ export const ROUTE_DEF = [{
 		origin: 'origin',
 	},
 }, {
-	// Legacy Compatibility
 	path: '/authorize-follow',
 	redirect: '/lookup',
 	loginRequired: true,
 }, {
-	// Mastodon Compatibility
 	path: '/authorize_interaction',
 	redirect: '/lookup',
 	loginRequired: true,
@@ -608,7 +606,6 @@ export const ROUTE_DEF = [{
 	component: page(() => import('@/pages/debug.vue')),
 	loginRequired: false,
 }, {
-	// テスト用リダイレクト設定。ログイン中ユーザのプロフィールにリダイレクトする
 	path: '/redirect-test',
 	redirect: $i ? `@${$i.username}` : '/',
 	loginRequired: true,

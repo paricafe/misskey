@@ -62,7 +62,7 @@ describe('S3Service', () => {
 			await s3Service.upload({} as MiMeta, {
 				Bucket: 'fake',
 				Key: 'fake',
-				Body: 'x'.repeat(8 * 1024 * 1024 + 1), // デフォルトpartSizeにしている 8 * 1024 * 1024 を越えるサイズ
+				Body: 'x'.repeat(8 * 1024 * 1024 + 1),
 			});
 		});
 
@@ -82,7 +82,7 @@ describe('S3Service', () => {
 			await expect(s3Service.upload({} as MiMeta, {
 				Bucket: 'fake',
 				Key: 'fake',
-				Body: 'x'.repeat(8 * 1024 * 1024 + 1), // デフォルトpartSizeにしている 8 * 1024 * 1024 を越えるサイズ
+				Body: 'x'.repeat(8 * 1024 * 1024 + 1),
 			})).rejects.toThrow(Error);
 		});
 	});

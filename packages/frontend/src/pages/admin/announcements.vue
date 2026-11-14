@@ -211,7 +211,7 @@ async function del(announcement: (typeof announcements)['value'][number]) {
 
 async function archive(announcement: (typeof announcements)['value'][number]) {
 	if (announcement.id == null) return;
-	const { _id, id, autoArchiveAt, originalAutoArchiveAt, ...data } = announcement; // APIに不要な項目を消す
+	const { _id, id, autoArchiveAt, originalAutoArchiveAt, ...data } = announcement;
 	await os.apiWithDialog('admin/announcements/update', {
 		...data,
 		id,
@@ -223,7 +223,7 @@ async function archive(announcement: (typeof announcements)['value'][number]) {
 
 async function unarchive(announcement: (typeof announcements)['value'][number]) {
 	if (announcement.id == null) return;
-	const { _id, id, autoArchiveAt, originalAutoArchiveAt, ...data } = announcement; // APIに不要な項目を消す
+	const { _id, id, autoArchiveAt, originalAutoArchiveAt, ...data } = announcement;
 	const autoArchiveAtMs = toAutoArchiveAt(autoArchiveAt, originalAutoArchiveAt);
 	await os.apiWithDialog('admin/announcements/update', {
 		...data,
@@ -235,7 +235,7 @@ async function unarchive(announcement: (typeof announcements)['value'][number]) 
 }
 
 async function save(announcement: (typeof announcements)['value'][number]) {
-	const { _id, id, isActive, reads, autoArchiveAt, originalAutoArchiveAt, ...data } = announcement; // APIに不要な項目を消す
+	const { _id, id, isActive, reads, autoArchiveAt, originalAutoArchiveAt, ...data } = announcement;
 	const autoArchiveAtMs = toAutoArchiveAt(autoArchiveAt, originalAutoArchiveAt);
 	if (id == null) {
 		if (autoArchiveAtMs != null && (Number.isNaN(autoArchiveAtMs) || autoArchiveAtMs <= Date.now())) {

@@ -18,7 +18,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 		@paste.stop="paste"
 		@keydown="onKeydown"
 	>
-	<!-- FirefoxのTabフォーカスが想定外の挙動となるためtabindex="-1"を追加 https://github.com/misskey-dev/misskey/issues/10744 -->
 	<div ref="emojisEl" class="emojis" tabindex="-1">
 		<section class="result">
 			<div v-if="searchResultCustom.length > 0" class="body">
@@ -151,7 +150,7 @@ const props = withDefaults(defineProps<{
 	maxHeight?: number;
 	asDrawer?: boolean;
 	asWindow?: boolean;
-	asReactionPicker?: boolean; // 今は使われてないが将来的に使いそう
+	asReactionPicker?: boolean;
 	targetNote?: Misskey.entities.Note | null;
 }>(), {
 	showPinned: true,
@@ -237,10 +236,9 @@ watch(q, () => {
 		const exactMatch = emojis.find(emoji => emoji.name === newQ);
 		if (exactMatch) matches.add(exactMatch);
 
-		if (newQ.includes(' ')) { // AND検索
+		if (newQ.includes(' ')) {
 			const keywords = newQ.split(' ');
 
-			// 名前にキーワードが含まれている
 			for (const emoji of emojis) {
 				if (keywords.every(keyword => emoji.name.includes(keyword))) {
 					matches.add(emoji);
@@ -249,7 +247,6 @@ watch(q, () => {
 			}
 			if (matches.size >= max) return matches;
 
-			// 名前またはエイリアスにキーワードが含まれている
 			for (const emoji of emojis) {
 				if (keywords.every(keyword => emoji.name.includes(keyword) || emoji.aliases.some(alias => alias.includes(keyword)))) {
 					matches.add(emoji);
@@ -313,7 +310,7 @@ watch(q, () => {
 		const exactMatch = emojis.find(emoji => emoji.name === newQ);
 		if (exactMatch) matches.add(exactMatch);
 
-		if (newQ.includes(' ')) { // AND検索
+		if (newQ.includes(' ')) {
 			const keywords = newQ.split(' ');
 
 			for (const emoji of emojis) {
@@ -402,8 +399,6 @@ function getKey(emoji: string | Misskey.entities.EmojiSimple | UnicodeEmojiDef):
 
 function getDef(emoji: string): string | Misskey.entities.EmojiSimple | UnicodeEmojiDef {
 	if (emoji.includes(':')) {
-		// カスタム絵文字が存在する場合はその情報を持つオブジェクトを返し、
-		// サーバの管理画面から削除された等で情報が見つからない場合は名前の文字列をそのまま返しておく（undefinedを返すとエラーになるため）
 		const name = emoji.replaceAll(':', '');
 		return customEmojisMap.get(name) ?? emoji;
 	} else {
@@ -411,7 +406,6 @@ function getDef(emoji: string): string | Misskey.entities.EmojiSimple | UnicodeE
 	}
 }
 
-/** @see MkEmojiPicker.section.vue */
 function computeButtonTitle(ev: PointerEvent): void {
 	const elm = ev.target as HTMLElement;
 	const emoji = elm.dataset.emoji as string;
@@ -434,7 +428,6 @@ function chosen(emoji: string | Misskey.entities.EmojiSimple | UnicodeEmojiDef, 
 
 	haptic();
 
-	// 最近使った絵文字更新
 	if (!pinned.value?.includes(key)) {
 		let recents = store.s.recentlyUsedEmojis;
 		recents = recents.filter((emoji) => emoji !== key);
@@ -444,9 +437,6 @@ function chosen(emoji: string | Misskey.entities.EmojiSimple | UnicodeEmojiDef, 
 }
 
 function input(): void {
-	// Using custom input event instead of v-model to respond immediately on
-	// Android, where composition happens on all languages
-	// (v-model does not update during composition)
 	q.value = searchEl.value?.value.trim() ?? '';
 }
 
@@ -710,9 +700,6 @@ defineExpose({
 			}
 
 			> header {
-				/*position: sticky;
-				top: 0;
-				left: 0;*/
 				height: 32px;
 				line-height: 32px;
 				z-index: 2;

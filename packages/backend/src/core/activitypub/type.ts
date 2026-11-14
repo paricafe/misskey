@@ -39,38 +39,23 @@ export interface IObject {
 	height?: number;
 }
 
-/**
- * Get array of ActivityStreams Objects id
- */
 export function getApIds(value: ApObject | undefined): string[] {
 	if (value == null) return [];
 	const array = Array.isArray(value) ? value : [value];
 	return array.map(x => getApId(x));
 }
 
-/**
- * Get first ActivityStreams Object id
- */
 export function getOneApId(value: ApObject): string {
 	const firstOne = Array.isArray(value) ? value[0] : value;
 	return getApId(firstOne);
 }
 
-/**
- * Get ActivityStreams Object id
- */
 export function getApId(value: string | IObject | undefined): string {
 	if (typeof value === 'string') return value;
 	if (value != null && typeof value.id === 'string') return value.id;
 	throw new Error('cannot determine id');
 }
 
-/**
- * Get ActivityStreams Object type
- *
- * タイプ判定ができなかった場合に、あえてエラーではなくnullを返すようにしている。
- * 詳細: https://github.com/misskey-dev/misskey/issues/14239
- */
 export function getApType(value: IObject): string | null {
 	if (typeof value.type === 'string') return value.type;
 	if (Array.isArray(value.type) && typeof value.type[0] === 'string') return value.type[0];
@@ -89,11 +74,9 @@ export function getApHrefNullable(value: string | IObject | undefined): string |
 }
 
 export interface IActivity extends IObject {
-	//type: 'Activity';
 	actor: IObject | string;
 	object: IObject | string;
 	target?: IObject | string;
-	/** LD-Signature */
 	signature?: {
 		type: string;
 		created: Date;
@@ -184,7 +167,7 @@ export interface IActor extends IObject {
 	alsoKnownAs?: string[];
 	discoverable?: boolean;
 	inbox: string;
-	sharedInbox?: string;	// 後方互換性のため
+	sharedInbox?: string;
 	publicKey?: {
 		id: string;
 		publicKeyPem: string;
@@ -245,8 +228,6 @@ export interface IApEmoji extends IObject {
 	type: 'Emoji';
 	name: string;
 	updated: string;
-	// Misskey拡張。後方互換性のためにoptional。
-	// 将来の拡張性を考慮してobjectにしている
 	_misskey_license?: {
 		freeText: string | null;
 	};

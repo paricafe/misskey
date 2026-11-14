@@ -44,7 +44,6 @@ import { normalizeTag } from '@/misc/normalize-tag.js';
 export const MAX_NOTE_HISTORY_REVISIONS = 100;
 export const MAX_NOTE_HISTORY_BYTES = 1024 * 1024;
 export const NOTE_HISTORY_LIMIT_ERROR_ID = '8a2c5b6f-8e2b-4f1d-a5d9-f2b96c5b0d34';
-// Shared with NoteCreateService so the inbox processor treats it as a rejected note.
 export const NOTE_PROHIBITED_WORDS_ERROR_ID = '689ee33f-f97c-479a-ac49-1b9f8140af99';
 export const NOTE_SENSITIVE_WORDS_ERROR_ID = '3f0e7c8a-5b2d-4c1e-9a6f-8d4b2e7c1a90';
 export const NOTE_NOT_FOUND_ERROR_ID = '512d8fe8-453e-463c-bf87-5b795293dc0c';
@@ -113,12 +112,6 @@ export class NoteUpdateService {
 		private utilityService: UtilityService,
 	) {}
 
-	/**
-	 * Update note
-	 * @param user Note creator
-	 * @param note Note to update
-	 * @param data New note info
-	 */
 	async update(
 		user: { id: MiUser['id']; uri: MiUser['uri']; host: MiUser['host']; isBot: MiUser['isBot']; },
 		note: MiNote,
@@ -148,7 +141,6 @@ export class NoteUpdateService {
 		)) {
 			throw new IdentifiableError(NOTE_PROHIBITED_WORDS_ERROR_ID, 'Note contains prohibited words');
 		}
-		// An edit cannot downgrade visibility: the note may already be in public timelines.
 		const sensitiveWordsTarget = data.cw ?? data.text ?? '';
 		if (
 			user.host == null && note.visibility === 'public' && note.channelId == null && meta.sensitiveWords.length > 0 &&
@@ -175,7 +167,6 @@ export class NoteUpdateService {
 			: [];
 		const mentionTokens = [data.text, data.cw, ...pollChoices].flatMap(text => text ? mfm.parse(text) : []);
 		let mentionedUsers = data.apMentions ?? await resolveNoteMentions(user.host, mentionTokens, this.remoteUserResolveService.resolveUser);
-		// The reply author and direct recipients remain part of the immutable audience.
 		const audienceIds = [...new Set([...(note.visibleUserIds ?? []), ...(note.replyUserId && note.replyUserId !== user.id ? [note.replyUserId] : [])])];
 		const missingAudienceIds = audienceIds.filter(id => !mentionedUsers.some(mentioned => mentioned.id === id));
 		if (missingAudienceIds.length > 0) mentionedUsers.push(...await this.usersRepository.findBy({ id: In(missingAudienceIds) }));
@@ -187,8 +178,6 @@ export class NoteUpdateService {
 			host: mentioned.host,
 		})));
 
-		// Keep this transaction DB-local. ActivityPub actor, attachment, and emoji
-		// resolution must be completed by the caller before entering it.
 		const result = await this.notesRepository.manager.transaction(async transactionalEntityManager => {
 			const transactionalNotesRepository = transactionalEntityManager.getRepository(MiNote);
 			const lockedRow = await transactionalNotesRepository.findOne({
@@ -279,7 +268,6 @@ export class NoteUpdateService {
 			(note.history?.some(revision => revision.createdAt === updatedAt.toISOString()) ?? false);
 	}
 
-	/** The history column is not selected by default; load it for edit checks and snapshots. */
 	async withHistory<T extends Pick<MiNote, 'id'>>(
 		note: T,
 		notesRepository: Pick<NotesRepository, 'findOne'> = this.notesRepository,
@@ -396,13 +384,11 @@ export class NoteUpdateService {
 	private async deliverToConcerned(user: { id: MiLocalUser['id']; host: null; }, note: MiNote, noteActivity: any) {
 		const dm = this.apDeliverManagerService.createDeliverManager(user, noteActivity);
 
-		// Earlier edits may have delivered the note to users who are no longer mentioned.
 		const legacyRevisions = (note.history ?? []).filter(revision => revision.mentions == null);
 		const tokens = legacyRevisions.flatMap(revision =>
 			[revision.text, revision.cw].flatMap(text => text ? mfm.parse(text) : []));
 		const mentionedUsers = await resolveNoteMentions(user.host, tokens, this.remoteUserResolveService.resolveUser);
 
-		// Users mentioned before this edit already have the note, so they need the Update too.
 		const mentionIds = new Set([...note.mentions, ...(note.history ?? []).flatMap(revision => revision.mentions ?? [])]);
 		const previouslyMentionedIds = [...mentionIds].filter(id => !mentionedUsers.some(u => u.id === id));
 		if (previouslyMentionedIds.length > 0) {
@@ -419,25 +405,20 @@ export class NoteUpdateService {
 			}
 		}
 
-		// メンションされたリモートユーザーに配送
 		for (const u of mentionedUsers.filter(u => this.userEntityService.isRemoteUser(u))) {
 			dm.addDirectRecipe(u as MiRemoteUser);
 		}
 
-		// The note is loaded without relations, so use the denormalized author columns.
-		// 投稿がリプライかつリプライ先の投稿の投稿者がリモートユーザーなら配送
 		if (note.replyUserId != null && note.replyUserHost != null) {
 			const u = await this.usersRepository.findOneBy({ id: note.replyUserId });
 			if (u && this.userEntityService.isRemoteUser(u)) dm.addDirectRecipe(u);
 		}
 
-		// 投稿がRenoteかつRenote元の投稿の投稿者がリモートユーザーなら配送
 		if (note.renoteUserId != null && note.renoteUserHost != null) {
 			const u = await this.usersRepository.findOneBy({ id: note.renoteUserId });
 			if (u && this.userEntityService.isRemoteUser(u)) dm.addDirectRecipe(u);
 		}
 
-		// フォロワーに配送
 		if (['public', 'home', 'followers'].includes(note.visibility)) {
 			dm.addFollowersRecipe();
 		}

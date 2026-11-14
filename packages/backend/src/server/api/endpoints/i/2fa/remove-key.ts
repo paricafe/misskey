@@ -71,13 +71,11 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				throw new ApiError(meta.errors.incorrectPassword);
 			}
 
-			// Make sure we only delete the user's own creds
 			await this.userSecurityKeysRepository.delete({
 				userId: me.id,
 				id: ps.credentialId,
 			});
 
-			// 使われているキーがなくなったらパスワードレスログインをやめる
 			const keyCount = await this.userSecurityKeysRepository.count({
 				where: {
 					userId: me.id,
@@ -95,7 +93,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				});
 			}
 
-			// Publish meUpdated event
 			this.globalEventService.publishMainStream(me.id, 'meUpdated', await this.userEntityService.pack(me.id, me, {
 				schema: 'MeDetailed',
 				includeSecrets: true,

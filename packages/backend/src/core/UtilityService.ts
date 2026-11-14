@@ -40,8 +40,6 @@ export class UtilityService {
 		return this.punyHost(uri) === this.toPuny(this.config.host);
 	}
 
-	// メールアドレスのバリデーションを行う
-	// https://html.spec.whatwg.org/multipage/input.html#valid-e-mail-address
 	@bindThis
 	public validateEmailFormat(email: string): boolean {
 		const regexp = /^[a-zA-Z0-9.!#$%&'*+\/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
@@ -73,10 +71,6 @@ export class UtilityService {
 		pollChoices?: string[] | null;
 		others?: string[] | null;
 	}): string {
-		/**
-		 * ノートの内容を結合してキーワードチェック用の文字列を生成する
-		 * cwとtextは内容が繋がっているかもしれないので間に何も入れずにチェックする
-		 */
 		return `${content.cw ?? ''}${content.text ?? ''}\n${(content.pollChoices ?? []).join('\n')}\n${(content.others ?? []).join('\n')}`;
 	}
 
@@ -88,18 +82,14 @@ export class UtilityService {
 		const regexpregexp = /^\/(.+)\/(.*)$/;
 
 		const matched = keyWords.some(filter => {
-			// represents RegExp
 			const regexp = filter.match(regexpregexp);
-			// This should never happen due to input sanitisation.
 			if (!regexp) {
 				const words = filter.split(' ');
 				return words.every(keyword => text.includes(keyword));
 			}
 			try {
-				// TODO: RE2インスタンスをキャッシュ
 				return new RE2(regexp[1], regexp[2]).test(text);
 			} catch (_) {
-				// This should never happen due to input sanitisation.
 				return false;
 			}
 		});
@@ -151,7 +141,6 @@ export class UtilityService {
 	public isDeliverSuspendedSoftware(software: Pick<MiInstance, 'softwareName' | 'softwareVersion'>): SoftwareSuspension | undefined {
 		if (software.softwareName == null) return undefined;
 		if (software.softwareVersion == null) {
-			// software version is null; suspend iff versionRange is *
 			return this.meta.deliverSuspendedSoftware.find(x =>
 				x.software === software.softwareName
 				&& x.versionRange.trim() === '*');

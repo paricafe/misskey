@@ -52,7 +52,6 @@ export class FetchInstanceMetadataService {
 	}
 
 	@bindThis
-	// public for test
 	public async tryLock(host: string): Promise<DistributedLock | null> {
 		try {
 			return await acquireDistributedLock(this.redisClient, `fetch-instance-metadata:${host}`, 30_000, 1, 0);
@@ -75,7 +74,6 @@ export class FetchInstanceMetadataService {
 				const _instance = await this.federatedInstanceService.fetchOrRegister(host);
 				const now = Date.now();
 				if (_instance && _instance.infoUpdatedAt && (now - _instance.infoUpdatedAt.getTime() < 1000 * 60 * 60 * 24)) {
-					// unlock at the finally caluse
 					return;
 				}
 			}
@@ -202,7 +200,6 @@ export class FetchInstanceMetadataService {
 		const url = 'https://' + instance.host;
 
 		if (doc) {
-			// https://github.com/misskey-dev/misskey/pull/8220#issuecomment-1025104043
 			const href = Array.from(doc.getElementsByTagName('link')).reverse().find(link => link.attributes.rel === 'icon')?.attributes.href;
 
 			if (href) {
@@ -233,9 +230,7 @@ export class FetchInstanceMetadataService {
 		if (doc) {
 			const url = 'https://' + instance.host;
 
-			// https://github.com/misskey-dev/misskey/pull/8220#issuecomment-1025104043
 			const links = Array.from(doc.getElementsByTagName('link')).reverse();
-			// https://github.com/misskey-dev/misskey/pull/8220/files/0ec4eba22a914e31b86874f12448f88b3e58dd5a#r796487559
 			const href =
 				[
 					links.find(link => link.attributes.rel?.split(/\s+/).includes('apple-touch-icon-precomposed'))?.attributes.href,

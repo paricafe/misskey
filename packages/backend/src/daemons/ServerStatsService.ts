@@ -28,9 +28,6 @@ export class ServerStatsService implements OnApplicationShutdown {
 	) {
 	}
 
-	/**
-	 * Report server stats regularly
-	 */
 	@bindThis
 	public async start(): Promise<void> {
 		if (!this.meta.enableServerMachineStats) return;
@@ -85,7 +82,6 @@ export class ServerStatsService implements OnApplicationShutdown {
 	}
 }
 
-// CPU STAT
 function cpuUsage(): Promise<number> {
 	return new Promise((res, rej) => {
 		osUtils.cpuUsage((cpuUsage) => {
@@ -94,14 +90,12 @@ function cpuUsage(): Promise<number> {
 	});
 }
 
-// MEMORY STAT
 async function mem() {
 	const si = await import('systeminformation');
 	const data = await si.mem();
 	return data;
 }
 
-// NETWORK STAT
 async function net() {
 	const si = await import('systeminformation');
 	const iface = await si.networkInterfaceDefault();
@@ -109,7 +103,6 @@ async function net() {
 	return data[0];
 }
 
-// FS STAT
 async function fs() {
 	const si = await import('systeminformation');
 	return await si.disksIO().catch(() => ({ rIO_sec: 0, wIO_sec: 0 }));

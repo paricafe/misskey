@@ -56,7 +56,6 @@ export class RateLimiterService {
 			return null;
 		}
 
-		// Short-term limit
 		if (limitation.minInterval != null) {
 			const info = await this.checkLimiter({
 				id: `${actor}:${limitation.key}:min`,
@@ -72,7 +71,6 @@ export class RateLimiterService {
 			}
 		}
 
-		// Long term limit
 		if (limitation.duration != null && limitation.max != null) {
 			const info = await this.checkLimiter({
 				id: `${actor}:${limitation.key}`,

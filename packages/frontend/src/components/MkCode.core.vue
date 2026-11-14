@@ -55,11 +55,8 @@ async function fetchLanguage(to: string): Promise<void> {
 	const language = to as BundledLanguage;
 	let resolvedLang: BundledLanguage | 'aiscript' = language;
 
-	// Check for the loaded languages, and load the language if it's not loaded yet.
 	if (!highlighter.getLoadedLanguages().includes(language)) {
-		// Check if the language is supported by Shiki
 		const bundles = bundledLanguagesInfo.filter((bundle) => {
-			// Languages are specified by their id, they can also have aliases (i. e. "js" and "javascript")
 			return bundle.id === language || bundle.aliases?.includes(language);
 		});
 		if (bundles.length > 0) {
@@ -70,7 +67,6 @@ async function fetchLanguage(to: string): Promise<void> {
 		}
 	}
 
-	// Discard the result if the lang prop has changed while loading the language
 	if (props.lang !== to) return;
 	codeLang.value = resolvedLang;
 }

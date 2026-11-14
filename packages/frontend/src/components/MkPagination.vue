@@ -8,7 +8,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 	<div>
 		<MkPaginationControl v-if="props.withControl" :paginator="paginator" style="margin-bottom: 10px"/>
 
-		<!-- :css="prefer.s.animation" にしたいけどバグる(おそらくvueのバグ) https://github.com/misskey-dev/misskey/issues/16078 -->
 		<Transition
 			:enterActiveClass="prefer.s.animation ? $style.transition_fade_enterActive : ''"
 			:leaveActiveClass="prefer.s.animation ? $style.transition_fade_leaveActive : ''"
@@ -47,14 +46,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 <script lang="ts">
 export type MkPaginationOptions = {
 	autoLoad?: boolean;
-	/**
-	 * ページネーションを進める方向
-	 * - up: 上方向
-	 * - down: 下方向 (default)
-	 * - both: 双方向
-	 *
-	 * NOTE: この方向はページネーションの方向であって、アイテムの並び順ではない
-	 */
 	direction?: 'up' | 'down' | 'both';
 	pullToRefresh?: boolean;
 	withControl?: boolean;
@@ -92,7 +83,6 @@ function onContextmenu(ev: PointerEvent) {
 	if (ev.target && isLink(ev.target as HTMLElement)) return;
 	if (window.getSelection()?.toString() !== '') return;
 
-	// TODO: 並び順設定
 	os.contextMenu([{
 		icon: 'ti ti-refresh',
 		text: i18n.ts.reload,

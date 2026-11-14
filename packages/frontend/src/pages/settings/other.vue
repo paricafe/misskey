@@ -6,15 +6,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 <template>
 <SearchMarker path="/settings/other" :label="i18n.ts.other" :keywords="['other']" icon="ti ti-dots">
 	<div class="_gaps_m">
-		<!--
-		<MkSwitch v-model="$i.injectFeaturedNote" @update:model-value="onChangeInjectFeaturedNote">
-			<template #label>{{ i18n.ts.showFeaturedNotesInTimeline }}</template>
-		</MkSwitch>
-		-->
-
-		<!--
-		<MkSwitch v-model="reportError">{{ i18n.ts.sendErrorReports }}<template #caption>{{ i18n.ts.sendErrorReportsDescription }}</template></MkSwitch>
-		-->
 
 		<div class="_gaps_s">
 			<SearchMarker :keywords="['account', 'info']">

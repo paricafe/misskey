@@ -50,7 +50,7 @@ export const paramDef = {
 		untilId: { type: 'string', format: 'misskey:id' },
 		sinceDate: { type: 'integer' },
 		untilDate: { type: 'integer' },
-		allowPartial: { type: 'boolean', default: false }, // true is recommended but for compatibility false by default
+		allowPartial: { type: 'boolean', default: false },
 	},
 	required: ['channelId'],
 } as const;
@@ -115,7 +115,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 		limit: number,
 		channelId: string
 	}, me: MiLocalUser | null) {
-		//#region fallback to database
 		const query = this.queryService.makePaginationQuery(this.notesRepository.createQueryBuilder('note'), ps.sinceId, ps.untilId)
 			.andWhere('note.channelId = :channelId', { channelId: ps.channelId })
 			.innerJoinAndSelect('note.user', 'user')
@@ -140,7 +139,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				}));
 			}
 		}
-		//#endregion
 
 		return await query.limit(ps.limit).getMany();
 	}

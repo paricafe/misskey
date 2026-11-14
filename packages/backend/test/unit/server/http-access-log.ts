@@ -21,7 +21,6 @@ type TestManager = {
 	readonly writeAccess: ReturnType<typeof vi.fn>;
 };
 
-/** Access logの動作確認用に固定時刻・プロセス情報を持つManagerを作成します。 */
 function createManager(options: {
 	statusClasses?: AccessLogStatusClass[];
 	requestBody?: boolean;
@@ -51,7 +50,6 @@ function createManager(options: {
 	return { manager, writeAccess };
 }
 
-/** Access logフックを登録したテスト用Fastifyを作成します。 */
 async function createServer(options: Parameters<typeof createManager>[0] = {}): Promise<TestServer> {
 	const { manager, writeAccess } = createManager(options);
 	const fastify = Fastify({ logger: false });

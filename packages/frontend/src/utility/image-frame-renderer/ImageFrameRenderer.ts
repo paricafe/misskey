@@ -29,7 +29,7 @@ export type ImageFrameParams = {
 	bgColor: [r: number, g: number, b: number];
 	fgColor: [r: number, g: number, b: number];
 	font: 'serif' | 'sans-serif';
-	borderRadius: number; // TODO
+	borderRadius: number;
 };
 
 export type ImageFramePreset = {
@@ -84,7 +84,7 @@ export class ImageFrameRenderer {
 		const GPSLongitude = this.exif == null ? '456.000000000000123' : this.exif.GPSLongitude?.description;
 		return text.replaceAll(/\{(\w+)\}/g, (_: string, key: string) => {
 			let meta_date = DateTimeOriginal ?? '????:??:?? ??:??:??';
-			if (meta_date.includes('T') || meta_date.includes('Z')) { // ISO 8601
+			if (meta_date.includes('T') || meta_date.includes('Z')) {
 				const parsed = new Date(meta_date);
 				const yyyy = parsed.getFullYear().toString().padStart(4, '0');
 				const mm = (parsed.getMonth() + 1).toString().padStart(2, '0');
@@ -180,7 +180,6 @@ export class ImageFrameRenderer {
 				);
 				qrImageBitmap.close();
 			} catch (_) {
-				// nop
 			}
 		}
 
@@ -239,9 +238,6 @@ export class ImageFrameRenderer {
 		}]);
 	}
 
-	/*
-	 * disposeCanvas = true だとloseContextを呼ぶため、コンストラクタで渡されたcanvasも再利用不可になるので注意
-	 */
 	public destroy(disposeCanvas = true): void {
 		this.compositor.destroy(disposeCanvas);
 	}

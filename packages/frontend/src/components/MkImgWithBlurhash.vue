@@ -67,7 +67,7 @@ const props = withDefaults(defineProps<{
 	width?: number;
 	cover?: boolean;
 	forceBlurhash?: boolean;
-	onlyAvgColor?: boolean; // 軽量化のためにBlurhashを使わずに平均色だけを描画
+	onlyAvgColor?: boolean;
 	marker?: string;
 }>(), {
 	transition: null,

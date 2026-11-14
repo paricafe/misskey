@@ -58,29 +58,28 @@ export class AntennaService implements OnApplicationShutdown {
 			const { type, body } = obj.message as GlobalEvents['internal']['payload'];
 			switch (type) {
 				case 'antennaCreated':
-					this.antennas.push({ // TODO: このあたりのデシリアライズ処理は各modelファイル内に関数としてexportしたい
+					this.antennas.push({
 						...body,
 						lastUsedAt: new Date(body.lastUsedAt),
-						user: null, // joinなカラムは通常取ってこないので
-						userList: null, // joinなカラムは通常取ってこないので
+						user: null,
+						userList: null,
 					});
 					break;
 				case 'antennaUpdated': {
 					const idx = this.antennas.findIndex(a => a.id === body.id);
 					if (idx >= 0) {
-						this.antennas[idx] = { // TODO: このあたりのデシリアライズ処理は各modelファイル内に関数としてexportしたい
+						this.antennas[idx] = {
 							...body,
 							lastUsedAt: new Date(body.lastUsedAt),
-							user: null, // joinなカラムは通常取ってこないので
-							userList: null, // joinなカラムは通常取ってこないので
+							user: null,
+							userList: null,
 						};
 					} else {
-						// サーバ起動時にactiveじゃなかった場合、リストに持っていないので追加する必要あり
-						this.antennas.push({ // TODO: このあたりのデシリアライズ処理は各modelファイル内に関数としてexportしたい
+						this.antennas.push({
 							...body,
 							lastUsedAt: new Date(body.lastUsedAt),
-							user: null, // joinなカラムは通常取ってこないので
-							userList: null, // joinなカラムは通常取ってこないので
+							user: null,
+							userList: null,
 						});
 					}
 				}
@@ -111,8 +110,6 @@ export class AntennaService implements OnApplicationShutdown {
 		return matchedAntennas;
 	}
 
-	// NOTE: フォローしているユーザーのノート、リストのユーザーのノート、グループのユーザーのノート指定はパフォーマンス上の理由で無効になっている
-
 	@bindThis
 	public async checkHitAntenna(antenna: MiAntenna, note: (MiNote | Packed<'Note'>), noteUser: { id: MiUser['id']; username: string; host: string | null; isBot: boolean; }): Promise<boolean> {
 		if (antenna.excludeNotesInSensitiveChannel && note.channel?.isSensitive) return false;
@@ -136,7 +133,6 @@ export class AntennaService implements OnApplicationShutdown {
 		}
 
 		if (antenna.src === 'home') {
-			// TODO
 		} else if (antenna.src === 'list') {
 			if (antenna.userListId == null) return false;
 			const exists = await this.userListMembershipsRepository.exists({
@@ -165,7 +161,6 @@ export class AntennaService implements OnApplicationShutdown {
 		}
 
 		const keywords = antenna.keywords
-			// Clean up
 			.map(xs => xs.filter(x => x !== ''))
 			.filter(xs => xs.length > 0);
 
@@ -185,7 +180,6 @@ export class AntennaService implements OnApplicationShutdown {
 		}
 
 		const excludeKeywords = antenna.excludeKeywords
-			// Clean up
 			.map(xs => xs.filter(x => x !== ''))
 			.filter(xs => xs.length > 0);
 
@@ -208,8 +202,6 @@ export class AntennaService implements OnApplicationShutdown {
 			if (note.fileIds && note.fileIds.length === 0) return false;
 		}
 
-		// TODO: eval expression
-
 		return true;
 	}
 
@@ -227,9 +219,6 @@ export class AntennaService implements OnApplicationShutdown {
 
 	@bindThis
 	public async onMoveAccount(src: MiUser, dst: MiUser): Promise<void> {
-		// There is a possibility for users to add the srcUser to their antennas, but it's low, so we don't check it.
-
-		// Get MiAntenna[] from cache and filter to select antennas with the src user is in the users list
 		const srcUserAcct = this.utilityService.getFullApAccount(src.username, src.host).toLowerCase();
 		const antennasToMigrate = (await this.getAntennas()).filter(antenna => {
 			return antenna.users.some(user => {
@@ -242,7 +231,6 @@ export class AntennaService implements OnApplicationShutdown {
 
 		const antennaIds = antennasToMigrate.map(x => x.id);
 
-		// Update the antennas by appending dst users acct to the users list
 		const dstUserAcct = '@' + Acct.toString({ username: dst.username, host: dst.host });
 
 		await this.antennasRepository.createQueryBuilder('antenna')
@@ -254,7 +242,6 @@ export class AntennaService implements OnApplicationShutdown {
 			.setParameters({ dstUserAcct })
 			.execute();
 
-		// announce update to event
 		for (const newAntenna of await this.antennasRepository.findBy({ id: In(antennaIds) })) {
 			this.globalEventService.publishInternalEvent('antennaUpdated', newAntenna);
 		}

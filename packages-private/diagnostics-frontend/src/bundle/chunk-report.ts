@@ -11,13 +11,8 @@ import {
 } from 'diagnostics-shared/format';
 import type { CollectedBundleReport, FileEntry } from './manifest';
 
-/**
- * この差分以下のチャンクは個別に出さず `(other)` にまとめる。
- * ハッシュ文字列の揺れ等でサイズが数バイト動くだけの行がノイズになるため。
- */
 const smallDeltaThreshold = 5;
 
-/** diff表に個別行として出す上限。これを超えた分は `(other)` に集約する */
 const diffRowLimit = 30;
 
 function entryDisplayName(entry: FileEntry | undefined) {
@@ -57,9 +52,6 @@ export function sumChunkSizes(chunks: FileEntry[]) {
 	return chunks.reduce((sum, chunk) => sum + chunk.size, 0);
 }
 
-/**
- * 比較キーを持たない (= base/head で対応付けできない) チャンクの合計。
- */
 export function generatedAggregate(base: FileEntry[], head: FileEntry[]): ChunkAggregate {
 	const baseGenerated = base.filter(chunk => chunk.comparisonKey == null);
 	const headGenerated = head.filter(chunk => chunk.comparisonKey == null);
@@ -104,9 +96,6 @@ export function formatChunkChangeSummary(label: string, summary: ReturnType<type
 	return `${label} (${summary.updated} updated, ${summary.added} added, ${summary.removed} removed)`;
 }
 
-/**
- * 差分の絶対値が大きい順。同着は増加側・元サイズ・名前の順で決定的に並べる。
- */
 export function compareChunkComparisonRows(a: ChunkComparisonRow, b: ChunkComparisonRow) {
 	return Math.abs(b.headSize - b.baseSize) - Math.abs(a.headSize - a.baseSize)
 		|| (b.headSize - b.baseSize) - (a.headSize - a.baseSize)
@@ -131,7 +120,7 @@ export function chunkMarkdownTable(
 	if (rows.length === 0 && total == null && !hasGenerated && !hasOther) return '_No data_';
 
 	const lines = [
-		'| Chunk | Base | Head | Δ | Δ\u00A0(%) |', // nbspにすること
+		'| Chunk | Base | Head | Δ | Δ\u00A0(%) |',
 		'| --- | ---: | ---: | ---: | ---: |',
 	];
 	if (total != null) {
@@ -151,7 +140,7 @@ export function chunkMarkdownTable(
 	}
 	if (hasGenerated) {
 		// eslint-disable-next-line no-irregular-whitespace
-		lines.push(`| (other\u00A0generated\u00A0chunks) | ${formatBytes(generated.baseSize)} | ${formatBytes(generated.headSize)} | ${calcAndFormatDeltaBytes(generated.baseSize, generated.headSize, 1000)} | ${calcAndFormatDeltaPercentInMdTable(generated.baseSize, generated.headSize, 0.1)} |`); // nbspにすること
+		lines.push(`| (other\u00A0generated\u00A0chunks) | ${formatBytes(generated.baseSize)} | ${formatBytes(generated.headSize)} | ${calcAndFormatDeltaBytes(generated.baseSize, generated.headSize, 1000)} | ${calcAndFormatDeltaPercentInMdTable(generated.baseSize, generated.headSize, 0.1)} |`);
 	}
 	if (hasOther) {
 		lines.push(`| (other) | ${formatBytes(other.baseSize)} | ${formatBytes(other.headSize)} | ${calcAndFormatDeltaBytes(other.baseSize, other.headSize, 1000)} | ${calcAndFormatDeltaPercentInMdTable(other.baseSize, other.headSize, 0.1)} |`);
@@ -174,7 +163,6 @@ export function renderFrontendChunkReport(base: CollectedBundleReport, head: Col
 	const diffGenerated = generatedAggregate(base.chunks, head.chunks);
 	const largeDeltaRows = changedRows.filter(row => !hasSmallDelta(row)).sort(compareChunkComparisonRows);
 	const diffRows = largeDeltaRows.slice(0, diffRowLimit);
-	// 表示上限で切り捨てた行も `(other)` に含める。落とすと合計が実際の変化量と合わなくなる
 	const diffOther = comparisonRowsAggregate([
 		...changedRows.filter(hasSmallDelta),
 		...largeDeltaRows.slice(diffRowLimit),

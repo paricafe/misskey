@@ -31,7 +31,6 @@ import { basename, extname } from 'node:path';
 
 import { DEFAULT_INTEGRATION_REFS, findClosestMergeBase, gitLines, gitMergeBase, gitPaths } from './lib/git.mjs';
 
-/** CI の対象ディレクトリ。この配列を CI とローカル検査の両方が使う。 */
 const TARGET_DIRECTORIES = [
 	'packages/mastodon-compat/src',
 	'packages/mastodon-compat/test',
@@ -59,7 +58,7 @@ const TARGET_DIRECTORIES = [
 const TARGET_EXTENSIONS = new Set(['.cjs', '.html', '.js', '.mjs', '.scss', '.ts', '.vue']);
 const EXCLUDED_CONFIG_EXTENSIONS = new Set(['.cjs', '.js', '.mjs', '.ts']);
 const EXCLUDED_FILES = new Set([
-	'packages/frontend/public/mockServiceWorker.js', // `msw init` が生成する
+	'packages/frontend/public/mockServiceWorker.js',
 ]);
 const HTML_COMMENT_EXTENSIONS = new Set(['.vue', '.html']);
 
@@ -344,5 +343,4 @@ function main() {
 	}
 }
 
-// process.exit() だと stdout が pipe のとき未フラッシュの出力が切り捨てられる。
 process.exitCode = main();

@@ -29,12 +29,9 @@ export class MetaService implements OnApplicationShutdown {
 		private featuredService: FeaturedService,
 		private globalEventService: GlobalEventService,
 	) {
-		//this.onMessage = this.onMessage.bind(this);
-
 		if (process.env.NODE_ENV !== 'test') {
 			this.intervalId = setInterval(() => {
 				this.fetch(true).then(meta => {
-					// fetch内でもセットしてるけど仕様変更の可能性もあるため一応
 					this.cache = meta;
 				});
 			}, 1000 * 60 * 5);
@@ -51,9 +48,9 @@ export class MetaService implements OnApplicationShutdown {
 			const { type, body } = obj.message as GlobalEvents['internal']['payload'];
 			switch (type) {
 				case 'metaUpdated': {
-					this.cache = { // TODO: このあたりのデシリアライズ処理は各modelファイル内に関数としてexportしたい
+					this.cache = {
 						...(body.after),
-						rootUser: null, // joinなカラムは通常取ってこないので
+						rootUser: null,
 					};
 					break;
 				}
@@ -68,7 +65,6 @@ export class MetaService implements OnApplicationShutdown {
 		if (!noCache && this.cache) return this.cache;
 
 		return await this.db.transaction(async transactionalEntityManager => {
-			// 過去のバグでレコードが複数出来てしまっている可能性があるので新しいIDを優先する
 			const metas = await transactionalEntityManager.find(MiMeta, {
 				order: {
 					id: 'DESC',
@@ -81,7 +77,6 @@ export class MetaService implements OnApplicationShutdown {
 				this.cache = meta;
 				return meta;
 			} else {
-				// metaが空のときfetchMetaが同時に呼ばれるとここが同時に呼ばれてしまうことがあるのでフェイルセーフなupsertを使う
 				const saved = await transactionalEntityManager
 					.upsert(
 						MiMeta,

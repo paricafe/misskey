@@ -5,7 +5,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 
 <template>
 <div :class="$style.root">
-	<!-- keyを変えて要素ごと作り直すことで、AudioContextに繋いだ要素を確実に切り離す (onLoadErrorを参照) -->
 	<audio
 		:key="audioElKey"
 		ref="audioEl"
@@ -40,14 +39,13 @@ import { i18n } from '@/i18n.js';
 import { themeManager } from '@/theme.js';
 import { prefer } from '@/preferences.js';
 
-// クリック等のフォールスルーはキャンバスに渡す (ルートは全面を覆うので、その外側は背景として扱わせる)
 defineOptions({
 	inheritAttrs: false,
 });
 
 const props = defineProps<{
 	content: Content;
-	user?: Misskey.entities.User | null; // DriveFileのuserはnullになることがある。その場合に使用する所有者情報
+	user?: Misskey.entities.User | null;
 	isPlaying: boolean;
 	volume: number;
 }>();
@@ -62,78 +60,53 @@ const canvasCtx = computed(() => canvasEl.value?.getContext('2d') ?? null);
 
 const fileUser = computed(() => props.content.file?.user ?? props.user);
 
-//#region 描画パラメータ
 const BAND_COUNT = 96;
 const BASE_HALF_HEIGHT_RATIO = 0.003;
 
 const FFT_SIZE = 4096;
 const BIN_COUNT = FFT_SIZE / 2;
 
-/** スペクトルとして取り出す周波数レンジ */
 const MIN_FREQ = 20;
 const MAX_FREQ = 16000;
 
-/**
- * 低域の傾き補正の倍率。1オクターブ上がるごとにこの値を掛ける。1より大きいと高域が持ち上がる
- */
 const SPECTRUM_TILT_COEFFICIENT = 1.085;
 
 const BEAT_BAND_COUNT = 36;
 const BEAT_MIN_FREQ = 30;
 const BEAT_MAX_FREQ = 300;
 
-/** 波形の立ち上がり / 立ち下がりの時定数 (s) */
 const WAVE_ATTACK_TAU = 0.01;
 const WAVE_RELEASE_TAU = 0.015;
-/** 正規化後にかけるコントラスト強調の指数 大きいほど小さい山が引っ込み、大きい山との差が開く */
 const CONTRAST_EXPONENT = 1.9;
-/** キャンバス高に対する無音時の半幅と、振幅によって加わる最大半幅 */
 const WAVE_GAIN_HALF_HEIGHT_RATIO = 0.3;
-/** 各バーに割り当てられた横幅のうち、実際の線の幅として使う割合 (0-1) */
 const BAR_THICKNESS_FACTOR = 0.5;
 
-/** 全体の音圧に追従する緩やかな拡大縮小の時定数 (s) と最大量 */
 const LEVEL_TAU = 0.3;
 const LEVEL_SCALE = 0.1;
-/** ビート検出用のエンベロープ / その移動平均の時定数 (s) */
 const BEAT_ATTACK_TAU = 0.012;
 const BEAT_FALL_TAU = 0.11;
 const BEAT_BASELINE_TAU = 0.7;
-/** 移動平均からの超過分をビートとみなす際の増幅率と、減衰の時定数 (s) */
 const BEAT_SENSITIVITY = 3;
 const BEAT_RELEASE_TAU = 0.18;
-/** ビートに合わせて瞬間的に拡大する量 */
 const BEAT_SCALE = 0.16;
 
-/** キャンバス高に対するアバター直径の比 */
 const AVATAR_SIZE_RATIO = 0.36;
-//#endregion
 
-// アニメーション量を控えるべきかどうか（拡大縮小のみ抑制）
 const motionDamp = prefer.s.animation ? 1 : 0.3;
 
-//#region 解析の状態
 const freqArray = new Uint8Array(BIN_COUNT);
-/** 帯域ごとに参照する bin の範囲 */
 const bandStart = new Uint16Array(BAND_COUNT);
 const bandEnd = new Uint16Array(BAND_COUNT);
-/** ビート検出用の低域だけを参照する bin の範囲 */
 const beatBandStart = new Uint16Array(BEAT_BAND_COUNT);
 const beatBandEnd = new Uint16Array(BEAT_BAND_COUNT);
-/** 帯域ごとに掛ける傾き補正の倍率 */
 const bandTilt = new Float32Array(BAND_COUNT);
-/** 帯域ごとの生の振幅 (フレーム内の作業用) */
 const rawLevels = new Float32Array(BAND_COUNT);
-/** 帯域ごとの平滑化済み振幅 (0-1) */
 const levels = new Float32Array(BAND_COUNT);
-/** ビート検出用の低域の生の振幅 */
 const beatRawLevels = new Float32Array(BEAT_BAND_COUNT);
-/** 上下の輪郭の頂点座標 */
 const pointsX = new Float64Array(BAND_COUNT);
 const topPointsY = new Float64Array(BAND_COUNT);
 const bottomPointsY = new Float64Array(BAND_COUNT);
 
-/** 表示波形と低域ビート検出がそれぞれ追跡する自動レンジ */
 type AnalysisRange = { floor: number; ceil: number };
 const waveRange: AnalysisRange = { floor: 0, ceil: 0 };
 const beatRange: AnalysisRange = { floor: 0, ceil: 0 };
@@ -146,9 +119,6 @@ function getAudioVisualizerBarWidth(canvasWidth: number, barCount: number, thick
 	return (canvasWidth / barCount) * thicknessFactor;
 }
 
-/**
- * FFT の bin を帯域ごとにまとめる。低域は十分な分解能で刻めるよう、対数的に帯域を広げる
- */
 function writeLogarithmicFrequencyBands(options: {
 	fftSize: number;
 	sampleRate: number;
@@ -173,9 +143,6 @@ function writeLogarithmicFrequencyBands(options: {
 	}
 }
 
-/**
- * 帯域ごとの傾き補正の倍率をかける
- */
 function writeSpectrumTilt(options: {
 	sampleRate: number;
 	minFrequency: number;
@@ -198,7 +165,6 @@ function writeFrequencyBandLevels(options: {
 	starts: Uint16Array;
 	ends: Uint16Array;
 	levels: Float32Array;
-	/** 帯域ごとに掛ける倍率 (傾き補正が要らない用途では省略する) */
 	tilt?: Float32Array;
 }) {
 	const bandCount = options.levels.length;
@@ -254,7 +220,6 @@ function setupBands(sampleRate: number) {
 		maxFrequency: MAX_FREQ,
 		tilt: bandTilt,
 	});
-	// ビート検出は低域を見るのが目的なので、こちらには傾き補正を掛けない
 	writeLogarithmicFrequencyBands({
 		fftSize: FFT_SIZE,
 		sampleRate,
@@ -277,52 +242,33 @@ function resetAnalysis() {
 	beatEnv = 0;
 }
 
-/**
- * 指数平滑。フレームレートに依存しないよう、経過時間から係数を求める
- * @param tau 目標値の約 63% まで近づくのにかかる秒数
- */
 function approach(current: number, target: number, tau: number, dt: number) {
 	return current + (target - current) * (1 - Math.exp(-dt / tau));
 }
 
-/** 下限が下がる / 上がるときの時定数 (s) 上げ側を遅くして、鳴っている間に基準が持ち上がらないようにする */
 const RANGE_FLOOR_FALL_TAU = 0.25;
 const RANGE_FLOOR_RISE_TAU = 4;
-/** 上限が下がるときの時定数 (s) 上がるときは即時 */
 const RANGE_CEIL_FALL_TAU = 1.4;
-/** レンジ幅の下限。これ以下に潰れたときに無理な増幅をしない */
 const MIN_RANGE_SPAN = 0.14;
 
-/**
- * フレーム内の最小 / 最大値から、正規化に使うレンジを更新して幅を返す (自動レンジ調整)。
- * 音源ごとの音量差を吸収しつつ、下限をゆっくり、上限を即時に追従させて短時間のダイナミクスは残す
- */
 function updateRange(range: AnalysisRange, frameMin: number, framePeak: number, dt: number) {
 	range.floor = approach(range.floor, frameMin, frameMin < range.floor ? RANGE_FLOOR_FALL_TAU : RANGE_FLOOR_RISE_TAU, dt);
-	// 上限は即座に持ち上げ、ゆっくり戻す。戻り先に下限 + 最小幅を混ぜて、レンジが潰れないようにする
 	range.ceil = framePeak > range.ceil ? framePeak : approach(range.ceil, Math.max(framePeak, range.floor + MIN_RANGE_SPAN), RANGE_CEIL_FALL_TAU, dt);
 	return Math.max(range.ceil - range.floor, MIN_RANGE_SPAN);
 }
-//#endregion
 
 const accentColorHue = tinycolor(themeManager.currentCompiledTheme!.accent).toHsl().h;
 
-// 読み込みが終わるまでは描画しない (読み込み完了時の描き直しは下のwatchで行う)
 const avatarImage = shallowRef<HTMLImageElement | null>(null);
 
-//#region audio graph
 let audioCtx: AudioContext | null = null;
 let audioSource: MediaElementAudioSourceNode | null = null;
 let analyserNode: AnalyserNode | null = null;
 let gainNode: GainNode | null = null;
 let abortController: AbortController | null = null;
 
-/** 解析用のオーディオグラフを組めたかどうか。組めなかった場合は波形の代わりに文言を出す */
 let isVisualizerAvailable = true;
 
-// AnalyserNodeはCORS的に読めない音源に対して無音を返すが、その際に例外もイベントも発生しない。
-// しかも一度 createMediaElementSource() に渡した要素は元の出力に戻せないため、
-// 「読み込み方を先に決める」「駄目なら要素ごと作り直す」の二段構えにする
 function isSameOrigin(url: string) {
 	try {
 		return new URL(url, window.location.href).origin === window.location.origin;
@@ -331,25 +277,16 @@ function isSameOrigin(url: string) {
 	}
 }
 
-/** 同一オリジンの音源はCORS属性なしでも解析できる */
 const isSameOriginContent = computed(() => isSameOrigin(props.content.url));
-/** CORS付きでの読み込みに失敗した音源 */
 const corsFailedUrl = ref<string | null>(null);
-/** フォールバックで要素を作り直した後、再生を再開すべき音源 */
 let resumeAfterReloadUrl: string | null = null;
 
-/** `anonymous`: CORS付きで読み込む (解析できる) / `none`: CORS無しで読み込む (同一オリジンでない場合は再生のみ) */
 const crossOriginMode = computed<'anonymous' | 'none'>(() => (isSameOriginContent.value || corsFailedUrl.value === props.content.url) ? 'none' : 'anonymous');
 const canUseAudioGraph = computed(() => isSameOriginContent.value || crossOriginMode.value === 'anonymous');
 
-// 読み込み方が変わったときと音源が差し替わったときに<audio>を作り直す。
-// 同じ要素を2度 createMediaElementSource() に渡すことはできないので、
-// グラフの組み直しが要る場面では必ず新しい要素を用意する必要がある
 const audioElKey = computed(() => `${crossOriginMode.value}\n${props.content.url}`);
 
-/** 現在の要素でメタデータまで到達できたか。到達していればCORSのチェックは通過している */
 let hasLoadedMetadata = false;
-/** 現在の要素に対して再生が要求されたか */
 let isPlayRequested = false;
 
 function onLoadedMetadata() {
@@ -358,14 +295,8 @@ function onLoadedMetadata() {
 }
 
 function onLoadError() {
-	// CORSヘッダを返さないサーバーでは crossorigin 付きの読み込みが失敗するが、
-	// MediaErrorからは原因を判別できないので、理由を問わず一度だけCORS無しで読み直す
-	// (本当に壊れているファイルなら再試行も失敗し、同じエラー状態に落ち着く)。
-	// ただしメタデータまで読めていたならCORSは通過済みなので、再生中のネットワーク断や
-	// デコード失敗を拾ってフォールバックしてしまわないようにする
 	if (crossOriginMode.value !== 'anonymous' || hasLoadedMetadata) return;
 
-	// 読み込み前に失敗しているので再生位置は0のまま。再生の要求だけ引き継げばよい
 	resumeAfterReloadUrl = isPlayRequested ? props.content.url : null;
 	corsFailedUrl.value = props.content.url;
 }
@@ -381,7 +312,6 @@ function resumeAudioCtx() {
 }
 
 function visualizerTick(timestamp: number) {
-	// タブがバックグラウンドに回っている間は rAF が止まるので、復帰時の巨大な dt は 0.1s で頭打ちにする
 	const dt = lastTickTimestamp === 0 ? 1 / 60 : Math.min((timestamp - lastTickTimestamp) / 1000, 0.1);
 	lastTickTimestamp = timestamp;
 
@@ -407,32 +337,23 @@ function setPlaying(playing: boolean) {
 	if (playing && isVisualizerAvailable) {
 		startVisualizerTick();
 	} else {
-		// 一時停止中はその時点の波形・スケールをそのまま保つ (キャンバスは最後に描いたフレームを保持する)
 		stopVisualizerTick();
 	}
 }
 
-/**
- * 解析用のオーディオグラフを組む。組めなかった場合は false を返す
- * (AudioContext を作れない環境や、要素が既に別の AudioContext に接続済みの場合など)
- */
 function setupAudioGraph(el: HTMLAudioElement) {
 	try {
 		audioCtx = new AudioContext();
 		analyserNode = audioCtx.createAnalyser();
 		analyserNode.fftSize = FFT_SIZE;
-		// 時間ベースの平滑は analyse() 側で行うので弱めでよい
 		analyserNode.smoothingTimeConstant = 0.2;
-		// 既定の -100〜-30dB は音楽素材に対して下が広すぎるので、実用レンジに寄せて 0-255 を使い切る
 		analyserNode.minDecibels = -90;
 		analyserNode.maxDecibels = -25;
 		gainNode = audioCtx.createGain();
 		gainNode.gain.value = props.volume;
 		audioSource = audioCtx.createMediaElementSource(el);
 
-		// ビジュアライザー用 (解析するだけなので destination には繋がない)
 		audioSource.connect(analyserNode);
-		// 再生用
 		audioSource.connect(gainNode).connect(audioCtx.destination);
 
 		setupBands(audioCtx.sampleRate);
@@ -448,18 +369,13 @@ function init() {
 	const el = audioEl.value;
 	if (el == null) return;
 
-	// 前の音源の波形を持ち越さない
 	resetAnalysis();
 
-	// CORS的に読めない音源をグラフに繋ぐと再生まで無音になるため、その場合は繋がずに素の再生に任せる
 	isVisualizerAvailable = canUseAudioGraph.value && setupAudioGraph(el);
 
 	if (isVisualizerAvailable) {
-		// 音量制御はGainNodeが担当するため、要素側は常に100%
-		// (ミュートは音量0として表現する。要素をmutedにするとタップまで無音になり波形が消える)
 		el.volume = 1;
 	} else {
-		// グラフを組めなかったときは要素側で音量を制御する (ビジュアライザは諦めるが再生はできる)
 		el.volume = props.volume;
 	}
 	el.muted = false;
@@ -471,8 +387,6 @@ function init() {
 		el.addEventListener(type, listener, { signal });
 	};
 
-	// 再生状態: メディア要素のイベントを唯一の情報源にすることで、このコンポーネント経由でない
-	// 操作 (コントロール・キーボード・OSのメディアキー等) でも波形の描画と同期がとれる
 	on('play', () => {
 		isPlayRequested = true;
 		resumeAudioCtx();
@@ -483,11 +397,9 @@ function init() {
 	on('ended', () => setPlaying(false));
 	on('emptied', () => setPlaying(false));
 
-	// 現在の要素の状態を取り込む (コンポーネントの準備前に再生が始まっている場合等)。
 	if (!el.paused) resumeAudioCtx();
 	setPlaying(!el.paused);
 
-	// フォールバックでaudio要素を作り直す前に再生が要求されていたなら、新しい要素で再生し直す
 	if (resumeAfterReloadUrl === props.content.url) {
 		resumeAfterReloadUrl = null;
 		el.play().catch(err => {
@@ -495,7 +407,6 @@ function init() {
 		});
 	}
 
-	// 波形が回らないケース (停止中、またはビジュアライザを描画できない場合) はここで一度だけ描く
 	redrawIfStopped();
 }
 
@@ -523,21 +434,14 @@ function teardown() {
 	hasLoadedMetadata = false;
 	isPlayRequested = false;
 }
-//#endregion
 
-//#region 解析
-/** 無音ゲート フレーム平均がこの下限からこの幅の間で 0→1 になる */
 const GATE_FLOOR = 0.02;
 const GATE_RANGE = 0.08;
 
-/**
- * スペクトルを帯域ごとの振幅に落とし込み、エンベロープ (波形・音圧・ビート) を更新する
- */
 function analyse(dt: number) {
 	if (analyserNode == null) return;
 	analyserNode.getByteFrequencyData(freqArray);
 
-	// 最大値寄りの帯域値を作り、低域寄りの傾きを補正してから、隣接帯域どうしをならして山をなだらかにする
 	const waveFrame = writeFrequencyBandLevels({
 		frequencyData: freqArray,
 		starts: bandStart,
@@ -546,8 +450,6 @@ function analyse(dt: number) {
 		tilt: bandTilt,
 	});
 
-	// 無音ゲート: 自動レンジ調整は微小なノイズも最大まで引き伸ばしてしまうので、
-	// フレーム全体のエネルギーが無いときは強制的に閉じる
 	const gate = Math.min(Math.max((waveFrame.mean - GATE_FLOOR) / GATE_RANGE, 0), 1);
 
 	const span = updateRange(waveRange, waveFrame.min, waveFrame.peak, dt);
@@ -567,30 +469,21 @@ function analyse(dt: number) {
 	});
 	const beatGate = Math.min(Math.max((beatFrame.mean - GATE_FLOOR) / GATE_RANGE, 0), 1);
 	const beatSpan = updateRange(beatRange, beatFrame.min, beatFrame.peak, dt);
-	// 低域全体のエネルギー。音圧による拡大縮小とビート検出の両方がこれを共有する
 	const energy = Math.min(Math.max((beatFrame.mean - beatRange.floor) / beatSpan, 0), 1) * beatGate;
 
-	// 全体の音圧: 緩やかに追従させ、曲の盛り上がりに合わせてじわっと拡大縮小させる
 	levelEnv = approach(levelEnv, energy, LEVEL_TAU, dt);
 
-	// ビート: エネルギーが自身の移動平均をどれだけ超えたかで検出する
 	energyEnv = approach(energyEnv, energy, energy > energyEnv ? BEAT_ATTACK_TAU : BEAT_FALL_TAU, dt);
 	energyBaseline = approach(energyBaseline, energyEnv, BEAT_BASELINE_TAU, dt);
 	const hit = Math.min(Math.max(energyEnv - energyBaseline, 0) * BEAT_SENSITIVITY, 1);
 	beatEnv = hit > beatEnv ? hit : approach(beatEnv, hit, BEAT_RELEASE_TAU, dt);
 }
-//#endregion
 
-//#region 描画
-/**
- * 低域から高域までを左から右へ並べ、中央線を挟んで上下対称の縦のバーとして描く
- */
 function drawBars(ctx: CanvasRenderingContext2D, width: number, height: number, centerY: number) {
 	const baseHalfHeight = height * BASE_HALF_HEIGHT_RATIO;
 	const gainHalfHeight = height * WAVE_GAIN_HALF_HEIGHT_RATIO;
 	const cellWidth = width / levels.length;
 
-	//ctx.beginPath();
 	for (let i = 0; i < BAND_COUNT; i++) {
 		const halfHeight = baseHalfHeight + levels[i] * gainHalfHeight;
 		pointsX[i] = cellWidth * (i + 0.5);
@@ -606,13 +499,9 @@ function drawBars(ctx: CanvasRenderingContext2D, width: number, height: number, 
 		ctx.lineTo(pointsX[i], bottomPointsY[i]);
 		ctx.stroke();
 	}
-	//ctx.stroke();
 	ctx.globalAlpha = 1;
 }
 
-/**
- * @param dt 前フレームからの経過時間 (s) 0 を渡すと解析を進めず、現在の状態をそのまま描き直す
- */
 function draw(dt: number) {
 	const canvas = canvasEl.value;
 	const ctx = canvasCtx.value;
@@ -632,7 +521,6 @@ function draw(dt: number) {
 		drawBars(ctx, canvas.width, canvas.height, centerY);
 	}
 
-	// アバターを円形にくりぬいて描画 (波形が出せない場合もアバターは出す)
 	const avatarScaleFactor = 1 + (levelEnv * LEVEL_SCALE + beatEnv * BEAT_SCALE) * motionDamp;
 	const avatar = avatarImage.value;
 	const avatarSize = canvas.height * AVATAR_SIZE_RATIO * avatarScaleFactor;
@@ -648,7 +536,6 @@ function draw(dt: number) {
 	}
 
 	if (!isVisualizerAvailable) {
-		// 再生自体はできるので、アバターの下に文言を添えるだけに留める
 		ctx.fillStyle = `hsl(${accentColorHue}, ${0.4 * 100}%, ${0.75 * 100}%)`;
 		ctx.textAlign = 'center';
 		ctx.textBaseline = 'middle';
@@ -657,17 +544,14 @@ function draw(dt: number) {
 	}
 }
 
-/** 停止中は描画の機会が無いので、表示内容が変わったときに自前で描き直す */
 function redrawIfStopped() {
 	if (visualizerTickFrameId == null) draw(0);
 }
-//#endregion
 
 watch(() => props.volume, (to) => {
 	if (gainNode != null) {
 		gainNode.gain.value = to;
 	} else if (audioEl.value != null) {
-		// グラフを組めなかったときの音量制御は要素側が担当する
 		audioEl.value.volume = to;
 	}
 });
@@ -704,7 +588,6 @@ defineExpose({
 .visualizer {
 	display: block;
 	user-select: none;
-	// 100cqw / 100cqhの基準はMkLightbox.item.vueの.contentWrapper (= paddingを除いた実際の表示領域)
 	width: min(100cqw, calc(100cqh * 16 / 9));
 	height: auto;
 	aspect-ratio: 16 / 9;
@@ -735,7 +618,6 @@ defineExpose({
 	transition: scale 100ms ease;
 }
 
-// アイコン自体はクリックを受け取らないので、hoverは下のcanvas要素を経由して拾う
 .visualizer:hover ~ .playIconWrapper .playIcon {
 	scale: 1.2;
 }

@@ -2,7 +2,6 @@ import { EventEmitter } from 'eventemitter3';
 import _ReconnectingWebSocket, { Options } from 'reconnecting-websocket';
 import type { BroadcastEvents, Channels } from './streaming.types.js';
 
-// コンストラクタとクラスそのものの定義が上手く解決出来ないため再定義
 const ReconnectingWebSocketConstructor = _ReconnectingWebSocket as unknown as typeof _ReconnectingWebSocket.default;
 type ReconnectingWebSocket = _ReconnectingWebSocket.default;
 
@@ -40,9 +39,6 @@ export interface IStream extends EventEmitter<StreamEvents> {
 	close(): void;
 }
 
-/**
- * Misskey stream connection
- */
 // eslint-disable-next-line import/no-default-export
 export default class Stream extends EventEmitter<StreamEvents> implements IStream {
 	private stream: ReconnectingWebSocket;
@@ -77,14 +73,13 @@ export default class Stream extends EventEmitter<StreamEvents> implements IStrea
 		const query = urlQuery({
 			i: user?.token,
 
-			// To prevent cache of an HTML such as error screen
 			_t: Date.now(),
 		});
 
 		const wsOrigin = origin.replace('http://', 'ws://').replace('https://', 'wss://');
 
 		this.stream = new ReconnectingWebSocketConstructor(`${wsOrigin}/streaming?${query}`, '', {
-			minReconnectionDelay: 1, // https://github.com/pladaria/reconnecting-websocket/issues/91
+			minReconnectionDelay: 1,
 			WebSocket: options.WebSocket,
 		});
 		if (options.binaryType) {
@@ -138,25 +133,18 @@ export default class Stream extends EventEmitter<StreamEvents> implements IStrea
 		this.nonSharedConnections = this.nonSharedConnections.filter(c => c !== connection);
 	}
 
-	/**
-	 * Callback of when open connection
-	 */
 	private onOpen(): void {
 		const isReconnect = this.state === 'reconnecting';
 
 		this.state = 'connected';
 		this.emit('_connected_');
 
-		// チャンネル再接続
 		if (isReconnect) {
 			for (const p of this.sharedConnectionPools) p.connect();
 			for (const c of this.nonSharedConnections) c.connect();
 		}
 	}
 
-	/**
-	 * Callback of when close connection
-	 */
 	private onClose(): void {
 		if (this.state === 'connected') {
 			this.state = 'reconnecting';
@@ -164,9 +152,6 @@ export default class Stream extends EventEmitter<StreamEvents> implements IStrea
 		}
 	}
 
-	/**
-	 * Callback of when received a message from connection
-	 */
 	private onMessage(message: { data: string; }): void {
 		const { type, body } = JSON.parse(message.data);
 
@@ -193,10 +178,6 @@ export default class Stream extends EventEmitter<StreamEvents> implements IStrea
 		}
 	}
 
-	/**
-	 * Send a message to connection
-	 * ! ストリーム上のやり取りはすべてJSONで行われます !
-	 */
 	public send(typeOrPayload: string): void;
 	public send(typeOrPayload: string, payload: unknown): void;
 	public send(typeOrPayload: Record<string, unknown> | unknown[]): void;
@@ -220,15 +201,11 @@ export default class Stream extends EventEmitter<StreamEvents> implements IStrea
 		this.stream.send('h');
 	}
 
-	/**
-	 * Close this connection
-	 */
 	public close(): void {
 		this.stream.close();
 	}
 }
 
-// TODO: これらのクラスを Stream クラスの内部クラスにすれば余計なメンバをpublicにしないで済むかも？
 // もしくは @internal を使う？ https://www.typescriptlang.org/tsconfig#stripInternal
 class Pool {
 	public channel: string;
@@ -263,7 +240,6 @@ class Pool {
 
 		this.users++;
 
-		// タイマー解除
 		if (this.disposeTimerId) {
 			clearTimeout(this.disposeTimerId);
 			this.disposeTimerId = null;
@@ -273,10 +249,7 @@ class Pool {
 	public dec(): void {
 		this.users--;
 
-		// そのコネクションの利用者が誰もいなくなったら
 		if (this.users === 0) {
-			// また直ぐに再利用される可能性があるので、一定時間待ち、
-			// 新たな利用者が現れなければコネクションを切断する
 			this.disposeTimerId = setTimeout(() => {
 				this.disconnect();
 			}, 3000);
@@ -315,9 +288,9 @@ export abstract class Connection<Channel extends AnyOf<Channels> = AnyOf<Channel
 	protected stream: Stream;
 	public abstract id: string;
 
-	public name?: string; // for debug
-	public inCount = 0; // for debug
-	public outCount = 0; // for debug
+	public name?: string;
+	public inCount = 0;
+	public outCount = 0;
 
 	constructor(stream: Stream, channel: string, name?: string) {
 		super();

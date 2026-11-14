@@ -35,14 +35,11 @@ const MAX_ROOM_MEMBERS = 50;
 const MAX_REACTIONS_PER_MESSAGE = 100;
 const isCustomEmojiRegexp = /^:([\w+-]+)(?:@\.)?:$/;
 
-// TODO: ReactionServiceのやつと共通化
 function normalizeEmojiString(x: string) {
 	const match = emojiRegex.exec(x);
 	if (match) {
-		// 合字を含む1つの絵文字
 		const unicode = match[0];
 
-		// 異体字セレクタ除去
 		return unicode.match('\u200d') ? unicode : unicode.replace(/\ufe0f/g, '');
 	} else {
 		throw new Error('invalid emoji');
@@ -121,7 +118,6 @@ export class ChatService {
 		}
 	}
 
-	/** getChatAvailabilityの糖衣。主にAPI呼び出し時に走らせて、権限的に問題ない場合はそのまま続行する */
 	@bindThis
 	public async checkChatAvailability(userId: MiUser['id'], permission: 'read' | 'write') {
 		const policy = await this.getChatAvailability(userId);
@@ -141,11 +137,11 @@ export class ChatService {
 		}
 
 		const approvals = await this.chatApprovalsRepository.createQueryBuilder('approval')
-			.where(new Brackets(qb => { // 自分が相手を許可しているか
+			.where(new Brackets(qb => {
 				qb.where('approval.userId = :fromUserId', { fromUserId: fromUser.id })
 					.andWhere('approval.otherId = :toUserId', { toUserId: toUser.id });
 			}))
-			.orWhere(new Brackets(qb => { // 相手が自分を許可しているか
+			.orWhere(new Brackets(qb => {
 				qb.where('approval.userId = :toUserId', { toUserId: toUser.id })
 					.andWhere('approval.otherId = :fromUserId', { fromUserId: fromUser.id });
 			}))
@@ -197,7 +193,6 @@ export class ChatService {
 
 		const inserted = await this.chatMessagesRepository.insertOne(message);
 
-		// 相手を許可しておく
 		if (!iApprovedOther) {
 			this.chatApprovalsRepository.insertOne({
 				id: this.idService.gen(),
@@ -216,21 +211,18 @@ export class ChatService {
 		}
 
 		if (this.userEntityService.isLocalUser(fromUser)) {
-			// 自分のストリーム
 			this.globalEventService.publishChatUserStream(fromUser.id, toUser.id, 'message', packedMessage);
 		}
 
 		if (this.userEntityService.isLocalUser(toUser)) {
-			// 相手のストリーム
 			this.globalEventService.publishChatUserStream(toUser.id, fromUser.id, 'message', packedMessage);
 		}
 
-		// 3秒経っても既読にならなかったらイベント発行
 		if (this.userEntityService.isLocalUser(toUser)) {
 			setTimeout(async () => {
 				const marker = await this.redisClient.get(`newUserChatMessageExists:${toUser.id}:${fromUser.id}`);
 
-				if (marker == null) return; // 既読
+				if (marker == null) return;
 
 				const packedMessageForTo = await this.chatEntityService.packMessageDetailed(inserted, toUser);
 				this.globalEventService.publishMainStream(toUser.id, 'newChatMessage', packedMessageForTo);
@@ -250,7 +242,7 @@ export class ChatService {
 		const memberships = (await this.chatRoomMembershipsRepository.findBy({ roomId: toRoom.id })).map(m => ({
 			userId: m.userId,
 			isMuted: m.isMuted,
-		})).concat({ // ownerはmembershipレコードを作らないため
+		})).concat({
 			userId: toRoom.ownerId,
 			isMuted: false,
 		});
@@ -286,7 +278,6 @@ export class ChatService {
 		}
 		redisPipeline.exec();
 
-		// 3秒経っても既読にならなかったらイベント発行
 		setTimeout(async () => {
 			const redisPipeline = this.redisClient.pipeline();
 			for (const membership of membershipsOtherThanMe) {
@@ -338,7 +329,6 @@ export class ChatService {
 		readerId: MiUser['id'],
 	): Promise<void> {
 		const redisPipeline = this.redisClient.pipeline();
-		// TODO: newUserChatMessageExists とか newRoomChatMessageExists も消したい(けどキーの列挙が必要になって面倒)
 		redisPipeline.del(`newChatMessagesExists:${readerId}`);
 		await redisPipeline.exec();
 	}
@@ -381,8 +371,6 @@ export class ChatService {
 			if (this.userEntityService.isLocalUser(toUser)) this.globalEventService.publishChatUserStream(message.toUserId, message.fromUserId, 'deleted', message.id);
 
 			if (this.userEntityService.isLocalUser(fromUser) && this.userEntityService.isRemoteUser(toUser)) {
-				//const activity = this.apRendererService.addContext(this.apRendererService.renderDelete(this.apRendererService.renderTombstone(`${this.config.url}/notes/${message.id}`), fromUser));
-				//this.queueService.deliver(fromUser, activity, toUser.inbox);
 			}
 		} else if (message.toRoomId) {
 			this.globalEventService.publishChatRoomStream(message.toRoomId, 'deleted', message.id);
@@ -468,7 +456,6 @@ export class ChatService {
 
 	@bindThis
 	public async roomHistory(meId: MiUser['id'], limit: number): Promise<MiChatMessage[]> {
-		// TODO: 一回のクエリにまとめられるかも
 		const [memberRoomIds, ownedRoomIds] = await Promise.all([
 			this.chatRoomMembershipsRepository.findBy({
 				userId: meId,
@@ -613,11 +600,10 @@ export class ChatService {
 	public async deleteRoom(room: MiChatRoom, deleter?: MiUser) {
 		const memberships = (await this.chatRoomMembershipsRepository.findBy({ roomId: room.id })).map(m => ({
 			userId: m.userId,
-		})).concat({ // ownerはmembershipレコードを作らないため
+		})).concat({
 			userId: room.ownerId,
 		});
 
-		// 未読フラグ削除
 		const redisPipeline = this.redisClient.pipeline();
 		for (const membership of memberships) {
 			redisPipeline.del(`newRoomChatMessageExists:${membership.userId}:${room.id}`);
@@ -753,7 +739,6 @@ export class ChatService {
 			userId: userId,
 		} satisfies Partial<MiChatRoomMembership>;
 
-		// TODO: transaction
 		await this.chatRoomMembershipsRepository.insertOne(membership);
 		await this.chatRoomInvitationsRepository.delete(invitation.id);
 	}
@@ -769,7 +754,6 @@ export class ChatService {
 		const membership = await this.chatRoomMembershipsRepository.findOneByOrFail({ roomId, userId });
 		await this.chatRoomMembershipsRepository.delete(membership.id);
 
-		// 未読フラグを消す (「既読にする」というわけでもないのでreadメソッドは使わないでおく)
 		const redisPipeline = this.redisClient.pipeline();
 		redisPipeline.del(`newRoomChatMessageExists:${userId}:${roomId}`);
 		redisPipeline.srem(`newChatMessagesExists:${userId}`, `room:${roomId}`);
@@ -942,7 +926,7 @@ export class ChatService {
 
 		if (custom == null) {
 			reaction = normalizeEmojiString(reaction_);
-		} else { // 削除されたカスタム絵文字のリアクションを削除したいかもしれないので絵文字の存在チェックはする必要なし
+		} else {
 			const name = custom[1];
 			reaction = `:${name}:`;
 		}
@@ -967,8 +951,6 @@ export class ChatService {
 			.where('id = :id', { id: message.id })
 			.setParameter('pair', `${userId}/${reaction}`)
 			.execute();
-
-		// TODO: 実際に削除が行われたときのみイベントを発行する
 
 		if (room) {
 			this.globalEventService.publishChatRoomStream(room.id, 'unreact', {

@@ -58,8 +58,8 @@ export const permissions = [
 	'write:favorites',
 	'read:following',
 	'write:following',
-	'read:messaging', // deprecated
-	'write:messaging', // deprecated
+	'read:messaging',
+	'write:messaging',
 	'read:mutes',
 	'write:mutes',
 	'write:notes',
@@ -253,7 +253,6 @@ export const queueTypes = [
 	'systemWebhookDeliver',
 ] as const;
 
-// See: packages/backend/src/core/ReversiService.ts@L410
 export const reversiUpdateKeys = [
 	'map',
 	'bw',

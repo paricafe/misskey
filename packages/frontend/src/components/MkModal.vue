@@ -91,7 +91,7 @@ const emit = defineEmits<{
 	(ev: 'opened'): void;
 	(ev: 'click'): void;
 	(ev: 'esc'): void;
-	(ev: 'close'): void; // TODO: (refactor) closing に改名する
+	(ev: 'close'): void;
 	(ev: 'closed'): void;
 }>();
 
@@ -193,7 +193,6 @@ const align = () => {
 	if (props.anchor.x === 'center') {
 		left = x + (props.anchorElement.offsetWidth / 2) - (width / 2);
 	} else if (props.anchor.x === 'left') {
-		// TODO
 	} else if (props.anchor.x === 'right') {
 		left = x + props.anchorElement.offsetWidth;
 	}
@@ -201,13 +200,11 @@ const align = () => {
 	if (props.anchor.y === 'center') {
 		top = (y - (height / 2));
 	} else if (props.anchor.y === 'top') {
-		// TODO
 	} else if (props.anchor.y === 'bottom') {
 		top = y + props.anchorElement.offsetHeight;
 	}
 
 	if (fixed.value) {
-		// 画面から横にはみ出る場合
 		if (left + width > (window.innerWidth - SCROLLBAR_THICKNESS)) {
 			left = (window.innerWidth - SCROLLBAR_THICKNESS) - width;
 		}
@@ -215,7 +212,6 @@ const align = () => {
 		const underSpace = ((window.innerHeight - SCROLLBAR_THICKNESS) - MARGIN) - top;
 		const upperSpace = (anchorRect.top - MARGIN);
 
-		// 画面から縦にはみ出る場合
 		if (top + height > ((window.innerHeight - SCROLLBAR_THICKNESS) - MARGIN)) {
 			if (props.noOverlap && props.anchor.x === 'center') {
 				if (underSpace >= (upperSpace / 3)) {
@@ -231,7 +227,6 @@ const align = () => {
 			maxHeight.value = underSpace;
 		}
 	} else {
-		// 画面から横にはみ出る場合
 		if (left + width - window.scrollX > (window.innerWidth - SCROLLBAR_THICKNESS)) {
 			left = (window.innerWidth - SCROLLBAR_THICKNESS) - width + window.scrollX - 1;
 		}
@@ -239,7 +234,6 @@ const align = () => {
 		const underSpace = ((window.innerHeight - SCROLLBAR_THICKNESS) - MARGIN) - (top - window.scrollY);
 		const upperSpace = (anchorRect.top - MARGIN);
 
-		// 画面から縦にはみ出る場合
 		if (top + height - window.scrollY > ((window.innerHeight - SCROLLBAR_THICKNESS) - MARGIN)) {
 			if (props.noOverlap && props.anchor.x === 'center') {
 				if (underSpace >= (upperSpace / 3)) {
@@ -288,18 +282,14 @@ const align = () => {
 const onOpened = () => {
 	emit('opened');
 
-	// contentの子要素にアクセスするためレンダリングの完了を待つ必要がある（nextTickが必要）
 	nextTick(() => {
-		// NOTE: Chromatic テストの際に undefined になる場合がある
 		if (content.value == null) return;
 
-		// モーダルコンテンツにマウスボタンが押され、コンテンツ外でマウスボタンが離されたときにモーダルバックグラウンドクリックと判定させないためにマウスイベントを監視しフラグ管理する
 		const el = content.value.children[0];
 		if (el == null) return;
 		el.addEventListener('mousedown', ev => {
 			contentClicking = true;
 			window.addEventListener('mouseup', ev => {
-				// click イベントより先に mouseup イベントが発生するかもしれないのでちょっと待つ
 				window.setTimeout(() => {
 					contentClicking = false;
 				}, 100);

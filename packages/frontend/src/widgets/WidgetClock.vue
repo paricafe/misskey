@@ -90,10 +90,9 @@ const widgetPropsDef = {
 		}, {
 			value: 'numbers' as const,
 			label: i18n.ts._widgetOptions._clock.graduationArabic,
-		}, /*, {
-			value: 'roman' as const,
-			label: i18n.ts._widgetOptions._clock.graduationRoman,
-		}*/],
+		},
+
+],
 	},
 	fadeGraduations: {
 		type: 'boolean',

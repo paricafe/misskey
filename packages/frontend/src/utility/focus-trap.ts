@@ -86,8 +86,6 @@ export function focusTrap(el: HTMLElement, hasInteractionWithOtherFocusTrappedEl
 	const highestZIndex = highestZIndexElement == null ? -Infinity : highestZIndexElement.zIndex;
 	const zIndex = getZIndex(el);
 
-	// If the element has a lower z-index than the highest z-index element, focus trap the highest z-index element instead
-	// Focus trapping for this element will be done in the release function
 	if (!parent && zIndex < highestZIndex) {
 		focusTrapElements.add(el);
 		if (highestZIndexElement) {

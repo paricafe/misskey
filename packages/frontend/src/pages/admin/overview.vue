@@ -109,16 +109,6 @@ function onInstanceClick(i: Misskey.entities.FederationInstance) {
 }
 
 onMounted(async () => {
-	/*
-	const magicGrid = new MagicGrid({
-		container: rootEl,
-		static: true,
-		animate: true,
-	});
-
-	magicGrid.listen();
-	*/
-
 	misskeyApiGet('charts/federation', { limit: 2, span: 'day' }).then(chart => {
 		federationPubActive.value = chart.pubActive[0];
 		federationPubActiveDiff.value = chart.pubActive[0] - chart.pubActive[1];

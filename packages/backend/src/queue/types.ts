@@ -16,15 +16,10 @@ import type { UserWebhookPayload } from '@/core/UserWebhookService.js';
 import type httpSignature from '@peertube/http-signature';
 
 export type DeliverJobData = {
-	/** Actor */
 	user: ThinUser;
-	/** Activity */
 	content: string;
-	/** Digest header */
 	digest: string;
-	/** inbox URL to deliver */
 	to: string;
-	/** whether it is sharedInbox */
 	isSharedInbox: boolean;
 };
 
@@ -137,7 +132,6 @@ export type EndedPollNotificationJobData = {
 
 export type PostScheduledNoteJobData = {
 	noteDraftId: string;
-	// Jobs created before revisions were introduced belong to revision zero.
 	scheduleRevision?: number;
 };
 

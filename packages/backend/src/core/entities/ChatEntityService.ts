@@ -54,7 +54,6 @@ export class ChatEntityService {
 
 		const message = typeof src === 'object' ? src : await this.chatMessagesRepository.findOneByOrFail({ id: src });
 
-		// userは削除されている可能性があるのでnull許容
 		const reactions: { user: Packed<'UserLite'> | null; reaction: string; }[] = [];
 
 		for (const record of message.reactions) {
@@ -109,7 +108,6 @@ export class ChatEntityService {
 			}
 		}
 
-		// TODO: packedUsersに削除されたユーザーもnullとして含める
 		const [packedUsers, packedFiles, packedRooms] = await Promise.all([
 			this.userEntityService.packMany(users, me)
 				.then(users => new Map(users.map(u => [u.id, u]))),
@@ -185,7 +183,6 @@ export class ChatEntityService {
 
 		const message = typeof src === 'object' ? src : await this.chatMessagesRepository.findOneByOrFail({ id: src });
 
-		// userは削除されている可能性があるのでnull許容
 		const reactions: { user: Packed<'UserLite'> | null; reaction: string; }[] = [];
 
 		for (const record of message.reactions) {

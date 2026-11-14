@@ -192,7 +192,6 @@ export class HeadlessChromeController {
 			await this.cdp.send('HeapProfiler.takeHeapSnapshot', { reportProgress: false });
 			content = chunks.join('');
 		} finally {
-			// 外さないとラウンドごとに積み上がり、古い配列にチャンクを流し続ける
 			this.cdp.off('HeapProfiler.addHeapSnapshotChunk', onChunk);
 		}
 

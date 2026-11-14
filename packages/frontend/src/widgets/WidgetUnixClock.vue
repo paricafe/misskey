@@ -100,7 +100,6 @@ watch(() => widgetProps.showMs, (to) => {
 	clearTimers();
 
 	if (to) {
-		// rafはdocumentが非表示の間はブラウザによって自動的に停止される
 		rafRequestId = window.requestAnimationFrame(function loop() {
 			tick();
 			rafRequestId = window.requestAnimationFrame(loop);

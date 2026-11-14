@@ -33,7 +33,7 @@ export function formatNumber(value: number) {
 }
 
 export function formatBytes(value: number) {
-	if (value === 0) return '0\u00A0B'; // nbspにすること
+	if (value === 0) return '0\u00A0B';
 	const units = ['B', 'KB', 'MB', 'GB'];
 	let unitIndex = 0;
 	let size = value;
@@ -44,12 +44,9 @@ export function formatBytes(value: number) {
 
 	const maximumFractionDigits = size >= 10 || unitIndex === 0 ? 0 : 1;
 	// eslint-disable-next-line no-irregular-whitespace
-	return `${numberFormatter.format(Number(size.toFixed(maximumFractionDigits)))}\u00A0${units[unitIndex]}`; // nbspにすること
+	return `${numberFormatter.format(Number(size.toFixed(maximumFractionDigits)))}\u00A0${units[unitIndex]}`;
 }
 
-/**
- * KiB単位の値をMB表記にする。/proc 由来の値の表示に使う。
- */
 export function formatKiBAsMb(valueKiB: number | null | undefined) {
 	if (valueKiB == null || !Number.isFinite(valueKiB)) return '-';
 	return `${formatNumber(valueKiB / 1000)} MB`;
@@ -70,15 +67,12 @@ export function formatSecondsAsMs(value: number | null | undefined) {
 	return formatMs(value * 1_000);
 }
 
-/**
- * 差分値を符号付きで整形する。`colorThreshold` 以上の変化があるときだけ色を付ける。
- */
 export function formatColoredDelta(delta: number, text: (value: number) => string, colorThreshold = 0) {
 	if (delta === 0) return text(0);
 	const sign = delta > 0 ? '+' : '-';
-	if (Math.abs(delta) < colorThreshold) return `$\\text{${sign}${escapeLatex(text(Math.abs(delta))).replaceAll(' ', '~')}}$`; // "1 B"とかで1とBの間で自動改行させないためnbsp(~)にする
+	if (Math.abs(delta) < colorThreshold) return `$\\text{${sign}${escapeLatex(text(Math.abs(delta))).replaceAll(' ', '~')}}$`;
 	const color = delta > 0 ? 'orange' : 'green';
-	return `$\\color{${color}}{\\text{${sign}${escapeLatex(text(Math.abs(delta))).replaceAll(' ', '~')}}}$`; // "1 B"とかで1とBの間で自動改行させないためnbsp(~)にする
+	return `$\\color{${color}}{\\text{${sign}${escapeLatex(text(Math.abs(delta))).replaceAll(' ', '~')}}}$`;
 }
 
 export function formatDeltaBytes(deltaBytes: number, colorThreshold = 0) {
@@ -89,10 +83,6 @@ export function formatDeltaPercent(deltaPercent: number, colorThreshold = 0) {
 	return formatColoredDelta(deltaPercent, formatPercent, colorThreshold);
 }
 
-/**
- * Markdownのテーブルセル内に置く差分パーセント。
- * LaTeX由来の `\%` がMarkdownのエスケープで食われるため二重エスケープする。
- */
 export function formatDeltaPercentInMdTable(deltaPercent: number, colorThreshold = 0) {
 	return formatDeltaPercent(deltaPercent, colorThreshold).replaceAll('\\%', '\\\\%');
 }

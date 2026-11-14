@@ -30,7 +30,6 @@ import { Serialized } from '@/types.js';
 import type Emitter from 'strict-event-emitter-types';
 import type { EventEmitter } from 'events';
 
-//#region Stream type-body definitions
 export interface BroadcastTypes {
 	emojiAdded: {
 		emoji: Packed<'EmojiDetailed'>;
@@ -225,11 +224,7 @@ export interface ReversiGameEventTypes {
 		userId: MiUser['id'];
 	};
 }
-//#endregion
 
-// 辞書(interface or type)から{ type, body }ユニオンを定義
-// https://stackoverflow.com/questions/49311989/can-i-infer-the-type-of-a-value-using-extends-keyof-type
-// VS Codeの展開を防止するためにEvents型を定義
 type Events<T extends object> = { [K in keyof T]: { type: K; body: T[K]; } };
 type EventUnionFromDictionary<
 	T extends object,
@@ -286,7 +281,6 @@ export interface InternalEventTypes {
 
 export type EventTypesToEventPayload<T> = EventUnionFromDictionary<UndefinedAsNullAll<SerializedAll<T>>>;
 
-// name/messages(spec) pairs dictionary
 export type GlobalEvents = {
 	internal: {
 		name: 'internal';
@@ -350,16 +344,10 @@ export type GlobalEvents = {
 	};
 };
 
-// API event definitions
-// ストリームごとのEmitterの辞書を用意
 type EventEmitterDictionary = { [x in keyof GlobalEvents]: Emitter.default<EventEmitter, { [y in GlobalEvents[x]['name']]: (e: GlobalEvents[x]['payload']) => void }> };
-// 共用体型を交差型にする型 https://stackoverflow.com/questions/54938141/typescript-convert-union-to-intersection
 type UnionToIntersection<U> = (U extends any ? (k: U) => void : never) extends ((k: infer I) => void) ? I : never;
-// Emitter辞書から共用体型を作り、UnionToIntersectionで交差型にする
 export type StreamEventEmitter = UnionToIntersection<EventEmitterDictionary[keyof GlobalEvents]>;
-// { [y in name]: (e: spec) => void }をまとめてその交差型をEmitterにかけるとts(2590)にひっかかる
 
-// provide stream channels union
 export type StreamChannels = GlobalEvents[keyof GlobalEvents]['name'];
 
 @Injectable()

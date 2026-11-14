@@ -69,7 +69,6 @@ const common = {
 		},
 		layout: 'centered',
 		chromatic: {
-			// FIXME: flaky
 			disableSnapshot: true,
 		},
 	},

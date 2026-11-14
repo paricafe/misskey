@@ -445,38 +445,23 @@ describe('misc:MemoryKVCache', () => {
 			cache.dispose();
 		});
 
-		// Regression test for https://github.com/misskey-dev/misskey/issues/15500
-		// Updated keys keep their original insertion position in Map. gc() must not
-		// assume that entries are ordered from oldest to youngest, otherwise it can
-		// stop early at an updated key and leave later, truly-expired keys alive.
-		// The key observable symptom is that gc() fails to *remove* the expired entry
-		// from the Map — get() has its own expiry check so it returns undefined either
-		// way, but the stale entry keeps consuming memory.
 		test('correctly expires old entries after a key is updated (issue #15500)', () => {
 			const lifetime = 1000;
 			const cache = new MemoryKVCache<string>(lifetime);
 
-			// Insert 'a' and 'b' at t=0
 			cache.set('a', 'v1');
 			cache.set('b', 'v1');
 
-			// Advance time and update 'a'. It stays at position 0 in the Map, so a
-			// gc() implementation that stops at the first fresh entry would leave 'b'
-			// in the Map even though get() would hide it as expired.
 			vi.advanceTimersByTime(500);
-			cache.set('a', 'v2'); // refresh 'a'; 'b' is still at t=0
+			cache.set('a', 'v2');
 
-			// 'b' is now expired, 'a' has 400ms left
-			vi.advanceTimersByTime(600); // total 1100ms
+			vi.advanceTimersByTime(600);
 
 			cache.gc();
 
-			// Verify the entry is actually removed from the Map, not just hidden by get().
-			// get() always checks expiry itself, so it returns undefined even without gc() —
-			// the real bug is memory not being freed.
 			const entries = [...cache.entries];
-			expect(entries.find(([k]) => k === 'b')).toBeUndefined(); // 'b' must be gone from Map
-			expect(entries.find(([k]) => k === 'a')?.[1].value).toBe('v2'); // 'a' still in Map
+			expect(entries.find(([k]) => k === 'b')).toBeUndefined();
+			expect(entries.find(([k]) => k === 'a')?.[1].value).toBe('v2');
 			cache.dispose();
 		});
 
@@ -542,7 +527,6 @@ describe('misc:MemoryKVCache', () => {
 			const fetcher = vi.fn().mockResolvedValue(undefined);
 			const result = await cache.fetchMaybe('key', fetcher);
 			expect(result).toBeUndefined();
-			// A second call should invoke the fetcher again because undefined was not cached
 			await cache.fetchMaybe('key', fetcher);
 			expect(fetcher).toHaveBeenCalledTimes(2);
 			cache.dispose();

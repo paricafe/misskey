@@ -100,9 +100,7 @@ const {
 } = useMkSelect({
 	items: [
 		{ value: 'all', label: i18n.ts._antennaSources.all },
-		//{ value: 'home', label: i18n.ts._antennaSources.homeTimeline },
 		{ value: 'users', label: i18n.ts._antennaSources.users },
-		//{ value: 'list', label: i18n.ts._antennaSources.userList },
 		{ value: 'users_blacklist', label: i18n.ts._antennaSources.userBlacklist },
 	],
 	initialValue: initialAntenna.src,

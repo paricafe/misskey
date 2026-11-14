@@ -51,7 +51,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 		private swSubscriptionsRepository: SwSubscriptionsRepository,
 	) {
 		super(meta, paramDef, async (ps, me) => {
-			// if already subscribed
 			const exist = await this.swSubscriptionsRepository.findOneBy({
 				userId: me.id,
 				endpoint: ps.endpoint,

@@ -238,7 +238,6 @@ function saveFields() {
 
 function save() {
 	os.apiWithDialog('i/update', {
-		// 空文字列をnullにしたいので??は使うな
 		// eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
 		name: profile.name || null,
 		// eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
@@ -261,7 +260,6 @@ function save() {
 	}).then((res) => {
 		replaceCurrentAccountData(res);
 	}).catch(() => {
-		// エラーダイアログは apiWithDialog 側で表示済み
 	});
 
 	claimAchievement('profileFilled');
@@ -282,7 +280,7 @@ function changeAvatar(ev: PointerEvent) {
 				title: i18n.ts.cannotSelectSensitiveMedia,
 				text: i18n.ts.cannotSelectSensitiveMediaDescription,
 			},
-		}).catch(() => null); // エラーダイアログは apiWithDialog 側で表示済み
+		}).catch(() => null);
 		if (i == null) return;
 
 		updateCurrentAccount({
@@ -345,7 +343,6 @@ function changeAvatar(ev: PointerEvent) {
 							avatarBlurhash: res.avatarBlurhash,
 						});
 					}).catch(() => {
-						// エラーダイアログは apiWithDialog 側で表示済み
 					});
 				},
 			},
@@ -361,7 +358,7 @@ function changeBanner(ev: PointerEvent) {
 				title: i18n.ts.cannotSelectSensitiveMedia,
 				text: i18n.ts.cannotSelectSensitiveMediaDescription,
 			},
-		}).catch(() => null); // エラーダイアログは apiWithDialog 側で表示済み
+		}).catch(() => null);
 		if (i == null) return;
 		updateCurrentAccount({
 			bannerId: i.bannerId,
@@ -420,7 +417,6 @@ function changeBanner(ev: PointerEvent) {
 							bannerUrl: res.bannerUrl,
 						});
 					}).catch(() => {
-						// エラーダイアログは apiWithDialog 側で表示済み
 					});
 				},
 			},
@@ -476,7 +472,6 @@ definePage(() => ({
 	align-items: flex-end;
 	border-radius: 6px;
 
-	/* (drag button) 32px + (drag button margin) 8px + (input width) 200px * 2 + (input gap) 12px = 452px */
 	@container (max-width: 452px) {
 		align-items: center;
 	}

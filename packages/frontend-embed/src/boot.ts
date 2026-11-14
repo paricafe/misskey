@@ -3,7 +3,6 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-// https://vitejs.dev/config/build-options.html#build-modulepreload
 import 'vite/modulepreload-polyfill';
 
 if (import.meta.env.DEV) {
@@ -32,13 +31,10 @@ import type { Theme } from '@@/js/theme.js';
 
 console.log('Misskey Embed');
 
-//#region Embedパラメータの取得・パース
 const params = new URLSearchParams(window.location.search);
 const embedParams = parseEmbedParams(params);
 if (_DEV_) console.log(embedParams);
-//#endregion
 
-//#region テーマ
 function parseThemeOrNull(theme: string | null): Theme | null {
 	if (theme == null) return null;
 	try {
@@ -74,16 +70,11 @@ if (embedParams.colorMode === 'dark') {
 		}
 	});
 }
-//#endregion
 
-//#region Detect language & fetch translations
 storeBootloaderErrors({ ...i18n.ts._bootErrors, reload: i18n.ts.reload });
-//#endregion
 
-// サイズの制限
 window.document.documentElement.style.maxWidth = '500px';
 
-// iframeIdの設定
 function setIframeIdHandler(event: MessageEvent) {
 	if (event.data?.type === 'misskey:embedParent:registerIframeId' && event.data.payload?.iframeId != null) {
 		setIframeId(event.data.payload.iframeId);
@@ -95,7 +86,7 @@ window.addEventListener('message', setIframeIdHandler);
 
 try {
 	await fetchCustomEmojis();
-} catch (err) { /* empty */ }
+} catch (err) { }
 
 const app = createApp(
 	defineAsyncComponent(() => import('@/ui.vue')),
@@ -109,8 +100,6 @@ app.provide(DI.serverContext, serverContext);
 
 app.provide(DI.embedParams, embedParams);
 
-// https://github.com/misskey-dev/misskey/pull/8575#issuecomment-1114239210
-// なぜか2回実行されることがあるため、mountするdivを1つに制限する
 const rootEl = ((): HTMLElement => {
 	const MISSKEY_MOUNT_DIV_ID = 'misskey_app';
 
@@ -131,13 +120,11 @@ postMessageToParentWindow('misskey:embed:ready');
 
 app.mount(rootEl);
 
-// boot.jsのやつを解除
 window.onerror = null;
 window.onunhandledrejection = null;
 
 removeSplash();
 
-//#region Self-XSS 対策メッセージ
 console.log(
 	`%c${i18n.ts._selfXssPrevention.warning}`,
 	'color: #f00; background-color: #ff0; font-size: 36px; padding: 4px;',
@@ -156,7 +143,6 @@ console.log(
 	'font-size: 20px; font-weight: 700; color: #f00;',
 );
 console.log(i18n.tsx._selfXssPrevention.description3({ link: 'https://misskey-hub.net/docs/for-users/resources/self-xss/' }));
-//#endregion
 
 function removeSplash() {
 	const splash = window.document.getElementById('splash');
@@ -164,7 +150,6 @@ function removeSplash() {
 		splash.style.opacity = '0';
 		splash.style.pointerEvents = 'none';
 
-		// transitionendイベントが発火しない場合があるため
 		window.setTimeout(() => {
 			splash.remove();
 		}, 1000);

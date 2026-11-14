@@ -16,14 +16,14 @@ export const buildParsedSignature = (signingString: string, signature: string, a
 	return {
 		scheme: 'Signature',
 		params: {
-			keyId: 'KeyID',	// dummy, not used for verify
+			keyId: 'KeyID',
 			algorithm: algorithm,
-			headers: ['(request-target)', 'date', 'host', 'digest'],	// dummy, not used for verify
+			headers: ['(request-target)', 'date', 'host', 'digest'],
 			signature: signature,
 		},
 		signingString: signingString,
 		algorithm: algorithm.toUpperCase(),
-		keyId: 'KeyID',	// dummy, not used for verify
+		keyId: 'KeyID',
 	};
 };
 
@@ -152,8 +152,6 @@ describe('ap-request', () => {
 			FetchAllowSoftFailMask.Strict,
 		), 'validation should pass with hash in request URL');
 
-		// fix issues like threads
-		// https://github.com/misskey-dev/misskey/issues/15039
 		const withOrWithoutWWW = [
 			'https://alice.example.com/abc',
 			'https://www.alice.example.com/abc',

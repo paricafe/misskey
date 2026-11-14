@@ -15,7 +15,6 @@ export function isBirthday(user: Misskey.entities.UserDetailed, now = new Date()
 	const m = now.getMonth() + 1;
 	const d = now.getDate();
 
-	// 閏日生まれで平年の場合は3月1日を誕生日として扱う
 	if (bm === 2 && bd === 29 && m === 3 && d === 1 && !isLeapYear(y)) {
 		return true;
 	}

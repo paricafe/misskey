@@ -19,9 +19,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 			<XAnnouncements v-if="$i"/>
 			<XStatusBars/>
 			<div :class="$style.columnsWrapper">
-				<!-- passive: https://bugs.webkit.org/show_bug.cgi?id=281300 -->
 				<div ref="columnsEl" :class="[$style.columns, { [$style.center]: prefer.r['deck.columnAlign'].value === 'center', [$style.snapScroll]: snapScroll }]" @contextmenu.self.prevent="onContextmenu" @wheel.passive.self="onWheel">
-					<!-- sectionを利用しているのは、deck.vue側でcolumnに対してfirst-of-typeを効かせるため -->
 					<section
 						v-for="ids in layout"
 						:class="$style.section"
@@ -156,19 +154,11 @@ window.addEventListener('resize', () => {
 	isMobile.value = window.innerWidth <= 500;
 });
 
-// ポインターイベント非対応用に初期値はUAから出す
 const snapScroll = ref(deviceKind === 'smartphone' || deviceKind === 'tablet');
 const withWallpaper = prefer.s['deck.wallpaper'] != null;
 const drawerMenuShowing = ref(false);
 const widgetsShowing = ref(false);
 const gap = prefer.r['deck.columnGap'];
-
-/*
-const route = 'TODO';
-watch(route, () => {
-	drawerMenuShowing.value = false;
-});
-*/
 
 function showSettings() {
 	os.pageWindow('/settings/deck');
@@ -204,7 +194,6 @@ function onContextmenu(ev: PointerEvent) {
 	}], ev);
 }
 
-// タッチでスクロールしてるときはスナップスクロールを有効にする
 function pointerEvent(ev: PointerEvent) {
 	snapScroll.value = ev.pointerType === 'touch';
 }
@@ -212,7 +201,6 @@ function pointerEvent(ev: PointerEvent) {
 window.document.addEventListener('pointerdown', pointerEvent, { passive: true });
 
 function onWheel(ev: WheelEvent) {
-	// WheelEvent はマウスからしか発火しないのでスナップスクロールは無効化する
 	snapScroll.value = false;
 	if (ev.deltaX === 0 && columnsEl.value != null) {
 		columnsEl.value.scrollLeft += ev.deltaY;
@@ -302,7 +290,6 @@ window.document.documentElement.style.scrollBehavior = 'auto';
 	display: flex;
 	flex-direction: row;
 
-	// これがないと狭い画面でマージンが広いデッキを表示したときにナビゲーションフッターが画面の外に追いやられて操作不能になる場合がある
 	min-height: 0;
 }
 

@@ -76,7 +76,6 @@ async function add() {
 
 	const id = genId();
 
-	// TODO: page-editor.vueのと共通化
 	if (type === 'text') {
 		children.value.push({
 			id,

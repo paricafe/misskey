@@ -65,7 +65,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 						.orWhere('poll.expiresAt > :now', { now: new Date() });
 				}));
 
-			//#region exclude arleady voted polls
 			const votedQuery = this.pollVotesRepository.createQueryBuilder('vote')
 				.select('vote.noteId')
 				.where('vote.userId = :meId', { meId: me.id });
@@ -74,9 +73,7 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				.andWhere(`poll.noteId NOT IN (${ votedQuery.getQuery() })`);
 
 			query.setParameters(votedQuery.getParameters());
-			//#endregion
 
-			//#region mute
 			const mutingQuery = this.mutingsRepository.createQueryBuilder('muting')
 				.select('muting.muteeId')
 				.where('muting.muterId = :muterId', { muterId: me.id });
@@ -85,13 +82,10 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				.andWhere(`poll.userId NOT IN (${ mutingQuery.getQuery() })`);
 
 			query.setParameters(mutingQuery.getParameters());
-			//#endregion
 
-			//#region exclude channels
 			if (ps.excludeChannels) {
 				query.andWhere('poll.channelId IS NULL');
 			}
-			//#endregion
 
 			const polls = await query
 				.orderBy('poll.noteId', 'DESC')

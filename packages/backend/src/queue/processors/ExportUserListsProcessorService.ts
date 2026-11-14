@@ -54,7 +54,6 @@ export class ExportUserListsProcessorService {
 			userId: user.id,
 		});
 
-		// Create temp file
 		const [path, cleanup] = await createTemp();
 
 		this.logger.info(`Temp file is ${path}`);
@@ -71,7 +70,6 @@ export class ExportUserListsProcessorService {
 
 				for (const u of users) {
 					const acct = this.utilityService.getFullApAccount(u.username, u.host);
-					// 3rd column and later will be key=value pairs
 					const content = `${list.name},${acct},withReplies=${usersWithReplies.has(u.id)}`;
 					await new Promise<void>((res, rej) => {
 						stream.write(content + '\n', err => {

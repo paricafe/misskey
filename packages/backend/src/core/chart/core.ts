@@ -3,12 +3,6 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-/**
- * チャートエンジン
- *
- * Tests located in test/chart
- */
-
 import * as nestedProperty from 'nested-property';
 import { EntitySchema, LessThan, Between } from 'typeorm';
 import { dateUTC, isTimeSame, isTimeBefore, subtractTime, addTime } from '@/misc/prelude/time.js';
@@ -31,7 +25,6 @@ type Schema = Record<string, {
 
 	range?: ValueRange;
 
-	// previousな値を引き継ぐかどうか
 	accumulate?: boolean;
 }>;
 
@@ -48,14 +41,8 @@ type TempColumnsForUnique<S extends Schema> = {
 type RawRecord<S extends Schema> = {
 	id: number;
 
-	/**
-	 * 集計のグループ
-	 */
 	group?: string | null;
 
-	/**
-	 * 集計日時のUnixタイムスタンプ(秒)
-	 */
 	date: number;
 } & TempColumnsForUnique<S> & Columns<S>;
 
@@ -66,36 +53,25 @@ const camelToSnake = (str: string): string => {
 const removeDuplicates = (array: any[]) => Array.from(new Set(array));
 
 const COLUMN_RANGE_LIMITS = {
-	small: { min: -32768, max: 32767 }, // smallint
-	medium: { min: -2147483648, max: 2147483647 }, // integer
+	small: { min: -32768, max: 32767 },
+	medium: { min: -2147483648, max: 2147483647 },
 } as const satisfies Partial<Record<ValueRange, { min: number; max: number; }>>;
 
 const getColumnRangeLimit = (range?: ValueRange): { min: number; max: number; } | null => {
 	return range === 'big' ? null : COLUMN_RANGE_LIMITS[range ?? 'medium'];
 };
 
-/**
- * カラムの型が表現できる範囲に値を丸める。
- * 範囲を超えた値を書き込もうとするとDBがエラーを返し、
- * そのチャートの更新が以降ずっと失敗し続ける(=バッファが解放されない)ため、
- * 精度を犠牲にしてでも更新自体は成功させる。
- */
 const clampToColumnRange = (value: number, range?: ValueRange): number => {
 	const limit = getColumnRangeLimit(range);
 	if (limit == null) return value;
 	return Math.min(Math.max(value, limit.min), limit.max);
 };
 
-/**
- * カラムを加減算するSQL式を作る。
- * 結果がカラムの型の範囲を超える場合は上限/下限で頭打ちにする。
- */
 const buildIncrementExpression = (columnName: string, value: number, range?: ValueRange): string => {
 	const limit = getColumnRangeLimit(range);
 	if (limit == null) {
 		return value > 0 ? `"${columnName}" + ${value}` : `"${columnName}" - ${Math.abs(value)}`;
 	}
-	// 加減算の途中でオーバーフローしないよう、bigintに広げてから丸める
 	return value > 0
 		? `LEAST("${columnName}"::bigint + ${value}, ${limit.max})`
 		: `GREATEST("${columnName}"::bigint - ${Math.abs(value)}, ${limit.min})`;
@@ -170,9 +146,6 @@ export function getJsonSchema<S extends Schema>(schema: S): ToJsonSchema<Unflatt
 	return jsonSchema as ToJsonSchema<Unflatten<ChartResult<S>>>;
 }
 
-/**
- * 様々なチャートの管理を司るクラス
- */
 // eslint-disable-next-line import/no-default-export
 export default abstract class Chart<T extends Schema> {
 	private logger: Logger;
@@ -184,20 +157,11 @@ export default abstract class Chart<T extends Schema> {
 		diff: Commit<T>;
 		group: string | null;
 	}[] = [];
-	// ↓にしたいけどfindOneとかで型エラーになる
-	//private repositoryForHour: Repository<RawRecord<T>> & MiRepository<RawRecord<T>>;
-	//private repositoryForDay: Repository<RawRecord<T>> & MiRepository<RawRecord<T>>;
 	private repositoryForHour: Repository<{ id: number; group?: string | null; date: number; }> & MiRepository<{ id: number; group?: string | null; date: number; }>;
 	private repositoryForDay: Repository<{ id: number; group?: string | null; date: number; }> & MiRepository<{ id: number; group?: string | null; date: number; }>;
 
-	/**
-	 * 1日に一回程度実行されれば良いような計算処理を入れる(主にCASCADE削除などアプリケーション側で感知できない変動によるズレの修正用)
-	 */
 	protected abstract tickMajor(group: string | null): Promise<Partial<KVs<T>>>;
 
-	/**
-	 * 少なくとも最小スパン内に1回は実行されて欲しい計算処理を入れる
-	 */
 	protected abstract tickMinor(group: string | null): Promise<Partial<KVs<T>>>;
 
 	private static convertSchemaToColumnDefinitions(schema: Schema): Record<string, { type: string; array?: boolean; default?: any; }> {
@@ -283,13 +247,6 @@ export default abstract class Chart<T extends Schema> {
 				columns: grouped ? ['date', 'group'] : ['date'],
 			}],
 			relations: {
-				/* TODO
-					group: {
-						target: () => Foo,
-						type: 'many-to-one',
-						onDelete: 'CASCADE',
-					},
-				*/
 			},
 		});
 
@@ -358,9 +315,6 @@ export default abstract class Chart<T extends Schema> {
 		}).then(x => x ?? null) as Promise<RawRecord<T> | null>;
 	}
 
-	/**
-	 * 現在(=今のHour or Day)のログをデータベースから探して、あればそれを返し、なければ作成して返します。
-	 */
 	@bindThis
 	private async claimCurrentLog(group: string | null, span: 'hour' | 'day'): Promise<RawRecord<T>> {
 		const [y, m, d, h] = Chart.getCurrentDate();
@@ -375,13 +329,11 @@ export default abstract class Chart<T extends Schema> {
 			span === 'day' ? this.repositoryForDay :
 			new Error('not happen') as never;
 
-		// 現在(=今のHour or Day)のログ
 		const currentLog = await repository.findOneBy({
 			date: Chart.dateToTimestamp(current),
 			...(group ? { group: group } : {}),
 		}) as RawRecord<T> | undefined;
 
-		// ログがあればそれを返して終了
 		if (currentLog != null) {
 			return currentLog;
 		}
@@ -389,22 +341,11 @@ export default abstract class Chart<T extends Schema> {
 		let log: RawRecord<T>;
 		let data: KVs<T>;
 
-		// 集計期間が変わってから、初めてのチャート更新なら
-		// 最も最近のログを持ってくる
-		// * 例えば集計期間が「日」である場合で考えると、
-		// * 昨日何もチャートを更新するような出来事がなかった場合は、
-		// * ログがそもそも作られずドキュメントが存在しないということがあり得るため、
-		// * 「昨日の」と決め打ちせずに「もっとも最近の」とします
 		const latest = await this.getLatestLog(group, span);
 
 		if (latest != null) {
-			// 空ログデータを作成
 			data = this.getNewLog(this.convertRawRecord(latest));
 		} else {
-			// ログが存在しなかったら
-			// (Misskeyインスタンスを建てて初めてのチャート更新時など)
-
-			// 初期ログデータを作成
 			data = this.getNewLog(null);
 
 			this.logger.info(`${this.name + (group ? `:${group}` : '')}(${span}): Initial commit created`);
@@ -415,13 +356,11 @@ export default abstract class Chart<T extends Schema> {
 
 		const unlock = await this.lock(lockKey);
 		try {
-			// ロック内でもう1回チェックする
 			const currentLog = await repository.findOneBy({
 				date: date,
 				...(group ? { group: group } : {}),
 			}) as RawRecord<T> | undefined;
 
-			// ログがあればそれを返して終了
 			if (currentLog != null) return currentLog;
 
 			const columns = {} as Record<string, number | unknown[]>;
@@ -430,7 +369,6 @@ export default abstract class Chart<T extends Schema> {
 				columns[COLUMN_PREFIX + name] = v;
 			}
 
-			// 新規ログ挿入
 			log = await repository.insertOne({
 				date: date,
 				...(group ? { group: group } : {}),
@@ -461,18 +399,8 @@ export default abstract class Chart<T extends Schema> {
 			return;
 		}
 
-		// バッファは書き込みを試みる前に切り離す。
-		// DBへの書き込みが失敗した場合、その分の集計は失われるが、
-		// バッファに残し続けると失敗し続けた場合に際限なく積み上がり、メモリリークになるため。
-		// (この処理が始まった後に追加された分は次回の書き込み対象になる)
 		const buffer = this.buffer;
 		this.buffer = [];
-
-		// TODO: 前の時間のログがbufferにあった場合のハンドリング
-		// 例えば、save が20分ごとに行われるとして、前回行われたのは 01:50 だったとする。
-		// 次に save が行われるのは 02:10 ということになるが、もし 01:55 に新規ログが buffer に追加されたとすると、
-		// そのログは本来は 01:00~ のログとしてDBに保存されて欲しいのに、02:00~ のログ扱いになってしまう。
-		// これを回避するための実装は複雑になりそうなため、一旦保留。
 
 		const update = async (logHour: RawRecord<T>, logDay: RawRecord<T>): Promise<void> => {
 			const finalDiffs = {} as Record<string, number | string[]>;
@@ -501,7 +429,7 @@ export default abstract class Chart<T extends Schema> {
 						queryForHour[name] = () => exp;
 						queryForDay[name] = () => exp;
 					}
-				} else if (Array.isArray(v) && v.length > 0) { // ユニークインクリメント
+				} else if (Array.isArray(v) && v.length > 0) {
 					const tempColumnName = UNIQUE_TEMP_COLUMN_PREFIX + k.replaceAll('.', COLUMN_DELIMITER) as string & keyof TempColumnsForUnique<T>;
 					const itemsForHour = v.filter(item => !(logHour[tempColumnName] as unknown as string[]).includes(item)).map(item => sqlStringEscape(item));
 					const itemsForDay = v.filter(item => !(logDay[tempColumnName] as unknown as string[]).includes(item)).map(item => sqlStringEscape(item));
@@ -510,7 +438,6 @@ export default abstract class Chart<T extends Schema> {
 				}
 			}
 
-			// bake cardinality
 			for (const [k, v] of Object.entries(finalDiffs)) {
 				if (this.schema[k].uniqueIncrement) {
 					const name = COLUMN_PREFIX + k.replaceAll('.', COLUMN_DELIMITER) as keyof Columns<T>;
@@ -522,8 +449,6 @@ export default abstract class Chart<T extends Schema> {
 				}
 			}
 
-			// compute intersection
-			// TODO: intersectionに指定されたカラムがintersectionだった場合の対応
 			for (const [k, v] of Object.entries(this.schema)) {
 				const intersection = v.intersection;
 				if (intersection) {
@@ -551,7 +476,6 @@ export default abstract class Chart<T extends Schema> {
 				}
 			}
 
-			// ログ更新
 			await Promise.all([
 				this.repositoryForHour.createQueryBuilder()
 					.update()
@@ -624,7 +548,6 @@ export default abstract class Chart<T extends Schema> {
 	public async clean(): Promise<void> {
 		const current = dateUTC(Chart.getCurrentDate());
 
-		// 一日以上前かつ三日以内
 		const gt = Chart.dateToTimestamp(current) - (60 * 60 * 24 * 3);
 		const lt = Chart.dateToTimestamp(current) - (60 * 60 * 24);
 
@@ -673,7 +596,6 @@ export default abstract class Chart<T extends Schema> {
 			span === 'day' ? this.repositoryForDay :
 			new Error('not happen') as never;
 
-		// ログ取得
 		let logs = await repository.find({
 			where: {
 				date: Between(Chart.dateToTimestamp(gt), Chart.dateToTimestamp(lt)),
@@ -684,10 +606,7 @@ export default abstract class Chart<T extends Schema> {
 			},
 		}) as RawRecord<T>[];
 
-		// 要求された範囲にログがひとつもなかったら
 		if (logs.length === 0) {
-			// もっとも新しいログを持ってくる
-			// (すくなくともひとつログが無いと補間できないため)
 			const recentLog = await repository.findOne({
 				where: group ? {
 					group: group,
@@ -700,11 +619,7 @@ export default abstract class Chart<T extends Schema> {
 			if (recentLog) {
 				logs = [recentLog];
 			}
-
-		// 要求された範囲の最も古い箇所に位置するログが存在しなかったら
 		} else if (!isTimeSame(new Date(logs.at(-1)!.date * 1000), gt)) {
-			// 要求された範囲の最も古い箇所時点での最も新しいログを持ってきて末尾に追加する
-			// (補間できないため)
 			const outdatedLog = await repository.findOne({
 				where: {
 					date: LessThan(Chart.dateToTimestamp(gt)),
@@ -733,7 +648,6 @@ export default abstract class Chart<T extends Schema> {
 			if (log) {
 				chart.unshift(this.convertRawRecord(log));
 			} else {
-				// 補間
 				const latest = logs.find(l => isTimeBefore(new Date(l.date * 1000), current));
 				const data = latest ? this.convertRawRecord(latest) : null;
 				chart.unshift(this.getNewLog(data));
@@ -742,12 +656,6 @@ export default abstract class Chart<T extends Schema> {
 
 		const res = {} as ChartResult<T>;
 
-		/**
-		 * [{ foo: 1, bar: 5 }, { foo: 2, bar: 6 }, { foo: 3, bar: 7 }]
-		 * を
-		 * { foo: [1, 2, 3], bar: [5, 6, 7] }
-		 * にする
-		 */
 		for (const record of chart) {
 			for (const [k, v] of Object.entries(record) as ([keyof typeof record, number])[]) {
 				if (res[k]) {

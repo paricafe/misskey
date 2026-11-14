@@ -14,9 +14,6 @@ import { ChartLoggerService } from '../ChartLoggerService.js';
 import { name, schema } from './entities/ap-request.js';
 import type { KVs } from '../core.js';
 
-/**
- * Chart about ActivityPub requests
- */
 @Injectable()
 export default class ApRequestChart extends Chart<typeof schema> { // eslint-disable-line import/no-default-export
 	constructor(

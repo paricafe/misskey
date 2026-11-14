@@ -67,10 +67,8 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 			}
 
 			await this.db.transaction(async (transactionalEntityManager) => {
-				// パスキーを全て削除
 				await transactionalEntityManager.delete(MiUserSecurityKey, { userId: user.id });
 
-				// TOTP・パスワードレスログインを無効化
 				await transactionalEntityManager.update(MiUserProfile, { userId: user.id }, {
 					twoFactorSecret: null,
 					twoFactorBackupSecret: null,

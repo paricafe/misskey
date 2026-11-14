@@ -7,7 +7,6 @@ import { PrimaryColumn, Entity, Index, JoinColumn, Column, ManyToOne } from 'typ
 import { id } from './util/id.js';
 import { MiUser } from './User.js';
 
-// TODO: 同じdomain、同じscope、同じkeyのレコードは二つ以上存在しないように制約付けたい
 @Entity('registry_item')
 export class MiRegistryItem {
 	@PrimaryColumn(id())
@@ -49,7 +48,6 @@ export class MiRegistryItem {
 	})
 	public scope: string[];
 
-	// サードパーティアプリに開放するときのためのカラム
 	@Index()
 	@Column('varchar', {
 		length: 512, nullable: true,

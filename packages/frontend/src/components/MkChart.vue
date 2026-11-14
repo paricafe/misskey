@@ -84,11 +84,6 @@ const props = withDefaults(defineProps<{
 	bar: false,
 	aspectRatio: null,
 
-	/**
-	 * @desc Overwrites current date to fix background lines of chart.
-	 * @ignore Only used for Chromatic. Don't use this for production.
-	 * @see https://github.com/misskey-dev/misskey/pull/13830#issuecomment-2155886151
-	 */
 	nowForChromatic: undefined,
 });
 
@@ -233,7 +228,6 @@ const render = () => {
 					},
 					ticks: {
 						display: props.detailed,
-						//mirror: true,
 					},
 				},
 			},
@@ -296,7 +290,6 @@ const render = () => {
 };
 
 const exportData = () => {
-	// TODO
 };
 
 const fetchFederationChart = async (): Promise<typeof chartData> => {

@@ -44,13 +44,10 @@ describe('Block', () => {
 			strictEqual(followers.length, 0);
 		});
 
-		// FIXME: this is invalid case
 		test('Cannot follow even if unblocked', async () => {
-			// unblock here
 			await alice.client.request('blocking/delete', { userId: bobInA.id });
 			await sleep();
 
-			// TODO: why still being blocked?
 			await rejects(
 				async () => await bob.client.request('following/create', { userId: aliceInB.id }),
 				(err: any) => {
@@ -167,16 +164,13 @@ describe('Block', () => {
 			);
 		});
 
-		// FIXME: this is invalid case
 		test('Cannot reaction even if unblocked', async () => {
-			// unblock here
 			await alice.client.request('blocking/delete', { userId: bobInA.id });
 			await sleep();
 
 			const note = (await alice.client.request('notes/create', { text: 'a' })).createdNote;
 			const resolvedNote = await resolveRemoteNote('a.test', note.id, bob);
 
-			// TODO: why still being blocked?
 			await rejects(
 				async () => await bob.client.request('notes/reactions/create', { noteId: resolvedNote.id, reaction: '😅' }),
 				(err: any) => {
@@ -215,7 +209,6 @@ describe('Block', () => {
 			]);
 		});
 
-		/** NOTE: You should mute the target to stop receiving notifications */
 		test('Can mention and notified even if blocked', async () => {
 			await alice.client.request('blocking/create', { userId: bobInA.id });
 			await waitForBlocked(bob, aliceInB.id);

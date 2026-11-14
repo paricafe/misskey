@@ -76,7 +76,7 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 	) {
 		super(meta, paramDef, async (ps, me) => {
 			const userIdsWhoBlockingMe = me ? await this.cacheService.userBlockedCache.fetch(me.id) : new Set<string>();
-			const iAmModerator = me ? await this.roleService.isModerator(me) : false; // Moderators can see reactions of all users
+			const iAmModerator = me ? await this.roleService.isModerator(me) : false;
 			if (!iAmModerator) {
 				const user = await this.cacheService.findUserById(ps.userId);
 				if (this.userEntityService.isRemoteUser(user)) {
@@ -88,7 +88,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 					throw new ApiError(meta.errors.reactionsNotPublic);
 				}
 
-				// early return if me is blocked by requesting user
 				if (userIdsWhoBlockingMe.has(ps.userId)) {
 					return [];
 				}
@@ -113,7 +112,7 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 			const reactions = (await query
 				.limit(ps.limit)
 				.getMany()).filter(reaction => {
-				if (reaction.note?.userId === ps.userId) return true; // we can see reactions to note of requesting user
+				if (reaction.note?.userId === ps.userId) return true;
 				if (me && isUserRelated(reaction.note, userIdsWhoBlockingMe)) return false;
 				if (me && isUserRelated(reaction.note, userIdsWhoMeMuting)) return false;
 

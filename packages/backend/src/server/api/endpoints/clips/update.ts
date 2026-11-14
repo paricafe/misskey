@@ -53,7 +53,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 	) {
 		super(meta, paramDef, async (ps, me) => {
 			try {
-				// 空文字列をnullにしたいので??は使わない
 				// eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
 				await this.clipService.update(me, ps.clipId, ps.name, ps.isPublic, ps.description || null);
 			} catch (e) {

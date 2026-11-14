@@ -88,11 +88,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 								</MkSwitch>
 							</SearchMarker>
 
-							<!-- 現状 false positive が多すぎて実用に耐えない
-					<MkSwitch v-model="disallowUploadWhenPredictedAsPorn">
-						<template #label>{{ i18n.ts._sensitiveMediaDetection.disallowUploadWhenPredictedAsPorn }}</template>
-					</MkSwitch>
-					-->
 						</div>
 					</MkFolder>
 				</SearchMarker>

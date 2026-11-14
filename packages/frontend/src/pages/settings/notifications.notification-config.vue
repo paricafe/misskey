@@ -48,7 +48,7 @@ import { i18n } from '@/i18n.js';
 const props = defineProps<{
 	value: NotificationConfig;
 	userLists: Misskey.entities.UserList[];
-	configurableTypes?: NotificationConfig['type'][]; // If not specified, all types are configurable
+	configurableTypes?: NotificationConfig['type'][];
 }>();
 
 const emit = defineEmits<{

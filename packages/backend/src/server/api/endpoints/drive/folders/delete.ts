@@ -52,7 +52,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 		private globalEventService: GlobalEventService,
 	) {
 		super(meta, paramDef, async (ps, me) => {
-			// Get folder
 			const folder = await this.driveFoldersRepository.findOneBy({
 				id: ps.folderId,
 				userId: me.id,
@@ -73,7 +72,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 
 			await this.driveFoldersRepository.delete(folder.id);
 
-			// Publish folderCreated event
 			this.globalEventService.publishDriveStream(me.id, 'folderDeleted', folder.id);
 		});
 	}

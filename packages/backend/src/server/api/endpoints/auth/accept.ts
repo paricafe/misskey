@@ -51,7 +51,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 		private idService: IdService,
 	) {
 		super(meta, paramDef, async (ps, me) => {
-			// Fetch token
 			const session = await this.authSessionsRepository
 				.findOneBy({ token: ps.token });
 
@@ -61,7 +60,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 
 			const accessToken = secureRndstr(32);
 
-			// Fetch exist access token
 			const exist = await this.accessTokensRepository.exists({
 				where: {
 					appId: session.appId,
@@ -72,7 +70,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 			if (!exist) {
 				const app = await this.appsRepository.findOneByOrFail({ id: session.appId });
 
-				// Generate Hash
 				const sha256 = crypto.createHash('sha256');
 				sha256.update(accessToken + app.secret);
 				const hash = sha256.digest('hex');
@@ -89,7 +86,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				});
 			}
 
-			// Update session
 			await this.authSessionsRepository.update(session.id, {
 				userId: me.id,
 			});

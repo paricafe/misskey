@@ -26,7 +26,6 @@ export class DriveChannel extends Channel {
 
 	@bindThis
 	public async init(params: JsonObject) {
-		// Subscribe drive stream
 		this.subscriber.on(`driveStream:${this.user!.id}`, this.onData);
 	}
 

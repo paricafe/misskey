@@ -28,7 +28,6 @@ import type { ReactionService } from '../ReactionService.js';
 import type { UserEntityService } from './UserEntityService.js';
 import type { DriveFileEntityService } from './DriveFileEntityService.js';
 
-// is-renote.tsとよしなにリンク
 function isPureRenote(note: MiNote): note is MiNote & { renoteId: MiNote['id']; renote: MiNote } {
 	return (
 		note.renote != null &&
@@ -103,13 +102,6 @@ export class NoteEntityService implements OnModuleInit {
 		@Inject(DI.channelsRepository)
 		private channelsRepository: ChannelsRepository,
 
-		//private userEntityService: UserEntityService,
-		//private driveFileEntityService: DriveFileEntityService,
-		//private customEmojiService: CustomEmojiService,
-		//private reactionService: ReactionService,
-		//private reactionsBufferingService: ReactionsBufferingService,
-		//private idService: IdService,
-		//private cacheService: CacheService,
 	) {
 	}
 
@@ -138,9 +130,7 @@ export class NoteEntityService implements OnModuleInit {
 	@bindThis
 	public async shouldHideNote(packedNote: Packed<'Note'>, meId: MiUser['id'] | null): Promise<boolean> {
 		if (meId === packedNote.userId) return false;
-		// TODO: isVisibleForMe を使うようにしても良さそう(型違うけど)
 
-		// TODO: ugcVisibilityForVisitor が local の場合も、付随するリモートのノートをリンクだけ残して内容を隠せるようにする
 		if (meId == null && this.meta.ugcVisibilityForVisitor === 'none') return true;
 
 		if (packedNote.user.requireSigninToViewContents && meId == null) {
@@ -152,12 +142,10 @@ export class NoteEntityService implements OnModuleInit {
 			return true;
 		}
 
-		// visibility が specified かつ自分が指定されていなかったら非表示
 		if (packedNote.visibility === 'specified') {
 			if (meId == null) {
 				return true;
 			} else {
-				// 指定されているかどうか
 				const specified = packedNote.visibleUserIds!.some(id => meId === id);
 
 				if (!specified) {
@@ -166,18 +154,14 @@ export class NoteEntityService implements OnModuleInit {
 			}
 		}
 
-		// visibility が followers かつ自分が投稿者のフォロワーでなかったら非表示
 		if (packedNote.visibility === 'followers') {
 			if (meId == null) {
 				return true;
 			} else if (packedNote.reply && (meId === packedNote.reply.userId)) {
-				// 自分の投稿に対するリプライ
 				return false;
 			} else if (packedNote.mentions && packedNote.mentions.some(id => meId === id)) {
-				// 自分へのメンション
 				return false;
 			} else {
-				// フォロワーかどうか
 				const followings = await this.cacheService.userFollowingsCache.fetch(meId);
 				if (!Object.hasOwn(followings, packedNote.userId)) {
 					return true;
@@ -198,7 +182,6 @@ export class NoteEntityService implements OnModuleInit {
 		packedNote.cw = null;
 		packedNote.history = undefined;
 		packedNote.isHidden = true;
-		// TODO: hiddenReason みたいなのを提供しても良さそう
 	}
 
 	@bindThis
@@ -285,7 +268,6 @@ export class NoteEntityService implements OnModuleInit {
 			}
 		}
 
-		// パフォーマンスのためノートが作成されてから2秒以上経っていない場合はリアクションを取得しない
 		if (this.idService.parse(note.id).date.getTime() + 2000 > Date.now()) {
 			return undefined;
 		}
@@ -321,33 +303,26 @@ export class NoteEntityService implements OnModuleInit {
 
 	@bindThis
 	public async isVisibleForMe(note: MiNote, meId: MiUser['id'] | null): Promise<boolean> {
-		// This code must always be synchronized with the checks in QueryService.generateVisibilityQuery.
-		// visibility が specified かつ自分が指定されていなかったら非表示
 		if (note.visibility === 'specified') {
 			if (meId == null) {
 				return false;
 			} else if (meId === note.userId) {
 				return true;
 			} else {
-				// 指定されているかどうか
 				return note.visibleUserIds.some(id => meId === id);
 			}
 		}
 
-		// visibility が followers かつ自分が投稿者のフォロワーでなかったら非表示
 		if (note.visibility === 'followers') {
 			if (meId == null) {
 				return false;
 			} else if (meId === note.userId) {
 				return true;
 			} else if (note.replyUserId && (meId === note.replyUserId)) {
-				// 自分の投稿に対するリプライ
 				return true;
 			} else if (note.mentions && note.mentions.some(id => meId === id)) {
-				// 自分へのメンション
 				return true;
 			} else {
-				// フォロワーかどうか
 				const [blocked, following, user] = await Promise.all([
 					this.cacheService.userBlockingCache.fetch(meId).then((ids) => ids.has(note.userId)),
 					this.followingsRepository.count({
@@ -360,13 +335,6 @@ export class NoteEntityService implements OnModuleInit {
 					this.usersRepository.findOneByOrFail({ id: meId }),
 				]);
 
-				/* If we know the following, everyhting is fine.
-
-				But if we do not know the following, it might be that both the
-				author of the note and the author of the like are remote users,
-				in which case we can never know the following. Instead we have
-				to assume that the users are following each other.
-				*/
 				return following > 0 || (note.userHost != null && user.host != null);
 			}
 		}
@@ -403,7 +371,6 @@ export class NoteEntityService implements OnModuleInit {
 			detail?: boolean;
 			skipHide?: boolean;
 			withReactionAndUserPairCache?: boolean;
-			// Edit history is excluded unless requested; it is loaded separately.
 			withHistory?: boolean;
 			_hint_?: {
 				bufferedReactions: Map<MiNote['id'], BufferedReactions> | null;
@@ -446,7 +413,7 @@ export class NoteEntityService implements OnModuleInit {
 			: null;
 
 		const reactionEmojiNames = Object.keys(reactions)
-			.filter(x => x.startsWith(':') && x.includes('@') && !x.includes('@.')) // リモートカスタム絵文字のみ
+			.filter(x => x.startsWith(':') && x.includes('@') && !x.includes('@.'))
 			.map(x => this.reactionService.decodeReaction(x).reaction.replaceAll(':', ''));
 		const packedFiles = options?._hint_?.packedFiles;
 		const packedUsers = options?._hint_?.packedUsers;
@@ -495,7 +462,6 @@ export class NoteEntityService implements OnModuleInit {
 			...(opts.detail ? {
 				clippedCount: note.clippedCount,
 
-				// そもそもJOINしていない場合はundefined、JOINしたけど存在していなかった場合はnullで区別される
 				reply: (note.replyId && note.reply === null) ? null : note.replyId ? nullIfEntityNotFound(this.pack(note.reply ?? note.replyId, me, {
 					detail: false,
 					skipHide: opts.skipHide,
@@ -503,7 +469,6 @@ export class NoteEntityService implements OnModuleInit {
 					_hint_: options?._hint_,
 				})) : undefined,
 
-				// そもそもJOINしていない場合はundefined、JOINしたけど存在していなかった場合はnullで区別される
 				renote: (note.renoteId && note.renote === null) ? null : note.renoteId ? nullIfEntityNotFound(this.pack(note.renote ?? note.renoteId, me, {
 					detail: true,
 					skipHide: opts.skipHide,
@@ -553,7 +518,6 @@ export class NoteEntityService implements OnModuleInit {
 			const pollNoteIds = new Set<MiNote['id']>();
 			const visited = new Set<MiNote['id']>();
 			for (const root of notes) {
-				// Replies are packed without detail, but loaded renotes include their polls.
 				let note: MiNote | null = root;
 				while (note != null && !visited.has(note.id)) {
 					visited.add(note.id);
@@ -569,7 +533,6 @@ export class NoteEntityService implements OnModuleInit {
 			]);
 			for (const poll of fetchedPolls) polls.set(poll.noteId, poll);
 			if (meId) {
-				// Missing keys remain distinguishable from polls with no votes, so unloaded renotes can fall back.
 				for (const id of pollNoteIds) myVotes.set(id, []);
 				for (const vote of votes) myVotes.get(vote.noteId)!.push(vote);
 			}
@@ -579,10 +542,8 @@ export class NoteEntityService implements OnModuleInit {
 		if (meId) {
 			const idsNeedFetchMyReaction = new Set<MiNote['id']>();
 
-			// パフォーマンスのためノートが作成されてから2秒以上経っていない場合はリアクションを取得しない
 			const oldId = this.idService.gen(Date.now() - 2000);
 
-			// Renotes are packed with detail, so quoted notes in the renote chain need a reaction too.
 			const reactionNotes: MiNote[] = [];
 			const visited = new Set<MiNote['id']>();
 			for (const root of notes) {
@@ -624,7 +585,6 @@ export class NoteEntityService implements OnModuleInit {
 		}
 
 		await this.customEmojiService.prefetchEmojis(this.aggregateNoteEmojis(notes));
-		// TODO: 本当は renote とか reply がないのに renoteId とか replyId があったらここで解決しておく
 		const fileIds = notes.map(n => [n.fileIds, n.renote?.fileIds, n.reply?.fileIds]).flat(2).filter(x => x != null);
 		const packedFiles = fileIds.length > 0 ? await this.driveFileEntityService.packManyByIdsMap(fileIds) : new Map();
 		const users = [
@@ -687,7 +647,6 @@ export class NoteEntityService implements OnModuleInit {
 	@bindThis
 	public async fetchDiffs(noteIds: MiNote['id'][], meId: MiUser['id'] | null = null) {
 		if (noteIds.length === 0) return [];
-		// TODO: ugcVisibilityForVisitor が local の場合の扱いを shouldHideNote と揃える
 		if (meId == null && this.meta.ugcVisibilityForVisitor === 'none') return [];
 
 		const fetched = await this.notesRepository.find({
@@ -725,7 +684,7 @@ export class NoteEntityService implements OnModuleInit {
 			const reactions = this.reactionService.convertLegacyReactions(this.reactionsBufferingService.mergeReactions(note.reactions, deltas));
 
 			const reactionEmojiNames = Object.keys(reactions)
-				.filter(x => x.startsWith(':') && x.includes('@') && !x.includes('@.')) // リモートカスタム絵文字のみ
+				.filter(x => x.startsWith(':') && x.includes('@') && !x.includes('@.'))
 				.map(x => this.reactionService.decodeReaction(x).reaction.replaceAll(':', ''));
 
 			return this.customEmojiService.populateEmojis(reactionEmojiNames, note.userHost).then(reactionEmojis => ({

@@ -251,7 +251,7 @@ async function accept(user: Misskey.entities.UserLite) {
 useInterval(matchHeatbeat, 1000 * 5, {
 	immediate: false,
 	afterMounted: true,
-	keepRunningWhenHidden: true, // バックグラウンドタブでもマッチング待機を維持する必要がある
+	keepRunningWhenHidden: true,
 });
 
 onMounted(() => {

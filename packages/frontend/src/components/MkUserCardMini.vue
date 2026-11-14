@@ -33,7 +33,6 @@ const chartValues = ref<number[] | null>(null);
 onMounted(() => {
 	if (props.withChart) {
 		misskeyApiGet('charts/user/notes', { userId: props.user.id, limit: 16 + 1, span: 'day' }).then(res => {
-			// 今日のぶんの値はまだ途中の値であり、それも含めると大抵の場合前日よりも下降しているようなグラフになってしまうため今日は弾く
 			res.inc.splice(0, 1);
 			chartValues.value = res.inc;
 		});

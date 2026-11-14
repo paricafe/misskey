@@ -137,7 +137,6 @@ describe('SigninWithPasskeyApiService', () => {
 		});
 	});
 	describe('Try Passkey Auth', () => {
-		// context is generated server-side by randomUUID(), and the API rejects anything that is not a UUID
 		const dummyContext = '882042b6-bb28-4d79-8d63-f869488ef4ef';
 
 		it('Should Success', async () => {

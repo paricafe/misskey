@@ -22,12 +22,10 @@ export class MiPromoNote {
 	@Column('timestamp with time zone')
 	public expiresAt: Date;
 
-	//#region Denormalized fields
 	@Index()
 	@Column({
 		...id(),
 		comment: '[Denormalized]',
 	})
 	public userId: MiUser['id'];
-	//#endregion
 }

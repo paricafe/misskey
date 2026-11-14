@@ -43,7 +43,6 @@ describe('クリップ', () => {
 			...request,
 		});
 
-		// 入力が結果として入っていること
 		assert.deepStrictEqual(clip, {
 			...clip,
 			...defaultCreate(),
@@ -70,7 +69,6 @@ describe('クリップ', () => {
 			...request,
 		});
 
-		// 入力が結果として入っていること。clipIdはidになるので消しておく
 		delete (parameters as { clipId?: string }).clipId;
 		assert.deepStrictEqual(clip, {
 			...clip,
@@ -132,7 +130,6 @@ describe('クリップ', () => {
 	}, 1000 * 60 * 2);
 
 	afterEach(async () => {
-		// テスト間で影響し合わないように毎回全部消す。
 		for (const user of [alice, bob]) {
 			const list = await api('clips/list', { limit: 11 }, user);
 			for (const clip of list.body) {
@@ -143,7 +140,6 @@ describe('クリップ', () => {
 
 	test('の作成ができる', async () => {
 		const res = await create();
-		// ISO 8601で日付が返ってくること
 		assert.strictEqual(res.createdAt, new Date(res.createdAt).toISOString());
 		assert.strictEqual(res.lastClippedAt, null);
 		assert.strictEqual(res.name, 'test');
@@ -226,7 +222,6 @@ describe('クリップ', () => {
 			isPublic: true,
 		});
 
-		// ISO 8601で日付が返ってくること
 		assert.strictEqual(res.createdAt, new Date(res.createdAt).toISOString());
 		assert.strictEqual(res.lastClippedAt, null);
 		assert.strictEqual(res.name, 'updated');
@@ -371,7 +366,6 @@ describe('クリップ', () => {
 			parameters: { limit: clips.length },
 		});
 
-		// 作成responseの配列には順序保障がないのでidでソートして厳密比較
 		assert.deepStrictEqual(res.toReversed(), clips.sort(compareBy(s => s.id)));
 	});
 
@@ -391,12 +385,10 @@ describe('クリップ', () => {
 			userId: alice.id,
 		});
 
-		// 返ってくる配列には順序保障がないのでidでソートして厳密比較
 		assert.deepStrictEqual(
 			res.sort(compareBy<Misskey.entities.Clip>(s => s.id)),
 			clips.sort(compareBy(s => s.id)));
 
-		// 認証状態で見たときだけisFavoritedが入っている
 		for (const clip of res) {
 			assert.strictEqual(clip.isFavorited, false);
 		}
@@ -415,7 +407,6 @@ describe('クリップ', () => {
 			user: (user ?? (() => alice))(),
 		});
 
-		// 未認証で見たときはisFavoritedは入らない
 		for (const clip of res) {
 			assert.strictEqual('isFavorited' in clip, false);
 		}
@@ -441,10 +432,9 @@ describe('クリップ', () => {
 			limit: 4,
 		});
 
-		// Promise.allで返ってくる配列には順序保障がないのでidでソートして厳密比較
 		assert.deepStrictEqual(
 			res.sort(compareBy<Misskey.entities.Clip>(s => s.id)),
-			[clips[2], clips[3], clips[4]], // sinceIdとuntilId自体は結果に含まれない
+			[clips[2], clips[3], clips[4]],
 			clips[1].id + ' ... ' + clips[3].id + ' with ' + clips.map(s => s.id) + ' vs. ' + res.map(s => s.id));
 	});
 
@@ -538,7 +528,6 @@ describe('クリップ', () => {
 			assert.strictEqual(clip.favoritedCount, 1);
 			assert.strictEqual(clip.isFavorited, true);
 
-			// isFavoritedは見る人によって切り替わる。
 			const clip2 = await show({ clipId: publicClip.id });
 			assert.strictEqual(clip2.favoritedCount, 1);
 			assert.strictEqual(clip2.isFavorited, false);
@@ -567,7 +556,6 @@ describe('クリップ', () => {
 				await favorite({ clipId: clip.id });
 			}
 
-			// pagenationはない。全部一気にとれる。
 			const favorited = await myFavorites();
 			assert.strictEqual(favorited.length, clips.length);
 			for (const clip of favorited) {
@@ -716,7 +704,6 @@ describe('クリップ', () => {
 			assert.strictEqual(res.lastClippedAt, res.lastClippedAt ? new Date(res.lastClippedAt).toISOString() : null);
 			assert.deepStrictEqual((await notes({ clipId: aliceClip.id })).map(x => x.id), [aliceNote.id]);
 
-			// 他人の非公開ノートも突っ込める
 			await addNote({ clipId: aliceClip.id, noteId: bobHomeNote.id });
 			await addNote({ clipId: aliceClip.id, noteId: bobFollowersNote.id });
 			await addNote({ clipId: aliceClip.id, noteId: bobSpecifiedNote.id });
@@ -738,7 +725,6 @@ describe('クリップ', () => {
 			});
 		});
 
-		// TODO: 17000msくらいかかる...
 		test('をポリシーで定められた上限いっぱい(200)を超えて追加はできない。', async () => {
 			const noteLimit = DEFAULT_POLICIES.noteEachClipsLimit;
 			const noteList = await Promise.all([...Array(noteLimit)].map((_, i) => post(alice, {
@@ -833,7 +819,6 @@ describe('クリップ', () => {
 				id: 'aff017de-190e-434b-893e-33a9ff5049d8',
 			});
 
-			// 誤って減算されていれば再追加後も +1 に届かず waitFor がタイムアウトする
 			await addNote({ clipId: aliceClip.id, noteId: aliceNote.id });
 			await vi.waitFor(async () => {
 				assert.strictEqual((await showNote()).clippedCount, clippedCountBefore + 1);
@@ -852,15 +837,15 @@ describe('クリップ', () => {
 			{ label: 'noteId未指定', parameters: { noteId: undefined } },
 			{ label: '存在しないクリップ', parameters: { clipId: 'xxxxxx' }, assetion: {
 				code: 'NO_SUCH_CLIP',
-				id: 'b80525c6-97f7-49d7-a42d-ebccd49cfd52', // add-noteと異なる
+				id: 'b80525c6-97f7-49d7-a42d-ebccd49cfd52',
 			} },
 			{ label: '存在しないノート', parameters: { noteId: 'xxxxxx' }, assetion: {
 				code: 'NO_SUCH_NOTE',
-				id: 'aff017de-190e-434b-893e-33a9ff5049d8', // add-noteと異なる
+				id: 'aff017de-190e-434b-893e-33a9ff5049d8',
 			} },
 			{ label: '他人のクリップ', user: () => bob, assetion: {
 				code: 'NO_SUCH_CLIP',
-				id: 'b80525c6-97f7-49d7-a42d-ebccd49cfd52', // add-noteと異なる
+				id: 'b80525c6-97f7-49d7-a42d-ebccd49cfd52',
 			} },
 		])('の削除は$labelだとできない', async ({ parameters, user, assetion }) => failedApiCall({
 			endpoint: 'clips/remove-note',
@@ -887,8 +872,6 @@ describe('クリップ', () => {
 
 			const res = await notes({ clipId: aliceClip.id });
 
-			// 自分のノートは非公開でも入れられるし、見える
-			// 他人の非公開ノートは入れられるけど、除外される
 			const expects = [
 				aliceNote, aliceHomeNote, aliceFollowersNote, aliceSpecifiedNote,
 				bobNote, bobHomeNote,
@@ -911,7 +894,6 @@ describe('クリップ', () => {
 				limit: 3,
 			});
 
-			// Promise.allで返ってくる配列はID順で並んでないのでソートして厳密比較
 			const expects = [noteList[3], noteList[4], noteList[5]];
 			assert.deepStrictEqual(
 				res.sort(compareBy(s => s.id)).map(x => x.id),
@@ -931,7 +913,6 @@ describe('クリップ', () => {
 				untilId: noteList[4].id,
 			});
 
-			// Promise.allで返ってくる配列はID順で並んでないのでソートして厳密比較
 			const expects = [noteList[2], noteList[3]];
 			assert.deepStrictEqual(
 				res.sort(compareBy(s => s.id)).map(x => x.id),

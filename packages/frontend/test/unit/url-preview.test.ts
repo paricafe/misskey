@@ -51,7 +51,6 @@ describe('MkUrlPreview', () => {
 		const mkUrlPreview = await renderPreviewBy(summary);
 		const buttons = mkUrlPreview.getAllByRole('button');
 		buttons[0].click();
-		// Wait for the click event to be fired
 		await Promise.resolve();
 
 		return mkUrlPreview.container.querySelector('iframe');

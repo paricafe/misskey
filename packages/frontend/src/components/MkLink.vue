@@ -40,7 +40,6 @@ const target = computed(() => (self.value ? null : '_blank'));
 const el = ref<HTMLElement | { $el: HTMLElement }>();
 
 if (isEnabledUrlPreview.value) {
-	// URL が変わったら古い URL のプレビューを閉じる
 	let previewShowing: Ref<boolean> | null = null;
 	watch(() => props.url, () => {
 		if (previewShowing != null) previewShowing.value = false;

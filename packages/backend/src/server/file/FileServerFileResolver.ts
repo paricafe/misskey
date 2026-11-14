@@ -71,7 +71,6 @@ export class FileServerFileResolver {
 	}
 
 	public async resolveFileByAccessKey(key: string): Promise<FileResolveResult> {
-		// Fetch drive file
 		const file = await this.driveFilesRepository.createQueryBuilder('file')
 			.where('file.accessKey = :accessKey', { accessKey: key })
 			.orWhere('file.thumbnailAccessKey = :thumbnailAccessKey', { thumbnailAccessKey: key })
@@ -87,7 +86,7 @@ export class FileServerFileResolver {
 			if (!(file.isLink && file.uri)) return { kind: 'unavailable' };
 			const result = await this.downloadAndDetectTypeFromUrl(file.uri);
 			const { kind: _kind, ...downloaded } = result;
-			file.size = (await fs.promises.stat(downloaded.path)).size;	// DB file.sizeは正確とは限らないので
+			file.size = (await fs.promises.stat(downloaded.path)).size;
 			return {
 				kind: 'remote',
 				...downloaded,
@@ -119,7 +118,6 @@ export class FileServerFileResolver {
 			fileRole: 'original',
 			file,
 			filename: file.name,
-			// 古いファイルは修正前のmimeを持っているのでできるだけ修正してあげる
 			mime: this.fileInfoService.fixMime(file.type),
 			ext: null,
 			path,

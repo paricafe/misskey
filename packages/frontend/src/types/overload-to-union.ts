@@ -5,7 +5,6 @@
 
 type FlattenAndDedup<T> = T extends (...args: infer A) => infer R ? (...args: A) => R : never;
 
-// 10個で足りなかった場合は増やす
 export type OverloadToUnion<T> = FlattenAndDedup<T extends {
 	(...args: infer A1): infer R1;
 	(...args: infer A2): infer R2;

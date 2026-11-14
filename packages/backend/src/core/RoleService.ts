@@ -32,7 +32,6 @@ import { FanoutTimelineService } from '@/core/FanoutTimelineService.js';
 import { NotificationService } from '@/core/NotificationService.js';
 import type { OnApplicationShutdown, OnModuleInit } from '@nestjs/common';
 
-// misskey-js の rolePolicies と同期すべし
 export type RolePolicies = {
 	gtlAvailable: boolean;
 	ltlAvailable: boolean;
@@ -167,8 +166,8 @@ export class RoleService implements OnApplicationShutdown, OnModuleInit {
 		private moderationLogService: ModerationLogService,
 		private fanoutTimelineService: FanoutTimelineService,
 	) {
-		this.rolesCache = new MemorySingleCache<MiRole[]>(1000 * 60 * 60); // 1h
-		this.roleAssignmentByUserIdCache = new MemoryKVCache<MiRoleAssignment[]>(1000 * 60 * 5); // 5m
+		this.rolesCache = new MemorySingleCache<MiRole[]>(1000 * 60 * 60);
+		this.roleAssignmentByUserIdCache = new MemoryKVCache<MiRoleAssignment[]>(1000 * 60 * 5);
 
 		this.redisForSub.on('message', this.onMessage);
 	}
@@ -219,11 +218,11 @@ export class RoleService implements OnApplicationShutdown, OnModuleInit {
 				case 'userRoleAssigned': {
 					const cached = this.roleAssignmentByUserIdCache.get(body.userId);
 					if (cached) {
-						cached.push({ // TODO: このあたりのデシリアライズ処理は各modelファイル内に関数としてexportしたい
+						cached.push({
 							...body,
 							expiresAt: body.expiresAt ? new Date(body.expiresAt) : null,
-							user: null, // joinなカラムは通常取ってこないので
-							role: null, // joinなカラムは通常取ってこないので
+							user: null,
+							role: null,
 						});
 					}
 					break;
@@ -245,79 +244,60 @@ export class RoleService implements OnApplicationShutdown, OnModuleInit {
 	private evalCond(user: MiUser, roles: MiRole[], value: RoleCondFormulaValue): boolean {
 		try {
 			switch (value.type) {
-				// ～かつ～
 				case 'and': {
 					return value.values.every(v => this.evalCond(user, roles, v));
 				}
-				// ～または～
 				case 'or': {
 					return value.values.some(v => this.evalCond(user, roles, v));
 				}
-				// ～ではない
 				case 'not': {
 					return !this.evalCond(user, roles, value.value);
 				}
-				// マニュアルロールがアサインされている
 				case 'roleAssignedTo': {
 					return roles.some(r => r.id === value.roleId);
 				}
-				// ローカルユーザのみ
 				case 'isLocal': {
 					return this.userEntityService.isLocalUser(user);
 				}
-				// リモートユーザのみ
 				case 'isRemote': {
 					return this.userEntityService.isRemoteUser(user);
 				}
-				// サスペンド済みユーザである
 				case 'isSuspended': {
 					return user.isSuspended;
 				}
-				// 鍵アカウントユーザである
 				case 'isLocked': {
 					return user.isLocked;
 				}
-				// botユーザである
 				case 'isBot': {
 					return user.isBot;
 				}
-				// 猫である
 				case 'isCat': {
 					return user.isCat;
 				}
-				// 「ユーザを見つけやすくする」が有効なアカウント
 				case 'isExplorable': {
 					return user.isExplorable;
 				}
-				// ユーザが作成されてから指定期間経過した
 				case 'createdLessThan': {
 					return this.idService.parse(user.id).date.getTime() > (Date.now() - (value.sec * 1000));
 				}
-				// ユーザが作成されてから指定期間経っていない
 				case 'createdMoreThan': {
 					return this.idService.parse(user.id).date.getTime() < (Date.now() - (value.sec * 1000));
 				}
-				// フォロワー数が指定値以下
 				case 'followersLessThanOrEq': {
 					return user.followersCount <= value.value;
 				}
-				// フォロワー数が指定値以上
 				case 'followersMoreThanOrEq': {
 					return user.followersCount >= value.value;
 				}
-				// フォロー数が指定値以下
 				case 'followingLessThanOrEq': {
 					return user.followingCount <= value.value;
 				}
-				// フォロー数が指定値以上
 				case 'followingMoreThanOrEq': {
 					return user.followingCount >= value.value;
 				}
-				// ノート数が指定値以下
 				case 'notesLessThanOrEq': {
 					return user.notesCount <= value.value;
 				}
-				// ノート数が指定値以上
 				case 'notesMoreThanOrEq': {
 					return user.notesCount >= value.value;
 				}
@@ -325,7 +305,6 @@ export class RoleService implements OnApplicationShutdown, OnModuleInit {
 					return false;
 			}
 		} catch (_) {
-			// TODO: log error
 			return false;
 		}
 	}
@@ -340,7 +319,6 @@ export class RoleService implements OnApplicationShutdown, OnModuleInit {
 	public async getUserAssigns(userId: MiUser['id']) {
 		const now = Date.now();
 		let assigns = await this.roleAssignmentByUserIdCache.fetch(userId, () => this.roleAssignmentsRepository.findBy({ userId }));
-		// 期限切れのロールを除外
 		assigns = assigns.filter(a => a.expiresAt == null || (a.expiresAt.getTime() > now));
 		return assigns;
 	}
@@ -355,14 +333,10 @@ export class RoleService implements OnApplicationShutdown, OnModuleInit {
 		return [...assignedRoles, ...matchedCondRoles];
 	}
 
-	/**
-	 * 指定ユーザーのバッジロール一覧取得
-	 */
 	@bindThis
 	public async getUserBadgeRoles(userId: MiUser['id']) {
 		const now = Date.now();
 		let assigns = await this.roleAssignmentByUserIdCache.fetch(userId, () => this.roleAssignmentsRepository.findBy({ userId }));
-		// 期限切れのロールを除外
 		assigns = assigns.filter(a => a.expiresAt == null || (a.expiresAt.getTime() > now));
 		const roles = await this.rolesCache.fetch(() => this.rolesRepository.findBy({}));
 		const assignedRoles = roles.filter(r => assigns.map(x => x.roleId).includes(r.id));
@@ -481,13 +455,6 @@ export class RoleService implements OnApplicationShutdown, OnModuleInit {
 		return check.isExplorable;
 	}
 
-	/**
-	 * モデレーター権限のロールが割り当てられているユーザID一覧を取得する.
-	 *
-	 * @param opts.includeAdmins 管理者権限も含めるか(デフォルト: true)
-	 * @param opts.includeRoot rootユーザも含めるか(デフォルト: false)
-	 * @param opts.excludeExpire 期限切れのロールを除外するか(デフォルト: false)
-	 */
 	@bindThis
 	public async getModeratorIds(opts?: {
 		includeAdmins?: boolean,
@@ -507,7 +474,6 @@ export class RoleService implements OnApplicationShutdown, OnModuleInit {
 			? await this.roleAssignmentsRepository.findBy({ roleId: In(moderatorRoles.map(r => r.id)) })
 			: [];
 
-		// Setを経由して重複を除去（ユーザIDは重複する可能性があるので）
 		const now = Date.now();
 		const resultSet = new Set(
 			assigns
@@ -547,8 +513,6 @@ export class RoleService implements OnApplicationShutdown, OnModuleInit {
 		const assigns = administratorRoles.length > 0 ? await this.roleAssignmentsRepository.findBy({
 			roleId: In(administratorRoles.map(r => r.id)),
 		}) : [];
-		// TODO: isRootなアカウントも含める
-		// Setを経由して重複を除去（ユーザIDは重複する可能性があるので）
 		return [...new Set(assigns.map(a => a.userId))].sort((x, y) => x.localeCompare(y));
 	}
 

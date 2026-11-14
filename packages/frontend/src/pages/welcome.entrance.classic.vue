@@ -19,7 +19,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 	<div v-if="instances && instances.length > 0" :class="$style.federation">
 		<MkMarqueeText :duration="40">
 			<MkA v-for="instance in instances" :key="instance.id" :class="$style.federationInstance" :to="`/instance-info/${instance.host}`" behavior="window">
-				<!--<MkInstanceCardMini :instance="instance"/>-->
 				<img v-if="instance.iconUrl" :class="$style.federationInstanceIcon" :src="getInstanceIcon(instance)" alt=""/>
 				<span class="_monospace">{{ instance.host }}</span>
 			</MkA>
@@ -70,9 +69,8 @@ misskeyApiGet('federation/instances', {
 	position: fixed;
 	top: 0;
 	right: 0;
-	width: 80vw; // 100%からshapeの幅を引いている
+	width: 80vw;
 	height: 100vh;
-	// 固定レイヤがホイール操作を奪い、コンテンツ列以外の上でページをスクロールできなくなるのを防ぐ (issue #17680)
 	pointer-events: none;
 }
 
@@ -102,7 +100,7 @@ misskeyApiGet('federation/instances', {
 	height: 100vh;
 	background: var(--MI_THEME-accent);
 	clip-path: polygon(0% 0%, 45% 0%, 20% 100%, 0% 100%);
-	pointer-events: none; // 装飾レイヤ。ホイール操作を透過させる (→ .bg 参照)
+	pointer-events: none;
 }
 .shape2 {
 	position: fixed;
@@ -113,7 +111,7 @@ misskeyApiGet('federation/instances', {
 	background: var(--MI_THEME-accent);
 	clip-path: polygon(0% 0%, 25% 0%, 35% 100%, 0% 100%);
 	opacity: 0.5;
-	pointer-events: none; // 装飾レイヤ。ホイール操作を透過させる (→ .bg 参照)
+	pointer-events: none;
 }
 
 .logoWrapper {

@@ -40,16 +40,13 @@ export class MiUserListMembership {
 	@JoinColumn()
 	public userList: MiUserList | null;
 
-	// タイムラインにその人のリプライまで含めるかどうか
 	@Column('boolean', {
 		default: false,
 	})
 	public withReplies: boolean;
 
-	//#region Denormalized fields
 	@Column({
 		...id(),
 	})
 	public userListUserId: MiUser['id'];
-	//#endregion
 }

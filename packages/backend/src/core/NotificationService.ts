@@ -22,7 +22,6 @@ import type { Config } from '@/config.js';
 import { UserListService } from '@/core/UserListService.js';
 import { FilterUnionByProperty, groupedNotificationTypes, obsoleteNotificationTypes } from '@/types.js';
 import { trackPromise } from '@/misc/promise-tracker.js';
-// import { escapeHtml } from '@/misc/escape-html.js';
 
 @Injectable()
 export class NotificationService implements OnApplicationShutdown {
@@ -96,7 +95,6 @@ export class NotificationService implements OnApplicationShutdown {
 	): Promise<MiNotification | null> {
 		const profile = await this.cacheService.userProfileCache.fetch(notifieeId);
 
-		// 古いMisskeyバージョンのキャッシュが残っている可能性がある
 		// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
 		const recieveConfig = (profile.notificationRecieveConfig ?? {})[type];
 		if (recieveConfig?.type === 'never') {
@@ -169,7 +167,6 @@ export class NotificationService implements OnApplicationShutdown {
 					this.toXListId(notification.id),
 					'data', JSON.stringify(notification)))!;
 			} catch (e) {
-				// The ID specified in XADD is equal or smaller than the target stream top item で失敗することがあるのでリトライ
 				if (e instanceof ReplyError) continue;
 				throw e;
 			}
@@ -182,11 +179,8 @@ export class NotificationService implements OnApplicationShutdown {
 
 		if (packed == null) return null;
 
-		// Publish notification event
 		this.globalEventService.publishMainStream(notifieeId, 'notification', packed);
 
-		// 2秒経っても(今回作成した)通知が既読にならなかったら「未読の通知がありますよ」イベントを発行する
-		// テスト通知の場合は即時発行
 		const interval = notification.type === 'test' ? 0 : 2000;
 		setTimeout(interval, 'unread notification', { signal: this.#shutdownController.signal }).then(async () => {
 			const latestReadNotificationId = await this.redisClient.get(`latestReadNotification:${notifieeId}`);
@@ -197,40 +191,17 @@ export class NotificationService implements OnApplicationShutdown {
 
 			if (type === 'follow') this.emailNotificationFollow(notifieeId, await this.usersRepository.findOneByOrFail({ id: notifierId! }));
 			if (type === 'receiveFollowRequest') this.emailNotificationReceiveFollowRequest(notifieeId, await this.usersRepository.findOneByOrFail({ id: notifierId! }));
-		}, () => { /* aborted, ignore it */ });
+		}, () => { });
 
 		return notification;
 	}
 
-	// TODO
-	//const locales = await import('i18n');
-
-	// TODO: locale ファイルをクライアント用とサーバー用で分けたい
-
 	@bindThis
 	private async emailNotificationFollow(userId: MiUser['id'], follower: MiUser) {
-		/*
-		const userProfile = await UserProfiles.findOneByOrFail({ userId: userId });
-		if (!userProfile.email || !userProfile.emailNotificationTypes.includes('follow')) return;
-		const locale = locales[userProfile.lang ?? 'ja-JP'];
-		const i18n = new I18n(locale);
-		// TODO: render user information html
-		const body = `${follower.name} (@${Acct.toString(follower)})`;
-		sendEmail(userProfile.email, i18n.t('_email._follow.title'), escapeHtml(body), body);
-		*/
 	}
 
 	@bindThis
 	private async emailNotificationReceiveFollowRequest(userId: MiUser['id'], follower: MiUser) {
-		/*
-		const userProfile = await UserProfiles.findOneByOrFail({ userId: userId });
-		if (!userProfile.email || !userProfile.emailNotificationTypes.includes('receiveFollowRequest')) return;
-		const locale = locales[userProfile.lang ?? 'ja-JP'];
-		const i18n = new I18n(locale);
-		// TODO: render user information html
-		const body = `${follower.name} (@${Acct.toString(follower)})`;
-		sendEmail(userProfile.email, i18n.t('_email._receiveFollowRequest.title'), escapeHtml(body), body);
-		*/
 	}
 
 	@bindThis
@@ -249,7 +220,6 @@ export class NotificationService implements OnApplicationShutdown {
 
 	private toXListId(id: string): string {
 		const { date, additional } = this.idService.parseFull(id);
-		// Redis Stream sequenceはunit64制約があるため、収まらない場合は下位64bitを取る
 		return date.toString() + '-' + BigInt.asUintN(64, additional).toString();
 	}
 
@@ -266,7 +236,6 @@ export class NotificationService implements OnApplicationShutdown {
 			sinceId?: string,
 			untilId?: string,
 			limit?: number,
-			// any extra types are allowed, those are no-op
 			includeTypes?: (MiNotification['type'] | string)[],
 			excludeTypes?: (MiNotification['type'] | string)[],
 		},
@@ -278,7 +247,6 @@ export class NotificationService implements OnApplicationShutdown {
 		for (; ;) {
 			let notificationsRes: [id: string, fields: string[]][];
 
-			// sinceidのみの場合は古い順、そうでない場合は新しい順。 QueryService.makePaginationQueryも参照
 			if (sinceTime && !untilTime) {
 				notificationsRes = await this.redisClient.xrange(
 					`notificationTimeline:${userId}`,
@@ -306,11 +274,9 @@ export class NotificationService implements OnApplicationShutdown {
 			}
 
 			if (notifications.length !== 0) {
-				// 通知が１件以上ある場合は返す
 				break;
 			}
 
-			// フィルタしたことで通知が0件になった場合、次のページを取得する
 			if (sinceId && !untilId) {
 				sinceTime = notificationsRes[notificationsRes.length - 1][0];
 			} else {

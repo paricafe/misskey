@@ -37,7 +37,6 @@ export class FlashEntityService {
 		const meId = me ? me.id : null;
 		const flash = typeof src === 'object' ? src : await this.flashsRepository.findOneByOrFail({ id: src });
 
-		// { schema: 'UserDetailed' } すると無限ループするので注意
 		const user = hint?.packedUser ?? await this.userEntityService.pack(flash.user ?? flash.userId, me);
 
 		let isLiked = undefined;

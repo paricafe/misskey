@@ -41,8 +41,8 @@ const zIndex = ref<number>(os.claimZIndex('high'));
 const SCROLLBAR_THICKNESS = 16;
 
 onMounted(() => {
-	let left = props.ev.pageX + 1; // 間違って右ダブルクリックした場合に意図せずアイテムがクリックされるのを防ぐため + 1
-	let top = props.ev.pageY + 1; // 間違って右ダブルクリックした場合に意図せずアイテムがクリックされるのを防ぐため + 1
+	let left = props.ev.pageX + 1;
+	let top = props.ev.pageY + 1;
 
 	const width = rootEl.value!.offsetWidth;
 	const height = rootEl.value!.offsetHeight;

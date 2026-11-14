@@ -9,7 +9,6 @@ import type { MiMeta } from '@/models/Meta.js';
 export function InfoCardPage(props: CommonPropsMinimum<{
 	meta: MiMeta;
 }>) {
-	// 変数名をsafeで始めることでエラーをスキップ
 	const safeDescription = props.meta.description;
 
 	return (

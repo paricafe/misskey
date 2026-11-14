@@ -20,7 +20,6 @@ function collectStaticDependencies(roots: string[], context: ChunkingContext): S
 	return modules;
 }
 
-/** Keep eagerly needed code together without pulling posting tools into the visitor boot. */
 export function createClientChunkGroup(frontendRoot: string): CodeSplittingGroup {
 	const resolve = (file: string) => normalizePath(path.resolve(frontendRoot, file));
 	let common: Set<string> | undefined;

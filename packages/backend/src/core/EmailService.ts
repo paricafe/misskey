@@ -203,9 +203,9 @@ export class EmailService {
 					email: emailAddress,
 					validateRegex: true,
 					validateMx: true,
-					validateTypo: false, // TLDを見ているみたいだけどclubとか弾かれるので
-					validateDisposable: true, // 捨てアドかどうかチェック
-					validateSMTP: false, // 日本だと25ポートが殆どのプロバイダーで塞がれていてタイムアウトになるので
+					validateTypo: false,
+					validateDisposable: true,
+					validateSMTP: false,
 				});
 			}
 		}
@@ -273,7 +273,6 @@ export class EmailService {
 			related_domains: string[];
 		}>;
 
-		/* api error: when there is only one `message` attribute in the returned result */
 		if (Object.keys(json).length === 1 && Reflect.has(json, 'message')) {
 			return {
 				valid: false,

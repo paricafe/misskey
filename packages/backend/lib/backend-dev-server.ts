@@ -3,9 +3,6 @@ import fkill from 'fkill';
 import type { ResultPromise } from 'execa';
 import type { Plugin } from 'rolldown';
 
-/**
- * Watchモード時にバックエンドの起動・停止制御を行うプラグイン
- */
 export function backendDevServerPlugin(): Plugin {
 	let backendProcess: ResultPromise | null = null;
 	let backendShutdownPromise: Promise<void> | null = null;
@@ -24,7 +21,7 @@ export function backendDevServerPlugin(): Plugin {
 
 		const processToKill = backendProcess;
 		backendProcess = null;
-		processToKill.catch(() => {}); // プロセスの終了によって発生する例外を無視するためにcatch()を呼び出す
+		processToKill.catch(() => {});
 
 		backendShutdownPromise = (async () => {
 			if (process.platform === 'win32' && processToKill.pid != null) {

@@ -192,7 +192,6 @@ window.fetch(`/url?url=${encodeURIComponent(requestUrl.href)}&lang=${versatileLa
 		summalyResult.value = info;
 	});
 
-// Resolve the linked note only on demand, and only when it lives on the previewed host.
 const canExpandApNote = computed(() => {
 	const apUrl = summalyResult.value?.activityPub;
 	if ($i == null || apUrl == null) return false;

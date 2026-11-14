@@ -9,18 +9,14 @@ export default defineConfig((args) => {
 	const isWatchMode = args.watch != null && args.watch !== 'false';
 	const isE2E = args.e2e != null && args.e2e !== 'false';
 
-	// 外部モジュールの判定に使う正規表現。`@/` で始まるものは内部モジュールとみなす
 	const allExternalModulesRegex = /^(?!@\/|\0)[^.\/](?!:[\/\\])/;
 
-	// 通常のビルド時にexternalとするモジュール
 	const externalModules: ExternalOption = [
 		/^slacc-.*/,
 		'class-transformer',
 		'class-validator',
 		/^@sentry\/.*/,
 		/^@sentry-internal\/.*/,
-		// @nestjs/coreはmicroservices / websocketsをoptional peerとして動的importするが、
-		// Misskeyはどちらも使わないためインストールしていない
 		/^@nestjs\/(?:microservices|websockets)(?:\/.*)?$/,
 		'mock-aws-s3',
 		'aws-sdk',
@@ -30,12 +26,10 @@ export default defineConfig((args) => {
 		're2',
 		'ipaddr.js',
 		'file-type',
-		// バンドルするとSentryの自動計装が正しく行われなくなるため外しておく
 		'pg',
 	];
 
 	const define: Record<string, string> = {
-		// Summalyのバージョンを埋め込む
 		'_SUMMALY_VERSION_': JSON.stringify(summalyVersion),
 	};
 
@@ -53,9 +47,6 @@ export default defineConfig((args) => {
 			output: {
 				keepNames: true,
 				sourcemap: true,
-				// メモリ使用量削減に貢献するが、関数や正規表現のソース文字列がエスケープ表記になる
-				// それらに依存する処理が入った場合はここを疑うと良い
-				// https://rolldown.rs/reference/Interface.OutputOptions#charset
 				charset: 'ascii',
 				dir: './built-test',
 				cleanDir: true,
@@ -64,7 +55,6 @@ export default defineConfig((args) => {
 			experimental: {
 				nativeMagicString: true,
 			},
-			// node_modulesまでバンドルしてしまうとカバレッジの収集に時間がかかるので全部外す
 			external: allExternalModulesRegex,
 		};
 	} else {
@@ -90,9 +80,6 @@ export default defineConfig((args) => {
 				keepNames: true,
 				minify: !isWatchMode,
 				sourcemap: isWatchMode,
-				// メモリ使用量削減に貢献するが、関数や正規表現のソース文字列がエスケープ表記になる
-				// それらに依存する処理が入った場合はここを疑うと良い
-				// https://rolldown.rs/reference/Interface.OutputOptions#charset
 				charset: isWatchMode ? 'utf8' : 'ascii',
 				dir: './built',
 				cleanDir: !isWatchMode,
@@ -105,7 +92,6 @@ export default defineConfig((args) => {
 			experimental: {
 				nativeMagicString: true,
 			},
-			// ビルドの高速化のために、watchモードのときは外部モジュールは全てバンドルしないようにする
 			external: isWatchMode ? allExternalModulesRegex : externalModules,
 		};
 	}

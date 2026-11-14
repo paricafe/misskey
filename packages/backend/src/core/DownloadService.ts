@@ -54,10 +54,10 @@ export class DownloadService {
 				lookup: timeout,
 				connect: timeout,
 				secureConnect: timeout,
-				socket: timeout,	// read timeout
+				socket: timeout,
 				response: timeout,
 				send: timeout,
-				request: operationTimeout,	// whole operation timeout
+				request: operationTimeout,
 			},
 			agent: {
 				http: this.httpRequestService.getAgentForHttp(urlObj),
@@ -66,8 +66,6 @@ export class DownloadService {
 			hooks: {
 				beforeRedirect: [
 					(options) => {
-						// リダイレクト先ごとにエージェントを選択し直し、
-						// proxyBypassHosts 経由のリダイレクトでローカルアドレスチェックが素通しになるのを防ぐ
 						const redirectUrl = options.url;
 						if (redirectUrl == null) return;
 						options.agent = {
@@ -77,7 +75,7 @@ export class DownloadService {
 					},
 				],
 			},
-			http2: false,	// default
+			http2: false,
 			retry: {
 				limit: 0,
 			},
@@ -129,13 +127,11 @@ export class DownloadService {
 
 	@bindThis
 	public async downloadTextFile(url: string): Promise<string> {
-		// Create temp file
 		const [path, cleanup] = await createTemp();
 
 		this.logger.info(`text file: Temp file is ${path}`);
 
 		try {
-			// write content at URL to temp file
 			await this.downloadUrl(url, path);
 
 			const text = await fs.promises.readFile(path, 'utf8');

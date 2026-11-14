@@ -71,12 +71,10 @@ export type CompleteInfo = {
 		payload: string;
 		query: string;
 	},
-	// `:emo` -> `:emoji:` or some unicode emoji
 	emoji: {
 		payload: string;
 		query: string;
 	},
-	// like emoji but for `:emoji:` -> unicode emoji
 	emojiComplete: {
 		payload: string;
 		query: string;
@@ -97,7 +95,6 @@ export type CompleteInfo = {
 const lib = emojilist.filter(x => x.category !== 'flags');
 
 const unicodeEmojiDB = computed(() => {
-	//#region Unicode Emoji
 	const char2path = prefer.r.emojiStyle.value === 'twemoji' ? char2twemojiFilePath : char2fluentEmojiFilePath;
 
 	const unicodeEmojiDB: EmojiDef[] = lib.map(x => ({
@@ -125,10 +122,6 @@ const unicodeEmojiDB = computed(() => {
 });
 
 const emojiDb = computed(() => {
-	//#region Unicode Emoji
-	//#endregion
-
-	//#region Custom Emoji
 	const customEmojiDB: EmojiDef[] = [];
 
 	for (const x of customEmojis.value) {
@@ -151,7 +144,6 @@ const emojiDb = computed(() => {
 	}
 
 	customEmojiDB.sort((a, b) => a.name.length - b.name.length);
-	//#endregion
 
 	return markRaw([...customEmojiDB, ...unicodeEmojiDB.value]);
 });
@@ -166,15 +158,11 @@ export default {
 type PropsType<T extends keyof CompleteInfo> = {
 	type: T;
 	q: CompleteInfo[T]['query'];
-	// なぜかわからないけど HTMLTextAreaElement | HTMLInputElement だと addEventListener/removeEventListenerがエラー
 	textarea: (HTMLTextAreaElement | HTMLInputElement) & HTMLElement;
 	close: () => void;
 	x: number;
 	y: number;
 };
-//const props = defineProps<PropsType<keyof CompleteInfo>>();
-// ↑と同じだけど↓にしないとdiscriminated unionにならない。
-// https://www.typescriptlang.org/docs/handbook/typescript-in-5-minutes-func.html#discriminated-unions
 const props = defineProps<PropsType<'user'> | PropsType<'hashtag'> | PropsType<'emoji'> | PropsType<'emojiComplete'> | PropsType<'mfmTag'> | PropsType<'mfmParam'>>();
 
 const emit = defineEmits<{
@@ -257,7 +245,6 @@ function exec() {
 			}).then(searchedUsers => {
 				users.value = searchedUsers;
 				fetching.value = false;
-				// キャッシュ
 				sessionStorage.setItem(cacheKey, JSON.stringify(searchedUsers));
 			});
 		}
@@ -279,14 +266,12 @@ function exec() {
 				}).then(searchedHashtags => {
 					hashtags.value = searchedHashtags;
 					fetching.value = false;
-					// キャッシュ
 					sessionStorage.setItem(cacheKey, JSON.stringify(searchedHashtags));
 				});
 			}
 		}
 	} else if (props.type === 'emoji') {
 		if (!props.q || props.q === '') {
-			// 最近使った絵文字をサジェスト
 			emojis.value = store.s.recentlyUsedEmojis.map(emoji => emojiDb.value.find(dbEmoji => dbEmoji.emoji === emoji)).filter(x => x) as EmojiDef[];
 			return;
 		}

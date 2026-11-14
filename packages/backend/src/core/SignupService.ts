@@ -61,31 +61,25 @@ export class SignupService {
 		const { username, password, passwordHash, host, reason } = opts;
 		let hash = passwordHash;
 
-		// Validate username
 		if (!this.userEntityService.validateLocalUsername(username)) {
 			throw new Error('INVALID_USERNAME');
 		}
 
 		if (password != null && passwordHash == null) {
-			// Validate password
 			if (!this.userEntityService.validatePassword(password)) {
 				throw new Error('INVALID_PASSWORD');
 			}
 
-			// Generate hash of password
 			const salt = await bcrypt.genSalt(8);
 			hash = await bcrypt.hash(password, salt);
 		}
 
-		// Generate secret
 		const secret = generateNativeUserToken();
 
-		// Check username duplication
 		if (await this.usersRepository.exists({ where: { usernameLower: username.toLowerCase(), host: IsNull() } })) {
 			throw new Error('DUPLICATED_USERNAME');
 		}
 
-		// Check deleted username duplication
 		if (await this.usedUsernamesRepository.exists({ where: { username: username.toLowerCase() } })) {
 			throw new Error('USED_USERNAME');
 		}
@@ -121,12 +115,7 @@ export class SignupService {
 
 		let account!: MiUser;
 
-		// Start transaction
 		await this.db.transaction(async transactionalEntityManager => {
-			// ローカルユーザーのユーザー名は host が NULL のため、(usernameLower, host) の
-			// 複合ユニークインデックスでは重複を防げない（NULLは互いにdistinct扱い）。
-			// 同一ユーザー名の並行サインアップをトランザクション単位のadvisory lockで直列化し、
-			// チェック→挿入のTOCTOU競合を排除する。
 			await transactionalEntityManager.query(
 				'SELECT pg_advisory_xact_lock(hashtext($1))',
 				[`signup:username:${username.toLowerCase()}`],

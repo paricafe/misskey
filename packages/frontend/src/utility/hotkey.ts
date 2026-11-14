@@ -4,7 +4,6 @@
  */
 import { getHTMLElementOrNull } from '@/utility/get-dom-node-or-null.js';
 
-//#region types
 export type Keymap = Record<string, CallbackFunction | CallbackObject>;
 
 type CallbackFunction = (ev: KeyboardEvent) => unknown;
@@ -26,9 +25,7 @@ type Action = {
 	callback: CallbackFunction;
 	options: Required<Omit<CallbackObject, 'callback'>>;
 };
-//#endregion
 
-//#region consts
 const KEY_ALIASES = {
 	'esc': 'Escape',
 	'enter': 'Enter',
@@ -43,13 +40,9 @@ const KEY_ALIASES = {
 const MODIFIER_KEYS = ['ctrl', 'alt', 'shift'];
 
 const IGNORE_ELEMENTS = ['input', 'textarea'];
-//#endregion
 
-//#region store
 let latestHotkey: Pattern & { callback: CallbackFunction } | null = null;
-//#endregion
 
-//#region impl
 export const makeHotkey = (keymap: Keymap, ignoreElements = IGNORE_ELEMENTS) => {
 	const actions = parseKeymap(keymap);
 	return (ev: KeyboardEvent) => {
@@ -168,4 +161,3 @@ const getValueByKey = <
 };
 
 const trimLower = (str: string) => str.trim().toLowerCase();
-//#endregion

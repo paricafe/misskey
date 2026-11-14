@@ -43,14 +43,8 @@ export class NotePiningService {
 	) {
 	}
 
-	/**
-	 * 指定した投稿をピン留めします
-	 * @param user
-	 * @param noteId
-	 */
 	@bindThis
 	public async addPinned(user: { id: MiUser['id']; host: MiUser['host']; }, noteId: MiNote['id']) {
-	// Fetch pinee
 		const note = await this.notesRepository.findOneBy({
 			id: noteId,
 			userId: user.id,
@@ -76,20 +70,13 @@ export class NotePiningService {
 			noteId: note.id,
 		} as MiUserNotePining);
 
-		// Deliver to remote followers
 		if (this.userEntityService.isLocalUser(user) && !note.localOnly && ['public', 'home'].includes(note.visibility)) {
 			this.deliverPinnedChange(user.id, note.id, true);
 		}
 	}
 
-	/**
-	 * 指定した投稿のピン留めを解除します
-	 * @param user
-	 * @param noteId
-	 */
 	@bindThis
 	public async removePinned(user: { id: MiUser['id']; host: MiUser['host']; }, noteId: MiNote['id']) {
-	// Fetch unpinee
 		const note = await this.notesRepository.findOneBy({
 			id: noteId,
 			userId: user.id,
@@ -104,7 +91,6 @@ export class NotePiningService {
 			noteId: note.id,
 		});
 
-		// Deliver to remote followers
 		if (this.userEntityService.isLocalUser(user) && !note.localOnly && ['public', 'home'].includes(note.visibility)) {
 			this.deliverPinnedChange(user.id, noteId, false);
 		}

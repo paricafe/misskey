@@ -47,20 +47,17 @@ export class UserAuthService {
 			return true;
 		}
 
-		// 1. 判定に用いるタイムスタンプを固定
 		const now = Date.now();
 		const normalizedToken = token.trim();
 		const validationWindow = 1;
-		const timeStep = 30; // TOTPの周期（秒）
+		const timeStep = 30;
 
-		// 2. TOTPインスタンスを生成（設定を一元管理するため）
 		const totp = new OTPAuth.TOTP({
 			secret: OTPAuth.Secret.fromBase32(twoFactorSecret),
 			digits: 6,
 			period: timeStep,
 		});
 
-		// 3. 固定したタイムスタンプを使って検証
 		const delta = totp.validate({
 			token: normalizedToken,
 			window: validationWindow,
@@ -71,7 +68,6 @@ export class UserAuthService {
 			throw new Error('authentication failed');
 		}
 
-		// 4. totp.counter() を用い、同じタイムスタンプから基準ステップを取得
 		const currentStep = totp.counter({ timestamp: now });
 		const step = currentStep + delta;
 		const secretFingerprint = createHash('sha256')
@@ -80,7 +76,6 @@ export class UserAuthService {
 
 		const usedTokenRedisKey = `2fa:used:${userId}:${secretFingerprint}:${step}`;
 
-		// 5. TTL（有効期限）を設定いてredis set
 		const ttl = timeStep * (validationWindow * 2 + 1);
 		const setResult = await this.redisClient.set(usedTokenRedisKey, normalizedToken, 'EX', ttl, 'NX');
 

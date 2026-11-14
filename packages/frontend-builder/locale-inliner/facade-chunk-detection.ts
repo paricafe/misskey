@@ -10,7 +10,6 @@ import type { ESTree as RolldownESTree } from 'rolldown/utils';
 
 interface FacadeInfo {
 	fileName: string,
-	// facade export name => internal name
 	nameMap: Partial<Record<string, string>>,
 }
 
@@ -31,29 +30,14 @@ export function detectI18nFacadeChunk(
 		return null;
 	}
 
-	// check if the file is like facade.
-	// The exact shape of the facade chunk depends on the bundler version, so we accept any module
-	// that consists only of import / re-export statements. e.g.
-	// ```
-	// import { something } from "file";
-	// export { something };
-	// ```
-	// or
-	// ```
-	// export { something } from "file";
-	// ```
 	if (programNode.body.length === 0) return null;
 	const isFacadeStatement = (stmt: RolldownESTree.Statement | RolldownESTree.Directive | RolldownESTree.ModuleDeclaration) =>
 		stmt.type === 'ImportDeclaration'
 		|| stmt.type === 'ExportAllDeclaration'
 		|| (stmt.type === 'ExportNamedDeclaration' && stmt.declaration == null);
-	if (!programNode.body.every(isFacadeStatement)) return null; // not a facade
+	if (!programNode.body.every(isFacadeStatement)) return null;
 
-	// the file is a facade file.
-
-	// local name => [source, imported name]
 	const importNameMap = new Map<string, [string, string]>();
-	// facade export name => [source, imported name]
 	const exportMap = new Map<string, [string, string]>();
 
 	for (const stmt of programNode.body) {
@@ -74,10 +58,8 @@ export function detectI18nFacadeChunk(
 			const localName = getExportName(spec.local);
 			const facadeExportName = getExportName(spec.exported);
 			if (stmt.source != null) {
-				// export { local as exported } from "file";
 				exportMap.set(facadeExportName, [stmt.source.value, localName]);
 			} else {
-				// import { imported as local } from "file"; export { local as exported };
 				const imported = importNameMap.get(localName);
 				if (imported == null) throw new Error(`${fileName}: Facade module exports '${localName}' which is not imported`);
 				exportMap.set(facadeExportName, imported);

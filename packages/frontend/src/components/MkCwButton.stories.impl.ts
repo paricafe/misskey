@@ -57,7 +57,6 @@ export const Default = {
 	},
 	parameters: {
 		chromatic: {
-			// NOTE: テストが終わるまで待つ
 			delay: 5000,
 		},
 		layout: 'centered',

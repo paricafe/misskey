@@ -70,10 +70,8 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				throw new ApiError(meta.errors.notLiked);
 			}
 
-			// Delete like
 			await this.galleryLikesRepository.delete(exist.id);
 
-			// ランキング更新
 			if (Date.now() - this.idService.parse(post.id).date.getTime() < GALLERY_POSTS_RANKING_WINDOW) {
 				await this.featuredService.updateGalleryPostsRanking(post.id, -1);
 			}

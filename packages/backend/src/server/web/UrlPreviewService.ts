@@ -37,7 +37,7 @@ export class UrlPreviewService implements OnApplicationShutdown {
 		private loggerService: LoggerService,
 	) {
 		this.logger = this.loggerService.getLogger('url-preview');
-		this.summaryCache = new MemoryKVCache<SummalyResult>(1000 * 60 * 60, 100); // 1h, 100件
+		this.summaryCache = new MemoryKVCache<SummalyResult>(1000 * 60 * 60, 100);
 		this.summalyDefaultUserAgent = `SummalyBot/${_SUMMALY_VERSION_} (${this.config.url}; +https://github.com/misskey-dev/summaly/blob/master/README.md)`;
 	}
 
@@ -117,7 +117,6 @@ export class UrlPreviewService implements OnApplicationShutdown {
 				summary.sensitive = this.utilityService.isKeyWordIncluded(summary.url, this.meta.urlPreviewSensitiveList);
 			}
 
-			// Cache 1day
 			reply.header('Cache-Control', 'max-age=86400, immutable');
 
 			return summary;

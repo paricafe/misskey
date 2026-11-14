@@ -120,11 +120,6 @@ export class ApRendererService {
 		};
 	}
 
-	/**
-	 * Renders a block into its ActivityPub representation.
-	 *
-	 * @param block The block to be rendered. The blockee relation must be loaded.
-	 */
 	@bindThis
 	public renderBlock(block: MiBlocking): IBlock {
 		if (block.blockee?.uri == null) {
@@ -188,7 +183,6 @@ export class ApRendererService {
 			icon: {
 				type: 'Image',
 				mediaType: emoji.type ?? 'image/png',
-				// || emoji.originalUrl してるのは後方互換性のため（publicUrlはstringなので??はだめ）
 				url: emoji.publicUrl || emoji.originalUrl,
 			},
 			_misskey_license: {
@@ -197,7 +191,6 @@ export class ApRendererService {
 		};
 	}
 
-	// to anonymise reporters, the reporting actor must be a system user
 	@bindThis
 	public renderFlag(user: MiLocalUser, object: IObject | string, content: string): IFlag {
 		return {
@@ -218,10 +211,6 @@ export class ApRendererService {
 		};
 	}
 
-	/**
-	 * Convert (local|remote)(Follower|Followee)ID to URL
-	 * @param id Follower|Followee ID
-	 */
 	@bindThis
 	public async renderFollowUser(id: MiUser['id']): Promise<string> {
 		const user = await this.usersRepository.findOneByOrFail({ id: id }) as MiPartialLocalUser | MiPartialRemoteUser;
@@ -436,9 +425,6 @@ export class ApRendererService {
 		let extraHtml: string | null = null;
 
 		if (quote != null) {
-			// Append quote link as `<br><br><span class="quote-inline">RE: <a href="...">...</a></span>`
-			// the class name `quote-inline` is used in non-misskey clients for styling quote notes.
-			// For compatibility, the span part should be kept as possible.
 			extraHtml = `<br><br><span class="quote-inline">RE: <a href="${escapeHtml(quote)}">${escapeHtml(quote)}</a></span>`;
 		}
 
@@ -716,15 +702,6 @@ export class ApRendererService {
 		return activity;
 	}
 
-	/**
-	 * Render OrderedCollectionPage
-	 * @param id URL of self
-	 * @param totalItems Number of total items
-	 * @param orderedItems Items
-	 * @param partOf URL of base
-	 * @param prev URL of prev page (optional)
-	 * @param next URL of next page (optional)
-	 */
 	@bindThis
 	public renderOrderedCollectionPage(id: string, totalItems: any, orderedItems: any, partOf: string, prev?: string, next?: string) {
 		const page: any = {
@@ -741,14 +718,6 @@ export class ApRendererService {
 		return page;
 	}
 
-	/**
-	 * Render OrderedCollection
-	 * @param id URL of self
-	 * @param totalItems Total number of items
-	 * @param first URL of first page (optional)
-	 * @param last URL of last page (optional)
-	 * @param orderedItems attached objects (optional)
-	 */
 	@bindThis
 	public renderOrderedCollection(id: string, totalItems: number, first?: string, last?: string, orderedItems?: IObject[]) {
 		const page: any = {

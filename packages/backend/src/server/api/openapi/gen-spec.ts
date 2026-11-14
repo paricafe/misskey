@@ -40,7 +40,6 @@ export function genOpenapiSpec(config: Config, includeSelfRef = false) {
 		},
 	};
 
-	// 書き換えたりするのでディープコピーしておく。そのまま編集するとメモリ上の値が汚れて次回以降の出力に影響する
 	const copiedEndpoints = JSON.parse(JSON.stringify(endpoints)) as IEndpoint[];
 	for (const endpoint of copiedEndpoints) {
 		const errors = {} as any;
@@ -85,7 +84,6 @@ export function genOpenapiSpec(config: Config, includeSelfRef = false) {
 		}
 
 		if (schema.required && schema.required.length <= 0) {
-			// 空配列は許可されない
 			schema.required = undefined;
 		}
 
@@ -93,7 +91,7 @@ export function genOpenapiSpec(config: Config, includeSelfRef = false) {
 			|| ['allOf', 'oneOf', 'anyOf'].some(o => (Array.isArray(schema[o]) && schema[o].length >= 0));
 
 		const info = {
-			operationId: endpoint.name.replaceAll('/', '___'), // NOTE: スラッシュは使えない
+			operationId: endpoint.name.replaceAll('/', '___'),
 			summary: endpoint.name,
 			description: desc,
 			externalDocs: {

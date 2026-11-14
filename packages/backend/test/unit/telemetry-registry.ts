@@ -15,7 +15,6 @@ const mocks = vi.hoisted(() => {
 	};
 });
 
-// telemetry-registryは`@/logger.js`経由でlogManagerも参照するため、両方をmockする。
 vi.mock('@/logging/logging-runtime.js', () => ({
 	setLogTraceContextProvider: mocks.setLogTraceContextProvider,
 	logManager: { write: mocks.logWrite },

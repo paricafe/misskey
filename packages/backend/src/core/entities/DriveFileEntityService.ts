@@ -41,7 +41,6 @@ export class DriveFileEntityService {
 		@Inject(DI.driveFilesRepository)
 		private driveFilesRepository: DriveFilesRepository,
 
-		// 循環参照のため / for circular dependency
 		@Inject(forwardRef(() => UserEntityService))
 		private userEntityService: UserEntityService,
 
@@ -95,14 +94,10 @@ export class DriveFileEntityService {
 
 			return this.videoProcessingService.getExternalVideoThumbnailUrl(file.webpublicUrl ?? file.url);
 		} else if (file.uri != null && file.userHost != null && this.config.externalMediaProxyEnabled) {
-			// 動画ではなくリモートかつメディアプロキシ
 			return this.getProxiedUrl(file.uri, 'static');
 		}
 
 		if (file.uri != null && file.isLink && this.meta.proxyRemoteFiles) {
-			// リモートかつ期限切れはローカルプロキシを試みる
-			// 従来は/files/${thumbnailAccessKey}にアクセスしていたが、
-			// /filesはメディアプロキシにリダイレクトするようにしたため直接メディアプロキシを指定する
 			return this.getProxiedUrl(file.uri, 'static');
 		}
 
@@ -112,17 +107,15 @@ export class DriveFileEntityService {
 	}
 
 	@bindThis
-	public getPublicUrl(file: MiDriveFile, mode?: 'avatar'): string { // static = thumbnail
-		// リモートかつメディアプロキシ
+	public getPublicUrl(file: MiDriveFile, mode?: 'avatar'): string {
 		if (file.uri != null && file.userHost != null && this.config.externalMediaProxyEnabled) {
 			return this.getProxiedUrl(file.uri, mode);
 		}
 
-		// リモートかつ期限切れはローカルプロキシを試みる
 		if (file.uri != null && file.isLink && this.meta.proxyRemoteFiles) {
 			const key = file.webpublicAccessKey;
 
-			if (key && !key.match('/')) {	// 古いものはここにオブジェクトストレージキーが入ってるので除外
+			if (key && !key.match('/')) {
 				const url = `${this.config.url}/files/${key}`;
 				if (mode === 'avatar') return this.getProxiedUrl(file.uri, 'avatar');
 				return url;
@@ -265,8 +258,6 @@ export class DriveFileEntityService {
 		files: MiDriveFile[],
 		options?: PackOptions,
 	): Promise<Packed<'DriveFile'>[]> {
-		// -- ユーザ情報の事前取得 --
-
 		let userMap: Map<string, Packed<'UserLite'>> | null = null;
 		if (options?.withUser) {
 			const users = files
@@ -277,8 +268,6 @@ export class DriveFileEntityService {
 			const packedUsers = await this.userEntityService.packMany(uniqueUsers);
 			userMap = new Map(packedUsers.map(user => [user.id, user]));
 		}
-
-		// -- フォルダ情報の事前取得 --
 
 		let folderMap: Map<string, Packed<'DriveFolder'>> | null = null;
 		if (options?.detail) {

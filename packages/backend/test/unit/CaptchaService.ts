@@ -556,7 +556,6 @@ describe('CaptchaService', () => {
 					);
 				});
 
-				// testchapchaはrequestFailedがない
 			});
 
 			describe('verificationFailed', () => {

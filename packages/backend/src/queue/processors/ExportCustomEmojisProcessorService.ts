@@ -87,9 +87,6 @@ export class ExportCustomEmojisProcessorService {
 			},
 		});
 
-		// ZIP のエントリ名 (meta.json 以外) → 実ファイルのパス
-		// name と host: null が同じレコードは DB 上で重複し得て、その場合 fileName も同じになるため、
-		// fileName ごとに最後にダウンロードに成功したファイルだけを保持する
 		const emojiFiles = new Map<string, string>();
 
 		for (const emoji of customEmojis) {
@@ -99,7 +96,6 @@ export class ExportCustomEmojisProcessorService {
 			}
 			const ext = mime.extension(emoji.type ?? 'image/png');
 			const fileName = emoji.name + (ext ? '.' + ext : '');
-			// 失敗時に同じ fileName の別レコードのファイルを消さないよう、一時パスはレコードごとに分ける
 			const emojiPath = path + '/emoji-' + emoji.id;
 			fs.writeFileSync(emojiPath, '', 'binary');
 			let downloaded = false;
@@ -107,7 +103,7 @@ export class ExportCustomEmojisProcessorService {
 			try {
 				await this.downloadService.downloadUrl(emoji.originalUrl, emojiPath);
 				downloaded = true;
-			} catch (e) { // TODO: 何度か再試行
+			} catch (e) {
 				this.logger.error(e instanceof Error ? e : new Error(e as string));
 			}
 
@@ -133,18 +129,15 @@ export class ExportCustomEmojisProcessorService {
 
 		await writeMeta(']}');
 
-		// ZIP に入れる前に確実にディスクへ書き出しておく
 		await new Promise<void>((res, rej) => {
 			metaStream.on('error', rej);
 			metaStream.end(res);
 		});
 
-		// Create archive
 		const [archivePath, archiveCleanup] = await createTemp();
 		try {
 			const archive = await ZipArchive.create(archivePath);
 			try {
-				// エントリを 1 件ずつ直列に追加する
 				await archive.addFile(metaFileName, metaPath);
 				for (const [fileName, emojiPath] of emojiFiles) {
 					await archive.addFile(fileName, emojiPath);

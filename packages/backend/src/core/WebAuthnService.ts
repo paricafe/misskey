@@ -162,10 +162,6 @@ export class WebAuthnService {
 		return authenticationOptions;
 	}
 
-	/**
-	 * Initiate Passkey Auth (Without specifying user)
-	 * @returns authenticationOptions
-	 */
 	@bindThis
 	public async initiateSignInWithPasskeyAuthentication(context: string): Promise<PublicKeyCredentialRequestOptionsJSON> {
 		const relyingParty = await this.getRelyingParty();
@@ -180,11 +176,6 @@ export class WebAuthnService {
 		return authenticationOptions;
 	}
 
-	/**
-	 * Verify Webauthn AuthenticationCredential
-	 * @throws IdentifiableError
-	 * @returns If the challenge is successful, return the user ID. Otherwise, return null.
-	 */
 	@bindThis
 	public async verifySignInWithPasskeyAuthentication(context: string, response: AuthenticationResponseJSON): Promise<MiUser['id'] | null> {
 		const challenge = await this.redisClient.getdel(`webauthn:passkeyChallenge:${context}`);
@@ -257,18 +248,17 @@ export class WebAuthnService {
 			throw new IdentifiableError('36b96a7d-b547-412d-aeed-2d611cdc8cdc', 'unknown key');
 		}
 
-		// マイグレーション
 		if (key.counter === 0 && key.publicKey.length === 87) {
 			const cert = new Uint8Array(Buffer.from(key.publicKey, 'base64url'));
-			if (cert[0] === 0x04) { // 前の実装ではいつも 0x04 で始まっていた
+			if (cert[0] === 0x04) {
 				const halfLength = (cert.length - 1) / 2;
 
 				const cborMap = new Map<number, number | Uint8Array>();
-				cborMap.set(1, 2); // kty, EC2
-				cborMap.set(3, -7); // alg, ES256
-				cborMap.set(-1, 1); // crv, P256
-				cborMap.set(-2, cert.slice(1, halfLength + 1)); // x
-				cborMap.set(-3, cert.slice(halfLength + 1)); // y
+				cborMap.set(1, 2);
+				cborMap.set(3, -7);
+				cborMap.set(-1, 1);
+				cborMap.set(-2, cert.slice(1, halfLength + 1));
+				cborMap.set(-3, cert.slice(halfLength + 1));
 
 				const cborPubKey = Buffer.from(isoCBOR.encode(cborMap)).toString('base64url');
 				await this.userSecurityKeysRepository.update({

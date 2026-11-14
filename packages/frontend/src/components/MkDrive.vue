@@ -216,11 +216,8 @@ const shouldEnableInfiniteScroll = computed(() => {
 const folder = ref<Misskey.entities.DriveFolder | null>(null);
 const hierarchyFolders = ref<Misskey.entities.DriveFolder[]>([]);
 
-// ドロップされようとしているか
 const draghover = ref(false);
 
-// 自身の所有するアイテムがドラッグをスタートさせたか
-// (自分自身の階層にドロップできないようにするためのフラグ)
 const isDragSource = ref(false);
 
 const isEditMode = ref(false);
@@ -244,7 +241,7 @@ const sortModeSelect = ref<NonNullable<Misskey.entities.DriveFilesRequest['sort'
 const filesPaginator = markRaw(new Paginator('drive/files', {
 	limit: 30,
 	canFetchDetection: 'limit',
-	params: () => ({ // 自動でリロードしたくないためcomputedParamsは使わない
+	params: () => ({
 		folderId: folder.value ? folder.value.id : null,
 		type: props.type,
 		sort: ['-createdAt', '+createdAt'].includes(sortModeSelect.value) ? null : sortModeSelect.value,
@@ -253,7 +250,7 @@ const filesPaginator = markRaw(new Paginator('drive/files', {
 const foldersPaginator = markRaw(new Paginator('drive/folders', {
 	limit: 30,
 	canFetchDetection: 'limit',
-	params: () => ({ // 自動でリロードしたくないためcomputedParamsは使わない
+	params: () => ({
 		folderId: folder.value ? folder.value.id : null,
 	}),
 }));
@@ -309,9 +306,7 @@ function onFileDragstart(file: Misskey.entities.DriveFile, ev: DragEvent) {
 function onDragover(ev: DragEvent) {
 	if (!ev.dataTransfer) return;
 
-	// ドラッグ元が自分自身の所有するアイテムだったら
 	if (isDragSource.value) {
-		// 自分自身にはドロップさせない
 		ev.dataTransfer.dropEffect = 'none';
 		return;
 	}
@@ -354,7 +349,6 @@ function onDrop(ev: DragEvent): void | boolean {
 
 	if (!ev.dataTransfer) return;
 
-	// ドロップされてきたものがファイルだったら
 	if (ev.dataTransfer.files.length > 0) {
 		os.launchUploader(Array.from(ev.dataTransfer.files), {
 			folderId: folder.value?.id ?? null,
@@ -362,7 +356,6 @@ function onDrop(ev: DragEvent): void | boolean {
 		return;
 	}
 
-	//#region ドライブのファイル
 	{
 		const droppedData = getDragData(ev, 'driveFiles');
 		if (droppedData != null) {
@@ -378,14 +371,11 @@ function onDrop(ev: DragEvent): void | boolean {
 			});
 		}
 	}
-	//#endregion
 
-	//#region ドライブのフォルダ
 	{
 		const droppedData = getDragData(ev, 'driveFolders');
 		if (droppedData != null) {
 			const droppedFolder = droppedData[0];
-			// 移動先が自分自身ならreject
 			if (folder.value && droppedFolder.id === folder.value.id) return false;
 			if (foldersPaginator.items.value.some(f => f.id === droppedFolder.id)) return false;
 			misskeyApi('drive/folders/update', {
@@ -416,7 +406,6 @@ function onDrop(ev: DragEvent): void | boolean {
 			});
 		}
 	}
-	//#endregion
 }
 
 function onUploadRequested(files: File[], folder?: Misskey.entities.DriveFolder | null) {
@@ -479,7 +468,6 @@ function deleteFolder(folderToDelete: Misskey.entities.DriveFolder) {
 	misskeyApi('drive/folders/delete', {
 		folderId: folderToDelete.id,
 	}).then(() => {
-		// 削除時に親フォルダに移動
 		cd(folderToDelete.parentId);
 		globalEvents.emit('driveFoldersDeleted', [folderToDelete]);
 	}).catch(err => {
@@ -527,7 +515,6 @@ function onFileClick(ev: PointerEvent, file: Misskey.entities.DriveFile) {
 			}
 		} else {
 			if (isAlreadySelected) {
-				//emit('selected', file);
 			} else {
 				selectedFiles.value = [file];
 			}
@@ -547,7 +534,6 @@ function chooseFolder(folderToChoose: Misskey.entities.DriveFolder) {
 		}
 	} else {
 		if (isAlreadySelected) {
-			//emit('selected', folderToChoose);
 		} else {
 			selectedFolders.value = [folderToChoose];
 		}
@@ -605,7 +591,6 @@ async function moveFilesBulk() {
 }
 
 function goRoot() {
-	// 既にrootにいるなら何もしない
 	if (folder.value == null) return;
 
 	folder.value = null;

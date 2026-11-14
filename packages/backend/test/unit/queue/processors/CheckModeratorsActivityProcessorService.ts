@@ -28,8 +28,6 @@ describe('CheckModeratorsActivityProcessorService', () => {
 	let clock: lolex.Clock;
 	let service: CheckModeratorsActivityProcessorService;
 
-	// --------------------------------------------------------------------------------------
-
 	let usersRepository: UsersRepository;
 	let userProfilesRepository: UserProfilesRepository;
 	let idService: IdService;
@@ -41,8 +39,6 @@ describe('CheckModeratorsActivityProcessorService', () => {
 	let systemWebhook1: MiSystemWebhook;
 	let systemWebhook2: MiSystemWebhook;
 	let systemWebhook3: MiSystemWebhook;
-
-	// --------------------------------------------------------------------------------------
 
 	async function createUser(data: Partial<MiUser> = {}, profile: Partial<MiUserProfile> = {}): Promise<MiUser> {
 		const id = idService.gen();
@@ -82,8 +78,6 @@ describe('CheckModeratorsActivityProcessorService', () => {
 		roleService.getModerators.mockReset();
 		roleService.getModerators.mockResolvedValue(users);
 	}
-
-	// --------------------------------------------------------------------------------------
 
 	beforeAll(async () => {
 		app = await Test
@@ -142,7 +136,6 @@ describe('CheckModeratorsActivityProcessorService', () => {
 
 	beforeEach(async () => {
 		clock = lolex.install({
-			// https://github.com/sinonjs/sinon/issues/2620
 			toFake: Object.keys(lolex.timers).filter((key) => !['nextTick', 'queueMicrotask'].includes(key)) as lolex.FakeMethod[],
 			now: new Date(baseDate),
 			shouldClearNativeTimers: true,
@@ -172,18 +165,12 @@ describe('CheckModeratorsActivityProcessorService', () => {
 		await app.close();
 	});
 
-	// --------------------------------------------------------------------------------------
-
 	describe('evaluateModeratorsInactiveDays', () => {
 		test('[isModeratorsInactive] inactiveなモデレーターがいても他のモデレーターがアクティブなら"運営が非アクティブ"としてみなされない', async () => {
 			const [user1, user2, user3, user4] = await Promise.all([
-				// 期限よりも1秒新しいタイミングでアクティブ化（セーフ）
 				createUser({ lastActiveDate: subDays(addSeconds(baseDate, 1), 7) }),
-				// 期限ちょうどにアクティブ化（セーフ）
 				createUser({ lastActiveDate: subDays(baseDate, 7) }),
-				// 期限よりも1秒古いタイミングでアクティブ化（アウト）
 				createUser({ lastActiveDate: subDays(subSeconds(baseDate, 1), 7) }),
-				// 対象外
 				createUser({ lastActiveDate: null }),
 			]);
 
@@ -196,9 +183,7 @@ describe('CheckModeratorsActivityProcessorService', () => {
 
 		test('[isModeratorsInactive] 全員非アクティブなら"運営が非アクティブ"としてみなされる', async () => {
 			const [user1, user2] = await Promise.all([
-				// 期限よりも1秒古いタイミングでアクティブ化（アウト）
 				createUser({ lastActiveDate: subDays(subSeconds(baseDate, 1), 7) }),
-				// 対象外
 				createUser({ lastActiveDate: null }),
 			]);
 
@@ -212,8 +197,6 @@ describe('CheckModeratorsActivityProcessorService', () => {
 		test('[remainingTime] 猶予まで24時間ある場合、猶予1日として計算される', async () => {
 			const [user1, user2] = await Promise.all([
 				createUser({ lastActiveDate: subDays(baseDate, 8) }),
-				// 猶予はこのユーザ基準で計算される想定。
-				// 期限まで残り24時間->猶予1日として計算されるはずである
 				createUser({ lastActiveDate: subDays(baseDate, 6) }),
 			]);
 
@@ -229,8 +212,6 @@ describe('CheckModeratorsActivityProcessorService', () => {
 		test('[remainingTime] 猶予まで25時間ある場合、猶予1日として計算される', async () => {
 			const [user1, user2] = await Promise.all([
 				createUser({ lastActiveDate: subDays(baseDate, 8) }),
-				// 猶予はこのユーザ基準で計算される想定。
-				// 期限まで残り25時間->猶予1日として計算されるはずである
 				createUser({ lastActiveDate: subDays(addHours(baseDate, 1), 6) }),
 			]);
 
@@ -246,8 +227,6 @@ describe('CheckModeratorsActivityProcessorService', () => {
 		test('[remainingTime] 猶予まで23時間ある場合、猶予0日として計算される', async () => {
 			const [user1, user2] = await Promise.all([
 				createUser({ lastActiveDate: subDays(baseDate, 8) }),
-				// 猶予はこのユーザ基準で計算される想定。
-				// 期限まで残り23時間->猶予0日として計算されるはずである
 				createUser({ lastActiveDate: subDays(subHours(baseDate, 1), 6) }),
 			]);
 
@@ -263,8 +242,6 @@ describe('CheckModeratorsActivityProcessorService', () => {
 		test('[remainingTime] 期限ちょうどの場合、猶予0日として計算される', async () => {
 			const [user1, user2] = await Promise.all([
 				createUser({ lastActiveDate: subDays(baseDate, 8) }),
-				// 猶予はこのユーザ基準で計算される想定。
-				// 期限ちょうど->猶予0日として計算されるはずである
 				createUser({ lastActiveDate: subDays(baseDate, 7) }),
 			]);
 
@@ -280,8 +257,6 @@ describe('CheckModeratorsActivityProcessorService', () => {
 		test('[remainingTime] 期限より1時間超過している場合、猶予-1日として計算される', async () => {
 			const [user1, user2] = await Promise.all([
 				createUser({ lastActiveDate: subDays(baseDate, 8) }),
-				// 猶予はこのユーザ基準で計算される想定。
-				// 期限より1時間超過->猶予-1日として計算されるはずである
 				createUser({ lastActiveDate: subDays(subHours(baseDate, 1), 7) }),
 			]);
 
@@ -297,8 +272,6 @@ describe('CheckModeratorsActivityProcessorService', () => {
 		test('[remainingTime] 期限より25時間超過している場合、猶予-2日として計算される', async () => {
 			const [user1, user2] = await Promise.all([
 				createUser({ lastActiveDate: subDays(baseDate, 10) }),
-				// 猶予はこのユーザ基準で計算される想定。
-				// 期限より1時間超過->猶予-1日として計算されるはずである
 				createUser({ lastActiveDate: subDays(subHours(baseDate, 25), 7) }),
 			]);
 
@@ -338,8 +311,6 @@ describe('CheckModeratorsActivityProcessorService', () => {
 			mockModeratorRole([user1]);
 			await service.notifyInactiveModeratorsWarning({ time: 1, asDays: 0, asHours: 0 });
 
-			// typeとactiveによる絞り込みが機能しているかはSystemWebhookServiceのテストで確認する.
-			// ここでは呼び出されているか、typeが正しいかのみを確認する
 			expect(systemWebhookService.enqueueSystemWebhook).toHaveBeenCalledTimes(1);
 			expect(systemWebhookService.enqueueSystemWebhook.mock.calls[0][0] as SystemWebhookEventType).toEqual('inactiveModeratorsWarning');
 		});
@@ -377,8 +348,6 @@ describe('CheckModeratorsActivityProcessorService', () => {
 			mockModeratorRole([user1]);
 			await service.notifyChangeToInvitationOnly();
 
-			// typeとactiveによる絞り込みが機能しているかはSystemWebhookServiceのテストで確認する.
-			// ここでは呼び出されているか、typeが正しいかのみを確認する
 			expect(systemWebhookService.enqueueSystemWebhook).toHaveBeenCalledTimes(1);
 			expect(systemWebhookService.enqueueSystemWebhook.mock.calls[0][0] as SystemWebhookEventType).toEqual('inactiveModeratorsInvitationOnlyChanged');
 		});

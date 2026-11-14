@@ -22,7 +22,6 @@ describe('opt-in process performance metrics', () => {
 			encoding: 'utf8',
 			env: { ...process.env, MK_PERFORMANCE_INTERVAL_MS: '20', MK_ONLY_SERVER: '1', MK_ONLY_QUEUE: '', MK_DISABLE_CLUSTERING: '1' },
 		});
-		// Metrics deliberately use stderr so the application stdout remains usable.
 		expect(result.status).toBe(0);
 		expect(result.stdout).toBe('');
 		const samples = result.stderr.trim().split('\n').map(line => JSON.parse(line));

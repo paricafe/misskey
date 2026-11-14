@@ -69,7 +69,6 @@ export class FanoutTimelineEndpointService {
 
 	@bindThis
 	async getMiNotes(ps: TimelineOptions): Promise<MiNote[]> {
-		// 呼び出し元と以下の処理をシンプルにするためにdbFallbackを置き換える
 		if (!ps.useDbFallback) ps.dbFallback = () => Promise.resolve([]);
 
 		const ascending = ps.sinceId && !ps.untilId;
@@ -77,7 +76,6 @@ export class FanoutTimelineEndpointService {
 
 		const redisResult = await this.fanoutTimelineService.getMulti(ps.redisTimelines, ps.untilId, ps.sinceId);
 
-		// TODO: いい感じにgetMulti内でソート済だからuniqするときにredisResultが全てソート済なのを利用して再ソートを避けたい
 		const redisResultIds = Array.from(new Set(redisResult.flat(1))).sort(idCompare);
 
 		let noteIds = redisResultIds.slice(0, ps.limit);
@@ -176,12 +174,11 @@ export class FanoutTimelineEndpointService {
 
 			const redisTimeline: MiNote[] = [];
 			let readFromRedis = 0;
-			let lastSuccessfulRate = 1; // rateをキャッシュする？
+			let lastSuccessfulRate = 1;
 
 			while ((redisResultIds.length - readFromRedis) !== 0) {
 				const remainingToRead = ps.limit - redisTimeline.length;
 
-				// DBからの取り直しを減らす初回と同じ割合以上で成功すると仮定するが、クエリの長さを考えて三倍まで
 				const countToGet = Math.ceil(remainingToRead * Math.min(1.1 / lastSuccessfulRate, 3));
 				noteIds = redisResultIds.slice(readFromRedis, readFromRedis + countToGet);
 
@@ -192,12 +189,10 @@ export class FanoutTimelineEndpointService {
 				lastSuccessfulRate = gotFromDb.length / noteIds.length;
 
 				if (ps.allowPartial ? redisTimeline.length !== 0 : redisTimeline.length >= ps.limit) {
-					// 十分Redisからとれた
 					return redisTimeline.slice(0, ps.limit);
 				}
 			}
 
-			// まだ足りない分はDBにフォールバック
 			const remainingToRead = ps.limit - redisTimeline.length;
 			let dbUntil: string | null;
 			let dbSince: string | null;

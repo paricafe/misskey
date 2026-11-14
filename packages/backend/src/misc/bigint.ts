@@ -22,19 +22,13 @@ function parseBigIntChunked(str: string, base: number, chunkSize: number, powerO
 }
 
 export function parseBigInt36(str: string): bigint {
-	// log_36(Number.MAX_SAFE_INTEGER) => 10.251599391715352
-	// so we process 10 chars at once
 	return parseBigIntChunked(str, 36, 10, 36n ** 10n);
 }
 
 export function parseBigInt16(str: string): bigint {
-	// log_16(Number.MAX_SAFE_INTEGER) => 13.25
-	// so we process 13 chars at once
 	return parseBigIntChunked(str, 16, 13, 16n ** 13n);
 }
 
 export function parseBigInt32(str: string): bigint {
-	// log_32(Number.MAX_SAFE_INTEGER) => 10.6
-	// so we process 10 chars at once
 	return parseBigIntChunked(str, 32, 10, 32n ** 10n);
 }

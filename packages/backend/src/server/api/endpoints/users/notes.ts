@@ -64,7 +64,7 @@ export const paramDef = {
 		untilId: { type: 'string', format: 'misskey:id' },
 		sinceDate: { type: 'integer' },
 		untilDate: { type: 'integer' },
-		allowPartial: { type: 'boolean', default: false }, // true is recommended but for compatibility false by default
+		allowPartial: { type: 'boolean', default: false },
 		withFiles: { type: 'boolean', default: false },
 	},
 	required: ['userId'],
@@ -92,7 +92,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 
 			if (ps.withReplies && ps.withFiles) throw new ApiError(meta.errors.bothWithRepliesAndWithFiles);
 
-			// early return if me is blocked by requesting user
 			if (me != null) {
 				const userIdsWhoBlockingMe = await this.cacheService.userBlockedCache.fetch(me.id);
 				if (userIdsWhoBlockingMe.has(ps.userId)) {
@@ -132,8 +131,8 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				ignoreAuthorFromMute: true,
 				ignoreAuthorFromInstanceBlock: true,
 				ignoreAuthorFromUserSuspension: true,
-				excludeReplies: ps.withChannelNotes && !ps.withReplies, // userTimelineWithChannel may include replies
-				excludeNoFiles: ps.withChannelNotes && ps.withFiles, // userTimelineWithChannel may include notes without files
+				excludeReplies: ps.withChannelNotes && !ps.withReplies,
+				excludeNoFiles: ps.withChannelNotes && ps.withFiles,
 				excludePureRenotes: !ps.withRenotes,
 				noteFilter: note => {
 					if (note.channel?.isSensitive && !isSelf) return false;
@@ -202,7 +201,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 			query.andWhere('note.channelId IS NULL');
 		}
 
-		// -- ミュートされたチャンネルのリノート対策
 		if (mutingChannelIds.length > 0) {
 			query.andWhere(new Brackets(qb => {
 				qb.orWhere('note.renoteChannelId IS NULL');

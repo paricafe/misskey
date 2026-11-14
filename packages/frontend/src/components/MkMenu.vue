@@ -299,7 +299,7 @@ watch(() => props.items, () => {
 	for (let i = 0; i < items.length; i++) {
 		const item = items[i];
 
-		if ('then' in item) { // if item is Promise
+		if ('then' in item) {
 			items[i] = { type: 'pending' };
 			item.then(actualItem => {
 				if (items2.value?.[i]) items2.value[i] = actualItem;
@@ -398,7 +398,6 @@ async function showChildren(item: MenuParent, ev: MouseEvent | PointerEvent | Ke
 		emit('hide');
 	} else {
 		childTarget.value = (ev.currentTarget ?? ev.target) as HTMLElement;
-		// これでもリアクティビティは保たれる
 		childMenu.value = children;
 		childMenuKey.value++;
 		childShowingItem.value = item;
@@ -514,7 +513,7 @@ const guard = reactive({
 const guardPolygon = computed(() =>
 	guard.enabled
 		? guard.direction === 'toRight'
-			? `polygon(${guard.cursorSideX}px ${guard.cursorSideY}px, 101% ${guard.childSideTopY}px, 101% ${guard.childSideBottomY}px)` // ぴったり端に100%で覆ってもなぜか端でカーソルのイベントが後ろに貫通するので1%だけ伸ばす
+			? `polygon(${guard.cursorSideX}px ${guard.cursorSideY}px, 101% ${guard.childSideTopY}px, 101% ${guard.childSideBottomY}px)`
 			: `polygon(0% ${guard.childSideTopY}px, 0% ${guard.childSideBottomY}px, ${guard.cursorSideX}px ${guard.cursorSideY}px)`
 		: 'polygon(0 0, 0 0, 0 0)',
 );
@@ -531,10 +530,10 @@ function parentMouseMove(ev: MouseEvent) {
 	const childBounding = child.value.rootElement.getBoundingClientRect();
 	const isChildRight = childBounding.left > rootBounding.left;
 
-	const CURSOR_SIDE_X_PADDING = 3; // (px)
-	const CHILD_SIDE_Y_PADDING_BASE = 70; // (px)
-	const CHILD_SIDE_Y_PADDING_EXTEND = 30; // (px)
-	const SCALE_FACTOR_COMPUTE_DISTANCE = 300; // コーンの広さが最大になる距離(px)
+	const CURSOR_SIDE_X_PADDING = 3;
+	const CHILD_SIDE_Y_PADDING_BASE = 70;
+	const CHILD_SIDE_Y_PADDING_EXTEND = 30;
+	const SCALE_FACTOR_COMPUTE_DISTANCE = 300;
 	const localMouseX = ev.clientX - itemBounding.left;
 	const localMouseY = ev.clientY - rootBounding.top;
 	const scaleFactor = isChildRight ? Math.min((itemBounding.width - localMouseX), SCALE_FACTOR_COMPUTE_DISTANCE) / SCALE_FACTOR_COMPUTE_DISTANCE : Math.min(localMouseX, SCALE_FACTOR_COMPUTE_DISTANCE) / SCALE_FACTOR_COMPUTE_DISTANCE;
@@ -682,7 +681,7 @@ function guardMouseMove(ev: MouseEvent) {
 		&:focus-visible.active {
 			color: var(--menuHoverFg, var(--MI_THEME-accent));
 			position: relative;
-			z-index: 10; // guardより上にする
+			z-index: 10;
 
 			&::before {
 				background-color: var(--menuHoverBg, var(--MI_THEME-accentedBg));

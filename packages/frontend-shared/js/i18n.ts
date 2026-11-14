@@ -28,7 +28,6 @@ type ParametersOf<T extends ILocale, TKey extends FlattenKeys<T, ParameterizedSt
 		: never;
 
 type Tsx<T extends ILocale> = {
-	// `string extends T[K] ? never : K` part removes non-parameterized string keys from Tsx type.
 	readonly [K in keyof T as string extends T[K] ? never : K]: T[K] extends ParameterizedString<infer P>
 		? (arg: { readonly [_ in P]: string | number }) => string
 		// @ts-expect-error -- 証明省略
@@ -42,9 +41,7 @@ export class I18n<T extends ILocale> {
 	constructor(public locale: T, devMode = false) {
 		this.devMode = devMode;
 
-		//#region BIND
 		this.t = this.t.bind(this);
-		//#endregion
 	}
 
 	public get ts(): T {

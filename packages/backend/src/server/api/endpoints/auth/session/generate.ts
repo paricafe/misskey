@@ -65,7 +65,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 		private idService: IdService,
 	) {
 		super(meta, paramDef, async (ps, me) => {
-			// Lookup app
 			const app = await this.appsRepository.findOneBy({
 				secret: ps.appSecret,
 			});
@@ -74,10 +73,8 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				throw new ApiError(meta.errors.noSuchApp);
 			}
 
-			// Generate token
 			const token = randomUUID();
 
-			// Create session token document
 			const doc = await this.authSessionsRepository.insertOne({
 				id: this.idService.gen(),
 				appId: app.id,

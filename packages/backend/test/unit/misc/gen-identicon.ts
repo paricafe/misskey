@@ -64,9 +64,9 @@ describe(genIdenticon, () => {
 		const ihdr = chunks[0].data;
 		expect(ihdr.readUInt32BE(0)).toBe(size);
 		expect(ihdr.readUInt32BE(4)).toBe(size);
-		expect(ihdr[8]).toBe(8); // bit depth
-		expect(ihdr[9]).toBe(3); // color type: indexed-color
-		expect(chunks[1].data.length).toBe(256 * 3); // 256色のパレット
+		expect(ihdr[8]).toBe(8);
+		expect(ihdr[9]).toBe(3);
+		expect(chunks[1].data.length).toBe(256 * 3);
 
 		const metadata = await sharp(png, { failOn: 'warning' }).metadata();
 		expect(metadata.format).toBe('png');
@@ -123,8 +123,6 @@ describe(genIdenticon, () => {
 		}
 	});
 
-	// identiconはアバターとして使われるため、意図せず見た目が変わらないようにする
-	// (圧縮後のバイト列はzlibの実装によって変わりうるため、デコード後のピクセルで比較する)
 	test.each([
 		['carol@example.com', '4b6010bffe237109c0814c3303a3b9b23ca0d61f6d8b8c1613775988b5eb86bf'],
 		['alice@example.com', '49aa5dd99926d6ad367a95e257668d50eda6de4df3aaa680fd1bcd903eaba00e'],

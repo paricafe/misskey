@@ -62,7 +62,6 @@ export class PageEntityService {
 		};
 		collectFile(page.content);
 
-		// 後方互換性のため
 		let migrated = false;
 		const migrate = (xs: any[]) => {
 			for (const x of xs) {
@@ -93,7 +92,7 @@ export class PageEntityService {
 			createdAt: this.idService.parse(page.id).date.toISOString(),
 			updatedAt: page.updatedAt.toISOString(),
 			userId: page.userId,
-			user: hint?.packedUser ?? this.userEntityService.pack(page.user ?? page.userId, me), // { schema: 'UserDetailed' } すると無限ループするので注意
+			user: hint?.packedUser ?? this.userEntityService.pack(page.user ?? page.userId, me),
 			content: page.content,
 			variables: page.variables,
 			title: page.title,

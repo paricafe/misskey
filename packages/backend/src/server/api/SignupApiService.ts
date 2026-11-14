@@ -80,8 +80,6 @@ export class SignupApiService {
 	) {
 		const body = request.body;
 
-		// Verify *Captcha
-		// ただしテスト時はこの機構は障害となるため無効にする
 		if (process.env.NODE_ENV !== 'test') {
 			if (this.meta.enableHcaptcha && this.meta.hcaptchaSecretKey) {
 				await this.captchaService.verifyHcaptcha(this.meta.hcaptchaSecretKey, body['hcaptcha-response']).catch(err => {
@@ -134,7 +132,6 @@ export class SignupApiService {
 			}
 		}
 
-		// Matches the varchar(1000) reason columns on user and user_pending.
 		if (reason != null && (typeof reason !== 'string' || reason.length > 1000)) {
 			reply.code(400);
 			return;
@@ -147,15 +144,12 @@ export class SignupApiService {
 
 		let ticket: MiRegistrationTicket | null = null;
 
-		// テスト時はこの機構は障害となるため無効にする
 		if (process.env.NODE_ENV !== 'test' && this.meta.disableRegistration) {
 			if (invitationCode == null || typeof invitationCode !== 'string') {
 				reply.code(400);
 				return;
 			}
 
-			// ここでの検証はあくまで早期リジェクトのための事前チェックで、
-			// 実際の使用可否は消費直前の claimRegistrationTicket() が担保する
 			ticket = await this.registrationTicketsRepository.findOneBy({
 				code: invitationCode,
 			});
@@ -170,15 +164,12 @@ export class SignupApiService {
 				return;
 			}
 
-			// メアド認証が有効の場合
 			if (this.meta.emailRequiredForSignup) {
-				// メアド認証済みならエラー
 				if (ticket.usedBy) {
 					reply.code(400);
 					return;
 				}
 
-				// 認証しておらず、メール送信から30分以内ならエラー
 				if (ticket.usedAt && ticket.usedAt.getTime() + invitationCodeMailTimeoutMs > Date.now()) {
 					reply.code(400);
 					return;
@@ -194,7 +185,6 @@ export class SignupApiService {
 				throw new FastifyReplyError(400, 'DUPLICATED_USERNAME');
 			}
 
-			// Check deleted username duplication
 			if (await this.usedUsernamesRepository.exists({ where: { username: username.toLowerCase() } })) {
 				throw new FastifyReplyError(400, 'USED_USERNAME');
 			}
@@ -206,7 +196,6 @@ export class SignupApiService {
 
 			const code = secureRndstr(16, { chars: L_CHARS });
 
-			// Generate hash of password
 			const salt = await bcrypt.genSalt(8);
 			const hash = await bcrypt.hash(password, salt);
 
@@ -237,7 +226,6 @@ export class SignupApiService {
 					});
 				}
 			} catch (err) {
-				// 確保したコードが無駄に消費されたままになるのを防ぐ
 				if (ticket) await this.releaseRegistrationTicket(ticket);
 				throw err;
 			}
@@ -314,32 +302,23 @@ export class SignupApiService {
 					token: secret,
 				};
 			} catch (err) {
-				// 確保したコードが無駄に消費されたままになるのを防ぐ
-				// (アカウントと紐付け済みの場合は release 側の条件により戻らない)
 				if (ticket) await this.releaseRegistrationTicket(ticket);
 				throw new FastifyReplyError(400, typeof err === 'string' ? err : (err as Error).toString());
 			}
 		}
 	}
 
-	/**
-	 * 招待コードを使用中として確保する
-	 *
-	 * @returns 確保できた場合は true、既に他のリクエストが消費していた場合は false
-	 */
 	@bindThis
 	private async claimRegistrationTicket(ticket: MiRegistrationTicket): Promise<boolean> {
 		const where: FindOptionsWhere<MiRegistrationTicket>[] = [
 			{ id: ticket.id, usedById: IsNull(), usedAt: IsNull() },
 		];
 
-		// メアド認証が有効の場合、認証されないままメール送信から30分経過したコードは再び使用できる
 		if (this.meta.emailRequiredForSignup) {
 			where.push({
 				id: ticket.id,
 				usedById: IsNull(),
 				usedAt: LessThanOrEqual(new Date(Date.now() - invitationCodeMailTimeoutMs)),
-				// pendingUser は usedAt より後に作られるので、usedAt 起点だと pendingUser の有効期限内に再使用できてしまう
 				pendingUserId: IsNull(),
 			});
 		}
@@ -350,7 +329,6 @@ export class SignupApiService {
 
 		if ((result.affected ?? 0) > 0) return true;
 
-		// 期限切れの pendingUser に紐付いたままのコードは、紐付けを解除してから確保し直す
 		if (this.meta.emailRequiredForSignup) {
 			const stale = await this.registrationTicketsRepository.findOneBy({
 				id: ticket.id,
@@ -376,11 +354,6 @@ export class SignupApiService {
 		return false;
 	}
 
-	/**
-	 * {@link claimRegistrationTicket} で確保した招待コードを未使用に戻す
-	 *
-	 * 既にアカウントと紐付いた (= 消費が確定した) コードは戻さない
-	 */
 	@bindThis
 	private async releaseRegistrationTicket(ticket: MiRegistrationTicket): Promise<void> {
 		await this.registrationTicketsRepository.update({

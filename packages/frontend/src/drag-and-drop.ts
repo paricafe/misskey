@@ -12,8 +12,6 @@ type DragDataMap = {
 	MkDraggable: { item: { id: string }; instanceId: string; group: string; };
 };
 
-// NOTE: dataTransfer の format は大文字小文字区別されないっぽいので toLowerCase が必要
-
 export function setDragData<T extends keyof DragDataMap>(
 	event: DragEvent,
 	type: T,

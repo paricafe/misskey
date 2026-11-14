@@ -63,7 +63,7 @@ export class DeleteAccountProcessorService {
 			return;
 		}
 
-		{ // Delete notes
+		{
 			let cursor: MiNote['id'] | null = null;
 
 			while (true) {
@@ -94,7 +94,7 @@ export class DeleteAccountProcessorService {
 			this.logger.succ('All of notes deleted');
 		}
 
-		{ // Delete reactions
+		{
 			let cursor: MiNoteReaction['id'] | null = null;
 
 			while (true) {
@@ -119,11 +119,9 @@ export class DeleteAccountProcessorService {
 				const noteById = new Map(notes.map(note => [note.id, note]));
 
 				for (const reaction of reactions) {
-					// The note may have been deleted meanwhile, which also removes its reactions.
 					const note = noteById.get(reaction.noteId);
 					if (note == null) continue;
 
-					// The account Delete has already been federated, so per-reaction Undo deliveries would only fail.
 					await this.reactionService.removeReaction(reaction, note);
 				}
 			}
@@ -131,7 +129,7 @@ export class DeleteAccountProcessorService {
 			this.logger.succ('All reactions have been deleted');
 		}
 
-		{ // Delete files
+		{
 			let cursor: MiDriveFile['id'] | null = null;
 
 			while (true) {
@@ -161,7 +159,6 @@ export class DeleteAccountProcessorService {
 		}
 
 		{
-			// delete pages. Necessary for decrementing pageCount of notes.
 			while (true) {
 				const pages = await this.pagesRepository.find({
 					where: {
@@ -182,7 +179,7 @@ export class DeleteAccountProcessorService {
 			}
 		}
 
-		{ // Send email notification
+		{
 			const profile = await this.userProfilesRepository.findOneByOrFail({ userId: user.id });
 			if (profile.email && profile.emailVerified) {
 				this.emailService.sendEmail(profile.email, 'Account deleted',
@@ -191,9 +188,7 @@ export class DeleteAccountProcessorService {
 			}
 		}
 
-		// soft指定されている場合は物理削除しない
 		if (job.data.soft) {
-		// nop
 		} else {
 			await this.usersRepository.delete(job.data.user.id);
 		}

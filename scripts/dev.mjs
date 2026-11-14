@@ -44,8 +44,6 @@ function spawnChildProcess(command, args, options) {
 		: args;
 	const childProcess = execa(executable, executableArgs, isWindows ? {
 		...options,
-		// `start /b` keeps the process in the current console without forwarding
-		// Ctrl+C, allowing only this supervisor to coordinate the shutdown.
 		windowsVerbatimArguments: true,
 		windowsHide: false,
 		env: shouldForceColor ? { FORCE_COLOR: '1' } : undefined,
@@ -171,7 +169,6 @@ try {
 		stderr: process.stderr,
 	});
 
-	// アセットのビルドで依存しているので一番最初に必要
 	await runChildProcess('pnpm', ['--filter', 'i18n', 'build'], {
 		cwd: _dirname + '/../',
 		stdout: process.stdout,
@@ -194,7 +191,6 @@ try {
 			stdout: process.stdout,
 			stderr: process.stderr,
 		}),
-		// icons-subsetterは開発段階では使用されないが、型エラーを抑制するためにはじめの一度だけビルドする
 		runChildProcess('pnpm', ['--filter', 'icons-subsetter', 'build'], {
 			cwd: _dirname + '/../',
 			stdout: process.stdout,

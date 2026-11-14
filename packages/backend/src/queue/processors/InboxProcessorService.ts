@@ -70,14 +70,12 @@ export class InboxProcessorService implements OnApplicationShutdown {
 
 	@bindThis
 	public async process(job: Bull.Job<InboxJobData>): Promise<string> {
-		const signature = job.data.signature;	// HTTP-signature
+		const signature = job.data.signature;
 		let activity = job.data.activity;
 
-		//#region Log
 		const info = Object.assign({}, activity);
 		delete info['@context'];
 		this.logger.debug(JSON.stringify(info, null, 2));
-		//#endregion
 
 		const host = this.utilityService.toPuny(new URL(signature.keyId).hostname);
 
@@ -93,8 +91,6 @@ export class InboxProcessorService implements OnApplicationShutdown {
 		{
 			let userExistenceCheckApId: string | null = null;
 
-			// 存在しないActorに対するActorのDeleteアクティビティは無視する。
-			// actorとobjectが同じならばそれはActorに違いない
 			if (isDelete(activity) && typeof activity.object === 'object' && (isActor(activity.object) || getApId(activity.actor) === getApId(activity.object))) {
 				userExistenceCheckApId = getApId(activity.object);
 			}
@@ -107,18 +103,15 @@ export class InboxProcessorService implements OnApplicationShutdown {
 			}
 		}
 
-		// HTTP-Signature keyIdを元にDBから取得
 		let authUser: {
 			user: MiRemoteUser;
 			key: MiUserPublickey | null;
 		} | null = await this.apDbResolverService.getAuthUserFromKeyId(signature.keyId);
 
-		// keyIdでわからなければ、activity.actorを元にDBから取得 || activity.actorを元にリモートから取得
 		if (authUser == null) {
 			try {
 				authUser = await this.apDbResolverService.getAuthUserFromApId(getApId(activity.actor));
 			} catch (err) {
-				// 対象が4xxならスキップ
 				if (err instanceof StatusError && !err.isRetryable) {
 					throw new Bull.UnrecoverableError(`skip: Ignored deleted actors on both ends ${getApId(activity.actor)} - ${err.statusCode}`);
 				}
@@ -126,36 +119,28 @@ export class InboxProcessorService implements OnApplicationShutdown {
 			}
 		}
 
-		// それでもわからなければ終了
 		if (authUser == null) {
 			throw new Bull.UnrecoverableError(`skip: failed to resolve user ${getApId(activity.actor)}`);
 		}
 
-		// publicKey がなくても終了
 		if (authUser.key == null) {
 			throw new Bull.UnrecoverableError(`skip: failed to resolve user publicKey ${getApId(activity.actor)}`);
 		}
 
-		// HTTP-Signatureの検証
 		const httpSignatureValidated = httpSignature.verifySignature(signature, authUser.key.keyPem);
 
-		// また、signatureのsignerは、activity.actorと一致する必要がある
 		if (!httpSignatureValidated || authUser.user.uri !== getApId(activity.actor)) {
-			// 一致しなくても、でもLD-Signatureがありそうならそっちも見る
 			const ldSignature = activity.signature;
 			if (ldSignature) {
 				if (ldSignature.type !== 'RsaSignature2017') {
 					throw new Bull.UnrecoverableError(`skip: unsupported LD-signature type ${ldSignature.type}`);
 				}
 
-				// ldSignature.creator: https://example.oom/users/user#main-key
-				// みたいになっててUserを引っ張れば公開キーも入ることを期待する
 				if (ldSignature.creator) {
 					const candicate = ldSignature.creator.replace(/#.*/, '');
 					await this.apPersonService.resolvePerson(candicate).catch(() => null);
 				}
 
-				// keyIdからLD-Signatureのユーザーを取得
 				authUser = await this.apDbResolverService.getAuthUserFromKeyId(ldSignature.creator);
 				if (authUser == null) {
 					throw new Bull.UnrecoverableError('skip: LD-Signatureのユーザーが取得できませんでした');
@@ -182,17 +167,14 @@ export class InboxProcessorService implements OnApplicationShutdown {
 					throw new Bull.UnrecoverableError(`skip: ${error}`);
 				}
 
-				//#region Log
 				const compactedInfo = Object.assign({}, activity);
 				delete compactedInfo['@context'];
 				this.logger.debug(`compacted: ${JSON.stringify(compactedInfo, null, 2)}`);
-				//#endregion
 
 				activity.signature = ldSignature;
 
 				jsonLd.freeze();
 
-				// LD-Signature検証
 				let verified;
 				try {
 					verified = await jsonLd.verifyRsaSignature2017(activity, authUser.key.keyPem);
@@ -207,7 +189,6 @@ export class InboxProcessorService implements OnApplicationShutdown {
 					}
 				}
 
-				// もう一度actorチェック
 				if (authUser.user.uri !== getApId(activity.actor)) {
 					throw new Bull.UnrecoverableError(`skip: LD-Signature user(${authUser.user.uri}) !== activity.actor(${getApId(activity.actor)})`);
 				}
@@ -221,7 +202,6 @@ export class InboxProcessorService implements OnApplicationShutdown {
 			}
 		}
 
-		// activity.idがあればホストが署名者のホストであることを確認する
 		if (typeof activity.id === 'string') {
 			const signerHost = this.utilityService.extractDbHost(authUser.user.uri!);
 			const activityIdHost = this.utilityService.extractDbHost(activity.id);
@@ -229,14 +209,12 @@ export class InboxProcessorService implements OnApplicationShutdown {
 				throw new Bull.UnrecoverableError(`skip: signerHost(${signerHost}) !== activity.id host(${activityIdHost}`);
 			}
 		} else {
-			// Activity ID should only be string or undefined.
 			delete activity.id;
 		}
 
 		this.apRequestChart.inbox();
 		this.federationChart.inbox(authUser.user.host);
 
-		// Update instance stats
 		process.nextTick(async () => {
 			const i = await (this.meta.enableStatsForFederatedInstances
 				? this.federatedInstanceService.fetchOrRegister(authUser.user.host)
@@ -256,7 +234,6 @@ export class InboxProcessorService implements OnApplicationShutdown {
 			this.fetchInstanceMetadataService.fetchInstanceMetadata(i);
 		});
 
-		// アクティビティを処理
 		try {
 			const result = await this.apInboxService.performActivity(authUser.user, activity);
 			if (result && !result.startsWith('ok')) {
@@ -277,11 +254,11 @@ export class InboxProcessorService implements OnApplicationShutdown {
 						return 'blocked notes with prohibited words';
 					case '85ab9bd7-3a41-4530-959d-f07073900109':
 						return 'actor has been suspended';
-					case 'd450b8a9-48e4-4dab-ae36-f4db763fda7c': // invalid Note
+					case 'd450b8a9-48e4-4dab-ae36-f4db763fda7c':
 						return e.message;
 					case '9f466dab-c856-48cd-9e65-ff90ff750580':
 						return 'note contains too many mentions';
-					case '09d79f9e-64f1-4316-9cfa-e75c4d091574': // Instance is blocked
+					case '09d79f9e-64f1-4316-9cfa-e75c4d091574':
 						return 'skip: blocked instance';
 				}
 			}
@@ -307,7 +284,6 @@ export class InboxProcessorService implements OnApplicationShutdown {
 		await this.federatedInstanceService.update(id, {
 			latestRequestReceivedAt: new Date(),
 			isNotResponding: false,
-			// もしサーバーが死んでるために配信が止まっていた場合には自動的に復活させてあげる
 			suspensionState: job.shouldUnsuspend ? 'none' : undefined,
 		});
 	}

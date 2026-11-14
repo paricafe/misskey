@@ -14,8 +14,6 @@ export async function shutdownClusterWorkers(): Promise<void> {
 			else reject(new Error(`Worker ${worker.id} failed to shut down cleanly (${signal || code})`));
 		};
 		worker.once('exit', onExit);
-		// Worker.kill() disconnects IPC first. Send the signal to the child process
-		// directly so it can drain while the primary stays alive and awaits exit.
 		try {
 			worker.process.kill('SIGTERM');
 		} catch (error) {

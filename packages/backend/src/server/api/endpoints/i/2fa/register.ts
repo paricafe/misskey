@@ -80,14 +80,12 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				throw new ApiError(meta.errors.incorrectPassword);
 			}
 
-			// Generate user's secret key
 			const secret = new OTPAuth.Secret();
 
 			await this.userProfilesRepository.update(me.id, {
 				twoFactorTempSecret: secret.base32,
 			});
 
-			// Get the data URL of the authenticator URL
 			const totp = new OTPAuth.TOTP({
 				secret,
 				digits: 6,

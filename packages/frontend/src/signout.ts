@@ -37,24 +37,20 @@ export async function signout() {
 		await Promise.race([
 			Promise.all([
 				...idbPromises,
-				// idb keyval-storeはidb-keyvalライブラリによる別管理
 				clear(),
 			]),
 			new Promise((_, rej) => idbAbortController.signal.addEventListener('abort', () => rej(new Error('Operation timed out')))),
 		]);
 	} catch {
-		// nothing
 	} finally {
 		window.clearTimeout(timeout);
 	}
 
-	//#region Remove service worker registration
 	try {
 		if (navigator.serviceWorker.controller) {
 			const registration = await navigator.serviceWorker.ready;
 			const push = await registration.pushManager.getSubscription();
 			if (push) {
-				// Service Workerごと登録解除するので、この購読に紐づく全アカウントの登録を解除する
 				await window.fetch(`${apiUrl}/sw/unregister`, {
 					method: 'POST',
 					body: JSON.stringify({
@@ -74,9 +70,7 @@ export async function signout() {
 				return Promise.all(registrations.map(registration => registration.unregister()));
 			});
 	} catch {
-		// nothing
 	}
-	//#endregion
 
 	unisonReload('/');
 }

@@ -12,7 +12,6 @@ import ts from 'typescript';
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const defaultRootDir = path.resolve(scriptDir, '..');
 
-// パス判定は OS 差分を避けるため、必要なところだけ POSIX 形式へ寄せる。
 function toPosixPath(filePath) {
 	return filePath.split(path.sep).join('/');
 }
@@ -22,7 +21,6 @@ function isInside(parentDir, filePath) {
 	return relative !== '' && !relative.startsWith('..') && !path.isAbsolute(relative);
 }
 
-// skipLibCheck で隠したくない、リポジトリ管理下の手書き .d.ts だけを検査する。
 export function isCheckableDeclarationFile(filePath, rootDir = defaultRootDir) {
 	const absoluteRootDir = path.resolve(rootDir);
 	const absoluteFilePath = path.resolve(filePath);
@@ -37,7 +35,6 @@ export function isCheckableDeclarationFile(filePath, rootDir = defaultRootDir) {
 	return true;
 }
 
-// root package.json の workspaces を信頼して、検査対象 package を列挙する。
 function readJson(filePath) {
 	return JSON.parse(fs.readFileSync(filePath, 'utf8'));
 }
@@ -60,7 +57,6 @@ function getTsconfigPaths(packageDir) {
 	);
 }
 
-// tsconfig の include から漏れる package 直下の shim も拾えるよう、補助的に探索する。
 function discoverDeclarationFiles(packageDir, rootDir) {
 	return ts.sys.readDirectory(
 		packageDir,
@@ -71,7 +67,6 @@ function discoverDeclarationFiles(packageDir, rootDir) {
 	).filter((filePath) => isCheckableDeclarationFile(filePath, rootDir));
 }
 
-// 各 package の設定をそのまま使い、検査時だけ skipLibCheck を後で上書きする。
 function readTsconfig(tsconfigPath) {
 	if (!fs.existsSync(tsconfigPath)) return undefined;
 
@@ -80,7 +75,6 @@ function readTsconfig(tsconfigPath) {
 		throw new Error(ts.flattenDiagnosticMessageText(config.error.messageText, '\n'));
 	}
 
-	// configFileName を渡さないと libReplacement (@typescript/lib-*) が cwd 基準で解決されてしまう
 	return ts.parseJsonConfigFileContent(config.config, ts.sys, path.dirname(tsconfigPath), undefined, tsconfigPath);
 }
 
@@ -92,7 +86,6 @@ function createFormatHost(rootDir) {
 	};
 }
 
-// 通常の tsconfig は include 対象を使い、root tsconfig だけ package 直下の shim を足す。
 function isRootTsconfig(packageDir, tsconfigPath) {
 	return path.resolve(packageDir, 'tsconfig.json') === path.resolve(tsconfigPath);
 }
@@ -113,7 +106,6 @@ function getDeclarationFilesForTsconfig(packageDir, tsconfigPath, parsedConfig, 
 	return [...new Set([...declarationFiles, ...extraRootConfigDeclarationFiles])];
 }
 
-// node_modules 側の診断は出さず、対象 .d.ts 自身に出た診断だけを失敗扱いにする。
 function checkTsconfigDeclarations(packageDir, tsconfigPath, rootDir) {
 	const parsedConfig = readTsconfig(tsconfigPath);
 	if (parsedConfig == null) {
@@ -140,7 +132,6 @@ function checkTsconfigDeclarations(packageDir, tsconfigPath, rootDir) {
 	return { declarationFiles, diagnostics };
 }
 
-// 複数 tsconfig で同じ宣言を読むことがあるため、同一診断をまとめる。
 function deduplicateDiagnostics(diagnostics) {
 	const seen = new Set();
 	return diagnostics.filter((diagnostic) => {
@@ -166,7 +157,6 @@ function checkPackageDeclarations(packageDir, rootDir) {
 	};
 }
 
-// workspace 全体を走査し、CI が扱いやすい件数と診断リストに集約する。
 export function checkDeclarations(rootDir = defaultRootDir) {
 	const workspacePackageDirs = getWorkspacePackageDirs(rootDir);
 	const results = workspacePackageDirs.map((packageDir) => ({
@@ -181,7 +171,6 @@ export function checkDeclarations(rootDir = defaultRootDir) {
 	};
 }
 
-// CLI 実行時は TypeScript 標準の formatter で、通常の tsc に近い形で表示する。
 function main() {
 	const { declarationFileCount, diagnostics } = checkDeclarations(defaultRootDir);
 

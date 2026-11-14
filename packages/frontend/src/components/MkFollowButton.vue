@@ -15,7 +15,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 			<span v-if="full" :class="$style.text">{{ i18n.ts.followRequestPending }}</span><i class="ti ti-hourglass-empty"></i>
 		</template>
 		<template v-else-if="hasPendingFollowRequestFromYou && !user.isLocked">
-			<!-- つまりリモートフォローの場合。 -->
 			<span v-if="full" :class="$style.text">{{ i18n.ts.processing }}</span><MkLoading :em="true" :colored="false"/>
 		</template>
 		<template v-else-if="isFollowing">
@@ -218,11 +217,9 @@ onBeforeUnmount(() => {
 	}
 
 	&:hover {
-		//background: mix($primary, #fff, 20);
 	}
 
 	&:active {
-		//background: mix($primary, #fff, 40);
 	}
 
 	&.active {

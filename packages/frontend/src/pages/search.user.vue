@@ -67,7 +67,6 @@ async function search() {
 	// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
 	if (query == null || query === '') return;
 
-	//#region AP lookup
 	if (query.startsWith('https://') && !query.includes(' ')) {
 		const confirm = await os.confirm({
 			type: 'info',
@@ -100,7 +99,6 @@ async function search() {
 			return;
 		}
 	}
-	//#endregion
 
 	if (query.length > 1 && !query.includes(' ')) {
 		if (query.startsWith('@')) {
@@ -110,7 +108,6 @@ async function search() {
 			});
 			if (!confirm.canceled) {
 				if (query.endsWith('.bsky.social')) {
-					// convert to bsky bridge
 					router.pushByPath(`/${query}@bsky.brid.gy`);
 				} else {
 					router.pushByPath(`/${query}`);

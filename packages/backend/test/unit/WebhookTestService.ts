@@ -21,8 +21,6 @@ describe('WebhookTestService', () => {
 	let app: TestingModule;
 	let service: WebhookTestService;
 
-	// --------------------------------------------------------------------------------------
-
 	let usersRepository: UsersRepository;
 	let userProfilesRepository: UserProfilesRepository;
 	let queueService: Mocked<QueueService>;
@@ -47,8 +45,6 @@ describe('WebhookTestService', () => {
 
 		return user;
 	}
-
-	// --------------------------------------------------------------------------------------
 
 	beforeAll(async () => {
 		app = await Test.createTestingModule({
@@ -119,8 +115,6 @@ describe('WebhookTestService', () => {
 	afterAll(async () => {
 		await app.close();
 	});
-
-	// --------------------------------------------------------------------------------------
 
 	describe('testUserWebhook', () => {
 		test('note', async () => {

@@ -32,7 +32,6 @@ const state = ref<'fetching' | 'done'>('fetching');
 function _fetch_() {
 	const params = new URL(window.location.href).searchParams;
 
-	// acctのほうはdeprecated
 	let uri = params.get('uri') ?? params.get('acct');
 	if (uri == null) {
 		state.value = 'done';
@@ -83,7 +82,6 @@ function _fetch_() {
 function close(): void {
 	window.close();
 
-	// 閉じなければ100ms後タイムラインに
 	window.setTimeout(() => {
 		window.location.href = '/';
 	}, 100);

@@ -138,9 +138,7 @@ export class QueueModule implements OnApplicationShutdown {
 	) {}
 
 	public async dispose(): Promise<void> {
-		// Wait for all potential queue jobs
 		await allSettled();
-		// And then close all queues
 		await Promise.all([
 			this.systemQueue.close(),
 			this.endedPollNotificationQueue.close(),

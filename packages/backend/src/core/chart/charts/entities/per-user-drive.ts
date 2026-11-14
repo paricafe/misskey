@@ -9,11 +9,11 @@ export const name = 'perUserDrive';
 
 export const schema = {
 	'totalCount': { accumulate: true },
-	'totalSize': { accumulate: true }, // in kilobyte
+	'totalSize': { accumulate: true },
 	'incCount': { range: 'small' },
-	'incSize': {}, // in kilobyte
+	'incSize': {},
 	'decCount': { range: 'small' },
-	'decSize': {}, // in kilobyte
+	'decSize': {},
 } as const;
 
 export const entity = Chart.schemaToEntity(name, schema, true);

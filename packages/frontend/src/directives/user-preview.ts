@@ -96,7 +96,6 @@ export class UserPreview {
 	public setUser(user: string | Misskey.entities.UserDetailed) {
 		if (this.user === user) return;
 		this.user = user;
-		// 表示中のポップアップは古いユーザーのものなので閉じる
 		this.close();
 	}
 
@@ -131,7 +130,6 @@ export const userPreviewDirective = {
 		if (binding.value == null) return;
 		if (isTouchUsing) return;
 
-		// メモリ的にはWeakMapを使わずに要素にプロパティを生やしたほうが省メモリかもしれないので検討中
 		const preview = new UserPreview(el, binding.value);
 		states.set(el, preview);
 	},

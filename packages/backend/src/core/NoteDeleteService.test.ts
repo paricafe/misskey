@@ -20,7 +20,6 @@ describe('note deletion recipients after edits', () => {
 			history, visibility: 'home', localOnly: false, replyId: null, renoteId: null,
 		} as unknown as MiNote;
 		const service = Object.create(NoteDeleteService.prototype) as NoteDeleteService;
-		// Partial TypeORM entities can have undefined own properties for unselected columns.
 		const manager = { findOne: vi.fn().mockResolvedValue({ ...current, fileIds: undefined }), delete: vi.fn().mockResolvedValue({ affected: 1 }) };
 		const updateChart = vi.fn();
 		const find = vi.fn(async ({ where }: { where: Array<{ id?: { value: string[] }; uri?: { value: string[] } }> }) =>
@@ -40,7 +39,6 @@ describe('note deletion recipients after edits', () => {
 			relayService: { deliverToRelays: vi.fn() },
 			notesChart: { update: updateChart }, perUserNotesChart: { update: vi.fn() }, searchService: { unindexNote: vi.fn() },
 		});
-		// Simulate a caller holding a note from before the last edit.
 		await service.delete({ id: 'author', uri: null, host: null, isBot: false }, { ...current, mentions: [], mentionedRemoteUsers: '[]', history: null });
 		await vi.waitFor(() => expect(deliverToUsers).toHaveBeenCalledWith(expect.anything(), { type: 'Delete' }, [alice, bob]));
 		expect(manager.findOne).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ lock: { mode: 'pessimistic_write' }, select: expect.objectContaining({ history: true }) }));

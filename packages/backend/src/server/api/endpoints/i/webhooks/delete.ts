@@ -34,8 +34,6 @@ export const paramDef = {
 	required: ['webhookId'],
 } as const;
 
-// TODO: ロジックをサービスに切り出す
-
 @Injectable()
 export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-disable-line import/no-default-export
 	constructor(

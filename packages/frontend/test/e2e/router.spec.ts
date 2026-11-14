@@ -5,11 +5,8 @@
 
 import { test } from './fixtures.js';
 import {
-	// const
 	BASE_URL,
-	// utils
 	resetState, registerUser,
-	// page utils
 	signIn, closeUserSetupDialogIfVisible,
 } from './utils.js';
 
@@ -23,7 +20,6 @@ test.describe('Router transition', () => {
 	test.beforeEach(async ({ page }) => {
 		await signIn(page, 'alice', 'alice1234');
 
-		// 表示に時間がかかるのでデフォルト秒数だとタイムアウトする。少し待つ
 		await page.waitForTimeout(1000);
 
 		await closeUserSetupDialogIfVisible(page);

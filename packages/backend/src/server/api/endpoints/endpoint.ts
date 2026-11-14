@@ -6,7 +6,6 @@
 import { Injectable } from '@nestjs/common';
 import { Endpoint } from '@/server/api/endpoint-base.js';
 
-// 循環参照を回避
 let endpointsPromise: Promise<typeof import('../endpoints.js').default> | undefined;
 
 function getEndpoints() {

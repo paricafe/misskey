@@ -35,17 +35,12 @@ export class Cache<T> {
 		this.cachedAt = null;
 	}
 
-	/**
-	 * キャッシュがあればそれを返し、無ければfetcherを呼び出して結果をキャッシュ&返します
-	 */
 	public async fetch(): Promise<T> {
 		const cachedValue = this.get();
 		if (cachedValue !== undefined) {
-			// Cache HIT
 			return cachedValue;
 		}
 
-		// Cache MISS
 		const value = await this.fetcher();
 		this.set(value);
 		return value;

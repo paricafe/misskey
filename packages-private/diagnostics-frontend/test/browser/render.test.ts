@@ -16,7 +16,6 @@ async function loadFixture(name: string) {
 }
 
 beforeEach(() => {
-	// renderBrowserDiagnosticsHtml() が生成時刻を埋め込むので、スナップショットが揺れないよう時刻を固定する
 	vi.useFakeTimers();
 	vi.setSystemTime(new Date('2026-07-18T00:00:00.000Z'));
 });
@@ -34,7 +33,6 @@ test('renders the network request diff html report', async () => {
 test('escapes html metacharacters coming from the browser session', async () => {
 	const base = await loadFixture('base');
 	const head = await loadFixture('head');
-	// CDP由来の値は原理的には任意の文字列になりうるので、生HTMLとして出ないことを確かめる
 	head.samples[0].networkRequests[0].url = 'http://127.0.0.1:61812/"><script>alert(1)</script>';
 
 	const html = renderBrowserDiagnosticsHtml(base, head);

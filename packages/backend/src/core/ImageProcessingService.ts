@@ -53,10 +53,6 @@ export class ImageProcessingService {
 	) {
 	}
 
-	/**
-	 * Convert to WebP
-	 *   with resize, remove metadata, resolve orientation, stop animation
-	 */
 	@bindThis
 	public async convertToWebp(path: string, width: number, height: number, options: WebpOptions = webpDefault): Promise<IImage> {
 		return this.convertSharpToWebp(sharp(path), width, height, options);
@@ -95,10 +91,6 @@ export class ImageProcessingService {
 		};
 	}
 
-	/**
-	 * Convert to Avif
-	 *   with resize, remove metadata, resolve orientation, stop animation
-	 */
 	@bindThis
 	public async convertToAvif(path: string, width: number, height: number, options: AvifOptions = avifDefault): Promise<IImage> {
 		return this.convertSharpToAvif(sharp(path), width, height, options);
@@ -137,10 +129,6 @@ export class ImageProcessingService {
 		};
 	}
 
-	/**
-	 * Convert to PNG
-	 *   with resize, remove metadata, resolve orientation, stop animation
-	 */
 	@bindThis
 	public async convertToPng(path: string, width: number, height: number): Promise<IImage> {
 		return this.convertSharpToPng(sharp(path), width, height);

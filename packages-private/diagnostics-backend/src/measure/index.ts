@@ -21,9 +21,7 @@ import { measureMemoryUntilStable } from './stability';
 import type { MemorySample } from '../types';
 
 export type MeasureBackendMemoryOptions = {
-	/** heap snapshotを取得するか (既定: MK_MEMORY_HEAP_SNAPSHOT) */
 	heapSnapshot?: boolean;
-	/** 取得したheap snapshotの保存先。未指定なら解析後に破棄する */
 	heapSnapshotSavePath?: string | null;
 	heapSnapshotBreakdownTopN?: number;
 	heapSnapshotTimeoutMs?: number;
@@ -42,14 +40,10 @@ function resolveOptions(options: MeasureBackendMemoryOptions) {
 	};
 }
 
-/**
- * バックエンドを1回起動し、GC後のメモリ使用量を計測して1サンプル分の結果を返す。
- */
 export async function measureBackendMemory(backendDir: string, options: MeasureBackendMemoryOptions = {}): Promise<MemorySample> {
 	const settings = resolveOptions(options);
 	const serverProcess = forkBackendServer(backendDir);
 
-	// 起動完了メッセージを取りこぼさないよう、他のハンドラより先に待ち受ける
 	const serverReady = waitForServerReady(serverProcess, settings.startupTimeoutMs);
 
 	serverProcess.stdout?.on('data', (data) => {
@@ -64,7 +58,6 @@ export async function measureBackendMemory(backendDir: string, options: MeasureB
 		process.stderr.write(`[server error] ${err}\n`);
 	});
 
-	// 途中で失敗しても子プロセスを残さない。残すと次のラウンドがポート衝突で落ちる
 	try {
 		const startupStartTime = Date.now();
 		await serverReady;
@@ -121,7 +114,6 @@ async function getHeapSnapshotStatistics(
 		const snapshot = JSON.parse(await fs.readFile(writtenPath, 'utf-8'));
 		return analyzeHeapSnapshot(snapshot, { breakdownTopN: settings.heapSnapshotBreakdownTopN });
 	} finally {
-		// 数百MBになることがあるため、解析後は必ず消す
 		await fs.unlink(writtenPath).catch(err => {
 			process.stderr.write(`Failed to delete heap snapshot ${writtenPath}: ${err.message}\n`);
 		});

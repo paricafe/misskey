@@ -36,10 +36,8 @@ describe('Note', () => {
 			deepStrictEqualWithExcludedFields(note, resolvedNote, [
 				'id',
 				'emojis',
-				/** Consistency of files is checked at {@link file://./drive.test.ts}, so let's skip. */
 				'fileIds',
 				'files',
-				/** @see https://github.com/misskey-dev/misskey/issues/12409 */
 				'reactionAcceptance',
 				'userId',
 				'user',
@@ -56,7 +54,6 @@ describe('Note', () => {
 				text: 'b',
 				replyId: _replyedNote.id,
 			})).createdNote;
-			// NOTE: the repliedCount is incremented, so fetch again
 			const replyedNote = await alice.client.request('notes/show', { noteId: _replyedNote.id });
 			strictEqual(replyedNote.repliesCount, 1);
 
@@ -74,13 +71,11 @@ describe('Note', () => {
 			assert(resolvedNote.reply != null);
 			deepStrictEqualWithExcludedFields(replyedNote, resolvedNote.reply, [
 				'id',
-				// TODO: why clippedCount loses consistency?
 				'clippedCount',
 				'emojis',
 				'userId',
 				'user',
 				'uri',
-				// flaky because this is parallelly incremented, so let's check it below
 				'repliesCount',
 			]);
 			strictEqual(aliceInB.id, resolvedNote.userId);
@@ -92,7 +87,6 @@ describe('Note', () => {
 		});
 
 		test('Consistency of Renote', async () => {
-			// NOTE: the renoteCount is not incremented, so no need to fetch again
 			const renotedNote = (await alice.client.request('notes/create', {
 				text: 'a',
 			})).createdNote;
@@ -213,10 +207,6 @@ describe('Note', () => {
 				});
 			});
 
-			/**
-			 * FIXME: not delivered
-			 * @see https://github.com/misskey-dev/misskey/issues/15548
-			 */
 			describe('To only resolved and not followed user', () => {
 				test.skip('Check', async () => {
 					const note = (await bob.client.request('notes/create', { text: 'I\'m Bob.' })).createdNote;
@@ -254,10 +244,6 @@ describe('Note', () => {
 				);
 			});
 
-			/**
-			 * FIXME: implement soft deletion as well as user?
-			 *        @see https://github.com/misskey-dev/misskey/issues/11437
-			 */
 			test.skip('Not found even if resolve again', async () => {
 				const noteInB = await resolveRemoteNote('a.test', note.id, bob);
 				await rejects(
@@ -315,10 +301,6 @@ describe('Note', () => {
 				strictEqual(reactions[0].type, '❤');
 			});
 
-			/**
-			 * TODO: this may be unexpected behavior?
-			 *       @see https://github.com/misskey-dev/misskey/issues/12409
-			 */
 			test('Even if nonSensitiveOnly, remote users can react with sensitive emoji, and it is not converted', async () => {
 				const note = (await alice.client.request('notes/create', { text: 'a', reactionAcceptance: 'nonSensitiveOnly' })).createdNote;
 				const noteInB = await resolveRemoteNote('a.test', note.id, bob);
@@ -371,7 +353,6 @@ describe('Note', () => {
 
 			test('A vote in Bob\'s server is delivered to Bob\'s remote followers', async () => {
 				const note = (await bob.client.request('notes/create', { poll: { choices: ['inu', 'neko'] } })).createdNote;
-				// NOTE: resolve before voting
 				const noteInA = await resolveRemoteNote('b.test', note.id, bobRemoteFollower);
 				await localVoter.client.request('notes/polls/vote', { noteId: note.id, choice: 0 });
 

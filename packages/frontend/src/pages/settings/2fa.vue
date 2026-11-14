@@ -99,8 +99,6 @@ import { updateCurrentAccount } from '@/accounts.js';
 
 const $i = ensureSignin();
 
-// メモ: 各エンドポイントはmeUpdatedを発行するため、refreshAccountは不要
-
 withDefaults(defineProps<{
 	first?: boolean;
 }>(), {
@@ -213,7 +211,7 @@ async function addSecurityKey() {
 	const credential = await os.promiseDialog(
 		startRegistration({ optionsJSON: registrationOptions }),
 		null,
-		() => {}, // ユーザーのキャンセルはrejectなのでエラーダイアログを出さない
+		() => {},
 		i18n.ts._2fa.tapSecurityKey,
 	);
 	if (!credential) return;

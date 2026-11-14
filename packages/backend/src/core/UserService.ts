@@ -54,12 +54,6 @@ export class UserService {
 		}
 	}
 
-	/**
-	 * SystemWebhookを用いてユーザに関する操作内容を管理者各位に通知する.
-	 * ここではJobQueueへのエンキューのみを行うため、即時実行されない.
-	 *
-	 * @see SystemWebhookService.enqueueSystemWebhook
-	 */
 	@bindThis
 	public async notifySystemWebhook(user: MiUser, type: 'userCreated') {
 		const packedUser = await this.userEntityService.pack(user, null, { schema: 'UserLite' });

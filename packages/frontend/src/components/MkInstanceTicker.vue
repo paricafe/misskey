@@ -27,7 +27,6 @@ const props = defineProps<{
 	}
 }>();
 
-// if no instance data is given, this is for the local instance
 const instanceName = computed(() => props.host == null ? localInstanceName : props.instance?.name ?? props.host);
 
 const faviconUrl = computed(() => {
@@ -70,13 +69,6 @@ function showInstanceTickerWindow() {
 	overflow: clip;
 	color: #fff;
 
-	// text-shadowは重いから使うな
-
-	// mask-image: linear-gradient(90deg,
-	// 	rgb(0,0,0),
-	// 	rgb(0,0,0) calc(100% - 16px),
-	// 	rgba(0,0,0,0) 100%
-	// );
 }
 
 .icon {
@@ -94,7 +86,6 @@ function showInstanceTickerWindow() {
 	white-space: nowrap;
 	overflow: visible;
 
-	// text-shadowは重いから使うな
 	color: var(--MI_THEME-fg);
 	-webkit-text-stroke: var(--MI_THEME-panel) .225em;
 	paint-order: stroke fill;

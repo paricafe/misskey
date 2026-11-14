@@ -54,7 +54,6 @@ const props = defineProps<{
 const router = useRouter();
 
 function noteClickToOpen(id: string, ev: MouseEvent) {
-	// Let links and controls inside the note handle their own clicks.
 	if (ev.target instanceof Element && ev.target.closest('a, button, [role="button"], input, textarea, summary, label') != null) return;
 	const selection = window.document.getSelection();
 	if (selection?.toString().length === 0) {

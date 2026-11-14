@@ -157,7 +157,6 @@ describe('ActivityPub', () => {
 		jsonLdService = app.get<JsonLdService>(JsonLdService);
 		resolver = new MockResolver(await app.resolve<LoggerService>(LoggerService));
 
-		// Prevent ApPersonService from fetching instance, as it causes Jest import-after-test error
 		const federatedInstanceService = app.get<FederatedInstanceService>(FederatedInstanceService);
 		vi.spyOn(federatedInstanceService, 'fetch').mockImplementation(() => new Promise(() => { }));
 	});
@@ -305,12 +304,10 @@ describe('ActivityPub', () => {
 				id: `${actor.id}/following`,
 				type: 'OrderedCollection',
 				totalItems: 0,
-				// first: …
 			};
 			actor.followers = `${actor.id}/followers`;
 
 			resolver.register(actor.id, actor);
-			//resolver.register(actor.followers, { … });
 
 			const user = await personService.createPerson(actor.id, resolver);
 			const userProfile = await userProfilesRepository.findOneByOrFail({ userId: user.id });
@@ -382,10 +379,8 @@ describe('ActivityPub', () => {
 
 			await personService.createPerson(actor.id, resolver);
 
-			// All notes in `featured` are same-origin, no need to fetch notes again
 			assert.deepStrictEqual(resolver.remoteGetTrials(), [actor.id, actor.featured]);
 
-			// Created notes without resolving anything
 			for (const item of featured.items as IPost[]) {
 				const note = await noteService.fetchNote(item);
 				assert.ok(note);
@@ -423,7 +418,7 @@ describe('ActivityPub', () => {
 			const featured = createRandomFeaturedCollection(actor1, 0);
 			(featured.items as IPost[]).push({
 				...actor2Note,
-				content: 'test test bar', // fraud!
+				content: 'test test bar',
 			});
 
 			resolver.register(actor1.id, actor1);
@@ -433,7 +428,6 @@ describe('ActivityPub', () => {
 
 			await personService.createPerson(actor1.id, resolver);
 
-			// actor2Note is from a different server and needs to be fetched again
 			assert.deepStrictEqual(
 				resolver.remoteGetTrials(),
 				[actor1.id, actor1.featured, actor2Note.id, actor2.id],
@@ -442,7 +436,6 @@ describe('ActivityPub', () => {
 			const note = await noteService.fetchNote(actor2Note.id);
 			assert.ok(note);
 
-			// Reflects the original content instead of the fraud
 			assert.strictEqual(note.text, 'test test foo');
 			assert.strictEqual(note.uri, actor2Note.id);
 		});
@@ -617,7 +610,6 @@ describe('ActivityPub', () => {
 				content: 'test test foo',
 				_misskey_quote: 'https://example.com/notes/1',
 				'https://example.org/ns#unknown': 'test test bar',
-				// undefined: 'test test baz',
 			});
 		});
 	});

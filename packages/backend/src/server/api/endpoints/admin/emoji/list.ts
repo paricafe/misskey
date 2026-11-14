@@ -10,7 +10,6 @@ import type { MiEmoji } from '@/models/Emoji.js';
 import { QueryService } from '@/core/QueryService.js';
 import { DI } from '@/di-symbols.js';
 import { EmojiEntityService } from '@/core/entities/EmojiEntityService.js';
-//import { sqlLikeEscape } from '@/misc/sql-like-escape.js';
 
 export const meta = {
 	tags: ['admin'],
@@ -58,9 +57,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 			let emojis: MiEmoji[];
 
 			if (ps.query) {
-				//q.andWhere('emoji.name ILIKE :q', { q: `%${ sqlLikeEscape(ps.query) }%` });
-				//const emojis = await q.limit(ps.limit).getMany();
-
 				emojis = await q.getMany();
 				const queryarry = ps.query.match(/\:([a-z0-9_]*)\:/g);
 

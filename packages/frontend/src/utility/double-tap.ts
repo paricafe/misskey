@@ -4,8 +4,8 @@
  */
 
 export function makeDoubleTapDetector(onDoubletap: (event: TouchEvent) => void) {
-	const positionThreshold = 10; // px
-	const durationThreshold = 300; // ms
+	const positionThreshold = 10;
+	const durationThreshold = 300;
 
 	let lastTapTime = 0;
 	let lastTapPosition = { x: 0, y: 0 };
@@ -20,7 +20,7 @@ export function makeDoubleTapDetector(onDoubletap: (event: TouchEvent) => void) 
 			Math.abs(ev.touches[0].clientY - lastTapPosition.y),
 		);
 
-		if (tapLength < durationThreshold && tapLength > 0 && positionDelta < positionThreshold) { // ダブルタップ
+		if (tapLength < durationThreshold && tapLength > 0 && positionDelta < positionThreshold) {
 			onDoubletap(ev);
 			lastTapTime = 0;
 			return;

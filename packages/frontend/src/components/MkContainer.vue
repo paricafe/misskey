@@ -68,7 +68,7 @@ function enter(el: Element) {
 	if (!(el instanceof HTMLElement)) return;
 	const elementHeight = el.getBoundingClientRect().height;
 	el.style.height = '0';
-	el.offsetHeight; // reflow
+	el.offsetHeight;
 	el.style.height = `${Math.min(elementHeight, props.maxHeight ?? Infinity)}px`;
 }
 
@@ -81,7 +81,7 @@ function leave(el: Element) {
 	if (!(el instanceof HTMLElement)) return;
 	const elementHeight = el.getBoundingClientRect().height;
 	el.style.height = `${elementHeight}px`;
-	el.offsetHeight; // reflow
+	el.offsetHeight;
 	el.style.height = '0';
 }
 
@@ -221,12 +221,6 @@ onUnmounted(() => {
 .content {
 	--MI-stickyTop: 0px;
 
-	/*
-	理屈は知らないけど、ここでbackgroundを設定しておかないと
-	スクロールコンテナーが少なくともChromeにおいて
-	main thread scrolling になってしまい、パフォーマンスが(多分)落ちる。
-	backgroundが透明だと裏側を描画しないといけなくなるとかそういう理由かもしれない
-	*/
 	background: var(--MI_THEME-panel);
 
 	&.omitted {

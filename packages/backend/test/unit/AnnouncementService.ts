@@ -306,6 +306,5 @@ describe('AnnouncementService', () => {
 	});
 
 	describe.todo('read', () => {
-		// TODO
 	});
 });

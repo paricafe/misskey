@@ -68,7 +68,7 @@ import { genId } from '@/utility/id.js';
 
 const props = defineProps<{
 	mediaList: Misskey.entities.DriveFile[];
-	user?: Misskey.entities.User | null; // DriveFileのuserはnullになることがある。その場合に使用する所有者情報
+	user?: Misskey.entities.User | null;
 	raw?: boolean;
 }>();
 
@@ -127,7 +127,7 @@ async function calcAspectRatio() {
 onMounted(() => {
 	calcAspectRatio();
 
-	if (gallery.value == null) return; // TSを黙らすため
+	if (gallery.value == null) return;
 });
 
 onUnmounted(() => {
@@ -207,7 +207,6 @@ defineExpose({
 	&.n1 {
 		grid-template-rows: 1fr;
 
-		// default but fallback (expand)
 		min-height: 64px;
 		max-height: clamp(
 			64px,
@@ -218,19 +217,19 @@ defineExpose({
 		&.n116_9 {
 			min-height: initial;
 			max-height: initial;
-			aspect-ratio: 16 / 9; // fallback
+			aspect-ratio: 16 / 9;
 		}
 
 		&.n11_1{
 			min-height: initial;
 			max-height: initial;
-			aspect-ratio: 1 / 1; // fallback
+			aspect-ratio: 1 / 1;
 		}
 
 		&.n12_3 {
 			min-height: initial;
 			max-height: initial;
-			aspect-ratio: 2 / 3; // fallback
+			aspect-ratio: 2 / 3;
 		}
 	}
 
@@ -271,7 +270,7 @@ defineExpose({
 }
 
 .media {
-	overflow: hidden; // clipにするとバグる
+	overflow: hidden;
 	border-radius: 8px;
 	cursor: zoom-in;
 }

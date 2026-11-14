@@ -68,7 +68,7 @@ class NoteStream extends ReadableStream<Record<string, unknown>> {
 						userId,
 						...(cursor !== null ? { id: MoreThan(cursor) } : {}),
 					},
-					take: 100, // 100件ずつ取得
+					take: 100,
 					order: { id: 1 },
 				});
 
@@ -81,9 +81,9 @@ class NoteStream extends ReadableStream<Record<string, unknown>> {
 
 				for (const note of notes) {
 					const poll = note.hasPoll
-						? await pollsRepository.findOneByOrFail({ noteId: note.id }) // N+1
+						? await pollsRepository.findOneByOrFail({ noteId: note.id })
 						: null;
-					const files = await driveFileEntityService.packManyByIds(note.fileIds); // N+1
+					const files = await driveFileEntityService.packManyByIds(note.fileIds);
 					const content = serialize(note, poll, files);
 
 					controller.enqueue(content);
@@ -129,13 +129,11 @@ export class ExportNotesProcessorService {
 			return;
 		}
 
-		// Create temp file
 		const [path, cleanup] = await createTemp();
 
 		this.logger.info(`Temp file is ${path}`);
 
 		try {
-			// メモリが足りなくならないようにストリームで処理する
 			await new NoteStream(
 				job,
 				this.notesRepository,

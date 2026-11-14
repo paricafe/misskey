@@ -40,13 +40,11 @@ const config = {
 			config.plugins?.splice(replacePluginForIsChromatic, 1);
 		}
 
-		//pluginsからcreateSearchIndexを削除、複数あるかもしれないので全て削除
 		config.plugins = config.plugins?.filter((plugin: Plugin) => plugin && plugin.name !== 'createSearchIndex') ?? [];
 
 		return mergeConfig(config, {
 			plugins: [
 				{
-					// XXX: https://github.com/IanVS/vite-plugin-turbosnap/issues/8
 					...(turbosnap as any as typeof turbosnap['default'])({
 						rootDir: config.root ?? process.cwd(),
 					}),

@@ -74,7 +74,6 @@ const qrSvg = computed(() => {
 	});
 });
 
-//#region flip
 const THRESHOLD = -3;
 // @ts-expect-error TS(2339)
 const deviceMotionPermissionNeeded = window.DeviceMotionEvent && typeof window.DeviceMotionEvent.requestPermission === 'function';
@@ -122,7 +121,6 @@ const vFlip = {
 		flipEls.delete(el);
 	},
 } as Directive;
-//#endregion
 </script>
 
 <style lang="scss" module>
@@ -194,10 +192,6 @@ $avatarSize: 58px;
 </style>
 
 <style lang="scss">
-/*
- * useCssModuleで$styleを読み込みたかったが、rollupでのunwindが壊れてしまうらしく失敗。
- * グローバルにクラスを定義することでお茶を濁す。
- */
 ._qrShowFlip {
 	transition: rotate .3s linear, scale .3s .15s step-start;
 }

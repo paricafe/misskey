@@ -382,7 +382,7 @@ if (props.id) {
 
 const title = ref(flash.value?.title ?? 'New Play');
 const summary = ref(flash.value?.summary ?? '');
-const permissions = ref([]); // not implemented yet
+const permissions = ref([]);
 const {
 	model: visibility,
 	def: visibilityDef,

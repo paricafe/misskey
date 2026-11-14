@@ -42,7 +42,6 @@ function formatMemoryMetricName(metric: MemoryMetric) {
 
 function getMemoryValueFromSample(sample: MemoryReport['samples'][number], phase: MemoryPhase, metric: MemoryMetric) {
 	const memoryUsage = sample.phases[phase].memoryUsage;
-	// USSは直接取れないのでPrivateの合算で近似する
 	if (metric !== 'USS') return memoryUsage[metric];
 	return memoryUsage.Private_Clean + memoryUsage.Private_Dirty;
 }
@@ -101,10 +100,7 @@ function renderHeapSnapshotSection(base: MemoryReport, head: MemoryReport) {
 		'',
 	];
 
-	// Sankeyはノイズが多く読み取りづらかったため現在は無効。復活させる余地を残して残置する
 	for (const graph of [
-		//renderHeapSnapshotSankey(baseHeapSnapshotReport, 'Base'),
-		//renderHeapSnapshotSankey(headHeapSnapshotReport, 'Head'),
 	] as (string | null)[]) {
 		if (graph == null) continue;
 		lines.push(graph);
@@ -126,12 +122,6 @@ export function renderMemoryReportMarkdown(base: MemoryReport, head: MemoryRepor
 		'## ⚙️ Backend Diagnostics Report',
 		'',
 	];
-
-	//const summary = measurementSummary(base, head);
-	//if (summary != null) {
-	//	lines.push(summary);
-	//	lines.push('');
-	//}
 
 	for (const phase of memoryReportPhases) {
 		lines.push(`### Memory: ${phase.title}`);

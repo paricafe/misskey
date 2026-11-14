@@ -146,7 +146,6 @@ const customLocales: Record<string, ILocale> = {
 		},
 	},
 	'zh-CN': {
-		// Keep muting distinct from blocking when the upstream locale gives them the same label.
 		mute: '隐藏',
 		_mfm: {
 			intro: 'MFM 是 Misskey、Sharkey、Firefish、Akkoma 等软件使用的标记语言。您可以在这里查看可用的 MFM 语法。',

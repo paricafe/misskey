@@ -17,9 +17,6 @@ function sanitizeLabel(value: unknown, fallback = 'unknown') {
 	return `${label.slice(0, 77)}...`;
 }
 
-/**
- * ノードの type / name から、内訳テーブルに出す粒度のラベルを決める。
- */
 export function classifyHeapSnapshotBreakdown(category: HeapSnapshotCategory, type: string, name: string) {
 	switch (category) {
 		case 'strings':
@@ -61,9 +58,6 @@ export function classifyHeapSnapshotBreakdown(category: HeapSnapshotCategory, ty
 	}
 }
 
-/**
- * 内訳を上位N件に丸め、残りを `Other` にまとめる。
- */
 export function collapseHeapSnapshotBreakdown(breakdown: Record<string, number>, topN = defaultHeapSnapshotBreakdownTopN) {
 	const entries = Object.entries(breakdown)
 		.filter(([, value]) => value > 0)

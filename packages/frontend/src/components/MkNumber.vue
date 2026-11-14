@@ -20,7 +20,6 @@ const tweened = reactive({
 });
 
 watch(() => props.value, (to, from) => {
-	// requestAnimationFrameを利用して、500msでfromからtoまでを1次関数的に変化させる
 	let start: number | null = null;
 
 	function step(timestamp: number) {

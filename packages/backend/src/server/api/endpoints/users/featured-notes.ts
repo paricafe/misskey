@@ -55,7 +55,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 		super(meta, paramDef, async (ps, me) => {
 			const userIdsWhoBlockingMe = me ? await this.cacheService.userBlockedCache.fetch(me.id) : new Set<string>();
 
-			// early return if me is blocked by requesting user
 			if (userIdsWhoBlockingMe.has(ps.userId)) {
 				return [];
 			}

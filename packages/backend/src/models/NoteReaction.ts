@@ -34,8 +34,6 @@ export class MiNoteReaction {
 	@JoinColumn()
 	public note?: MiNote | null;
 
-	// TODO: 対象noteのuserIdを非正規化したい(「受け取ったリアクション一覧」のようなものを(JOIN無しで)実装したいため)
-
 	@Column('varchar', {
 		length: 260,
 	})

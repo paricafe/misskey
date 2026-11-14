@@ -13,7 +13,6 @@ import type * as misskey from 'misskey-js';
 const waitForPushToTlOptions = { timeout: 3000, interval: 25 };
 
 describe('Renote Mute', () => {
-	// alice mutes carol
 	let alice: misskey.entities.SignupResponse;
 	let bob: misskey.entities.SignupResponse;
 	let carol: misskey.entities.SignupResponse;
@@ -64,7 +63,6 @@ describe('Renote Mute', () => {
 		}, waitForPushToTlOptions);
 	});
 
-	// #12956
 	test('タイムラインにリノートミュートしているユーザーの通常ノートのリノートが含まれる', async () => {
 		const carolNote = await post(carol, { text: 'hi' });
 		const bobRenote = await post(bob, { renoteId: carolNote.id });
@@ -103,7 +101,6 @@ describe('Renote Mute', () => {
 		assert.strictEqual(fired, true);
 	});
 
-	// #12956
 	test('ストリームにリノートミュートしているユーザーの通常ノートのリノートが流れてくる', async () => {
 		const carolbNote = await post(carol, { text: 'hi' });
 

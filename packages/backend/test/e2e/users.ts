@@ -13,8 +13,6 @@ import type * as misskey from 'misskey-js';
 import { DEFAULT_POLICIES } from '@/core/RoleService.js';
 
 describe('ユーザー', () => {
-	// エンティティとしてのユーザーを主眼においたテストを記述する
-	// (Userを返すエンドポイントとUserエンティティを書き換えるエンドポイントをテストする)
 
 	const stripUndefined = <T extends { [key: string]: any } >(orig: T): Partial<T> => {
 		return Object.entries({ ...orig })
@@ -29,7 +27,6 @@ describe('ユーザー', () => {
 		return successfulApiCall({ endpoint: 'users/show', parameters: { userId: id }, user: me });
 	};
 
-	// UserLiteのキーが過不足なく入っている？
 	const userLite = (user: misskey.entities.UserLite): Partial<misskey.entities.UserLite> => {
 		return stripUndefined({
 			id: user.id,
@@ -46,13 +43,11 @@ describe('ユーザー', () => {
 			onlineStatus: user.onlineStatus,
 			badgeRoles: user.badgeRoles,
 
-			// BUG isAdmin/isModeratorはUserLiteではなくMeDetailedOnlyに含まれる。
 			isAdmin: undefined,
 			isModerator: undefined,
 		});
 	};
 
-	// UserDetailedNotMeのキーが過不足なく入っている？
 	const userDetailedNotMe = (user: misskey.entities.SignupResponse): Partial<misskey.entities.UserDetailedNotMe> => {
 		return stripUndefined({
 			...userLite(user),
@@ -91,7 +86,6 @@ describe('ユーザー', () => {
 		});
 	};
 
-	// Relations関連のキーが過不足なく入っている？
 	const userDetailedNotMeWithRelations = (user: misskey.entities.SignupResponse): Partial<misskey.entities.UserDetailedNotMe> => {
 		return stripUndefined({
 			...userDetailedNotMe(user),
@@ -109,7 +103,6 @@ describe('ユーザー', () => {
 		});
 	};
 
-	// MeDetailedのキーが過不足なく入っている？
 	const meDetailed = (user: misskey.entities.SignupResponse, security = false): Partial<misskey.entities.MeDetailed> => {
 		return stripUndefined({
 			...userDetailedNotMe(user),
@@ -169,7 +162,6 @@ describe('ユーザー', () => {
 
 	let bob: misskey.entities.SignupResponse;
 
-	// NOTE: これがないと落ちる（bob の updatedAt が null になってしまうため？）
 	let bobNote: misskey.entities.Note; // eslint-disable-line @typescript-eslint/no-unused-vars
 
 	let carol: misskey.entities.SignupResponse;
@@ -211,7 +203,6 @@ describe('ユーザー', () => {
 		bobNote = await post(bob, { text: 'test' });
 		carol = await signup({ username: 'carol' });
 
-		// @alice -> @replyingへのリプライ。Promise.allで一気に作るとtimeoutしてしまうのでreduceで一つ一つawaitする
 		usersReplying = await [...Array(10)].map((_, i) => i).reduce(async (acc, i) => {
 			const u = await signup({ username: `replying${i}` });
 			for (let j = 0; j < 10 - i; j++) {
@@ -293,20 +284,15 @@ describe('ユーザー', () => {
 		aliceNote = await successfulApiCall({ endpoint: 'notes/show', parameters: { noteId: aliceNote.id }, user: alice });
 	});
 
-	//#region サインアップ(signup)
-
 	test('が作れる。（作りたての状態で自分のユーザー情報が取れる）', async () => {
-		// SignupApiService.ts
 		const response = await successfulApiCall({
 			endpoint: 'signup',
 			parameters: { username: 'zoe', password: 'password' },
 			user: undefined,
-		}) as unknown as misskey.entities.SignupResponse; // BUG MeDetailedに足りないキーがある
+		}) as unknown as misskey.entities.SignupResponse;
 
-		// signupの時はtokenが含まれる特別なMeDetailedが返ってくる
 		assert.match(response.token, /[a-zA-Z0-9]{16}/);
 
-		// UserLite
 		assert.match(response.id, /[0-9a-z]{10}/);
 		assert.strictEqual(response.name, null);
 		assert.strictEqual(response.username, 'zoe');
@@ -320,7 +306,6 @@ describe('ユーザー', () => {
 		assert.deepStrictEqual(response.emojis, {});
 		assert.strictEqual(response.onlineStatus, 'unknown');
 		assert.deepStrictEqual(response.badgeRoles, []);
-		// UserDetailedNotMeOnly
 		assert.strictEqual(response.url, null);
 		assert.strictEqual(response.uri, null);
 		assert.strictEqual(response.movedTo, null);
@@ -354,7 +339,6 @@ describe('ユーザー', () => {
 		assert.deepStrictEqual(response.roles, []);
 		assert.strictEqual(response.memo, null);
 
-		// MeDetailedOnly
 		assert.strictEqual(response.avatarId, null);
 		assert.strictEqual(response.bannerId, null);
 		assert.strictEqual(response.followedMessage, null);
@@ -401,9 +385,6 @@ describe('ユーザー', () => {
 		assert.deepStrictEqual(response.securityKeysList, []);
 	});
 
-	//#endregion
-	//#region 自分の情報(i)
-
 	test('を読み取ることができること（自分）、キーが過不足なく入っていること。', async () => {
 		const response = await successfulApiCall({
 			endpoint: 'i',
@@ -411,12 +392,9 @@ describe('ユーザー', () => {
 			user: userNoNote,
 		});
 		const expected = meDetailed(userNoNote, true);
-		expected.loggedInDays = 1; // iはloggedInDaysを更新する
+		expected.loggedInDays = 1;
 		assert.deepStrictEqual(response, expected);
 	});
-
-	//#endregion
-	//#region 自分の情報の更新(i/update)
 
 	test.each([
 		{ parameters: () => ({ name: null }) },
@@ -438,7 +416,7 @@ describe('ユーザー', () => {
 		{ parameters: () => ({ lang: 'en-US' as const }) },
 		{ parameters: () => ({ fields: [] }) },
 		{ parameters: () => ({ fields: [{ name: 'x', value: 'x' }] }) },
-		{ parameters: () => ({ fields: [{ name: 'x'.repeat(3000), value: 'x'.repeat(3000) }] }) }, // BUG? fieldには制限がない
+		{ parameters: () => ({ fields: [{ name: 'x'.repeat(3000), value: 'x'.repeat(3000) }] }) },
 		{ parameters: () => ({ fields: Array(16).fill({ name: 'x', value: 'y' }) }) },
 		{ parameters: () => ({ isLocked: true }) },
 		{ parameters: () => ({ isLocked: false }) },
@@ -507,7 +485,7 @@ describe('ユーザー', () => {
 			...meDetailed(alice, true),
 			avatarId: null,
 			avatarBlurhash: null,
-			avatarUrl: alice.avatarUrl, // 解除した場合、identiconになる
+			avatarUrl: alice.avatarUrl,
 		};
 		assert.deepStrictEqual(response2, expected2, inspect(parameters));
 	});
@@ -537,9 +515,6 @@ describe('ユーザー', () => {
 		assert.deepStrictEqual(response2, expected2, inspect(parameters));
 	});
 
-	//#endregion
-	//#region 自分の情報の更新(i/pin, i/unpin)
-
 	test('を書き換えることができる(ピン止めノート)', async () => {
 		const parameters = { noteId: aliceNote.id };
 		const response = await successfulApiCall({ endpoint: 'i/pin', parameters, user: alice });
@@ -550,9 +525,6 @@ describe('ユーザー', () => {
 		const expected2 = meDetailed(alice, false);
 		assert.deepStrictEqual(response2, expected2);
 	});
-
-	//#endregion
-	//#region メモの更新(users/update-memo)
 
 	test.each([
 		{ label: '最大長', memo: 'x'.repeat(2048) },
@@ -566,9 +538,6 @@ describe('ユーザー', () => {
 		assert.deepStrictEqual(response, expected);
 	});
 
-	//#endregion
-	//#region ユーザー(users)
-
 	test.each([
 		{ label: 'ID昇順', parameters: { limit: 5 }, selector: (u: misskey.entities.UserLite): string => u.id },
 		{ label: 'フォロワー昇順', parameters: { sort: '+follower' }, selector: (u: misskey.entities.UserDetailedNotMe): string => String(u.followersCount) },
@@ -580,7 +549,6 @@ describe('ユーザー', () => {
 	] as const)('をリスト形式で取得することができる（$label）', async ({ parameters, selector }) => {
 		const response = await successfulApiCall({ endpoint: 'users', parameters, user: alice });
 
-		// 結果の並びを事前にアサートするのは困難なので返ってきたidに対応するユーザーが返っており、ソート順が正しいことだけを検証する
 		const users = await Promise.all(response.map(u => show(u.id, alice)));
 		const expected = users.sort((x, y) => {
 			const index = (selector(x) < selector(y)) ? -1 : (selector(x) > selector(y)) ? 1 : 0;
@@ -607,9 +575,6 @@ describe('ユーザー', () => {
 	test.todo('をリスト形式で取得することができる（リモート, hostname指定）');
 	test.todo('をリスト形式で取得することができる（pagenation）');
 
-	//#endregion
-	//#region ユーザー情報(users/show)
-
 	test.each([
 		{ label: 'ID指定で自分自身を', parameters: () => ({ userId: alice.id }), user: () => alice, type: meDetailed },
 		{ label: 'ID指定で他人を', parameters: () => ({ userId: alice.id }), user: () => bob, type: userDetailedNotMeWithRelations },
@@ -633,8 +598,6 @@ describe('ユーザー', () => {
 		{ label: '自分以外から見た場合に二要素認証関連のプロパティがセットされていない', user: () => alice, me: () => bob, selector: (user: misskey.entities.UserDetailedNotMe) => user.twoFactorEnabled, expected: () => undefined },
 		{ label: 'モデレーターから見た場合に二要素認証関連のプロパティがセットされている', user: () => alice, me: () => userModerator, selector: (user: misskey.entities.UserDetailedNotMe) => user.twoFactorEnabled, expected: () => false },
 		{ label: 'サイレンスになっている', user: () => userSilenced, selector: (user: misskey.entities.UserDetailed) => user.isSilenced },
-		// FIXME: 落ちる
-		//{ label: 'サスペンドになっている', user: () => userSuspended, selector: (user: misskey.entities.UserDetailed) => user.isSuspended },
 		{ label: '削除済みになっている', user: () => userDeletedBySelf, me: () => userDeletedBySelf, selector: (user: misskey.entities.MeDetailed) => user.isDeleted },
 		// @ts-expect-error UserDetailedNotMe doesn't include isDeleted
 		{ label: '自分以外から見たときは削除済みか判定できない', user: () => userDeletedBySelf, selector: (user: misskey.entities.UserDetailedNotMe) => user.isDeleted, expected: () => undefined },
@@ -709,8 +672,6 @@ describe('ユーザー', () => {
 		{ label: '承認制ユーザーが含まれる', user: () => userLocking },
 		{ label: 'サイレンスユーザーが含まれる', user: () => userSilenced },
 		{ label: 'サスペンドユーザーが（モデレーターが見るときは）含まれる', user: () => userSuspended, me: () => root },
-		// BUG サスペンドユーザーを一般ユーザーから見るとrootユーザーが返ってくる
-		//{ label: 'サスペンドユーザーが（一般ユーザーが見るときは）含まれない', user: () => userSuspended, me: () => bob, excluded: true },
 		{ label: '削除済ユーザーが含まれる', user: () => userDeletedBySelf },
 		{ label: '削除済(byAdmin)ユーザーが含まれる', user: () => userDeletedByAdmin },
 		// @ts-expect-error excluded は上でコメントアウトされているので
@@ -721,9 +682,6 @@ describe('ユーザー', () => {
 		assert.deepStrictEqual(response, expected);
 	});
 	test.todo('をID指定のリスト形式で取得することができる(リモート)');
-
-	//#endregion
-	//#region 検索(users/search)
 
 	test('を検索することができる', async () => {
 		const parameters = { query: 'carol', limit: 10 };
@@ -762,9 +720,6 @@ describe('ユーザー', () => {
 	test.todo('を検索することができる(リモート)');
 	test.todo('を検索することができる(pagenation)');
 
-	//#endregion
-	//#region ID指定検索(users/search-by-username-and-host)
-
 	test.each([
 		{ label: '自分', parameters: { username: 'alice' }, user: () => [alice] },
 		{ label: '自分かつusernameが大文字', parameters: { username: 'ALICE' }, user: () => [alice] },
@@ -798,9 +753,6 @@ describe('ユーザー', () => {
 	});
 	test.todo('をID&ホスト指定で検索できる(リモート)');
 
-	//#endregion
-	//#region ID指定検索(users/get-frequently-replied-users)
-
 	test('がよくリプライをするユーザーのリストを取得できる', async () => {
 		const parameters = { userId: alice.id, limit: 5 };
 		const response = await successfulApiCall({ endpoint: 'users/get-frequently-replied-users', parameters, user: alice });
@@ -817,7 +769,6 @@ describe('ユーザー', () => {
 		{ label: 'ブロックしてきているユーザーが含まれない', user: () => userBlockingAlice, excluded: true },
 		{ label: '承認制ユーザーが含まれる', user: () => userLocking },
 		{ label: 'サイレンスユーザーが含まれる', user: () => userSilenced },
-		//{ label: 'サスペンドユーザーが含まれない', user: () => userSuspended, excluded: true },
 		{ label: '削除済ユーザーが含まれる', user: () => userDeletedBySelf },
 		{ label: '削除済(byAdmin)ユーザーが含まれる', user: () => userDeletedByAdmin },
 	] as const)('がよくリプライをするユーザーのリストを取得でき、結果に$label', async ({ user, excluded }) => {
@@ -828,9 +779,6 @@ describe('ユーザー', () => {
 		const expected = (excluded ?? false) ? [] : [await show(user().id, alice)];
 		assert.deepStrictEqual(response.map(s => s.user).filter((u) => u.id === user().id), expected);
 	});
-
-	//#endregion
-	//#region ハッシュタグ(hashtags/users)
 
 	test.each([
 		{ label: 'フォロワー昇順', sort: { sort: '+follower' }, selector: (u: misskey.entities.UserDetailedNotMe): string => String(u.followersCount) },
@@ -864,7 +812,6 @@ describe('ユーザー', () => {
 	] as const)('をハッシュタグ指定で取得することができ、結果に$label', async ({ user, excluded }) => {
 		const hashtag = `user_test${user().username}`;
 		if (user() !== userSuspended) {
-			// サスペンドユーザーはupdateできない。
 			await successfulApiCall({ endpoint: 'i/update', parameters: { description: `#${hashtag}` }, user: user() });
 		}
 		const parameters = { tag: hashtag, limit: 100, sort: '-follower' } as const;
@@ -874,19 +821,12 @@ describe('ユーザー', () => {
 	});
 	test.todo('をハッシュタグ指定で取得することができる(リモート)');
 
-	//#endregion
-	//#region オススメユーザー(users/recommendation)
-
-	// BUG users/recommendationは壊れている？ > QueryFailedError: missing FROM-clause entry for table "note"
 	test.skip('のオススメを取得することができる', async () => {
 		const parameters = {};
 		const response = await successfulApiCall({ endpoint: 'users/recommendation', parameters, user: alice });
 		const expected = await Promise.all(response.map(u => show(u.id)));
 		assert.deepStrictEqual(response, expected);
 	});
-
-	//#endregion
-	//#region ピン止めユーザー(pinned-users)
 
 	test('のピン止めユーザーを取得することができる', async () => {
 		await successfulApiCall({ endpoint: 'admin/update-meta', parameters: { pinnedUsers: [bob.username, `@${carol.username}`] }, user: root });
@@ -895,8 +835,6 @@ describe('ユーザー', () => {
 		const expected = await Promise.all([bob, carol].map(u => show(u.id, alice)));
 		assert.deepStrictEqual(response, expected);
 	});
-
-	//#endregion
 
 	test.todo('を管理人として確認することができる(admin/show-user)');
 	test.todo('を管理人として確認することができる(admin/show-users)');

@@ -12,8 +12,8 @@ import { MiNote } from './Note.js';
 import type { MiDriveFile } from './DriveFile.js';
 
 @Entity('note_draft')
-@Index('IDX_NOTE_DRAFT_FILE_IDS', { synchronize: false }) // GIN for fileIds in production
-@Index('IDX_NOTE_DRAFT_VISIBLE_USER_IDS', { synchronize: false }) // GIN for visibleUserIds in production
+@Index('IDX_NOTE_DRAFT_FILE_IDS', { synchronize: false })
+@Index('IDX_NOTE_DRAFT_VISIBLE_USER_IDS', { synchronize: false })
 @Index('IDX_NOTE_DRAFT_SCHEDULED', ['scheduledAt', 'id'], { where: '"isActuallyScheduled" = true' })
 export class MiNoteDraft {
 	@PrimaryColumn(id())
@@ -27,7 +27,6 @@ export class MiNoteDraft {
 	})
 	public replyId: MiNote['id'] | null;
 
-	// There is a possibility that replyId is not null but reply is null when the reply note is deleted.
 	@ManyToOne(() => MiNote, {
 		createForeignKeyConstraints: false,
 	})
@@ -42,14 +41,12 @@ export class MiNoteDraft {
 	})
 	public renoteId: MiNote['id'] | null;
 
-	// There is a possibility that renoteId is not null but renote is null when the renote note is deleted.
 	@ManyToOne(() => MiNote, {
 		createForeignKeyConstraints: false,
 	})
 	@JoinColumn()
 	public renote: MiNote | null;
 
-	// TODO: varcharにしたい(Note.tsと同じ)
 	@Column('text', {
 		nullable: true,
 	})
@@ -83,12 +80,6 @@ export class MiNoteDraft {
 	})
 	public reactionAcceptance: typeof noteReactionAcceptances[number];
 
-	/**
-	 * public ... 公開
-	 * home ... ホームタイムライン(ユーザーページのタイムライン含む)のみに流す
-	 * followers ... フォロワーのみ
-	 * specified ... visibleUserIds で指定したユーザーのみ
-	 */
 	@Column('enum', { enum: noteVisibilities })
 	public visibility: typeof noteVisibilities[number];
 
@@ -119,15 +110,11 @@ export class MiNoteDraft {
 	})
 	public channelId: MiChannel['id'] | null;
 
-	// There is a possibility that channelId is not null but channel is null when the channel is deleted.
-	// (deleting channel is not implemented so it's not happening now but may happen in the future)
 	@ManyToOne(() => MiChannel, {
 		createForeignKeyConstraints: false,
 	})
 	@JoinColumn()
 	public channel: MiChannel | null;
-
-	//#region 以下、Pollについて追加
 
 	@Column('boolean', {
 		default: false,
@@ -152,16 +139,11 @@ export class MiNoteDraft {
 	})
 	public pollExpiredAfter: number | null;
 
-	//#endregion
-
-	// 予約日時
-	// これがあるだけでは実際に予約されているかどうかはわからない
 	@Column('timestamp with time zone', {
 		nullable: true,
 	})
 	public scheduledAt: Date | null;
 
-	// scheduledAtに基づいて実際にスケジュールされているか
 	@Column('boolean', {
 		default: false,
 	})

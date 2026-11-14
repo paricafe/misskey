@@ -143,7 +143,6 @@ const UPDATE_INTERVAL = 1000 * 60;
 let nextDayTimer: number | null = null;
 
 watch(now, (to) => {
-	// 次回更新までに日付が変わる場合、日付が変わった直後に強制的に更新するタイマーをセットする
 	if (nextDayMidnightTime - to <= UPDATE_INTERVAL) {
 		if (nextDayTimer != null) {
 			window.clearTimeout(nextDayTimer);

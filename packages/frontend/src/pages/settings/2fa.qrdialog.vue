@@ -149,7 +149,7 @@ function cancel() {
 async function tokenDone() {
 	if (token.value == null) return;
 	const res = await os.apiWithDialog('i/2fa/done', {
-		token: token.value.toString(), // 実装ミスなどでnumberが入る可能性を払拭できないため念のためtoString
+		token: token.value.toString(),
 	});
 
 	backupCodes.value = res.backupCodes;

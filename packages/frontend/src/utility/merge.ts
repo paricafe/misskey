@@ -14,10 +14,6 @@ function isPureObject(value: unknown): value is Record<PropertyKey, unknown> {
 	return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-/**
- * valueにないキーをdefからもらう（再帰的）\
- * nullはそのまま、undefinedはdefの値
- **/
 export function deepMerge<X extends Record<PropertyKey, unknown>>(value: DeepPartial<X>, def: X): X {
 	if (isPureObject(value) && isPureObject(def)) {
 		const result = deepClone(value as Cloneable) as X;

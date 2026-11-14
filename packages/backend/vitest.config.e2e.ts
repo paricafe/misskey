@@ -10,7 +10,6 @@ export default mergeConfig(
 			setupFiles: ['./test/setup.e2e.ts'],
 			server: {
 				deps: {
-					// テスト用サーバのバンドルはViteのmodule runnerを通さずNodeに直接読み込ませる
 					external: [/\/built-test\//],
 				},
 			},

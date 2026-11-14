@@ -67,8 +67,6 @@ export class FileServerService {
 			this.assets,
 			this.imageProcessingService,
 		);
-
-		//this.createServer = this.createServer.bind(this);
 	}
 
 	@bindThis

@@ -26,9 +26,6 @@ describe('Drive', () => {
 			});
 
 			test('Check consistency of DriveFile', () => {
-				// console.log(`a.test: ${JSON.stringify(image, null, '\t')}`);
-				// console.log(`b.test: ${JSON.stringify(imageInB, null, '\t')}`);
-
 				deepStrictEqualWithExcludedFields(image, imageInB, [
 					'id',
 					'createdAt',
@@ -56,10 +53,6 @@ describe('Drive', () => {
 			});
 
 			test('Check consistency', () => {
-				// console.log(`a.test: ${JSON.stringify(updatedImage, null, '\t')}`);
-				// console.log(`b.test: ${JSON.stringify(updatedImageInB, null, '\t')}`);
-
-				// FIXME: not updated with `drive/files/update`
 				strictEqual(updatedImage.isSensitive, true);
 				strictEqual(updatedImage.name, 'updated_192.jpg');
 				strictEqual(updatedImageInB.isSensitive, false);
@@ -79,11 +72,7 @@ describe('Drive', () => {
 			});
 
 			test('Check consistency', () => {
-				// console.log(`b.test: ${JSON.stringify(reupdatedImageInB, null, '\t')}`);
-
-				// `isSensitive` is updated
 				strictEqual(reupdatedImageInB.isSensitive, true);
-				// FIXME: but `name` is not updated
 				strictEqual(reupdatedImageInB.name, '192.jpg');
 			});
 		});
@@ -147,7 +136,6 @@ describe('Drive', () => {
 			});
 		});
 
-		/** @see https://github.com/misskey-dev/misskey/issues/12208 */
 		describe('isSensitive is federated in replying', () => {
 			let alice: LoginUser, bob: LoginUser;
 

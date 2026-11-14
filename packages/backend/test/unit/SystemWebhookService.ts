@@ -25,18 +25,12 @@ describe('SystemWebhookService', () => {
 	let app: TestingModule;
 	let service: SystemWebhookService;
 
-	// --------------------------------------------------------------------------------------
-
 	let usersRepository: UsersRepository;
 	let systemWebhooksRepository: SystemWebhooksRepository;
 	let idService: IdService;
 	let queueService: Mocked<QueueService>;
 
-	// --------------------------------------------------------------------------------------
-
 	let root: MiUser;
-
-	// --------------------------------------------------------------------------------------
 
 	async function createUser(data: Partial<MiUser> = {}) {
 		return await usersRepository
@@ -59,8 +53,6 @@ describe('SystemWebhookService', () => {
 			})
 			.then(x => systemWebhooksRepository.findOneByOrFail(x.identifiers[0]));
 	}
-
-	// --------------------------------------------------------------------------------------
 
 	async function beforeAllImpl() {
 		app = await Test
@@ -105,8 +97,6 @@ describe('SystemWebhookService', () => {
 		await usersRepository.createQueryBuilder().delete().execute();
 		await systemWebhooksRepository.createQueryBuilder().delete().execute();
 	}
-
-	// --------------------------------------------------------------------------------------
 
 	describe('アプリを毎回作り直す必要のないグループ', () => {
 		beforeAll(beforeAllImpl);
@@ -399,7 +389,6 @@ describe('SystemWebhookService', () => {
 						root,
 					);
 
-					// redisでの配信経由で更新されるのでちょっと待つ
 					await setTimeout(500);
 
 					const fetchedWebhooks = await service.fetchActiveSystemWebhooks();
@@ -418,7 +407,6 @@ describe('SystemWebhookService', () => {
 						root,
 					);
 
-					// redisでの配信経由で更新されるのでちょっと待つ
 					await setTimeout(500);
 
 					const fetchedWebhooks = await service.fetchActiveSystemWebhooks();
@@ -430,9 +418,7 @@ describe('SystemWebhookService', () => {
 				test('ActiveなWebhookが編集された時、キャッシュに反映されている', async () => {
 					const id = idService.gen();
 					await createWebhook({ id });
-					// キャッシュ作成
 					const webhook1 = await service.fetchActiveSystemWebhooks();
-					// 読み込まれていることをチェック
 					expect(webhook1.length).toEqual(1);
 					expect(webhook1[0].id).toEqual(id);
 
@@ -448,7 +434,6 @@ describe('SystemWebhookService', () => {
 						root,
 					);
 
-					// redisでの配信経由で更新されるのでちょっと待つ
 					await setTimeout(500);
 
 					const fetchedWebhooks = await service.fetchActiveSystemWebhooks();
@@ -458,9 +443,7 @@ describe('SystemWebhookService', () => {
 				test('NotActiveなWebhookが編集された時、キャッシュに追加されない', async () => {
 					const id = idService.gen();
 					await createWebhook({ id, isActive: false });
-					// キャッシュ作成
 					const webhook1 = await service.fetchActiveSystemWebhooks();
-					// 読み込まれていないことをチェック
 					expect(webhook1.length).toEqual(0);
 
 					const webhook2 = await service.updateSystemWebhook(
@@ -475,7 +458,6 @@ describe('SystemWebhookService', () => {
 						root,
 					);
 
-					// redisでの配信経由で更新されるのでちょっと待つ
 					await setTimeout(500);
 
 					const fetchedWebhooks = await service.fetchActiveSystemWebhooks();
@@ -485,9 +467,7 @@ describe('SystemWebhookService', () => {
 				test('NotActiveなWebhookがActiveにされた時、キャッシュに追加されている', async () => {
 					const id = idService.gen();
 					const baseWebhook = await createWebhook({ id, isActive: false });
-					// キャッシュ作成
 					const webhook1 = await service.fetchActiveSystemWebhooks();
-					// 読み込まれていないことをチェック
 					expect(webhook1.length).toEqual(0);
 
 					const webhook2 = await service.updateSystemWebhook(
@@ -498,7 +478,6 @@ describe('SystemWebhookService', () => {
 						root,
 					);
 
-					// redisでの配信経由で更新されるのでちょっと待つ
 					await setTimeout(500);
 
 					const fetchedWebhooks = await service.fetchActiveSystemWebhooks();
@@ -508,9 +487,7 @@ describe('SystemWebhookService', () => {
 				test('ActiveなWebhookがNotActiveにされた時、キャッシュから削除されている', async () => {
 					const id = idService.gen();
 					const baseWebhook = await createWebhook({ id, isActive: true });
-					// キャッシュ作成
 					const webhook1 = await service.fetchActiveSystemWebhooks();
-					// 読み込まれていることをチェック
 					expect(webhook1.length).toEqual(1);
 					expect(webhook1[0].id).toEqual(id);
 
@@ -522,7 +499,6 @@ describe('SystemWebhookService', () => {
 						root,
 					);
 
-					// redisでの配信経由で更新されるのでちょっと待つ
 					await setTimeout(500);
 
 					const fetchedWebhooks = await service.fetchActiveSystemWebhooks();
@@ -534,9 +510,7 @@ describe('SystemWebhookService', () => {
 				test('キャッシュから削除されている', async () => {
 					const id = idService.gen();
 					const baseWebhook = await createWebhook({ id, isActive: true });
-					// キャッシュ作成
 					const webhook1 = await service.fetchActiveSystemWebhooks();
-					// 読み込まれていることをチェック
 					expect(webhook1.length).toEqual(1);
 					expect(webhook1[0].id).toEqual(id);
 
@@ -545,7 +519,6 @@ describe('SystemWebhookService', () => {
 						root,
 					);
 
-					// redisでの配信経由で更新されるのでちょっと待つ
 					await setTimeout(500);
 
 					const fetchedWebhooks = await service.fetchActiveSystemWebhooks();

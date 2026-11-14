@@ -35,7 +35,6 @@ export class NodeinfoServerService {
 		private notesChart: NotesChart,
 		private usersChart: UsersChart,
 	) {
-		//this.createServer = this.createServer.bind(this);
 	}
 
 	@bindThis
@@ -70,9 +69,6 @@ export class NodeinfoServerService {
 				this.usersRepository.count({ where: { host: IsNull(), lastActiveDate: MoreThan(new Date(now - 2592000000)) } }),
 			]);
 
-			//const activeHalfyear = null;
-			//const activeMonth = null;
-
 			const proxyAccount = await this.systemAccountService.fetch('proxy');
 
 			const basePolicies = { ...DEFAULT_POLICIES, ...meta.policies };
@@ -103,7 +99,6 @@ export class NodeinfoServerService {
 						name: meta.maintainerName,
 						email: meta.maintainerEmail,
 					}],
-					// deprecated
 					maintainer: {
 						name: meta.maintainerName,
 						email: meta.maintainerEmail,
@@ -137,7 +132,7 @@ export class NodeinfoServerService {
 			return document;
 		};
 
-		const cache = new MemorySingleCache<Awaited<ReturnType<typeof nodeinfo2>>>(1000 * 60 * 10); // 10m
+		const cache = new MemorySingleCache<Awaited<ReturnType<typeof nodeinfo2>>>(1000 * 60 * 10);
 
 		fastify.get(nodeinfo2_1path, async (request, reply) => {
 			const base = await cache.fetch(() => nodeinfo2(21));

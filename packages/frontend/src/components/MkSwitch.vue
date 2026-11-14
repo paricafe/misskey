@@ -14,7 +14,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 	>
 	<XButton :class="$style.toggle" :checked="checked" :disabled="disabled" @toggle="toggle"/>
 	<span v-if="!noBody" :class="$style.body">
-		<!-- TODO: 無名slotの方は廃止 -->
 		<span :class="$style.label">
 			<span @click="toggle">
 				<slot name="label"></slot><slot></slot>

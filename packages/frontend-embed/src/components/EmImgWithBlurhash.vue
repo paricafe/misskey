@@ -17,7 +17,6 @@ import { WorkerMultiDispatch } from '@@/js/worker-multi-dispatch.js';
 import { extractAvgColorFromBlurhash } from '@@/js/extract-avg-color-from-blurhash.js';
 
 const canvasPromise = new Promise<WorkerMultiDispatch | HTMLCanvasElement>(resolve => {
-	// テスト環境で Web Worker インスタンスは作成できない
 	if (import.meta.env.MODE === 'test') {
 		const canvas = window.document.createElement('canvas');
 		canvas.width = 64;
@@ -58,7 +57,7 @@ const props = withDefaults(defineProps<{
 	width?: number;
 	cover?: boolean;
 	forceBlurhash?: boolean;
-	onlyAvgColor?: boolean; // 軽量化のためにBlurhashを使わずに平均色だけを描画
+	onlyAvgColor?: boolean;
 }>(), {
 	src: null,
 	alt: '',
@@ -114,13 +113,11 @@ watch([() => props.width, () => props.height, root], () => {
 });
 
 function drawImage(bitmap: CanvasImageSource) {
-	// canvasがない（mountedされていない）場合はTmpに保存しておく
 	if (!canvas.value) {
 		bitmapTmp.value = bitmap;
 		return;
 	}
 
-	// canvasがあれば描画する
 	bitmapTmp.value = undefined;
 	const ctx = canvas.value.getContext('2d');
 	if (!ctx) return;
@@ -135,7 +132,6 @@ function drawAvg() {
 	const ctx = canvas.value.getContext('2d');
 	if (!ctx) return;
 
-	// avgColorでお茶をにごす
 	ctx.beginPath();
 	ctx.fillStyle = color;
 	ctx.fillRect(0, 0, canvasWidth.value, canvasHeight.value);
@@ -191,7 +187,6 @@ watch(() => props.hash, () => {
 });
 
 onMounted(() => {
-	// drawImageがmountedより先に呼ばれている場合はここで描画する
 	if (bitmapTmp.value) {
 		drawImage(bitmapTmp.value);
 	}

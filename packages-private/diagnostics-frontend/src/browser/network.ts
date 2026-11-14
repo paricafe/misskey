@@ -17,7 +17,6 @@ function normalizeHeaders(headers: Record<string, unknown> | undefined) {
 
 function webSocketFramePayloadBytes(frame: { opcode?: number; payloadData?: string } | undefined) {
 	if (frame?.payloadData == null) return 0;
-	// opcode 1 はテキストフレームで、それ以外はbase64エンコードされたバイナリとして届く
 	if (frame.opcode === 1) return Buffer.byteLength(frame.payloadData, 'utf8');
 	return Buffer.byteLength(frame.payloadData, 'base64');
 }
@@ -25,13 +24,9 @@ function webSocketFramePayloadBytes(frame: { opcode?: number; payloadData?: stri
 export type NetworkTracker = {
 	networkRequests: NetworkRequest[];
 	webSocketConnections: WebSocketConnection[];
-	/** CDPへの追加問い合わせ (postDataの取得) が全て決着するまで待つ */
 	waitForDetails: () => Promise<void>;
 };
 
-/**
- * CDPのNetworkドメインを有効化し、リクエスト/WebSocketの生ログを収集し続けるトラッカーを返す。
- */
 export async function enableNetworkTracking(cdp: CDPSession): Promise<NetworkTracker> {
 	const networkRequests: NetworkRequest[] = [];
 	const webSocketConnections: WebSocketConnection[] = [];
@@ -46,7 +41,6 @@ export async function enableNetworkTracking(cdp: CDPSession): Promise<NetworkTra
 		}).then(result => {
 			row.requestBody = result.postData;
 		}).catch(() => {
-			// Some requests expose hasPostData but no longer have retrievable body data.
 		});
 		pendingDetailReads.push(pending);
 	};
@@ -79,7 +73,6 @@ export async function enableNetworkTracking(cdp: CDPSession): Promise<NetworkTra
 		const row: WebSocketConnection = {
 			requestId: params.requestId,
 			url: params.url,
-			// Network.webSocketCreated はtimestampを持たないので、closedAt との差分は取れない
 			createdAt: 0,
 			sentFrameCount: 0,
 			receivedFrameCount: 0,
@@ -181,7 +174,6 @@ export async function enableNetworkTracking(cdp: CDPSession): Promise<NetworkTra
 		networkRequests,
 		webSocketConnections,
 		waitForDetails: async () => {
-			// 待っている最中にさらにpendingが増えることがあるので、増えなくなるまで繰り返す
 			let settledCount = 0;
 			while (settledCount < pendingDetailReads.length) {
 				const pending = pendingDetailReads.slice(settledCount);

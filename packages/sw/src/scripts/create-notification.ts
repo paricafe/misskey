@@ -3,9 +3,6 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-/*
- * Notification manager for SW
- */
 import type { BadgeNames, PushNotificationDataMap } from '@/types.js';
 import { char2fileName } from '@/scripts/twemoji-base.js';
 import { cli } from '@/scripts/operations.js';
@@ -20,13 +17,6 @@ const closeNotificationsByTags = async (tags: string[]): Promise<void> => {
 };
 
 const iconUrl = (name: BadgeNames): string => `/static-assets/tabler-badges/${name}.png`;
-/* How to add a new badge:
- * 1. Find the icon and download png from https://tabler-icons.io/
- * 2. vips resize ~/Downloads/icon-name.png vipswork.png 0.4; vips scRGB2BW vipswork.png ~/icon-name.png"[compression=9,strip]"; rm vipswork.png;
- * 3. mv ~/icon-name.png ~/misskey/packages/backend/assets/tabler-badges/
- * 4. Add 'icon-name' to BadgeNames
- * 5. Add `badge: iconUrl('icon-name'),`
- */
 
 export async function createNotification<K extends keyof PushNotificationDataMap>(data: PushNotificationDataMap[K]): Promise<void> {
 	const n = await composeNotification(data);
@@ -42,18 +32,9 @@ export async function createNotification<K extends keyof PushNotificationDataMap
 async function composeNotification(data: PushNotificationDataMap[keyof PushNotificationDataMap]): Promise<[string, NotificationOptions] | null> {
 	const i18n = await (swLang.i18n ?? swLang.fetchLocale());
 	switch (data.type) {
-		/*
-		case 'driveFileCreated': // TODO (Server Side)
-			return [i18n.ts._notification.fileUploaded, {
-				body: body.name,
-				icon: body.url,
-				data
-			}];
-		*/
 		case 'notification':
 			switch (data.body.type) {
 				case 'follow': {
-					// users/showの型定義をswos.apiへ当てはめるのが困難なのでapiFetch.requestを直接使用
 					const account = await getAccountFromId(data.userId);
 					if (!account) return null;
 					const userDetail = await cli.request('users/show', { userId: data.body.userId }, account.token);
@@ -145,14 +126,12 @@ async function composeNotification(data: PushNotificationDataMap[keyof PushNotif
 					let badge: string | undefined;
 
 					if (reaction.startsWith(':')) {
-						// カスタム絵文字の場合
 						const name = reaction.substring(1, reaction.length - 1);
 						const badgeUrl = new URL(`/emoji/${name}.webp`, origin);
 						badgeUrl.searchParams.set('badge', '1');
 						badge = badgeUrl.href;
 						reaction = name.split('@')[0];
 					} else {
-						// Unicode絵文字の場合
 						badge = `/twemoji-badge/${char2fileName(reaction)}.png`;
 					}
 

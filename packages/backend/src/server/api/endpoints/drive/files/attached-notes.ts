@@ -67,7 +67,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 		private roleService: RoleService,
 	) {
 		super(meta, paramDef, async (ps, me) => {
-			// Fetch file
 			const file = await this.driveFilesRepository.findOneBy({
 				id: ps.fileId,
 				userId: await this.roleService.isModerator(me) ? undefined : me.id,

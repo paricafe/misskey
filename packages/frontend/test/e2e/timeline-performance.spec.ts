@@ -130,7 +130,6 @@ for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 844 
 		for (let pass = 0; loaded < notes.length && pass < 30; pass++) {
 			const previous = loaded;
 			await expect.poll(async () => {
-				// Measured rows can move the end while approaching it; keep scrolling until the request starts.
 				if (loaded === previous) await scrollList(page, true);
 				return loaded;
 			}).toBeGreaterThan(previous);
@@ -140,7 +139,6 @@ for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 844 
 		}
 		expect(loaded).toBe(500);
 		await expect(first).toHaveCount(0);
-		// The reaction completes after its row was unmounted, and must reach retained note data.
 		reactionFinished.resolve();
 		expect(maximumMounted).toBeLessThan(40);
 		await scrollList(page, false);
@@ -148,7 +146,6 @@ for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 844 
 		await expect(first.getByText('Performance hidden content', { exact: true })).toBeVisible();
 		await expect(first.locator('button span').filter({ hasText: /^1$/ })).toBeVisible();
 
-		// A resize above the visible anchor must not move the content being read.
 		await page.locator('[data-virtual-list]').first().evaluate(list => {
 			let container = list.parentElement;
 			while (container && !['auto', 'scroll'].includes(getComputedStyle(container).overflowY)) container = container.parentElement;

@@ -127,7 +127,6 @@ const props = defineProps<{
 
 const role = ref((() => {
 	const base = deepClone(props.modelValue);
-	// fill missing policy
 	for (const ROLE_POLICY of Misskey.rolePolicies) {
 		if (base.policies[ROLE_POLICY] == null) {
 			base.policies[ROLE_POLICY] = {

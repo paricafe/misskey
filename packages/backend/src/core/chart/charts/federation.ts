@@ -15,9 +15,6 @@ import { ChartLoggerService } from '../ChartLoggerService.js';
 import { name, schema } from './entities/federation.js';
 import type { KVs } from '../core.js';
 
-/**
- * フェデレーションに関するチャート
- */
 @Injectable()
 export default class FederationChart extends Chart<typeof schema> { // eslint-disable-line import/no-default-export
 	constructor(

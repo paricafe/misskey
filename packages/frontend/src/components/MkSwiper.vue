@@ -45,21 +45,13 @@ const emit = defineEmits<{
 
 const shouldAnimate = computed(() => prefer.r.enableHorizontalSwipe.value || prefer.r.animation.value);
 
-// ▼ しきい値 ▼ //
-
-// スワイプと判定される最小の距離
 const MIN_SWIPE_DISTANCE = 20;
 
-// スワイプ時の動作を発火する最小の距離
 const SWIPE_DISTANCE_THRESHOLD = 70;
 
-// スワイプできる最大の距離
 const MAX_SWIPE_DISTANCE = 120;
 
-// スワイプ方向を判定する角度の許容範囲（度数）
 const SWIPE_DIRECTION_ANGLE_THRESHOLD = 50;
-
-// ▲ しきい値 ▲ //
 
 let startScreenX: number | null = null;
 let startScreenY: number | null = null;
@@ -80,7 +72,7 @@ function touchStart(event: TouchEvent) {
 
 	startScreenX = event.touches[0].screenX;
 	startScreenY = event.touches[0].screenY;
-	swipeDirectionLocked = null; // スワイプ方向をリセット
+	swipeDirectionLocked = null;
 }
 
 function touchMove(event: TouchEvent) {
@@ -97,7 +89,6 @@ function touchMove(event: TouchEvent) {
 	let distanceX = event.touches[0].screenX - startScreenX;
 	let distanceY = event.touches[0].screenY - startScreenY;
 
-	// スワイプ方向をロック
 	if (!swipeDirectionLocked) {
 		const angle = Math.abs(Math.atan2(distanceY, distanceX) * (180 / Math.PI));
 		if (angle > 90 - SWIPE_DIRECTION_ANGLE_THRESHOLD && angle < 90 + SWIPE_DIRECTION_ANGLE_THRESHOLD) {
@@ -107,7 +98,6 @@ function touchMove(event: TouchEvent) {
 		}
 	}
 
-	// 縦方向のスワイプの場合は中断
 	if (swipeDirectionLocked === 'vertical') {
 		swipeAborted = true;
 		pullDistance.value = 0;
@@ -132,7 +122,6 @@ function touchMove(event: TouchEvent) {
 	isSwiping.value = true;
 	isSwipingForClass.value = true;
 	nextTick(() => {
-		// グリッチを控えるため、1.5px以上の差がないと更新しない
 		if (Math.abs(distanceX - pullDistance.value) < 1.5) return;
 		pullDistance.value = distanceX;
 	});
@@ -176,10 +165,9 @@ function touchEnd(event: TouchEvent) {
 		isSwipingForClass.value = false;
 	}, 400);
 
-	swipeDirectionLocked = null; // スワイプ方向をリセット
+	swipeDirectionLocked = null;
 }
 
-/** 横スワイプに関与する可能性のある要素を調べる */
 function hasSomethingToDoWithXSwipe(el: HTMLElement) {
 	if (['INPUT', 'TEXTAREA'].includes(el.tagName)) return true;
 	if (el.isContentEditable) return true;

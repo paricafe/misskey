@@ -63,12 +63,10 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 			const seedDate = new Date(parseInt(ps.seed, 10));
 			const now = new Date();
 
-			// シードが未来なのは通常のプレイではありえないので弾く
 			if (seedDate.getTime() > now.getTime()) {
 				throw new ApiError(meta.errors.invalidSeed);
 			}
 
-			// シードが古すぎる(5時間以上前)のも弾く
 			if (seedDate.getTime() < now.getTime() - 1000 * 60 * 60 * 5) {
 				throw new ApiError(meta.errors.invalidSeed);
 			}

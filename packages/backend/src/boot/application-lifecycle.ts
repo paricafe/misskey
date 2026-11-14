@@ -13,7 +13,6 @@ type ManagedApplication = {
 const applications = new Set<Promise<ManagedApplication>>();
 let shutdown: Promise<void> | undefined;
 
-/** Track initialization too, so a signal during startup cannot orphan a context. */
 export function manageApplication<T extends ManagedApplication>(initialize: () => Promise<T>): Promise<T> {
 	if (isShutdownInProgress()) throw new Error('Cannot start an application during shutdown');
 	const application = initialize();
@@ -24,8 +23,6 @@ export function manageApplication<T extends ManagedApplication>(initialize: () =
 export function shutdownApplications(): Promise<void> {
 	shutdown ??= (async () => {
 		const running: ManagedApplication[] = [];
-		// Every context must stop accepting work before any context releases its
-		// dependencies. In non-cluster mode the HTTP and queue contexts coexist.
 		const drained = await Promise.allSettled([...applications].map(async initializing => {
 			const application = await initializing;
 			running.push(application);

@@ -6,8 +6,6 @@
 import * as mfm from 'mfm-js';
 import { unique } from '@/utility/array.js';
 
-// unique without hash
-// [ http://a/#1, http://a/#2, http://b/#3 ] => [ http://a/#1, http://b/#3 ]
 const removeHash = (x: string) => x.replace(/#[^#]*$/, '');
 
 export function extractUrlFromMfm(nodes: mfm.MfmNode[], respectSilentFlag = true): string[] {

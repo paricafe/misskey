@@ -81,17 +81,15 @@ const POLLING_INTERVAL =
 	prefer.s.pollingInterval === 3 ? MIN_POLLING_INTERVAL :
 	MIN_POLLING_INTERVAL;
 
-// documentが非表示の間はポーリングを停止する
 createVisibilityAwareInterval(() => {
 	const ids = [...pollingQueue.entries()]
-		.filter(([k, v]) => Date.now() - v.lastAddedAt < 1000 * 60 * 5) // 追加されてから一定時間経過したものは省く
+		.filter(([k, v]) => Date.now() - v.lastAddedAt < 1000 * 60 * 5)
 		.map(([k, v]) => k)
-		.sort((a, b) => (a > b ? -1 : 1)) // 新しいものを優先するためにIDで降順ソート
+		.sort((a, b) => (a > b ? -1 : 1))
 		.slice(0, CAPTURE_MAX);
 
 	if (ids.length === 0) return;
 
-	// まとめてリクエストするのではなく、個別にHTTPリクエスト投げてCDNにキャッシュさせた方がサーバーの負荷低減には良いかもしれない？
 	misskeyApi('notes/show-partial-bulk', {
 		noteIds: ids,
 	}).then((items) => {
@@ -195,8 +193,6 @@ type RealtimeCapture = {
 	onConnected: () => void;
 };
 
-// One listener per stream connection dispatches to the subscribed notes, instead of
-// one listener per note that would each receive and filter every event.
 const realtimeCaptures = new WeakMap<Misskey.IStream, RealtimeCapture>();
 
 function realtimeSubscribe(props: {
@@ -287,7 +283,6 @@ export function useNoteCapture(props: {
 
 	const $note = reactive<ReactiveNoteData>({
 		reactions: Object.entries(note.reactions).reduce((acc, [name, count]) => {
-			// Normalize reactions
 			const normalizedName = name.replace(/^:(\w+):$/, ':$1@.:');
 			if (acc[normalizedName] == null) {
 				acc[normalizedName] = count;
@@ -312,7 +307,6 @@ export function useNoteCapture(props: {
 	noteEvents.on(`childrenChanged:${note.id}`, onChildrenChanged);
 	noteEvents.on(`updated:${note.id}`, onUpdated);
 
-	// 操作がダブっていないかどうかを簡易的に記録するためのMap
 	const reactionUserMap = new Map<Misskey.entities.User['id'], string | typeof noReaction>();
 	let latestPollVotedKey: string | null = null;
 
@@ -340,7 +334,6 @@ export function useNoteCapture(props: {
 		let normalizedName = ctx.reaction.replace(/^:(\w+):$/, ':$1@.:');
 		normalizedName = normalizedName.match('\u200d') ? normalizedName : normalizedName.replace(/\ufe0f/g, '');
 
-		// 確実に一度リアクションされて取り消されている場合のみ処理をとめる（APIで初回読み込み→Streamでアップデート等の場合、reactionUserMapに情報がないため）
 		if (reactionUserMap.has(ctx.userId) && reactionUserMap.get(ctx.userId) === noReaction) return;
 		reactionUserMap.set(ctx.userId, noReaction);
 
@@ -393,7 +386,6 @@ export function useNoteCapture(props: {
 		fileIds?: string[];
 		files?: Misskey.entities.DriveFile[];
 	}): void {
-		// Edit history is not delivered to timelines, so only the current state is updated.
 		note.updatedAt = ctx.updatedAt;
 		note.cw = ctx.cw;
 		note.text = ctx.text;
@@ -405,7 +397,6 @@ export function useNoteCapture(props: {
 
 	function subscribe() {
 		if (mock || unsubscribeCapture != null) {
-			// モックモードでは購読しない
 			return;
 		}
 
@@ -435,13 +426,9 @@ export function useNoteCapture(props: {
 
 	if (!props.retain) onUnmounted(dispose);
 
-	// 投稿からある程度経過している(=タイムラインを遡って表示した)ノートは、イベントが発生する可能性が低いためそもそも購読しない
-	// ただし「リノートされたばかりの過去のノート」(= parentNoteが存在し、かつparentNoteの投稿日時が最近)はイベント発生が考えられるため購読する
-	// TODO: デバイスとサーバーの時計がズレていると不具合の元になるため、ズレを検知して警告を表示するなどのケアが必要かもしれない
 	if (!props.forceCapture) {
 		if (parentNote == null) {
-			if ((Date.now() - new Date(note.createdAt).getTime()) > 1000 * 60 * 5) { // 5min
-				// リノートで表示されているノートでもないし、投稿からある程度経過しているので自動で購読しない
+			if ((Date.now() - new Date(note.createdAt).getTime()) > 1000 * 60 * 5) {
 				return {
 					$note,
 					subscribe,
@@ -449,8 +436,7 @@ export function useNoteCapture(props: {
 				};
 			}
 		} else {
-			if ((Date.now() - new Date(parentNote.createdAt).getTime()) > 1000 * 60 * 5) { // 5min
-				// リノートで表示されているノートだが、リノートされてからある程度経過しているので自動で購読しない
+			if ((Date.now() - new Date(parentNote.createdAt).getTime()) > 1000 * 60 * 5) {
 				return {
 					$note,
 					subscribe,

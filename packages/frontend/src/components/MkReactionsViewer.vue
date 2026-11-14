@@ -76,7 +76,6 @@ function onMockToggleReaction(emoji: string, count: number) {
 
 function canReact(reaction: string) {
 	if (!$i) return false;
-	// TODO: CheckPermissions
 	return isLocalCustomEmojiReaction(reaction)
 		? customEmojisMap.has(getEmojiNameFromReaction(reaction))
 		: isSupportedEmoji(reaction);
@@ -85,7 +84,6 @@ function canReact(reaction: string) {
 watch([() => props.reactions, () => props.maxNumber], ([newSource, maxNumber]) => {
 	hasMoreReactions.value = Object.keys(newSource).length > maxNumber;
 
-	// Shown reactions keep their place so that the buttons do not move under the pointer.
 	const newReactions: [string, number][] = [];
 	for (const [reaction] of _reactions.value) {
 		if (reaction in newSource && newSource[reaction] !== 0) {
@@ -95,7 +93,6 @@ watch([() => props.reactions, () => props.maxNumber], ([newSource, maxNumber]) =
 
 	const sorted = Object.entries(newSource).filter(([, count]) => count !== 0);
 	if (prefer.s.showAvailableReactionsFirstInNote) {
-		// ソートの比較関数内で評価すると同じ絵文字に対して何度も実行されるため、事前に1回だけ評価しておく
 		const canReactCache = new Map<string, boolean>();
 		for (const [emoji] of sorted) {
 			canReactCache.set(emoji, canReact(emoji));

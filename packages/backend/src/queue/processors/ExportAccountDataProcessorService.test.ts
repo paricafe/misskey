@@ -58,7 +58,6 @@ function setup(
 }
 
 describe('ExportAccountDataProcessorService archive delivery', () => {
-	// Temporary files are only removed in production.
 	beforeEach(() => {
 		vi.stubEnv('NODE_ENV', 'production');
 	});
@@ -83,7 +82,6 @@ describe('ExportAccountDataProcessorService archive delivery', () => {
 		await service.process({ data: { user: { id: 'user' } } } as never);
 
 		expect(driveService.addFile).toHaveBeenCalledOnce();
-		// Role upload policies must not reject the generated zip archive.
 		expect(driveService.addFile).toHaveBeenCalledWith(expect.objectContaining({ skipPolicyCheck: true }));
 		expect(emailService.sendEmail).toHaveBeenCalledOnce();
 		await vi.waitFor(() => expect(fs.existsSync(tempDir()!)).toBe(false));

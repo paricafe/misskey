@@ -5,11 +5,6 @@
 
 type AvatarDecorationBase = { category?: string | null | undefined };
 
-/**
- * アバターデコレーションをカテゴリごとにグループ化します。
- * @param decorations アバターデコレーションの配列
- * @returns カテゴリごとにグループ化されたアバターデコレーションオブジェクト
- */
 export function groupAvatarDecorations<T extends AvatarDecorationBase>(decorations: T[]) {
 	const grouped: Record<string, T[]> = {};
 

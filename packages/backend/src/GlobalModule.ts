@@ -101,7 +101,6 @@ const $meta: Provider = {
 	provide: DI.meta,
 	useFactory: async (db: DataSource, redisForSub: Redis.Redis) => {
 		const meta = await db.transaction(async transactionalEntityManager => {
-			// 過去のバグでレコードが複数出来てしまっている可能性があるので新しいIDを優先する
 			const metas = await transactionalEntityManager.find(MiMeta, {
 				order: {
 					id: 'DESC',
@@ -113,7 +112,6 @@ const $meta: Provider = {
 			if (meta) {
 				return meta;
 			} else {
-				// metaが空のときfetchMetaが同時に呼ばれるとここが同時に呼ばれてしまうことがあるのでフェイルセーフなupsertを使う
 				const saved = await transactionalEntityManager
 					.upsert(
 						MiMeta,
@@ -138,7 +136,7 @@ const $meta: Provider = {
 						for (const key in body.after) {
 							(meta as any)[key] = (body.after as any)[key];
 						}
-						meta.rootUser = null; // joinなカラムは通常取ってこないので
+						meta.rootUser = null;
 						break;
 					}
 					default:
@@ -171,9 +169,7 @@ export class GlobalModule implements OnApplicationShutdown {
 	) { }
 
 	public async dispose(): Promise<void> {
-		// Wait for all potential DB queries
 		await allSettled();
-		// And then disconnect from DB
 		await Promise.all([
 			this.db.destroy(),
 			this.redisClient.disconnect(),

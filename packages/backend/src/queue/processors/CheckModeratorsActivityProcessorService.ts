@@ -16,11 +16,8 @@ import { SystemWebhookService } from '@/core/SystemWebhookService.js';
 import { AnnouncementService } from '@/core/AnnouncementService.js';
 import { QueueLoggerService } from '../QueueLoggerService.js';
 
-// モデレーターが不在と判断する日付の閾値
 const MODERATOR_INACTIVITY_LIMIT_DAYS = 7;
-// 警告通知やログ出力を行う残日数の閾値
 const MODERATOR_INACTIVITY_WARNING_REMAINING_DAYS = 2;
-// 期限から6時間ごとに通知を行う
 const MODERATOR_INACTIVITY_WARNING_NOTIFY_INTERVAL_HOURS = 6;
 const ONE_HOUR_MILLI_SEC = 1000 * 60 * 60;
 const ONE_DAY_MILLI_SEC = ONE_HOUR_MILLI_SEC * 24;
@@ -141,42 +138,12 @@ export class CheckModeratorsActivityProcessorService {
 				this.logger.warn(`A moderator has been inactive for a period of time. If you are inactive for an additional ${timeVariant}, it will switch to invitation only.`);
 
 				if (remainingTime.asHours % MODERATOR_INACTIVITY_WARNING_NOTIFY_INTERVAL_HOURS === 0) {
-					// ジョブの実行頻度と同等だと通知が多すぎるため期限から6時間ごとに通知する
-					// つまり、のこり2日を切ったら6時間ごとに通知が送られる
 					await this.notifyInactiveModeratorsWarning(remainingTime);
 				}
 			}
 		}
 	}
 
-	/**
-	 * モデレーターが不在であるかどうかを確認する。trueの場合はモデレーターが不在である。
-	 * isModerator, isAdministrator, isRootのいずれかがtrueのユーザを対象に、
-	 * {@link MiUser.lastActiveDate}の値が実行日時の{@link MODERATOR_INACTIVITY_LIMIT_DAYS}日前よりも古いユーザがいるかどうかを確認する。
-	 * {@link MiUser.lastActiveDate}がnullの場合は、そのユーザは確認の対象外とする。
-	 *
-	 * -----
-	 *
-	 * ### サンプルパターン
-	 * - 実行日時: 2022-01-30 12:00:00
-	 * - 判定基準: 2022-01-23 12:00:00（実行日時の{@link MODERATOR_INACTIVITY_LIMIT_DAYS}日前）
-	 *
-	 * #### パターン①
-	 * - モデレータA: lastActiveDate = 2022-01-20 00:00:00 ※アウト
-	 * - モデレータB: lastActiveDate = 2022-01-23 12:00:00 ※セーフ（判定基準と同値なのでギリギリ残り0日）
-	 * - モデレータC: lastActiveDate = 2022-01-23 11:59:59 ※アウト（残り-1日）
-	 * - モデレータD: lastActiveDate = null
-	 *
-	 * この場合、モデレータBのアクティビティのみ判定基準日よりも古くないため、モデレーターが在席と判断される。
-	 *
-	 * #### パターン②
-	 * - モデレータA: lastActiveDate = 2022-01-20 00:00:00 ※アウト
-	 * - モデレータB: lastActiveDate = 2022-01-22 12:00:00 ※アウト（残り-1日）
-	 * - モデレータC: lastActiveDate = 2022-01-23 11:59:59 ※アウト（残り-1日）
-	 * - モデレータD: lastActiveDate = null
-	 *
-	 * この場合、モデレータA, B, Cのアクティビティは判定基準日よりも古いため、モデレーターが不在と判断される。
-	 */
 	@bindThis
 	public async evaluateModeratorsInactiveDays(): Promise<ModeratorInactivityEvaluationResult> {
 		const today = new Date();
@@ -189,7 +156,6 @@ export class CheckModeratorsActivityProcessorService {
 			// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
 			.filter(it => it.lastActiveDate!.getTime() < inactivePeriod.getTime());
 
-		// 残りの猶予を示したいので、最終アクティブ日時が一番若いモデレータの日数を基準に猶予を計算する
 		// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
 		const newestLastActiveDate = new Date(Math.max(...moderators.map(it => it.lastActiveDate!.getTime())));
 		const remainingTime = newestLastActiveDate.getTime() - inactivePeriod.getTime();
@@ -214,8 +180,6 @@ export class CheckModeratorsActivityProcessorService {
 
 	@bindThis
 	public async notifyInactiveModeratorsWarning(remainingTime: ModeratorInactivityRemainingTime) {
-		// -- モデレータへのメール送信
-
 		const moderators = await this.fetchModerators();
 		const moderatorProfiles = await this.userProfilesRepository
 			.findBy({ userId: In(moderators.map(it => it.id)) })
@@ -229,8 +193,6 @@ export class CheckModeratorsActivityProcessorService {
 			}
 		}
 
-		// -- SystemWebhook
-
 		return this.systemWebhookService.enqueueSystemWebhook(
 			'inactiveModeratorsWarning',
 			{ remainingTime: remainingTime },
@@ -239,8 +201,6 @@ export class CheckModeratorsActivityProcessorService {
 
 	@bindThis
 	public async notifyChangeToInvitationOnly() {
-		// -- モデレータへのメールとお知らせ（個人向け）送信
-
 		const moderators = await this.fetchModerators();
 		const moderatorProfiles = await this.userProfilesRepository
 			.findBy({ userId: In(moderators.map(it => it.id)) })
@@ -262,8 +222,6 @@ export class CheckModeratorsActivityProcessorService {
 			}
 		}
 
-		// -- SystemWebhook
-
 		return this.systemWebhookService.enqueueSystemWebhook(
 			'inactiveModeratorsInvitationOnlyChanged',
 			{},
@@ -272,7 +230,6 @@ export class CheckModeratorsActivityProcessorService {
 
 	@bindThis
 	private async fetchModerators() {
-		// TODO: モデレーター以外にも特別な権限を持つユーザーがいる場合は考慮する
 		return this.roleService.getModerators({
 			includeAdmins: true,
 			includeRoot: true,

@@ -69,7 +69,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				throw new ApiError(meta.errors.yourPage);
 			}
 
-			// if already liked
 			const exist = await this.pageLikesRepository.exists({
 				where: {
 					pageId: page.id,
@@ -81,7 +80,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				throw new ApiError(meta.errors.alreadyLiked);
 			}
 
-			// Create like
 			await this.pageLikesRepository.insert({
 				id: this.idService.gen(),
 				pageId: page.id,

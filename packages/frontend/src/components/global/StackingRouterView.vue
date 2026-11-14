@@ -74,7 +74,7 @@ function mount() {
 }
 
 function back() {
-	if (tabs.value.length <= 1) return; // transitionの関係でタブが1つの状態でbackが呼ばれることがある
+	if (tabs.value.length <= 1) return;
 	const prev = tabs.value[tabs.value.length - 2];
 	tabs.value = [...tabs.value.slice(0, tabs.value.length - 1)];
 	router?.replaceByPath(prev.fullPath);
@@ -148,7 +148,6 @@ router.useListener('replace', ({ fullPath }) => {
 }
 .transition_x_leaveActive {
 	.tabFg {
-		//position: absolute;
 	}
 }
 

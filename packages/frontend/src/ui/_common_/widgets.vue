@@ -32,9 +32,6 @@ import { i18n } from '@/i18n.js';
 import { prefer } from '@/preferences.js';
 
 const props = withDefaults(defineProps<{
-	// null = 全てのウィジェットを表示
-	// left = place: leftだけを表示
-	// right = rightとnullを表示
 	place?: 'left' | null | 'right';
 }>(), {
 	place: null,

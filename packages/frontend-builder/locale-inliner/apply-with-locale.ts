@@ -44,7 +44,7 @@ export function applyWithLocale(
 					replacement = `({${Object.entries(accessed).map(([key, value]) => `${JSON.stringify(key)}:${formatFunction(value)}`).join(',')}})`;
 				} else {
 					fileLogger.warn(`Cannot find localization key ${modification.localizationKey.join('.')}`);
-					replacement = '(() => "")'; // placeholder for missing locale
+					replacement = '(() => "")';
 				}
 				sourceCode.update(modification.begin, modification.end, replacement);
 				break;
@@ -64,10 +64,9 @@ export function applyWithLocale(
 					}
 					components.push(JSON.stringify(format.slice(lastIndex)));
 
-					// we replace with `(({name,count})=>(name+count+"some"))`
 					const paramList = Array.from(params).join(',');
 					let body = components.filter(x => x !== '""').join('+');
-					if (body === '') body = '""'; // if the body is empty, we return empty string
+					if (body === '') body = '""';
 					return `(({${paramList}})=>(${body}))`;
 				}
 			}
@@ -76,9 +75,6 @@ export function applyWithLocale(
 				break;
 			}
 			case 'locale-json': {
-				// locale-json is inlined to place where initialize module-level variable which is executed only once.
-				// In such case we can use JSON.parse to speed up the parsing script.
-				// https://v8.dev/blog/cost-of-javascript-2019#json
 				sourceCode.update(modification.begin, modification.end, `JSON.parse(${JSON.stringify(JSON.stringify(localeJson))})`);
 				break;
 			}
@@ -94,7 +90,7 @@ function getPropertyByPath(localeJson: ILocale, localizationKey: string[]): stri
 	let current: ILocale | string = localeJson;
 	for (const key of localizationKey) {
 		if (typeof current !== 'object' || !(key in current)) {
-			return null; // Key not found
+			return null;
 		}
 		current = current[key];
 	}

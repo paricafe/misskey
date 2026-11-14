@@ -55,7 +55,7 @@ export class StreamingApiServerService {
 		this.#server = server;
 		this.#wss = new WebSocket.WebSocketServer({
 			noServer: true,
-			maxPayload: 1024 * 1024, // 1MiB
+			maxPayload: 1024 * 1024,
 			perMessageDeflate: false,
 		});
 
@@ -72,9 +72,6 @@ export class StreamingApiServerService {
 			let user: MiLocalUser | null = null;
 			let app: MiAccessToken | null = null;
 
-			// https://datatracker.ietf.org/doc/html/rfc6750.html#section-2.1
-			// Note that the standard WHATWG WebSocket API does not support setting any headers,
-			// but non-browser apps may still be able to set it.
 			const token = request.headers.authorization?.startsWith('Bearer ')
 				? request.headers.authorization.slice(7)
 				: q.get('i');
@@ -171,7 +168,6 @@ export class StreamingApiServerService {
 			await stream.listen(ev, connection);
 		});
 
-		// 一定期間通信が無いコネクションは実際には切断されている可能性があるため定期的にterminateする
 		this.#cleanConnectionsIntervalId = setInterval(() => {
 			const now = Date.now();
 			for (const [connection, lastActive] of this.#connections.entries()) {

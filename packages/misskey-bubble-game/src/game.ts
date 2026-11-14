@@ -43,15 +43,15 @@ export class DropAndFusionGame extends EventEmitter<{
 	monoAdded: (mono: Mono) => void;
 	gameOver: () => void;
 }> {
-	private PHYSICS_QUALITY_FACTOR = 16; // 低いほどパフォーマンスが高いがガタガタして安定しなくなる、逆に高すぎても何故か不安定になる
-	private COMBO_INTERVAL = 60; // frame
+	private PHYSICS_QUALITY_FACTOR = 16;
+	private COMBO_INTERVAL = 60;
 	public readonly GAME_VERSION = 3;
 	public readonly GAME_WIDTH = 450;
 	public readonly GAME_HEIGHT = 600;
-	public readonly DROP_COOLTIME = 30; // frame
+	public readonly DROP_COOLTIME = 30;
 	public readonly PLAYAREA_MARGIN = 25;
 	private STOCK_MAX = 4;
-	private TICK_DELTA = 1000 / 60; // 60fps
+	private TICK_DELTA = 1000 / 60;
 
 	public frame = 0;
 	public engine: Matter.Engine;
@@ -62,21 +62,14 @@ export class DropAndFusionGame extends EventEmitter<{
 	private rng: () => number;
 	private logs: Log[] = [];
 
-	/**
-	 * フィールドに出ていて、かつ合体の対象となるアイテム
-	 */
 	private fusionReadyBodyIds: Matter.Body['id'][] = [];
 
 	private gameOverReadyBodyIds: Matter.Body['id'][] = [];
 
-	/**
-	 * fusion予約アイテムのペア
-	 * TODO: これらのモノは光らせるなどの演出をすると視覚的に楽しそう
-	 */
 	private fusionReservedPairs: { bodyA: Matter.Body; bodyB: Matter.Body }[] = [];
 
-	private latestDroppedAt = 0; // frame
-	private latestFusionedAt = 0; // frame
+	private latestDroppedAt = 0;
+	private latestFusionedAt = 0;
 	private stock: { id: string; mono: Mono }[] = [];
 	private holding: { id: string; mono: Mono } | null = null;
 
@@ -119,15 +112,12 @@ export class DropAndFusionGame extends EventEmitter<{
 	}) {
 		super();
 
-		//#region BIND
 		this.tick = this.tick.bind(this);
-		//#endregion
 
 		this.gameMode = env.gameMode;
 		this.getMonoRenderOptions = env.getMonoRenderOptions ?? null;
 		this.rng = seedrandom(env.seed);
 
-		// sweetsモードは重いため
 		const physicsQualityFactor = this.gameMode === 'sweets' ? 4 : this.PHYSICS_QUALITY_FACTOR;
 		this.engine = Matter.Engine.create({
 			constraintIterations: 2 * physicsQualityFactor,
@@ -145,7 +135,6 @@ export class DropAndFusionGame extends EventEmitter<{
 
 		this.engine.world.bodies = [];
 
-		//#region walls
 		const WALL_OPTIONS: Matter.IChamferableBodyDefinition = {
 			label: '_wall_',
 			isStatic: true,
@@ -163,7 +152,6 @@ export class DropAndFusionGame extends EventEmitter<{
 			Matter.Bodies.rectangle(this.GAME_WIDTH + (thickness / 2) - this.PLAYAREA_MARGIN, this.GAME_HEIGHT / 2, thickness, this.GAME_HEIGHT, WALL_OPTIONS),
 			Matter.Bodies.rectangle(-((thickness / 2) - this.PLAYAREA_MARGIN), this.GAME_HEIGHT / 2, thickness, this.GAME_HEIGHT, WALL_OPTIONS),
 		]);
-		//#endregion
 
 		this.overflowCollider = Matter.Bodies.rectangle(this.GAME_WIDTH / 2, 0, this.GAME_WIDTH, 200, {
 			label: '_overflow_',
@@ -194,7 +182,6 @@ export class DropAndFusionGame extends EventEmitter<{
 			friction: this.gameMode === 'space' ? 0.5 : 0.7,
 			frictionStatic: this.gameMode === 'space' ? 0 : 5,
 			slop: this.gameMode === 'space' ? 0.01 : 0.7,
-			//mass: 0,
 			render: this.getMonoRenderOptions ? this.getMonoRenderOptions(mono) : undefined,
 		} satisfies Matter.IChamferableBodyDefinition;
 		if (mono.shape === 'circle') {
@@ -238,7 +225,6 @@ export class DropAndFusionGame extends EventEmitter<{
 			const body = this.createBody(nextMono, newX, newY);
 			Matter.Composite.add(this.engine.world, body);
 
-			// 連鎖してfusionした場合の分かりやすさのため少し間を置いてからfusion対象になるようにする
 			this.tickCallbackQueue.push({
 				frame: this.frame + this.msToFrame(100),
 				callback: () => {
@@ -300,7 +286,6 @@ export class DropAndFusionGame extends EventEmitter<{
 		for (const pairs of event.pairs) {
 			const { bodyA, bodyB } = pairs;
 
-			// ハコからあふれたかどうかの判定
 			if (bodyA.id === this.overflowCollider.id || bodyB.id === this.overflowCollider.id) {
 				if (this.gameOverReadyBodyIds.includes(bodyA.id) || this.gameOverReadyBodyIds.includes(bodyB.id)) {
 					this.gameOver();
@@ -393,7 +378,6 @@ export class DropAndFusionGame extends EventEmitter<{
 			x: inputX,
 		});
 
-		// add force
 		if (this.gameMode === 'space') {
 			Matter.Body.applyForce(body, body.position, {
 				x: 0,

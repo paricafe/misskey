@@ -165,7 +165,6 @@ type StringDefToType<T extends TypeStringef> =
 	T extends 'object' ? Record<string, any> :
 	any;
 
-// https://swagger.io/specification/?sbsearch=optional#schema-object
 type OfSchema = {
 	readonly anyOf?: ReadonlyArray<Schema>;
 	readonly oneOf?: ReadonlyArray<Schema>;
@@ -198,18 +197,13 @@ export interface Schema extends OfSchema {
 
 type RequiredPropertyNames<s extends Obj> = {
 	[K in keyof s]:
-	// K is not optional
 	s[K]['optional'] extends false ? K :
-	// K has default value
 	s[K]['default'] extends null | string | number | boolean | Record<string, unknown> ? K :
 	never
 }[keyof s];
 
 export type Obj = Record<string, Schema>;
 
-// https://github.com/misskey-dev/misskey/issues/8535
-// To avoid excessive stack depth error,
-// deceive TypeScript with UnionToIntersection (or more precisely, `infer` expression within it).
 export type ObjType<s extends Obj, RequiredProps extends ReadonlyArray<keyof s>> =
 	UnionToIntersection<
 		{ -readonly [R in RequiredPropertyNames<s>]-?: SchemaType<s[R]> } &
@@ -222,8 +216,6 @@ type NullOrUndefined<p extends Schema, T> =
 	| (p['optional'] extends true ? undefined : never)
 	| T;
 
-// https://stackoverflow.com/questions/54938141/typescript-convert-union-to-intersection
-// Get intersection from union
 type UnionToIntersection<U> = (U extends any ? (k: U) => void : never) extends ((k: infer I) => void) ? I : never;
 
 type ArrayToIntersection<T extends ReadonlyArray<Schema>> =
@@ -237,10 +229,7 @@ type ArrayToIntersection<T extends ReadonlyArray<Schema>> =
 			: never
 		: never;
 
-// https://github.com/misskey-dev/misskey/pull/8144#discussion_r785287552
-// To get union, we use `Foo extends any ? Hoge<Foo> : never`
 type UnionSchemaType<a extends readonly any[], X extends Schema = a[number]> = X extends any ? SchemaType<X> : never;
-//type UnionObjectSchemaType<a extends readonly any[], X extends Schema = a[number]> = X extends any ? ObjectSchemaType<X> : never;
 type UnionObjType<s extends Obj, a extends readonly any[], X extends ReadonlyArray<keyof s> = a[number]> = X extends any ? ObjType<s, X> : never;
 type ArrayUnion<T> = T extends any ? Array<T> : never;
 type ArrayToTuple<X extends ReadonlyArray<Schema>> = { [K in keyof X]: SchemaType<X[K]> };
@@ -271,7 +260,7 @@ export type SchemaTypeDef<p extends Schema> =
 	p['type'] extends 'string' ? (
 		p['enum'] extends readonly (string | null)[] ?
 			p['enum'][number] :
-			p['format'] extends 'date-time' ? string : // Dateにする？？
+			p['format'] extends 'date-time' ? string :
 			string
 	) :
 		p['type'] extends 'boolean' ? boolean :

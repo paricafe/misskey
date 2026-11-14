@@ -3,7 +3,6 @@ SPDX-FileCopyrightText: syuilo and misskey-project
 SPDX-License-Identifier: AGPL-3.0-only
 -->
 
-<!-- 動的ページのブロックの代替。利用できないということを表示する -->
 <template>
 <div :class="$style.root">
 	<div :class="$style.heading"><i class="ti ti-dice-5"></i> {{ i18n.ts._pages.blocks.dynamic }}</div>

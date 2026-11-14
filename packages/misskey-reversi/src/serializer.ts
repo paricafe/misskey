@@ -25,9 +25,6 @@ export function serializeLogs(logs: Log[]) {
 			case 'put':
 				_logs.push([timeDelta, log.player ? 1 : 0, 0, log.pos]);
 				break;
-			//case 'surrender':
-			//	_logs.push([timeDelta, log.player, 1]);
-			//	break;
 		}
 	}
 
@@ -55,13 +52,6 @@ export function deserializeLogs(logs: SerializedLog[]) {
 					pos: log[3],
 				});
 				break;
-			//case 1:
-			//	_logs.push({
-			//		time,
-			//		player: player === 1,
-			//		operation: 'surrender',
-			//	});
-			//	break;
 		}
 	}
 
@@ -88,9 +78,6 @@ export function restoreGame(env: {
 			case 'put':
 				game.putStone(log.pos);
 				break;
-			//case 'surrender':
-			//	game.surrender(log.player);
-			//	break;
 		}
 	}
 

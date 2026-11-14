@@ -42,8 +42,6 @@ export class HtmlTemplateService {
 		this.frontendEmbedViteBuilt = resolve(this.config.rootDir, 'built/_frontend_embed_vite_');
 	}
 
-	// 初期ロードで読み込むべきファイルのパスを収集する。
-	// See https://ja.vite.dev/guide/backend-integration
 	@bindThis
 	private collectViteAssetFiles(manifest: Manifest): ViteFiles {
 		const entryFile = Object.values(manifest).find((chunk) => chunk.isEntry);

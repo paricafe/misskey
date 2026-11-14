@@ -131,14 +131,13 @@ const bgSame = ref(false);
 const opened = ref(asPage ? false : props.defaultOpen);
 const openedAtLeastOnce = ref(opened.value);
 
-//#region interpolate-sizeに対応していないブラウザ向け（TODO: 主要ブラウザが対応したら消す）
 function enter(el: Element) {
 	if (CSS.supports('interpolate-size', 'allow-keywords')) return;
 	if (!(el instanceof HTMLElement)) return;
 
 	const elementHeight = el.getBoundingClientRect().height;
 	el.style.height = '0';
-	el.offsetHeight; // reflow
+	el.offsetHeight;
 	el.style.height = `${Math.min(elementHeight, props.maxHeight ?? Infinity)}px`;
 }
 
@@ -155,7 +154,7 @@ function leave(el: Element) {
 
 	const elementHeight = el.getBoundingClientRect().height;
 	el.style.height = `${elementHeight}px`;
-	el.offsetHeight; // reflow
+	el.offsetHeight;
 	el.style.height = '0';
 }
 
@@ -165,7 +164,6 @@ function afterLeave(el: Element) {
 
 	el.style.height = '';
 }
-//#endregion
 
 let pageId = pageFolderTeleportCount.value;
 pageFolderTeleportCount.value += 1000;
@@ -211,7 +209,7 @@ watch(opened, (isOpened) => {
 <style lang="scss" module>
 .transition_toggle_enterActive,
 .transition_toggle_leaveActive {
-	overflow-y: hidden; // 子要素のmarginが突き出るため clip を使ってはいけない
+	overflow-y: hidden;
 	transition: opacity 0.3s, height 0.3s;
 }
 
@@ -222,7 +220,7 @@ watch(opened, (isOpened) => {
 	}
 
 	.root {
-		interpolate-size: allow-keywords; // heightのtransitionを動作させるために必要
+		interpolate-size: allow-keywords;
 	}
 }
 

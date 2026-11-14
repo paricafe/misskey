@@ -10,13 +10,11 @@ export function physics(container: HTMLElement) {
 	const containerHeight = container.offsetHeight;
 	const containerCenterX = containerWidth / 2;
 
-	// サイズ固定化(要らないかも？)
 	container.style.position = 'relative';
 	container.style.boxSizing = 'border-box';
 	container.style.width = `${containerWidth}px`;
 	container.style.height = `${containerHeight}px`;
 
-	// create engine
 	const engine = Matter.Engine.create({
 		constraintIterations: 4,
 		positionIterations: 8,
@@ -25,22 +23,18 @@ export function physics(container: HTMLElement) {
 
 	const world = engine.world;
 
-	// create renderer
 	const render = Matter.Render.create({
 		engine: engine,
-		//element: window.document.getElementById('debug'),
 		options: {
 			width: containerWidth,
 			height: containerHeight,
-			background: 'transparent', // transparent to hide
-			wireframeBackground: 'transparent', // transparent to hide
+			background: 'transparent',
+			wireframeBackground: 'transparent',
 		},
 	});
 
-	// Disable to hide debug
 	Matter.Render.run(render);
 
-	// create runner
 	const runner = Matter.Runner.create();
 	Matter.Runner.run(runner, engine);
 
@@ -51,13 +45,8 @@ export function physics(container: HTMLElement) {
 		friction: 2,
 	});
 
-	//const wallRight = Matter.Bodies.rectangle(window.innerWidth+50, window.innerHeight/2, 100, window.innerHeight, wallopts);
-	//const wallLeft = Matter.Bodies.rectangle(-50, window.innerHeight/2, 100, window.innerHeight, wallopts);
-
 	Matter.World.add(world, [
 		ground,
-		//wallRight,
-		//wallLeft,
 	]);
 
 	const objEls = Array.from(container.children) as HTMLElement[];
@@ -95,8 +84,6 @@ export function physics(container: HTMLElement) {
 
 	Matter.World.add(engine.world, objs);
 
-	// Add mouse control
-
 	const mouse = Matter.Mouse.create(container);
 	const mouseConstraint = Matter.MouseConstraint.create(engine, {
 		mouse: mouse,
@@ -110,7 +97,6 @@ export function physics(container: HTMLElement) {
 
 	Matter.World.add(engine.world, mouseConstraint);
 
-	// keep the mouse in sync with rendering
 	render.mouse = mouse;
 
 	for (const objEl of objEls) {
@@ -140,7 +126,6 @@ export function physics(container: HTMLElement) {
 		}
 	}
 
-	// 奈落に落ちたオブジェクトは消す
 	const intervalId = window.setInterval(() => {
 		for (const obj of objs) {
 			if (obj.position.y > (containerHeight + 1024)) Matter.World.remove(world, obj);

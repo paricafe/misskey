@@ -4,7 +4,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 -->
 
 <template>
-<!-- durationは子Itemコンポーネントがフェードイン/アウトするdurationと合わせる -->
 <Transition
 	:enterActiveClass="prefer.s.animation ? $style.transition_root_enterActive : ''"
 	:leaveActiveClass="prefer.s.animation ? $style.transition_root_leaveActive : ''"
@@ -14,7 +13,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 	appear
 	@afterLeave="onAfterLeave"
 >
-	<!-- v-ifを使うとfalseになったとき(transitionが行われている間)子コンポーネントの更新が停止するのか子コンポーネントがアニメーションされなくなる -->
 	<div v-show="showing" ref="rootEl" v-hotkey.global="keymap" :class="$style.root" :style="{ zIndex }">
 		<div :class="[$style.bg]" class="_modalBg"></div>
 		<div ref="mainEl" :class="$style.main">
@@ -64,7 +62,7 @@ const props = withDefaults(defineProps<{
 	defaultIndex?: number;
 	contents: Content[];
 	initiallyRevealedContentIds?: string[];
-	user?: Misskey.entities.User | null; // DriveFileのuserはnullになることがある。その場合に使用する所有者情報
+	user?: Misskey.entities.User | null;
 }>(), {
 });
 
@@ -119,9 +117,9 @@ function onResize() {
 window.addEventListener('resize', onResize, { passive: true });
 
 function onHorizontalSwipe(offset: number) {
-	if (currentIndex.value === 0 && offset > 0) { // これ以上戻れない
+	if (currentIndex.value === 0 && offset > 0) {
 		contentsOffset.value = currentScrollLeft + (offset / 3);
-	} else if (currentIndex.value === props.contents.length - 1 && offset < 0) { // これ以上進めない
+	} else if (currentIndex.value === props.contents.length - 1 && offset < 0) {
 		contentsOffset.value = currentScrollLeft + (offset / 3);
 	} else {
 		contentsOffset.value = currentScrollLeft + offset;
@@ -142,7 +140,6 @@ function scrollToCurrentIndex() {
 	contentsOffset.value = targetOffset;
 }
 
-/** ギャラリーそのものを閉じるための内部処理（閉じる処理を書く場合は `close` か、item内では `closeThis` を使う） */
 function closeGallery() {
 	showing.value = false;
 	if (window.location.hash === '#pswp') {
@@ -248,7 +245,7 @@ defineExpose({
 .transition_root_enterActive,
 .transition_root_leaveActive {
 	> .bg {
-		transition: opacity v-bind("closeAnimDuration + 'ms'"); // 子Itemコンポーネントがフェードイン/アウトするdurationと合わせる
+		transition: opacity v-bind("closeAnimDuration + 'ms'");
 	}
 }
 .transition_root_enterFrom,

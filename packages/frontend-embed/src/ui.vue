@@ -51,19 +51,16 @@ if (_DEV_) console.log(page, contentId);
 
 const embedParams = inject(DI.embedParams, defaultEmbedParams);
 
-//#region Embed Style
 const embedRounded = ref(embedParams.rounded);
 const embedNoBorder = ref(!embedParams.border);
 const maxHeight = ref(embedParams.maxHeight ?? 0);
-//#endregion
 
-//#region Embed Resizer
 const rootEl = shallowRef<HTMLElement | null>(null);
 
 let previousHeight = 0;
 const resizeObserver = new ResizeObserver(async () => {
-	const height = rootEl.value!.scrollHeight + (embedNoBorder.value ? 0 : 2); // border 上下1px
-	if (Math.abs(previousHeight - height) < 1) return; // 1px未満の変化は無視
+	const height = rootEl.value!.scrollHeight + (embedNoBorder.value ? 0 : 2);
+	if (Math.abs(previousHeight - height) < 1) return;
 	postMessageToParentWindow('misskey:embed:changeHeight', {
 		height: (maxHeight.value > 0 && height > maxHeight.value) ? maxHeight.value : height,
 	});
@@ -75,7 +72,6 @@ onMounted(() => {
 onUnmounted(() => {
 	resizeObserver.disconnect();
 });
-//#endregion
 </script>
 
 <style lang="scss" module>

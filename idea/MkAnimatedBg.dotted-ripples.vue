@@ -133,8 +133,6 @@ onMounted(() => {
 	gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
 	gl.bufferData(gl.ARRAY_BUFFER, VERTICES, gl.STATIC_DRAW);
 
-	//gl.clearColor(0.0, 0.0, 0.0, 0.0);
-	//gl.clear(gl.COLOR_BUFFER_BIT);
 
 	const shaderProgram = initShaderProgram(gl, VERTEX_SHADER, FRAGMENT_SHADER);
 
@@ -224,7 +222,6 @@ onUnmounted(() => {
 		window.cancelAnimationFrame(handle);
 	}
 
-	// TODO: WebGLリソースの解放
 });
 </script>
 

@@ -21,8 +21,6 @@ describe('Timeline', () => {
 		]);
 
 		await bob.client.request('following/create', { userId: aliceInB.id });
-		// NOTE: 配送側 (a.test) だけでなく、受信側のホームタイムラインへの fan-out にも
-		//       followings が要るので、両サーバーへ反映されるまで待つ
 		await waitForFollowRelation(bob, alice, 1);
 	});
 
@@ -71,7 +69,6 @@ describe('Timeline', () => {
 			.filter(({ uri }) => uri === noteUri).pop();
 
 		await sleep();
-		// 届かないはずのケースは待っても意味がないので 1 回だけ取得する
 		const noteInB = expect
 			? await vi.waitFor(async () => {
 				const noteInB = await fetchNoteInB();
@@ -82,7 +79,6 @@ describe('Timeline', () => {
 		const endpointFired = noteInB != null;
 		strictEqual(endpointFired, expect);
 
-		// Let's check Delete reception
 		if (expect) {
 			const streamingFired = await isNoteUpdatedEventFired(
 				'b.test', bob, noteInB!.id,
@@ -100,7 +96,6 @@ describe('Timeline', () => {
 	}
 
 	describe('homeTimeline', () => {
-		// NOTE: narrowing scope intentionally to prevent mistakes by copy-and-paste
 		const homeTimeline = 'homeTimeline';
 
 		describe('Check reception of remote followee\'s Note', () => {
@@ -128,18 +123,10 @@ describe('Timeline', () => {
 				await postAndCheckReception(homeTimeline, false, { visibility: 'specified' });
 			});
 
-			/**
-			 * FIXME: can receive this
-			 * @see https://github.com/misskey-dev/misskey/issues/14083
-			 */
 			test.skip('Don\'t receive remote followee\'s invisible and mentioned specified-only Note', async () => {
 				await postAndCheckReception(homeTimeline, false, { text: `@${bob.username}@b.test Hello`, visibility: 'specified' });
 			});
 
-			/**
-			 * FIXME: cannot receive this
-			 * @see https://github.com/misskey-dev/misskey/issues/14084
-			 */
 			test.skip('Receive remote followee\'s visible specified-only reply to invisible specified-only Note', async () => {
 				const note = (await alice.client.request('notes/create', { text: 'a', visibility: 'specified' })).createdNote;
 				await postAndCheckReception(homeTimeline, true, { replyId: note.id, visibility: 'specified', visibleUserIds: [bobInA.id] });
@@ -267,7 +254,6 @@ describe('Timeline', () => {
 				name: 'Remote Users',
 				description: 'Remote users are assigned to this role.',
 				condFormula: {
-					/** TODO: @see https://github.com/misskey-dev/misskey/issues/14169 */
 					type: 'isRemote' as never,
 				},
 			});
@@ -297,7 +283,6 @@ describe('Timeline', () => {
 		});
 	});
 
-	// TODO: Cannot test
 	describe.skip('antenna', () => {
 		const antenna = 'antenna';
 

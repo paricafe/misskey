@@ -20,7 +20,6 @@ describe('median', () => {
 		expect(median([3, 1, 2])).toBe(2);
 	});
 
-	// 偶数長では平均を整数に丸める。KiB単位の整数値を扱う前提のため
 	test('rounds the average of an even-length sample', () => {
 		expect(median([1, 2])).toBe(2);
 		expect(median([1, 4])).toBe(3);
@@ -93,7 +92,6 @@ describe('pairedDeltaSummary', () => {
 		expect(pairedDeltaSummary(base, head, sample => sample.value).samples).toBe(2);
 	});
 
-	// 1サンプルでも中央値・最小・最大は定まる (偏差は常に0)
 	test('summarizes a single paired round without treating MAD as an error', () => {
 		expect(pairedDeltaSummary([base[0]], [{ round: 1, value: 130 }], sample => sample.value)).toStrictEqual({
 			median: 30,
@@ -108,7 +106,6 @@ describe('pairedDeltaSummary', () => {
 		expect(() => pairedDeltaSummary(base, [{ round: 9, value: 1 }], sample => sample.value)).toThrow(/no rounds in common/);
 	});
 
-	// 負のroundはwarmupを表すので集計に混ぜない
 	test('ignores warmup rounds', () => {
 		const warmupBase = [{ round: -1, value: 0 }, ...base];
 		const warmupHead = [{ round: -1, value: 9999 }, { round: 1, value: 110 }, { round: 2, value: 230 }, { round: 3, value: 320 }];

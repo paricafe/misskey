@@ -3,8 +3,6 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-// NIRAX --- A lightweight router
-
 import { onBeforeUnmount, onMounted, shallowRef } from 'vue';
 import { EventEmitter } from 'eventemitter3';
 import { safeURIDecode } from '@@/js/url.js';
@@ -39,34 +37,28 @@ type ParsedPath = (string | {
 })[];
 
 export type RouterEvents = {
-	/** ページ内遷移を検知した場合（analytics用） */
 	change: (ctx: {
 		beforeFullPath: string;
 		fullPath: string;
 		resolved: PathResolvedResult;
 	}) => void;
-	/** history stateのreplaceを行う場合 */
 	replace: (ctx: {
 		fullPath: string;
 	}) => void;
-	/** location.replace相当の処理が必要な場合 */
 	forceReplace: (ctx: {
 		onInit: boolean;
 		fullPath: string;
 	}) => void;
-	/** history stateのpushを行う場合 */
 	push: (ctx: {
 		beforeFullPath: string;
 		fullPath: string;
 		route: RouteDef | null;
 		props: Map<string, string | boolean> | null;
 	}) => void;
-	/** location.hrefへの代入相当の処理が必要な場合 */
 	forcePush: (ctx: {
 		onInit: boolean;
 		fullPath: string;
 	}) => void;
-	/** 遷移先が現在のページと同じだった場合 */
 	same: () => void;
 };
 
@@ -84,7 +76,6 @@ export type PathResolvedResult = {
 	};
 };
 
-//#region Path Types
 type Prettify<T> = {
 	[K in keyof T]: T[K]
 } & {};
@@ -156,7 +147,6 @@ type GetRouterOperationProps<Defs extends RouteDef[], Path extends FlattenAllPat
 	query?: GetPathQuery<Defs, Path>;
 	hash?: string;
 }>;
-//#endregion
 
 function buildFullPath(args: {
 	path: string;
@@ -172,7 +162,6 @@ function buildFullPath(args: {
 			const replaceRegex = new RegExp(`:${key}(\\?)?`, 'g');
 			fullPath = fullPath.replace(replaceRegex, value ? encodeURIComponent(value) : '');
 		}
-		// remove any optional parameters that are not provided
 		fullPath = fullPath.replace(/\/:\w+\?(?=\/|$)/g, '');
 	}
 
@@ -220,7 +209,7 @@ export class Nirax<DEF extends RouteDef[]> extends EventEmitter<RouterEvents> {
 	public current: PathResolvedResult;
 	public currentRef: ShallowRef<PathResolvedResult>;
 	public currentRoute: ShallowRef<RouteDef>;
-	private currentFullPath: string; // /foo/bar?baz=qux#hash
+	private currentFullPath: string;
 	private isLoggedIn: boolean;
 	private notFoundPageComponent: Component;
 
@@ -377,7 +366,6 @@ export class Nirax<DEF extends RouteDef[]> extends EventEmitter<RouterEvents> {
 		return check(this.routes, _parts);
 	}
 
-	/** 通常のresolve + リダイレクト解決 */
 	private resolveForNavigation(fullPath: string, _redirectCount = 0): PathResolvedResult {
 		const res = this.resolve(fullPath);
 
@@ -407,7 +395,6 @@ export class Nirax<DEF extends RouteDef[]> extends EventEmitter<RouterEvents> {
 		};
 	}
 
-	/** 解決された`res`に応じてrouterの状態を更新する。 */
 	private navigate(res: PathResolvedResult, emitChange = true) {
 		const beforeFullPath = this.currentFullPath;
 		this.currentFullPath = res._parsedRoute.fullPath;
@@ -456,7 +443,6 @@ export class Nirax<DEF extends RouteDef[]> extends EventEmitter<RouterEvents> {
 		this.replaceByPath(fullPath);
 	}
 
-	/** どうしても必要な場合に使用（パスが確定している場合は `Nirax.push` を使用すること） */
 	public pushByPath(fullPath: string, flag?: RouterFlag | null) {
 		const beforeFullPath = this.currentFullPath;
 		if (fullPath === beforeFullPath) {
@@ -484,7 +470,6 @@ export class Nirax<DEF extends RouteDef[]> extends EventEmitter<RouterEvents> {
 		}
 	}
 
-	/** どうしても必要な場合に使用（パスが確定している場合は `Nirax.replace` を使用すること） */
 	public replaceByPath(fullPath: string) {
 		const res = this.resolveForNavigation(fullPath);
 		if (res.route.path === '/:(*)') {

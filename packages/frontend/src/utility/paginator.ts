@@ -35,9 +35,7 @@ export type PaginatorCompatibleEndpoints = {
 export type ExtractorFunction<P extends IPaginator, T> = (item: UnwrapRef<P['items']>[number]) => T;
 
 type FetchNewerOptions = {
-	// 閲覧位置がリクエスト中に変わる場合は、レスポンス受信時に評価する
 	toQueue?: boolean | (() => boolean);
-	// タイムライン先頭の自動更新でのみ有効にする。通常のページングでは切り詰めない
 	trim?: boolean;
 };
 
@@ -51,9 +49,6 @@ function getNewItems<T extends MisskeyEntity>(items: T[], existingItems: readonl
 }
 
 export interface IPaginator<T = unknown, _T = T & MisskeyEntity> {
-	/**
-	 * 外部から直接操作しないでください
-	 */
 	items: Ref<_T[]> | ShallowRef<_T[]>;
 	queuedAheadItemsCount: Ref<number>;
 	fetching: Ref<boolean>;
@@ -91,9 +86,6 @@ export class Paginator<
 	T extends E['res'][number] & MisskeyEntity = E['res'][number] & MisskeyEntity,
 	SRef extends boolean = false,
 > implements IPaginator {
-	/**
-	 * 外部から直接操作しないでください
-	 */
 	public items: SRef extends true ? ShallowRef<T[]> : Ref<T[]>;
 
 	public queuedAheadItemsCount = ref(0);
@@ -111,9 +103,6 @@ export class Paginator<
 	public initialId: MisskeyEntity['id'] | null = null;
 	public initialDate: number | null = null;
 
-	// 初回読み込み時、initialIdを基準にそれより新しいものを取得するか古いものを取得するか
-	// newer: initialIdより新しいものを取得する
-	// older: initialIdより古いものを取得する (default)
 	public initialDirection: 'newer' | 'older';
 
 	private offsetMode: boolean;
@@ -127,10 +116,6 @@ export class Paginator<
 	private requestController = new AbortController();
 	private fetchNewerPromise: Promise<void> | null = null;
 
-	// 配列内の要素をどのような順序で並べるか
-	// newest: 新しいものが先頭 (default)
-	// oldest: 古いものが先頭
-	// NOTE: このようなプロパティを用意してこっち側で並びを管理せずに、Setで持っておき参照者側が好きに並び変えるような設計の方がすっきりしそうなものの、Vueのレンダリングのたびに並び替え処理が発生することになったりしそうでパフォーマンス上の懸念がある
 	public order: Ref<'newest' | 'oldest'>;
 
 	constructor(endpoint: Endpoint, props: {
@@ -138,10 +123,6 @@ export class Paginator<
 		params?: E['req'] | (() => E['req']);
 		computedParams?: ComputedRef<E['req'] | null | undefined>;
 
-		/**
-		 * 検索APIのような、ページング不可なエンドポイントを利用する場合
-		 * (そのようなAPIをこの関数で使うのは若干矛盾してるけど)
-		 */
 		noPaging?: boolean;
 
 		offsetMode?: boolean;
@@ -152,7 +133,6 @@ export class Paginator<
 
 		order?: 'newest' | 'oldest';
 
-		// 一部のAPIはさらに遡れる場合でもパフォーマンス上の理由でlimit以下の結果を返す場合があり、その場合はsafe、それ以外はlimitにすることを推奨
 		canFetchDetection?: 'safe' | 'limit';
 
 		useShallowRef?: SRef;
@@ -197,7 +177,6 @@ export class Paginator<
 	}
 
 	private getNewestId(): string | null | undefined {
-		// 様々な要因により並び順は保証されないのでソートが必要
 		if (this.aheadQueue.length > 0) {
 			return this.aheadQueue.map(x => x.id).sort().at(-1);
 		}
@@ -205,7 +184,6 @@ export class Paginator<
 	}
 
 	private getOldestId(): string | null | undefined {
-		// 様々な要因により並び順は保証されないのでソートが必要
 		return this.items.value.map(x => x.id).sort().at(0);
 	}
 
@@ -250,7 +228,6 @@ export class Paginator<
 			return;
 		}
 
-		// 逆順で返ってくるので
 		if ((this.initialId || this.initialDate) && this.initialDirection === 'newer') {
 			apiRes.reverse();
 		}
@@ -374,7 +351,6 @@ export class Paginator<
 
 		if (apiRes == null || apiRes.length === 0) {
 			this.canFetchNewer.value = false;
-			// 余計なre-renderを防止するためここで終了
 			return;
 		}
 
@@ -395,8 +371,6 @@ export class Paginator<
 				this.canFetchNewer.value = true;
 			}
 		}
-		// canFetchDetectionが'safe'の場合・apiRes.length === 0 の場合は apiRes.length === 0 の場合に canFetchNewer.value = false になるが、
-		// 余計な re-render を防ぐために上部で処理している。そのため、ここでは何もしない
 	}
 
 	public trim(trigger = true): void {
@@ -407,7 +381,7 @@ export class Paginator<
 
 	public unshiftItems(newItems: T[], trim = true): void {
 		const uniqueItems = getNewItems(newItems, this.items.value);
-		if (uniqueItems.length === 0) return; // これやらないと余計なre-renderが走る
+		if (uniqueItems.length === 0) return;
 		this.items.value.unshift(...uniqueItems);
 		if (trim) this.trim(true);
 		if (this.useShallowRef) triggerRef(this.items);
@@ -415,7 +389,7 @@ export class Paginator<
 
 	public pushItems(oldItems: T[]): void {
 		const uniqueItems = getNewItems(oldItems, this.items.value);
-		if (uniqueItems.length === 0) return; // これやらないと余計なre-renderが走る
+		if (uniqueItems.length === 0) return;
 		this.items.value.push(...uniqueItems);
 		if (this.useShallowRef) triggerRef(this.items);
 	}
@@ -439,15 +413,13 @@ export class Paginator<
 	}
 
 	public releaseQueue(): void {
-		if (this.aheadQueue.length === 0) return; // これやらないと余計なre-renderが走る
+		if (this.aheadQueue.length === 0) return;
 		this.unshiftItems(this.aheadQueue);
 		this.aheadQueue = [];
 		this.queuedAheadItemsCount.value = 0;
 	}
 
 	public removeItem(id: string): void {
-		// TODO: queueからも消す
-
 		const index = this.items.value.findIndex(x => x.id === id);
 		if (index !== -1) {
 			this.items.value.splice(index, 1);
@@ -456,8 +428,6 @@ export class Paginator<
 	}
 
 	public updateItem(id: string, updater: (item: T) => T): void {
-		// TODO: queueのも更新
-
 		const index = this.items.value.findIndex(x => x.id === id);
 		if (index !== -1) {
 			const item = this.items.value[index]!;

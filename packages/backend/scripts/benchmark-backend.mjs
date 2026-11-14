@@ -42,8 +42,6 @@ const directory = await mkdtemp(join(cache, 'backend-performance-'));
 try {
 	const plugins = [];
 	if (values['source-ref']) {
-		// Compare production source from another revision with the same harness,
-		// dependencies and fixtures, without changing the working tree.
 		const revision = execFileSync('git', ['rev-parse', '--verify', '--end-of-options', `${values['source-ref']}^{commit}`], { cwd: backend, encoding: 'utf8' }).trim();
 		values['source-ref'] = revision;
 		const snapshot = join(directory, 'snapshot');
@@ -65,8 +63,6 @@ try {
 		platform: 'node',
 		transform: {
 			define: { _SUMMALY_VERSION_: JSON.stringify(summalyVersion) },
-			// Historical sources live under node_modules/.cache, where automatic
-			// tsconfig discovery differs from the normal source directory.
 			decorator: { legacy: true, emitDecoratorMetadata: true },
 			jsx: { runtime: 'automatic', importSource: '@kitajs/html' },
 		},

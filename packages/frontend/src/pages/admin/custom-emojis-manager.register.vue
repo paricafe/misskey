@@ -125,12 +125,10 @@ function setupGrid(rowClass: { violationRow: string }): GridSetting {
 			minimumDefinitionCount: 100,
 			styleRules: [
 				{
-					// 1つでもバリデーションエラーがあれば行全体をエラー表示する
 					condition: ({ cells }) => cells.some(it => !it.violation.valid),
 					applyStyle: { className: rowClass.violationRow },
 				},
 			],
-			// 行のコンテキストメニュー設定
 			contextMenuFactory: (row, context) => {
 				return [
 					{
@@ -167,13 +165,11 @@ function setupGrid(rowClass: { violationRow: string }): GridSetting {
 			{
 				bindTo: 'roleIdsThatCanBeUsedThisEmojiAsReaction', title: 'role', type: 'text', editable: true, width: 140,
 				valueTransformer: (row) => {
-					// バックエンドからからはIDと名前のペア配列で受け取るが、表示にIDがあると煩雑なので名前だけにする
 					return gridItems.value[row.index].roleIdsThatCanBeUsedThisEmojiAsReaction
 						.map((it) => it.name)
 						.join(',');
 				},
 				customValueEditor: async (row) => {
-					// ID直記入は体験的に最悪なのでモーダルを使って入力する
 					const current = gridItems.value[row.index].roleIdsThatCanBeUsedThisEmojiAsReaction;
 					const result = await os.selectRole({
 						initialRoleIds: current.map(it => it.id),
@@ -193,7 +189,6 @@ function setupGrid(rowClass: { violationRow: string }): GridSetting {
 				events: {
 					paste: roleIdsParser,
 					delete(cell) {
-						// デフォルトはundefinedになるが、このプロパティは空配列にしたい
 						gridItems.value[cell.row.index].roleIdsThatCanBeUsedThisEmojiAsReaction = [];
 					},
 				},
@@ -201,7 +196,6 @@ function setupGrid(rowClass: { violationRow: string }): GridSetting {
 			{ bindTo: 'type', type: 'text', editable: false, width: 90 },
 		],
 		cells: {
-			// セルのコンテキストメニュー設定
 			contextMenuFactory: (col, row, value, context) => {
 				return [
 					{
@@ -284,7 +278,6 @@ async function onRegistryClicked() {
 		error: it.err ? JSON.stringify(it.err) : undefined,
 	}));
 
-	// 登録に成功したものは一覧から除く
 	const successItems = result.filter(it => it.success).map(it => it.item);
 	gridItems.value = gridItems.value.filter(it => !successItems.includes(it));
 }
@@ -304,8 +297,6 @@ async function onFileSelectClicked() {
 	const driveFiles = await chooseFileFromPcAndUpload({
 		multiple: true,
 		folderId: selectedFolderId.value,
-		// // 拡張子は消す
-		// nameConverter: (file) => file.name.replace(/\.[a-zA-Z0-9]+$/, ''),
 	});
 
 	gridItems.value.push(...driveFiles.map(fromDriveFile));
@@ -383,7 +374,6 @@ onMounted(async () => {
 	left:0;
 	bottom:0;
 	z-index: 1;
-	// stickyで追従させる都合上、フッター自身でpaddingを持つ必要があるため、親要素で画一的に指定している分をネガティブマージンで相殺している
 	margin-top: calc(var(--MI-margin) * -1);
 	margin-bottom: calc(var(--MI-margin) * -1);
 	padding-top: var(--MI-margin);

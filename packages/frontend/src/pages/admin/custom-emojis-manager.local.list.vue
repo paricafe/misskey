@@ -124,21 +124,17 @@ function setupGrid(rowClass: { changedRow: string, violationRow: string }): Grid
 		row: {
 			showNumber: true,
 			selectable: true,
-			// グリッドの行数をあらかじめ100行確保する
 			minimumDefinitionCount: 100,
 			styleRules: [
 				{
-					// 初期値から変わっていたら背景色を変更
 					condition: ({ row }) => JSON.stringify(gridItems.value[row.index]) !== JSON.stringify(originGridItems.value[row.index]),
 					applyStyle: { className: rowClass.changedRow },
 				},
 				{
-					// バリデーションに引っかかっていたら背景色を変更
 					condition: ({ cells }) => cells.some(it => !it.violation.valid),
 					applyStyle: { className: rowClass.violationRow },
 				},
 			],
-			// 行のコンテキストメニュー設定
 			contextMenuFactory: (row, context) => {
 				return [
 					{
@@ -161,7 +157,6 @@ function setupGrid(rowClass: { changedRow: string, violationRow: string }): Grid
 			},
 			events: {
 				delete(rows) {
-					// 行削除時は元データの行を消さず、削除対象としてマークするのみにする
 					for (const row of rows) {
 						gridItems.value[row.index].checked = true;
 					}
@@ -195,13 +190,11 @@ function setupGrid(rowClass: { changedRow: string, violationRow: string }): Grid
 			{
 				bindTo: 'roleIdsThatCanBeUsedThisEmojiAsReaction', title: 'role', type: 'text', editable: true, width: 140,
 				valueTransformer(row) {
-					// バックエンドからからはIDと名前のペア配列で受け取るが、表示にIDがあると煩雑なので名前だけにする
 					return gridItems.value[row.index].roleIdsThatCanBeUsedThisEmojiAsReaction
 						.map((it) => it.name)
 						.join(',');
 				},
 				async customValueEditor(row) {
-					// ID直記入は体験的に最悪なのでモーダルを使って入力する
 					const current = gridItems.value[row.index].roleIdsThatCanBeUsedThisEmojiAsReaction;
 					const result = await os.selectRole({
 						initialRoleIds: current.map(it => it.id),
@@ -221,7 +214,6 @@ function setupGrid(rowClass: { changedRow: string, violationRow: string }): Grid
 				events: {
 					paste: roleIdsParser,
 					delete(cell) {
-						// デフォルトはundefinedになるが、このプロパティは空配列にしたい
 						gridItems.value[cell.row.index].roleIdsThatCanBeUsedThisEmojiAsReaction = [];
 					},
 				},
@@ -232,7 +224,6 @@ function setupGrid(rowClass: { changedRow: string, violationRow: string }): Grid
 			{ bindTo: 'originalUrl', type: 'text', editable: false, width: 180 },
 		],
 		cells: {
-			// セルのコンテキストメニュー設定
 			contextMenuFactory(col, row, value, context) {
 				return [
 					{

@@ -269,7 +269,7 @@ function showMenu(ev: PointerEvent, contextmenu = false) {
 }
 
 .header {
-	min-height: 4px; // fukidashiの位置調整も兼ねるため
+	min-height: 4px;
 	font-size: 80%;
 }
 

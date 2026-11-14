@@ -209,11 +209,8 @@ describe('UserEntityService', () => {
 			await memo(me, who, 'memo');
 
 			const actual = await service.pack(who, me, { schema: 'UserLite' }) as any;
-			// no detail
 			expect(actual.memo).toBeUndefined();
-			// no detail and me
 			expect(actual.birthday).toBeUndefined();
-			// no detail and me
 			expect(actual.achievements).toBeUndefined();
 		});
 
@@ -224,11 +221,8 @@ describe('UserEntityService', () => {
 			await memo(me, who, 'memo');
 
 			const actual = await service.pack(who, me, { schema: 'UserDetailedNotMe' }) as any;
-			// is detail
 			expect(actual.memo).toBe('memo');
-			// is detail
 			expect(actual.birthday).toBe('2000-01-01');
-			// no detail and me
 			expect(actual.achievements).toBeUndefined();
 		});
 
@@ -241,11 +235,8 @@ describe('UserEntityService', () => {
 			await memo(me, me, 'memo');
 
 			const actual = await service.pack(me, me, { schema: 'MeDetailed' }) as any;
-			// is detail
 			expect(actual.memo).toBe('memo');
-			// is detail
 			expect(actual.birthday).toBe('2000-01-01');
-			// is detail and me
 			expect(actual.achievements).toEqual(achievements);
 		});
 
@@ -262,7 +253,6 @@ describe('UserEntityService', () => {
 		describe('packManyによるpreloadがある時、preloadが無い時とpackの結果が同じになるか見たい', () => {
 			test('no-preload', async() => {
 				const me = await createUser();
-				// meがフォローしてる人たち
 				const followeeMe = await Promise.all(randomIntRange().map(() => createUser()));
 				for (const who of followeeMe) {
 					await follow(me, who);
@@ -277,7 +267,6 @@ describe('UserEntityService', () => {
 					expect(actual.isRenoteMuted).toBe(false);
 				}
 
-				// meをフォローしてる人たち
 				const followerMe = await Promise.all(randomIntRange().map(() => createUser()));
 				for (const who of followerMe) {
 					await follow(who, me);
@@ -292,7 +281,6 @@ describe('UserEntityService', () => {
 					expect(actual.isRenoteMuted).toBe(false);
 				}
 
-				// meがフォローリクエストを送った人たち
 				const requestsFromYou = await Promise.all(randomIntRange().map(() => createUser()));
 				for (const who of requestsFromYou) {
 					await requestFollow(me, who);
@@ -307,7 +295,6 @@ describe('UserEntityService', () => {
 					expect(actual.isRenoteMuted).toBe(false);
 				}
 
-				// meにフォローリクエストを送った人たち
 				const requestsToYou = await Promise.all(randomIntRange().map(() => createUser()));
 				for (const who of requestsToYou) {
 					await requestFollow(who, me);
@@ -322,7 +309,6 @@ describe('UserEntityService', () => {
 					expect(actual.isRenoteMuted).toBe(false);
 				}
 
-				// meがブロックしてる人たち
 				const blockingYou = await Promise.all(randomIntRange().map(() => createUser()));
 				for (const who of blockingYou) {
 					await block(me, who);
@@ -337,7 +323,6 @@ describe('UserEntityService', () => {
 					expect(actual.isRenoteMuted).toBe(false);
 				}
 
-				// meをブロックしてる人たち
 				const blockingMe = await Promise.all(randomIntRange().map(() => createUser()));
 				for (const who of blockingMe) {
 					await block(who, me);
@@ -352,7 +337,6 @@ describe('UserEntityService', () => {
 					expect(actual.isRenoteMuted).toBe(false);
 				}
 
-				// meがミュートしてる人たち
 				const muters = await Promise.all(randomIntRange().map(() => createUser()));
 				for (const who of muters) {
 					await mute(me, who);
@@ -367,7 +351,6 @@ describe('UserEntityService', () => {
 					expect(actual.isRenoteMuted).toBe(false);
 				}
 
-				// meがリノートミュートしてる人たち
 				const renoteMuters = await Promise.all(randomIntRange().map(() => createUser()));
 				for (const who of renoteMuters) {
 					await muteRenote(me, who);
@@ -387,7 +370,6 @@ describe('UserEntityService', () => {
 				const me = await createUser();
 
 				{
-					// meがフォローしてる人たち
 					const followeeMe = await Promise.all(randomIntRange().map(() => createUser()));
 					for (const who of followeeMe) {
 						await follow(me, who);
@@ -406,7 +388,6 @@ describe('UserEntityService', () => {
 				}
 
 				{
-					// meをフォローしてる人たち
 					const followerMe = await Promise.all(randomIntRange().map(() => createUser()));
 					for (const who of followerMe) {
 						await follow(who, me);
@@ -425,7 +406,6 @@ describe('UserEntityService', () => {
 				}
 
 				{
-					// meがフォローリクエストを送った人たち
 					const requestsFromYou = await Promise.all(randomIntRange().map(() => createUser()));
 					for (const who of requestsFromYou) {
 						await requestFollow(me, who);
@@ -444,7 +424,6 @@ describe('UserEntityService', () => {
 				}
 
 				{
-					// meにフォローリクエストを送った人たち
 					const requestsToYou = await Promise.all(randomIntRange().map(() => createUser()));
 					for (const who of requestsToYou) {
 						await requestFollow(who, me);
@@ -463,7 +442,6 @@ describe('UserEntityService', () => {
 				}
 
 				{
-					// meがブロックしてる人たち
 					const blockingYou = await Promise.all(randomIntRange().map(() => createUser()));
 					for (const who of blockingYou) {
 						await block(me, who);
@@ -482,7 +460,6 @@ describe('UserEntityService', () => {
 				}
 
 				{
-					// meをブロックしてる人たち
 					const blockingMe = await Promise.all(randomIntRange().map(() => createUser()));
 					for (const who of blockingMe) {
 						await block(who, me);
@@ -501,7 +478,6 @@ describe('UserEntityService', () => {
 				}
 
 				{
-					// meがミュートしてる人たち
 					const muters = await Promise.all(randomIntRange().map(() => createUser()));
 					for (const who of muters) {
 						await mute(me, who);
@@ -520,7 +496,6 @@ describe('UserEntityService', () => {
 				}
 
 				{
-					// meがリノートミュートしてる人たち
 					const renoteMuters = await Promise.all(randomIntRange().map(() => createUser()));
 					for (const who of renoteMuters) {
 						await muteRenote(me, who);

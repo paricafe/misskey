@@ -42,17 +42,11 @@ export class MiMeta {
 	})
 	public description: string | null;
 
-	/**
-	 * メンテナの名前
-	 */
 	@Column('varchar', {
 		length: 1024, nullable: true,
 	})
 	public maintainerName: string | null;
 
-	/**
-	 * メンテナの連絡先
-	 */
 	@Column('varchar', {
 		length: 1024, nullable: true,
 	})
@@ -272,8 +266,6 @@ export class MiMeta {
 		default: false,
 	})
 	public enableTestcaptcha: boolean;
-
-	// chaptcha系を追加した際にはnodeinfoのレスポンスに追加するのを忘れないようにすること
 
 	@Column('enum', {
 		enum: ['none', 'all', 'local', 'remote'],
@@ -738,12 +730,12 @@ export class MiMeta {
 	public enableRemoteNotesCleaning: boolean;
 
 	@Column('integer', {
-		default: 60, // minutes
+		default: 60,
 	})
 	public remoteNotesCleaningMaxProcessingDurationInMinutes: number;
 
 	@Column('integer', {
-		default: 90, // days
+		default: 90,
 	})
 	public remoteNotesCleaningExpiryDaysForEachNotes: number;
 

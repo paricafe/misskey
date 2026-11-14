@@ -37,7 +37,6 @@ export function getScrollPosition(el: HTMLElement | null): number {
 }
 
 export function onScrollTop(el: HTMLElement, cb: (topVisible: boolean) => unknown, tolerance = 1, once = false) {
-	// とりあえず評価してみる
 	const firstTopVisible = isHeadVisible(el);
 	if (el.isConnected && firstTopVisible) {
 		cb(firstTopVisible);
@@ -46,9 +45,6 @@ export function onScrollTop(el: HTMLElement, cb: (topVisible: boolean) => unknow
 
 	const container = getScrollContainer(el) ?? window;
 
-	// 以下のケースにおいて、cbが何度も呼び出されてしまって具合が悪いので1回呼んだら以降は無視するようにする
-	// - スクロールイベントは1回のスクロールで複数回発生することがある
-	// - toleranceの範囲内に収まる程度の微量なスクロールが発生した
 	let prevTopVisible = firstTopVisible;
 	const onScroll = () => {
 		if (!window.document.body.contains(el)) return;
@@ -70,7 +66,6 @@ export function onScrollTop(el: HTMLElement, cb: (topVisible: boolean) => unknow
 export function onScrollBottom(el: HTMLElement, cb: () => unknown, tolerance = 1, once = false) {
 	const container = getScrollContainer(el);
 
-	// とりあえず評価してみる
 	if (el.isConnected && isTailVisible(el, tolerance, container)) {
 		cb();
 		if (once) return null;
@@ -102,21 +97,10 @@ export function scrollInContainer(el: HTMLElement, options: ScrollToOptions | un
 	}
 }
 
-/**
- * Scroll to Top
- * @param el Scroll container element
- * @param options Scroll options
- */
 export function scrollToTop(el: HTMLElement, options: { behavior?: ScrollBehavior; } = {}) {
 	scrollInContainer(el, { top: 0, ...options });
 }
 
-/**
- * Scroll to Bottom
- * @param el Content element
- * @param options Scroll options
- * @param container Scroll container element
- */
 export function scrollToBottom(
 	el: HTMLElement,
 	options: ScrollToOptions = {},
@@ -142,7 +126,6 @@ export function isTailVisible(el: HTMLElement, tolerance = 1, container = getScr
 	return el.scrollHeight <= window.innerHeight + window.scrollY + tolerance;
 }
 
-// https://ja.javascript.info/size-and-scroll-window#ref-932
 export function getBodyScrollHeight() {
 	return Math.max(
 		window.document.body.scrollHeight, window.document.documentElement.scrollHeight,

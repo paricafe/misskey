@@ -30,8 +30,8 @@ export class ChannelMutingService {
 		private globalEventService: GlobalEventService,
 	) {
 		this.mutingChannelsCache = new RedisKVCache<Set<string>>(this.redisClient, 'channelMutingChannels', {
-			lifetime: 1000 * 60 * 30, // 30m
-			memoryCacheLifetime: 1000 * 60, // 1m
+			lifetime: 1000 * 60 * 30,
+			memoryCacheLifetime: 1000 * 60,
 			fetcher: (userId) => this.channelMutingRepository.find({
 				where: { userId: userId },
 				select: { channelId: true },
@@ -43,14 +43,6 @@ export class ChannelMutingService {
 		this.redisForSub.on('message', this.onMessage);
 	}
 
-	/**
-	 * ミュートしているチャンネルの一覧を取得する.
-	 * @param params
-	 * @param [opts]
-	 * @param	{(boolean|undefined)} [opts.idOnly=false] チャンネルIDのみを取得するかどうか. ID以外のフィールドに値がセットされなくなり、他テーブルとのJOINも一切されなくなるので注意.
-	 * @param {(boolean|undefined)} [opts.joinUser=undefined] チャンネルオーナーのユーザ情報をJOINするかどうか(falseまたは省略時はJOINしない).
-	 * @param {(boolean|undefined)} [opts.joinBannerFile=undefined] バナー画像のドライブファイルをJOINするかどうか(falseまたは省略時はJOINしない).
-	 */
 	@bindThis
 	public async list(
 		params: {
@@ -95,13 +87,6 @@ export class ChannelMutingService {
 		}
 	}
 
-	/**
-	 * 期限切れのチャンネルミュート情報を取得する.
-	 *
-	 * @param [opts]
-	 * @param {(boolean|undefined)} [opts.joinUser=undefined] チャンネルミュートを設定したユーザ情報をJOINするかどうか(falseまたは省略時はJOINしない).
-	 * @param {(boolean|undefined)} [opts.joinChannel=undefined] ミュート先のチャンネル情報をJOINするかどうか(falseまたは省略時はJOINしない).
-	 */
 	public async findExpiredMutings(opts?: {
 		joinUser?: boolean;
 		joinChannel?: boolean;
@@ -121,11 +106,6 @@ export class ChannelMutingService {
 		return q.getMany();
 	}
 
-	/**
-	 * 既にミュートされているかどうかをキャッシュから取得する.
-	 * @param params
-	 * @param params.requestUserId
-	 */
 	@bindThis
 	public async isMuted(params: {
 		requestUserId: MiUser['id'],
@@ -135,11 +115,6 @@ export class ChannelMutingService {
 		return (mutedChannels?.has(params.targetChannelId) ?? false);
 	}
 
-	/**
-	 * チャンネルをミュートする.
-	 * @param params
-	 * @param {(Date|null|undefined)} [params.expiresAt] ミュートの有効期限. nullまたは省略時は無期限.
-	 */
 	@bindThis
 	public async mute(params: {
 		requestUserId: MiUser['id'],
@@ -159,10 +134,6 @@ export class ChannelMutingService {
 		});
 	}
 
-	/**
-	 * チャンネルのミュートを解除する.
-	 * @param params
-	 */
 	@bindThis
 	public async unmute(params: {
 		requestUserId: MiUser['id'],
@@ -179,9 +150,6 @@ export class ChannelMutingService {
 		});
 	}
 
-	/**
-	 * 期限切れのチャンネルミュート情報を削除する.
-	 */
 	@bindThis
 	public async eraseExpiredMutings(): Promise<void> {
 		const expiredMutings = await this.findExpiredMutings();

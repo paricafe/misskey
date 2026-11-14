@@ -19,19 +19,14 @@ import { QueueLoggerService } from '../QueueLoggerService.js';
 import type * as Bull from 'bullmq';
 import type { DbUserImportJobData } from '../types.js';
 
-// 展開後のサイズ上限
-const MAX_META_JSON_SIZE = 64 * 1024 * 1024; // 64MB
-const MAX_EMOJI_FILE_SIZE = 32 * 1024 * 1024; // 32MB
+const MAX_META_JSON_SIZE = 64 * 1024 * 1024;
+const MAX_EMOJI_FILE_SIZE = 32 * 1024 * 1024;
 
-// ファイルシステムのファイル名長上限
 const MAX_NAME_LENGTH = 255;
 
-// meta.json 中のファイル名: 英数字と _ からなる名前 + 任意の拡張子部 ('.' 以降は英数字と '.')
 const FILE_NAME_PATTERN = /^[a-zA-Z0-9_]+(\.[a-zA-Z0-9]+)*$/;
-// meta.json 中の絵文字名: Unicode の文字・数字・結合文字と _+- からなる名前
 const EMOJI_NAME_PATTERN = /^[\p{Letter}\p{Number}\p{Mark}_+-]+$/u;
 
-// meta.json の emojis 配列の要素 (ExportCustomEmojisProcessorService が出力する形式)
 type EmojiRecord = {
 	fileName: string;
 	downloaded: boolean;
@@ -49,13 +44,11 @@ function isValidName(value: unknown, pattern: RegExp): value is string {
 	return typeof value === 'string' && value.length <= MAX_NAME_LENGTH && pattern.test(value);
 }
 
-// ログが長くなるのを防ぐ
 function truncateForLog(value: unknown): string {
 	const text = typeof value === 'string' ? value : JSON.stringify(value) ?? String(value);
 	return text.length > MAX_NAME_LENGTH ? text.slice(0, MAX_NAME_LENGTH) + '...' : text;
 }
 
-// TODO: 名前衝突時の動作を選べるようにする
 @Injectable()
 export class ImportCustomEmojisProcessorService {
 	private logger: Logger;
@@ -95,7 +88,7 @@ export class ImportCustomEmojisProcessorService {
 		try {
 			fs.writeFileSync(destPath, '', 'binary');
 			await this.downloadService.downloadUrl(file.url, destPath);
-		} catch (e) { // TODO: 何度か再試行
+		} catch (e) {
 			if (e instanceof Error || typeof e === 'string') {
 				this.logger.error(e);
 			}
@@ -107,10 +100,8 @@ export class ImportCustomEmojisProcessorService {
 			this.logger.succ(`Unzipping to ${outputPath}`);
 			await fs.promises.mkdir(outputPath);
 
-			// 一括展開せず、meta.json で参照されているエントリだけを検証しながら1つずつ書き出す
 			const zip = await ZipFile.open(destPath);
 			try {
-				// 1. meta.json だけを取り出す
 				const metaPath = outputPath + '/meta.json';
 				let metaFound = false;
 				for await (const entry of zip.entries()) {
@@ -124,7 +115,6 @@ export class ImportCustomEmojisProcessorService {
 				const metaRaw = await fs.promises.readFile(metaPath, 'utf-8');
 				const meta = JSON.parse(metaRaw);
 
-				// 取り込むべきファイル名 → それを参照するレコード
 				const wanted = new Map<string, EmojiRecord[]>();
 				for (const record of meta.emojis as EmojiRecord[]) {
 					if (!record.downloaded) continue;
@@ -146,7 +136,6 @@ export class ImportCustomEmojisProcessorService {
 					}
 				}
 
-				// 2. meta.json で参照されているエントリだけを ZIP 内の順序で展開して取り込む
 				for await (const entry of zip.entries()) {
 					const records = wanted.get(entry.filename);
 					if (records == null) continue;
@@ -167,7 +156,6 @@ export class ImportCustomEmojisProcessorService {
 							await this.importEmoji(record, emojiPath);
 						}
 					} finally {
-						// ドライブへ取り込み済みなので、都度削除する
 						await fs.promises.rm(emojiPath, { force: true });
 					}
 				}

@@ -121,7 +121,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				includeSecrets: true,
 			});
 
-			// Publish meUpdated event
 			this.globalEventService.publishMainStream(me.id, 'meUpdated', iObj);
 
 			if (ps.email != null) {

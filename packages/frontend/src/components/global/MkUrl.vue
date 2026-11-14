@@ -53,7 +53,6 @@ const target = computed(() => self.value ? null : '_blank');
 const el = ref();
 
 if (props.showUrlPreview && isEnabledUrlPreview.value) {
-	// URL が変わったら古い URL のプレビューを閉じる
 	let previewShowing: Ref<boolean> | null = null;
 	watch(() => props.url, () => {
 		if (previewShowing != null) previewShowing.value = false;
@@ -89,7 +88,7 @@ if (props.showUrlPreview && isEnabledUrlPreview.value) {
 }
 
 .schema {
-	color: color(from currentcolor srgb r g b / 0.5); // DOMノード全体をopacityで半透明化するより文字色を半透明化した方が若干レンダリングパフォーマンスが良い
+	color: color(from currentcolor srgb r g b / 0.5);
 }
 
 .hostname {
@@ -97,11 +96,11 @@ if (props.showUrlPreview && isEnabledUrlPreview.value) {
 }
 
 .pathname {
-	color: color(from currentcolor srgb r g b / 0.8); // DOMノード全体をopacityで半透明化するより文字色を半透明化した方が若干レンダリングパフォーマンスが良い
+	color: color(from currentcolor srgb r g b / 0.8);
 }
 
 .query {
-	color: color(from currentcolor srgb r g b / 0.5); // DOMノード全体をopacityで半透明化するより文字色を半透明化した方が若干レンダリングパフォーマンスが良い
+	color: color(from currentcolor srgb r g b / 0.5);
 }
 
 .hash {

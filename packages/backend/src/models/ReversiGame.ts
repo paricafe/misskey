@@ -52,11 +52,6 @@ export class MiReversiGame {
 	})
 	public user2Ready: boolean;
 
-	/**
-	 * どちらのプレイヤーが先行(黒)か
-	 * 1 ... user1
-	 * 2 ... user2
-	 */
 	@Column('integer', {
 		nullable: true,
 	})
@@ -90,7 +85,6 @@ export class MiReversiGame {
 	})
 	public timeoutUserId: MiUser['id'] | null;
 
-	// in sec
 	@Column('smallint', {
 		default: 90,
 	})

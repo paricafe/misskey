@@ -26,7 +26,7 @@ export class S3Service {
 	public getS3Client(meta: MiMeta): S3Client {
 		const u = meta.objectStorageEndpoint
 			? `${meta.objectStorageUseSSL ? 'https' : 'http'}://${meta.objectStorageEndpoint}`
-			: `${meta.objectStorageUseSSL ? 'https' : 'http'}://example.net`; // dummy url to select http(s) agent
+			: `${meta.objectStorageUseSSL ? 'https' : 'http'}://example.net`;
 
 		const agent = this.httpRequestService.getAgentByUrl(new URL(u), !meta.objectStorageUseProxy, true);
 		const handlerOption: NodeHttpHandlerOptions = {};
@@ -42,9 +42,9 @@ export class S3Service {
 				accessKeyId: meta.objectStorageAccessKey,
 				secretAccessKey: meta.objectStorageSecretKey,
 			} : undefined,
-			region: meta.objectStorageRegion ? meta.objectStorageRegion : undefined, // 空文字列もundefinedにするため ?? は使わない
+			region: meta.objectStorageRegion ? meta.objectStorageRegion : undefined,
 			tls: meta.objectStorageUseSSL,
-			forcePathStyle: meta.objectStorageEndpoint ? meta.objectStorageS3ForcePathStyle : false, // AWS with endPoint omitted
+			forcePathStyle: meta.objectStorageEndpoint ? meta.objectStorageS3ForcePathStyle : false,
 			requestHandler: new NodeHttpHandler(handlerOption),
 			requestChecksumCalculation: 'WHEN_REQUIRED',
 			responseChecksumValidation: 'WHEN_REQUIRED',

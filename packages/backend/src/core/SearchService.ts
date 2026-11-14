@@ -42,10 +42,8 @@ export type SearchOpts = {
 	rangeEndAt?: number | null;
 };
 
-// Candidate windows start at one day and grow until they reach the search bounds.
 const INITIAL_SEARCH_WINDOW_MS = 1000 * 60 * 60 * 24;
 const SEARCH_WINDOW_GROWTH = 4;
-// Time-based IDs (aid/aidx) cannot represent earlier times.
 const EARLIEST_SEARCH_WINDOW_TIME = Date.UTC(2000, 0, 1);
 
 export type SearchPagination = {
@@ -193,8 +191,6 @@ export class SearchService {
 		switch (this.provider) {
 			case 'sqlLike':
 			case 'sqlPgroonga': {
-				// ほとんど内容に差がないのでsqlLikeとsqlPgroongaを同じ処理にしている.
-				// 今後の拡張で差が出る用であれば関数を分ける.
 				return this.searchNoteByLike(q, me, opts, pagination);
 			}
 			case 'meilisearch': {
@@ -242,13 +238,7 @@ export class SearchService {
 
 		let matches: SelectQueryBuilder<MiNote> | undefined;
 		if (this.provider === 'sqlPgroonga') {
-			// The index name preserves its tokenizer/normalizers for the condition.
 			const textMatch = 'note_search_text(note.text, note.replyId) &@~ (:q, NULL, \'"IDX_note_search_text"\')::pgroonga_full_text_search_condition';
-			// Keep ORDER BY / LIMIT out of the full-text query: otherwise the planner can
-			// scan the primary key backwards and evaluate PGroonga on every visited row.
-			// Retain the range/scope filters inside the full-text query.
-			// Hydration does not repeat the text match: it could let the planner drive
-			// the bounded ID lookup from the full-text index.
 			matches = query.clone()
 				.select('note.id', 'id')
 				.orderBy()
@@ -282,12 +272,8 @@ export class SearchService {
 		const ascending = Boolean(pagination.sinceId && !pagination.untilId);
 		const batchSize = Math.max(100, pagination.limit);
 		const notes: MiNote[] = [];
-		// Exclusive bound on the side that has already been examined.
 		let cursor: MiNote['id'] | undefined;
 
-		// Search in ID windows moving away from the pagination cursor. PostgreSQL combines
-		// the PGroonga matches with a primary key range (BitmapAnd), so only matches in the
-		// window are fetched from the table; frequent terms no longer read every matching row.
 		const startId = ascending ? pagination.sinceId : pagination.untilId;
 		let edge = startId != null ? this.idService.parse(startId).date.getTime() : Date.now();
 		if (!ascending && opts.rangeEndAt != null) edge = Math.min(edge, opts.rangeEndAt);
@@ -298,7 +284,6 @@ export class SearchService {
 
 		while (true) {
 			const farTime = ascending ? edge + span : edge - span;
-			// The last window has no far bound, so it also covers IDs outside the time scale.
 			const far = (ascending ? farTime >= ceiling : farTime <= floor) ? undefined : this.idService.gen(farTime);
 
 			while (true) {
@@ -310,8 +295,6 @@ export class SearchService {
 					batchMatches.andWhere(`note.id ${ascending ? '<=' : '>='} :searchWindow`, { searchWindow: far });
 				}
 
-				// Do not join the candidate CTE back to note. Its estimated cardinality can
-				// make PostgreSQL merge-join against a backward scan of the entire note PK.
 				const candidates = await this.notesRepository.manager.createQueryBuilder()
 					.addCommonTableExpression(batchMatches, 'matched_note', { materialized: true })
 					.select('matched_note.id', 'id')
@@ -329,14 +312,11 @@ export class SearchService {
 					if (notes.length >= pagination.limit) return notes;
 				}
 
-				// Advance past every examined candidate, including invisible or deleted
-				// notes, and keep fetching until the window is exhausted.
 				if (candidates.length < batchSize) break;
 				cursor = candidates[candidates.length - 1].id;
 			}
 
 			if (far == null) return notes;
-			// The next window starts just past this window's inclusive far bound.
 			cursor = far;
 			edge = farTime;
 			span *= SEARCH_WINDOW_GROWTH;

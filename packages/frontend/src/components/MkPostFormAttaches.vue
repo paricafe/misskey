@@ -21,7 +21,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 				@keydown.space.enter="showFileMenu(item, $event)"
 				@contextmenu.prevent.stop="showFileMenu(item, $event)"
 			>
-				<!-- pointer-eventsをnoneにしておかないとiOSなどでドラッグしたときに画像の方に判定が持ってかれる -->
 				<MkDriveFileThumbnail style="pointer-events: none;" :data-id="item.id" :class="$style.thumbnail" :file="item" fit="cover"/>
 				<div v-if="item.isSensitive" :class="$style.sensitive" style="pointer-events: none;">
 					<i class="ti ti-eye-exclamation" style="margin: auto;"></i>
@@ -184,7 +183,6 @@ function showFileMenu(file: Misskey.entities.DriveFile, ev: PointerEvent | Keybo
 					height: item.properties.height,
 					filename: item.name,
 					file: item,
-					//sourceElement: TODO
 				}));
 				const { dispose } = await os.popupAsyncWithDialog(import('@/components/MkLightbox.vue').then(x => x.default), {
 					defaultIndex: constents.findIndex(content => content.id === file.id),

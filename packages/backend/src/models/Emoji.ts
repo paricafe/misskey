@@ -8,7 +8,7 @@ import { id } from './util/id.js';
 
 @Entity('emoji')
 @Index(['name', 'host'], { unique: true })
-@Index('IDX_EMOJI_ROLE_IDS', { synchronize: false }) // GIN for roleIdsThatCanBeUsedThisEmojiAsReaction in production
+@Index('IDX_EMOJI_ROLE_IDS', { synchronize: false })
 export class MiEmoji {
 	@PrimaryColumn(id())
 	public id: string;
@@ -52,7 +52,6 @@ export class MiEmoji {
 	})
 	public uri: string | null;
 
-	// publicUrlの方のtypeが入る
 	@Column('varchar', {
 		length: 64, nullable: true,
 	})
@@ -78,7 +77,6 @@ export class MiEmoji {
 	})
 	public isSensitive: boolean;
 
-	// TODO: 定期ジョブで存在しなくなったロールIDを除去するようにする
 	@Column('varchar', {
 		array: true, length: 128, default: '{}',
 	})

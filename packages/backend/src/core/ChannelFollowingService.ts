@@ -33,8 +33,8 @@ export class ChannelFollowingService implements OnModuleInit {
 		private globalEventService: GlobalEventService,
 	) {
 		this.userFollowingChannelsCache = new RedisKVCache<Set<string>>(this.redisClient, 'userFollowingChannels', {
-			lifetime: 1000 * 60 * 30, // 30m
-			memoryCacheLifetime: 1000 * 60, // 1m
+			lifetime: 1000 * 60 * 30,
+			memoryCacheLifetime: 1000 * 60,
 			fetcher: (key) => this.channelFollowingsRepository.find({
 				where: { followerId: key },
 				select: { followeeId: true },
@@ -49,14 +49,6 @@ export class ChannelFollowingService implements OnModuleInit {
 	onModuleInit() {
 	}
 
-	/**
-	 * フォローしているチャンネルの一覧を取得する.
-	 * @param params
-	 * @param [opts]
-	 * @param	{(boolean|undefined)} [opts.idOnly=false] チャンネルIDのみを取得するかどうか. ID以外のフィールドに値がセットされなくなり、他テーブルとのJOINも一切されなくなるので注意.
-	 * @param {(boolean|undefined)} [opts.joinUser=undefined] チャンネルオーナーのユーザ情報をJOINするかどうか(falseまたは省略時はJOINしない).
-	 * @param {(boolean|undefined)} [opts.joinBannerFile=undefined] バナー画像のドライブファイルをJOINするかどうか(falseまたは省略時はJOINしない).
-	 */
 	@bindThis
 	public async list(
 		params: {

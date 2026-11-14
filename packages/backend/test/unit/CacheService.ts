@@ -46,7 +46,6 @@ describe('blocking cache invalidation across workers', () => {
 			services[0].userBlockingCache.refresh('alice'),
 			services[0].userBlockedCache.refresh('bob'),
 		]);
-		// A different worker still has the previous value until the internal event arrives.
 		expect((await services[1].userBlockingCache.fetch('alice')).has('bob')).toBe(!blocked);
 		const message = JSON.stringify({ channel: 'internal', message: { type, body: { blockerId: 'alice', blockeeId: 'bob' } } });
 		await Promise.all(subscribers.flatMap(subscriber => subscriber.listeners('message').map(listener => listener('internal', message))));

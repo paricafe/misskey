@@ -11,18 +11,12 @@ export class MiInstance {
 	@PrimaryColumn(id())
 	public id: string;
 
-	/**
-	 * このインスタンスを捕捉した日時
-	 */
 	@Index()
 	@Column('timestamp with time zone', {
 		comment: 'The caught date of the Instance.',
 	})
 	public firstRetrievedAt: Date;
 
-	/**
-	 * ホスト
-	 */
 	@Index({ unique: true })
 	@Column('varchar', {
 		length: 128,
@@ -30,67 +24,43 @@ export class MiInstance {
 	})
 	public host: string;
 
-	/**
-	 * インスタンスのユーザー数
-	 */
 	@Column('integer', {
 		default: 0,
 		comment: 'The count of the users of the Instance.',
 	})
 	public usersCount: number;
 
-	/**
-	 * インスタンスの投稿数
-	 */
 	@Column('integer', {
 		default: 0,
 		comment: 'The count of the notes of the Instance.',
 	})
 	public notesCount: number;
 
-	/**
-	 * このインスタンスのユーザーからフォローされている、自インスタンスのユーザーの数
-	 */
 	@Column('integer', {
 		default: 0,
 	})
 	public followingCount: number;
 
-	/**
-	 * このインスタンスのユーザーをフォローしている、自インスタンスのユーザーの数
-	 */
 	@Column('integer', {
 		default: 0,
 	})
 	public followersCount: number;
 
-	/**
-	 * 直近のリクエスト受信日時
-	 */
 	@Column('timestamp with time zone', {
 		nullable: true,
 	})
 	public latestRequestReceivedAt: Date | null;
 
-	/**
-	 * このインスタンスと不通かどうか
-	 */
 	@Column('boolean', {
 		default: false,
 	})
 	public isNotResponding: boolean;
 
-	/**
-	 * このインスタンスと不通になった日時
-	 */
 	@Column('timestamp with time zone', {
 		nullable: true,
 	})
 	public notRespondingSince: Date | null;
 
-	/**
-	 * このインスタンスへの配信状態
-	 */
 	@Index()
 	@Column('enum', {
 		default: 'none',

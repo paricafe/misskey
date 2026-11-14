@@ -143,8 +143,6 @@ export const paramDef = {
 		renoteId: { type: 'string', format: 'misskey:id', nullable: true },
 		channelId: { type: 'string', format: 'misskey:id', nullable: true },
 
-		// anyOf内にバリデーションを書いても最初の一つしかチェックされない
-		// See https://github.com/misskey-dev/misskey/pull/10082
 		text: {
 			type: 'string',
 			minLength: 1,
@@ -183,7 +181,6 @@ export const paramDef = {
 			required: ['choices'],
 		},
 	},
-	// (re)note with text, files and poll are optional
 	if: {
 		properties: {
 			renoteId: {
@@ -247,7 +244,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 					createdNote: await this.noteEntityService.pack(note, me),
 				};
 			} catch (err) {
-				// TODO: 他のErrorもここでキャッチしてエラーメッセージを当てるようにしたい
 				if (err instanceof IdentifiableError) {
 					if (err.id === '689ee33f-f97c-479a-ac49-1b9f8140af99') {
 						throw new ApiError(meta.errors.containsProhibitedWords);

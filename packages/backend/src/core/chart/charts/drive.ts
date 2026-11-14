@@ -15,9 +15,6 @@ import { ChartLoggerService } from '../ChartLoggerService.js';
 import { name, schema } from './entities/drive.js';
 import type { KVs } from '../core.js';
 
-/**
- * ドライブに関するチャート
- */
 @Injectable()
 export default class DriveChart extends Chart<typeof schema> { // eslint-disable-line import/no-default-export
 	constructor(

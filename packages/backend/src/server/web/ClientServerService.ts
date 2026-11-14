@@ -128,7 +128,6 @@ export class ClientServerService {
 		private htmlTemplateService: HtmlTemplateService,
 		private clientLoggerService: ClientLoggerService,
 	) {
-		//this.createServer = this.createServer.bind(this);
 		const backendRootdir = resolve(this.config.rootDir, 'packages/backend');
 		const frontendRootdir = resolve(this.config.rootDir, 'packages/frontend');
 		this.staticAssets = resolve(backendRootdir, 'assets');
@@ -145,27 +144,22 @@ export class ClientServerService {
 	@bindThis
 	private async manifestHandler(reply: FastifyReply) {
 		let manifest = {
-			// 空文字列の場合右辺を使いたいため
 			// eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
 			'short_name': this.meta.shortName || this.meta.name || this.config.host,
-			// 空文字列の場合右辺を使いたいため
 			// eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
 			'name': this.meta.name || this.config.host,
 			'start_url': '/',
 			'display': 'standalone',
 			'background_color': '#313a42',
-			// 空文字列の場合右辺を使いたいため
 			// eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
 			'theme_color': this.meta.themeColor || '#86b300',
 			'icons': [{
-				// 空文字列の場合右辺を使いたいため
 				// eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
 				'src': this.meta.app192IconUrl || '/static-assets/icons/192.png',
 				'sizes': '192x192',
 				'type': 'image/png',
 				'purpose': 'maskable',
 			}, {
-				// 空文字列の場合右辺を使いたいため
 				// eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
 				'src': this.meta.app512IconUrl || '/static-assets/icons/512.png',
 				'sizes': '512x512',
@@ -207,12 +201,10 @@ export class ClientServerService {
 		const configUrl = new URL(this.config.url);
 
 		fastify.addHook('onRequest', (request, reply, done) => {
-			// クリックジャッキング防止のためiFrameの中に入れられないようにする
 			reply.header('X-Frame-Options', 'DENY');
 			done();
 		});
 
-		//#region vite assets
 		if (this.config.frontendEmbedManifestExists) {
 			this.clientLoggerService.logger.info(`[ClientServerService] Using built frontend vite assets. ${this.frontendViteOut}`);
 			fastify.register((fastify, options, done) => {
@@ -253,9 +245,6 @@ export class ClientServerService {
 				rewritePrefix: '/embed_vite',
 			});
 		}
-		//#endregion
-
-		//#region static assets
 
 		fastify.register(fastifyStatic, {
 			root: this.staticAssets,
@@ -343,7 +332,7 @@ export class ClientServerService {
 				.resize(488, 488)
 				.greyscale()
 				.normalise()
-				.linear(1.75, -(128 * 1.75) + 128) // 1.75x contrast
+				.linear(1.75, -(128 * 1.75) + 128)
 				.flatten({ background: '#000' })
 				.extend({
 					top: 12,
@@ -371,17 +360,14 @@ export class ClientServerService {
 			return buffer;
 		});
 
-		// ServiceWorker
 		fastify.get('/sw.js', async (request, reply) => {
 			return await reply.sendFile('/sw.js', this.swAssets, {
 				maxAge: ms('10 minutes'),
 			});
 		});
 
-		// Manifest
 		fastify.get('/manifest.json', async (request, reply) => await this.manifestHandler(reply));
 
-		// Embed Javascript
 		fastify.get('/embed.js', async (request, reply) => {
 			return await reply.sendFile('/embed.js', this.staticAssets, {
 				maxAge: ms('1 day'),
@@ -419,7 +405,6 @@ export class ClientServerService {
 			return await reply.send(content);
 		});
 
-		// OpenSearch XML
 		fastify.get('/opensearch.xml', async (request, reply) => {
 			const name = this.meta.name ?? 'Misskey';
 			let content = '';
@@ -435,8 +420,6 @@ export class ClientServerService {
 			return await reply.send(content);
 		});
 
-		//#endregion
-
 		const renderBase = async (reply: FastifyReply, data: Partial<Parameters<typeof BasePage>[0]> = {}) => {
 			reply.header('Cache-Control', 'public, max-age=30');
 			return await HtmlTemplateService.replyHtml(reply, BasePage({
@@ -448,7 +431,6 @@ export class ClientServerService {
 			}));
 		};
 
-		// URL preview endpoint
 		fastify.get<{ Querystring: { url: string; lang: string; } }>('/url', (request, reply) => this.urlPreviewService.handle(request, reply));
 
 		const getFeed = async (acct: string) => {
@@ -469,7 +451,6 @@ export class ClientServerService {
 			return await this.feedService.packFeed(user);
 		};
 
-		// Atom
 		fastify.get<{ Params: { user?: string; } }>('/@:user.atom', async (request, reply) => {
 			if (request.params.user == null) return await renderBase(reply);
 
@@ -484,7 +465,6 @@ export class ClientServerService {
 			}
 		});
 
-		// RSS
 		fastify.get<{ Params: { user?: string; } }>('/@:user.rss', async (request, reply) => {
 			if (request.params.user == null) return await renderBase(reply);
 
@@ -499,7 +479,6 @@ export class ClientServerService {
 			}
 		});
 
-		// JSON
 		fastify.get<{ Params: { user?: string; } }>('/@:user.json', async (request, reply) => {
 			if (request.params.user == null) return await renderBase(reply);
 
@@ -514,8 +493,6 @@ export class ClientServerService {
 			}
 		});
 
-		//#region SSR
-		// User
 		fastify.get<{ Params: { user: string; sub?: string; } }>('/@:user/:sub?', async (request, reply) => {
 			const { username, host } = Acct.parse(request.params.user);
 			const user = await this.usersRepository.findOneBy({
@@ -555,8 +532,6 @@ export class ClientServerService {
 					}),
 				}));
 			} else {
-				// リモートユーザーなので
-				// モデレータがAPI経由で参照可能にするために404にはしない
 				return await renderBase(reply);
 			}
 		});
@@ -578,7 +553,6 @@ export class ClientServerService {
 			reply.redirect(`/@${user.username}${ user.host == null ? '' : '@' + user.host}`);
 		});
 
-		// Note
 		fastify.get<{ Params: { note: string; } }>('/notes/:note', async (request, reply) => {
 			vary(reply.raw, 'Accept');
 
@@ -621,7 +595,6 @@ export class ClientServerService {
 			}
 		});
 
-		// Page
 		fastify.get<{ Params: { user: string; page: string; } }>('/@:user/pages/:page', async (request, reply) => {
 			const { username, host } = Acct.parse(request.params.user);
 			const user = await this.usersRepository.findOneBy({
@@ -658,7 +631,6 @@ export class ClientServerService {
 			}
 		});
 
-		// Flash
 		fastify.get<{ Params: { id: string; } }>('/play/:id', async (request, reply) => {
 			const flash = await this.flashsRepository.findOneBy({
 				id: request.params.id,
@@ -682,7 +654,6 @@ export class ClientServerService {
 			}
 		});
 
-		// Clip
 		fastify.get<{ Params: { clip: string; } }>('/clips/:clip', async (request, reply) => {
 			const clip = await this.clipsRepository.findOneBy({
 				id: request.params.clip,
@@ -709,7 +680,6 @@ export class ClientServerService {
 			}
 		});
 
-		// Gallery post
 		fastify.get<{ Params: { post: string; } }>('/gallery/:post', async (request, reply) => {
 			const post = await this.galleryPostsRepository.findOneBy({ id: request.params.post });
 
@@ -731,7 +701,6 @@ export class ClientServerService {
 			}
 		});
 
-		// Channel
 		fastify.get<{ Params: { channel: string; } }>('/channels/:channel', async (request, reply) => {
 			const channel = await this.channelsRepository.findOneBy({
 				id: request.params.channel,
@@ -749,7 +718,6 @@ export class ClientServerService {
 			}
 		});
 
-		// Reversi game
 		fastify.get<{ Params: { game: string; } }>('/reversi/g/:game', async (request, reply) => {
 			const game = await this.reversiGamesRepository.findOneBy({
 				id: request.params.game,
@@ -767,7 +735,6 @@ export class ClientServerService {
 			}
 		});
 
-		// 個別お知らせページ
 		fastify.get<{ Params: { announcementId: string; } }>('/announcements/:announcementId', async (request, reply) => {
 			const announcement = await this.announcementsRepository.findOneBy({
 				id: request.params.announcementId,
@@ -785,21 +752,15 @@ export class ClientServerService {
 				return await renderBase(reply);
 			}
 		});
-		//#endregion
 
-		//#region noindex pages
-		// Tags
 		fastify.get<{ Params: { clip: string; } }>('/tags/:tag', async (request, reply) => {
 			return await renderBase(reply, { noindex: true });
 		});
 
-		// User with Tags
 		fastify.get<{ Params: { clip: string; } }>('/user-tags/:tag', async (request, reply) => {
 			return await renderBase(reply, { noindex: true });
 		});
-		//#endregion
 
-		//#region embed pages
 		fastify.get<{ Params: { user: string; } }>('/embed/user-timeline/:user', async (request, reply) => {
 			reply.removeHeader('X-Frame-Options');
 
@@ -892,7 +853,6 @@ export class ClientServerService {
 				meta: this.meta,
 			}));
 		});
-		//#endregion
 
 		fastify.get('/bios', async (request, reply) => {
 			return await HtmlTemplateService.replyHtml(reply, BiosPage({
@@ -911,7 +871,7 @@ export class ClientServerService {
 
 			if (request.headers['origin']) {
 				const originURL = new URL(request.headers['origin']);
-				if (originURL.protocol !== 'https:') { // Clear-Site-Data only supports https
+				if (originURL.protocol !== 'https:') {
 					sendHeader = false;
 				}
 				if (originURL.host !== configUrl.host) {
@@ -926,13 +886,11 @@ export class ClientServerService {
 			return await HtmlTemplateService.replyHtml(reply, FlushPage());
 		});
 
-		// streamingに非WebSocketリクエストが来た場合にbase htmlをキャシュ付きで返すと、Proxy等でそのパスがキャッシュされておかしくなる
 		fastify.get('/streaming', async (request, reply) => {
 			reply.code(503);
 			reply.header('Cache-Control', 'private, max-age=0');
 		});
 
-		// Render base html for all requests
 		fastify.get('*', async (request, reply) => {
 			return await renderBase(reply);
 		});

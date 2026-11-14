@@ -227,7 +227,6 @@ export class ExportAccountDataProcessorService {
 		}
 		fs.writeFileSync(path + '/lists.csv', listLines.join(''), 'utf-8');
 
-		// Create archive
 		const [archivePath, archiveCleanup] = await createTemp();
 		try {
 			const archive = await ZipArchive.create(archivePath);
@@ -245,7 +244,6 @@ export class ExportAccountDataProcessorService {
 			this.logger.succ(`Exported to: ${archivePath}`);
 
 			const fileName = 'data-request-' + dateFormat(new Date(), 'yyyy-MM-dd-HH-mm-ss') + '.zip';
-			// The archive bundles every drive file and is a zip, so role upload policies would reject it for most users.
 			const driveFile = await this.driveService.addFile({ user, path: archivePath, name: fileName, force: true, skipPolicyCheck: true });
 
 			this.logger.succ(`Exported to: ${driveFile.id}`);

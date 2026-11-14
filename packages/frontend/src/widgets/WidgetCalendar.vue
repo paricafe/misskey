@@ -101,7 +101,7 @@ function update(time: number) {
 	][now.getDay()];
 
 	const dayNumer = now.getTime() - new Date(ny, nm, nd).getTime();
-	const dayDenom = 1000/*ms*/ * 60/*s*/ * 60/*m*/ * 24/*h*/;
+	const dayDenom = 1000 * 60 * 60 * 24;
 	const monthNumer = now.getTime() - new Date(ny, nm, 1).getTime();
 	const monthDenom = new Date(ny, nm + 1, 1).getTime() - new Date(ny, nm, 1).getTime();
 	const yearNumer = now.getTime() - new Date(ny, 0, 1).getTime();
@@ -117,7 +117,6 @@ function update(time: number) {
 watch(fNow, (to) => {
 	update(to);
 
-	// 次回更新までに日付が変わる場合、日付が変わった直後に強制的に更新するタイマーをセットする
 	if (nextDayMidnightTime - to <= TIME_UPDATE_INTERVAL) {
 		if (nextDayTimer != null) {
 			window.clearTimeout(nextDayTimer);

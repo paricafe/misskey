@@ -28,8 +28,8 @@ export class FederatedInstanceService implements OnApplicationShutdown {
 		private idService: IdService,
 	) {
 		this.federatedInstanceCache = new RedisKVCache<MiInstance | null>(this.redisClient, 'federatedInstance', {
-			lifetime: 1000 * 60 * 30, // 30m
-			memoryCacheLifetime: 1000 * 60 * 3, // 3m
+			lifetime: 1000 * 60 * 30,
+			memoryCacheLifetime: 1000 * 60 * 3,
 			fetcher: (key) => this.instancesRepository.findOneBy({ host: key }),
 			toRedisConverter: (value) => JSON.stringify(value),
 			fromRedisConverter: (value) => {

@@ -137,7 +137,6 @@ export class CaptchaService {
 		}
 	}
 
-	// https://codeberg.org/Gusted/mCaptcha/src/branch/main/mcaptcha.go
 	@bindThis
 	public async verifyMcaptcha(secret: string, siteKey: string, instanceHost: string, response: string | null | undefined): Promise<void> {
 		if (response == null) {
@@ -251,22 +250,6 @@ export class CaptchaService {
 		};
 	}
 
-	/**
-	 * captchaの設定を更新します. その際、フロントエンド側で受け取ったcaptchaからの戻り値を検証し、passした場合のみ設定を更新します.
-	 * 実際の検証処理はサービス内で定義されている各captchaプロバイダの検証関数に委譲します.
-	 *
-	 * @param provider 検証するcaptchaのプロバイダ
-	 * @param params
-	 * @param params.sitekey hcaptcha, recaptcha, turnstile, mcaptchaの場合に指定するsitekey. それ以外のプロバイダでは無視されます
-	 * @param params.secret hcaptcha, recaptcha, turnstile, mcaptchaの場合に指定するsecret. それ以外のプロバイダでは無視されます
-	 * @param params.instanceUrl mcaptchaの場合に指定するインスタンスのURL. それ以外のプロバイダでは無視されます
-	 * @param params.captchaResult フロントエンド側で受け取ったcaptchaプロバイダからの戻り値. この値を使ってサーバサイドでの検証を行います
-	 * @see verifyHcaptcha
-	 * @see verifyMcaptcha
-	 * @see verifyRecaptcha
-	 * @see verifyTurnstile
-	 * @see verifyTestcaptcha
-	 */
 	@bindThis
 	public async save(
 		provider: CaptchaProvider,

@@ -3,9 +3,6 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-/**
- * ID付きエラー
- */
 export class IdentifiableError extends Error {
 	public message: string;
 	public id: string;

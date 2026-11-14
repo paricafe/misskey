@@ -156,14 +156,12 @@ export class UserEntityService implements OnModuleInit {
 		this.chatService = this.moduleRef.get('ChatService');
 	}
 
-	//#region Validators
 	public validateLocalUsername = ajv.compile(localUsernameSchema);
 	public validatePassword = ajv.compile(passwordSchema);
 	public validateName = ajv.compile(nameSchema);
 	public validateDescription = ajv.compile(descriptionSchema);
 	public validateLocation = ajv.compile(locationSchema);
 	public validateBirthday = ajv.compile(birthdaySchema);
-	//#endregion
 
 	public isLocalUser = isLocalUser;
 	public isRemoteUser = isRemoteUser;
@@ -327,19 +325,7 @@ export class UserEntityService implements OnModuleInit {
 
 	@bindThis
 	public async getHasUnreadAntenna(userId: MiUser['id']): Promise<boolean> {
-		/*
-		const myAntennas = (await this.antennaService.getAntennas()).filter(a => a.userId === userId);
-
-		const isUnread = (myAntennas.length > 0 ? await this.antennaNotesRepository.exists({
-			where: {
-				antennaId: In(myAntennas.map(x => x.id)),
-				read: false,
-			},
-		}) : false);
-
-		return isUnread;
-		*/
-		return false; // TODO
+		return false;
 	}
 
 	@bindThis
@@ -396,7 +382,7 @@ export class UserEntityService implements OnModuleInit {
 
 	@bindThis
 	public getIdenticonUrl(user: MiUser): string {
-		if ((user.host == null || user.host === this.config.host) && user.username.includes('.') && this.meta.iconUrl) { // ローカルのシステムアカウントの場合
+		if ((user.host == null || user.host === this.config.host) && user.username.includes('.') && this.meta.iconUrl) {
 			return this.meta.iconUrl;
 		} else {
 			return `${this.config.url}/identicon/${user.username.toLowerCase()}@${user.host ?? this.config.host}`;
@@ -414,17 +400,12 @@ export class UserEntityService implements OnModuleInit {
 		return `${this.config.url}/users/${userId}`;
 	}
 
-	/**
-	 * Remote decorations are fetched from the remote server. Never wait for that while
-	 * packing: on a cache miss, refresh in the background and show none for now.
-	 */
 	@bindThis
 	private async getRemoteUserDecorations(user: { id: MiUser['id']; host: string }) {
 		if (!this.config.avatarDecorationAllowedHosts?.includes(user.host)) return [];
 		const cache = this.cacheService.pariRemoteUserDecorationsCache;
 		const cached = await cache.get(user.id);
 		if (cached !== undefined) return cached;
-		// fetch() deduplicates concurrent loads of the same key.
 		cache.fetch(user.id).catch(() => {});
 		return [];
 	}
@@ -533,7 +514,6 @@ export class UserEntityService implements OnModuleInit {
 					: ad.url,
 			})));
 
-		// TODO: 例えば avatarUrl: true など間違った型を設定しても型エラーにならないのをどうにかする(ジェネリクス使わない方法で実装するしかなさそう？)
 		const packed = {
 			id: user.id,
 			name: user.name,
@@ -541,14 +521,6 @@ export class UserEntityService implements OnModuleInit {
 			host: user.host,
 			avatarUrl: (user.avatarId == null ? null : user.avatarUrl) ?? this.getIdenticonUrl(user),
 			avatarBlurhash: (user.avatarId == null ? null : user.avatarBlurhash),
-			// avatarDecorations: user.avatarDecorations.length > 0 ? this.avatarDecorationService.getAll().then(decorations => user.avatarDecorations.filter(ud => decorations.some(d => d.id === ud.id)).map(ud => ({
-			// 	id: ud.id,
-			// 	angle: ud.angle || undefined,
-			// 	flipH: ud.flipH || undefined,
-			// 	offsetX: ud.offsetX || undefined,
-			// 	offsetY: ud.offsetY || undefined,
-			// 	url: decorations.find(d => d.id === ud.id)!.url,
-			// }))) : [],
 			avatarDecorations,
 			isBot: user.isBot,
 			isCat: user.isCat,
@@ -566,7 +538,6 @@ export class UserEntityService implements OnModuleInit {
 			} : undefined) : undefined,
 			emojis: this.customEmojiService.populateEmojis(user.emojis, user.host),
 			onlineStatus: this.getOnlineStatus(user),
-			// パフォーマンス上の理由で、明示的に設定しない場合はローカルユーザーのみ取得
 			badgeRoles: (this.meta.showRoleBadgesOfRemoteUsers || user.host == null) ? this.roleService.getUserBadgeRoles(user.id).then((rs) => rs
 				.filter((r) => r.isPublic || iAmModerator)
 				.sort((a, b) => b.displayOrder - a.displayOrder)
@@ -608,7 +579,7 @@ export class UserEntityService implements OnModuleInit {
 				}),
 				pinnedPageId: profile!.pinnedPageId,
 				pinnedPage: profile!.pinnedPageId ? this.pageEntityService.pack(profile!.pinnedPageId, me) : null,
-				publicReactions: this.isLocalUser(user) ? profile!.publicReactions : false, // https://github.com/misskey-dev/misskey/issues/12964
+				publicReactions: this.isLocalUser(user) ? profile!.publicReactions : false,
 				followersVisibility: profile!.followersVisibility,
 				followingVisibility: profile!.followingVisibility,
 				chatScope: user.chatScope,
@@ -655,20 +626,20 @@ export class UserEntityService implements OnModuleInit {
 				isDeleted: user.isDeleted,
 				twoFactorBackupCodesStock: profile?.twoFactorBackupSecret?.length === 5 ? 'full' : (profile?.twoFactorBackupSecret?.length ?? 0) > 0 ? 'partial' : 'none',
 				hideOnlineStatus: user.hideOnlineStatus,
-				hasUnreadSpecifiedNotes: false, // 後方互換性のため
-				hasUnreadMentions: false, // 後方互換性のため
+				hasUnreadSpecifiedNotes: false,
+				hasUnreadMentions: false,
 				hasUnreadChatMessages: this.chatService.hasUnreadMessages(user.id),
 				hasUnreadAnnouncement: unreadAnnouncements!.length > 0,
 				unreadAnnouncements,
 				hasUnreadAntenna: this.getHasUnreadAntenna(user.id),
-				hasUnreadChannel: false, // 後方互換性のため
-				hasUnreadNotification: notificationsInfo?.hasUnread, // 後方互換性のため
+				hasUnreadChannel: false,
+				hasUnreadNotification: notificationsInfo?.hasUnread,
 				hasPendingReceivedFollowRequest: this.getHasPendingReceivedFollowRequest(user.id),
 				unreadNotificationsCount: notificationsInfo?.unreadCount,
 				mutedWords: profile!.mutedWords,
 				hardMutedWords: profile!.hardMutedWords,
 				mutedInstances: profile!.mutedInstances,
-				mutingNotificationTypes: [], // 後方互換性のため
+				mutingNotificationTypes: [],
 				notificationRecieveConfig: profile!.notificationRecieveConfig,
 				emailNotificationTypes: profile!.emailNotificationTypes,
 				achievements: profile!.achievements,
@@ -724,8 +695,6 @@ export class UserEntityService implements OnModuleInit {
 
 		const schema = (options?.schema ?? 'UserLite') as S;
 
-		// -- IDのみの要素を補完して完全なエンティティ一覧を作る
-
 		const _users = users.filter((user): user is MiUser => typeof user !== 'string');
 		if (_users.length !== users.length) {
 			_users.push(
@@ -735,8 +704,6 @@ export class UserEntityService implements OnModuleInit {
 			);
 		}
 		const _userIds = _users.map(u => u.id);
-
-		// -- 実行者の有無や指定スキーマの種別によって要否が異なる値群を取得
 
 		let profilesMap: Map<MiUser['id'], MiUserProfile> = new Map();
 		let userRelations: Map<MiUser['id'], UserRelation> = new Map();
@@ -770,7 +737,6 @@ export class UserEntityService implements OnModuleInit {
 							map.set(note.userId, notes);
 						}
 						for (const [, notes] of map.entries()) {
-							// pack側ではDESCで取得しているので、それに合わせて降順に並び替えておく
 							notes.sort((a, b) => b.id.localeCompare(a.id));
 						}
 						return map;

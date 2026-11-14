@@ -33,7 +33,6 @@ export class AntennaChannel extends Channel {
 		private noteStreamingHidingService: NoteStreamingHidingService,
 	) {
 		super(request);
-		//this.onEvent = this.onEvent.bind(this);
 	}
 
 	@bindThis
@@ -52,7 +51,6 @@ export class AntennaChannel extends Channel {
 
 		if (!antennaExists) return false;
 
-		// Subscribe stream
 		this.subscriber.on(`antennaStream:${this.antennaId}`, this.onEvent);
 
 		return true;
@@ -78,7 +76,6 @@ export class AntennaChannel extends Channel {
 
 	@bindThis
 	public dispose() {
-		// Unsubscribe events
 		this.subscriber.off(`antennaStream:${this.antennaId}`, this.onEvent);
 	}
 }

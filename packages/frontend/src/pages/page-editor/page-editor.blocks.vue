@@ -15,7 +15,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 >
 	<template #default="{ item, dragStart }">
 		<div>
-			<!-- divが無いとエラーになる -->
 			<component
 				:is="getComponent(item.type)"
 				:modelValue="item"

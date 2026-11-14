@@ -40,7 +40,6 @@ if (assertServerContext(serverContext, 'note')) {
 }
 
 if (note.value?.url != null || note.value?.uri != null) {
-	// リモートサーバーのノートは弾く
 	prohibited.value = true;
 }
 </script>

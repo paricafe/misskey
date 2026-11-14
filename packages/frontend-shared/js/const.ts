@@ -3,11 +3,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-// ブラウザで直接表示することを許可するファイルの種類のリスト
-// ここに含まれないものは application/octet-stream としてレスポンスされる
-// SVGはXSSを生むので許可しない
 export const FILE_TYPE_BROWSERSAFE = [
-	// Images
 	'image/png',
 	'image/gif',
 	'image/jpeg',
@@ -19,13 +15,11 @@ export const FILE_TYPE_BROWSERSAFE = [
 	'image/x-icon',
 	'image/svg+xml',
 
-	// OggS
 	'audio/opus',
 	'video/ogg',
 	'audio/ogg',
 	'application/ogg',
 
-	// ISO/IEC base media file format
 	'video/quicktime',
 	'video/mp4',
 	'audio/mp4',
@@ -42,18 +36,11 @@ export const FILE_TYPE_BROWSERSAFE = [
 
 	'audio/aac',
 
-	// see https://github.com/misskey-dev/misskey/pull/10686
 	'audio/flac',
 	'audio/wav',
-	// backward compatibility
 	'audio/x-flac',
 	'audio/vnd.wave',
 ];
-/*
-https://github.com/sindresorhus/file-type/blob/main/supported.js
-https://github.com/sindresorhus/file-type/blob/main/core.js
-https://developer.mozilla.org/en-US/docs/Web/Media/Formats/Containers
-*/
 
 export const MFM_TAGS = ['tada', 'jelly', 'twitch', 'shake', 'spin', 'jump', 'bounce', 'flip', 'x2', 'x3', 'x4', 'scale', 'position', 'fg', 'bg', 'border', 'font', 'blur', 'rainbow', 'sparkle', 'rotate', 'ruby', 'unixtime'];
 export const MFM_PARAMS: Record<typeof MFM_TAGS[number], string[]> = {
@@ -81,8 +68,4 @@ export const MFM_PARAMS: Record<typeof MFM_TAGS[number], string[]> = {
 	unixtime: [],
 };
 
-/**
- * デフォルトの絵文字。UIの演出などでも使用されるため空にしてはいけない
- * （絵文字パレットのデフォルト絵文字を空にする等の場合は、preferenceのdefinition側の値を空にすること）
- */
 export const DEFAULT_EMOJIS = ['👍', '❤️', '😆', '🤔', '😮', '🎉', '💢', '😥', '😇', '🍮'];

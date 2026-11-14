@@ -38,7 +38,6 @@ const draghover = ref(false);
 function onDragover(ev: DragEvent) {
 	if (!ev.dataTransfer) return;
 
-	// このフォルダがルートかつカレントディレクトリならドロップ禁止
 	if (props.folder == null && props.parentFolder == null) {
 		ev.dataTransfer.dropEffect = 'none';
 	}
@@ -81,13 +80,11 @@ function onDrop(ev: DragEvent) {
 
 	if (!ev.dataTransfer) return;
 
-	// ファイルだったら
 	if (ev.dataTransfer.files.length > 0) {
 		emit('upload', Array.from(ev.dataTransfer.files), props.folder);
 		return;
 	}
 
-	//#region ドライブのファイル
 	{
 		const droppedData = getDragData(ev, 'driveFiles');
 		if (droppedData != null) {
@@ -103,14 +100,11 @@ function onDrop(ev: DragEvent) {
 			});
 		}
 	}
-	//#endregion
 
-	//#region ドライブのフォルダ
 	{
 		const droppedData = getDragData(ev, 'driveFolders');
 		if (droppedData != null) {
 			const droppedFolder = droppedData[0];
-			// 移動先が自分自身ならreject
 			if (props.folder && droppedFolder.id === props.folder.id) return;
 			misskeyApi('drive/folders/update', {
 				folderId: droppedFolder.id,
@@ -124,7 +118,6 @@ function onDrop(ev: DragEvent) {
 			});
 		}
 	}
-	//#endregion
 }
 </script>
 

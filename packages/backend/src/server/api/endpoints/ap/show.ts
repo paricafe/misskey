@@ -127,9 +127,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 		});
 	}
 
-	/***
-	 * URIからUserかNoteを解決する
-	 */
 	@bindThis
 	private async fetchAny(uri: string, me: MiLocalUser | null | undefined): Promise<SchemaType<typeof meta['res']> | null> {
 		if (!this.utilityService.isFederationAllowedUri(uri)) {
@@ -144,16 +141,12 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 
 		const host = this.utilityService.extractDbHost(uri);
 
-		// local object, not found in db? fail
 		if (this.utilityService.isSelfHost(host)) return null;
 
-		// リモートから一旦オブジェクトフェッチ
 		const resolver = await this.apResolverService.createResolver();
-		// allow ap/show exclusively to lookup URLs that are cross-origin or non-canonical (like https://alice.example.com/@bob@bob.example.com -> https://bob.example.com/@bob)
 		const object = await resolver.resolve(uri, FetchAllowSoftFailMask.CrossOrigin | FetchAllowSoftFailMask.NonCanonicalId).catch((err) => {
 			if (err instanceof IdentifiableError) {
 				switch (err.id) {
-					// resolve
 					case 'b94fd5b1-0e3b-4678-9df2-dad4cd515ab2':
 						throw new ApiError(meta.errors.uriInvalid);
 					case '0dc86cf6-7cd6-4e56-b1e6-5903d62d7ea5':
@@ -164,7 +157,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 					case '72180409-793c-4973-868e-5a118eb5519b':
 						throw new ApiError(meta.errors.responseInvalid);
 
-					// resolveLocal
 					case '02b40cd0-fa92-4b0c-acc9-fb2ada952ab8':
 						throw new ApiError(meta.errors.uriInvalid);
 					case 'a9d946e5-d276-47f8-95fb-f04230289bb0':
@@ -182,8 +174,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 			throw new ApiError(meta.errors.responseInvalid);
 		}
 
-		// /@user のような正規id以外で取得できるURIが指定されていた場合、ここで初めて正規URIが確定する
-		// これはDBに存在する可能性があるため再度DB検索
 		if (uri !== object.id) {
 			local = await this.mergePack(me, ...await Promise.all([
 				this.apDbResolverService.getUserFromApId(object.id),
@@ -192,7 +182,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 			if (local != null) return local;
 		}
 
-		// 同一ユーザーの情報を再度処理するので、使用済みのresolverを再利用してはいけない
 		return await this.mergePack(
 			me,
 			isActor(object) ? await this.apPersonService.createPerson(getApId(object)) : null,

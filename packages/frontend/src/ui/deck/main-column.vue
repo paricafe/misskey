@@ -53,11 +53,6 @@ provideMetadataReceiver((metadataGetter) => {
 });
 provideReactiveMetadata(pageMetadata);
 
-/*
-function back() {
-	history.back();
-}
-*/
 function onContextmenu(ev: PointerEvent) {
 	if (!ev.target) return;
 

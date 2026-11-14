@@ -10,7 +10,6 @@ import { envOption } from '@/env.js';
 import type { LogBackend } from './LogBackend.js';
 import type { AccessLogRecord, LogAttributeValue, LogRecord } from './types.js';
 
-/** 見やすい形式の出力処理が外部から受け取る依存関係です。 */
 export type PrettyConsoleBackendDependencies = {
 	readonly output: (...args: unknown[]) => void;
 	readonly withLogTime: () => boolean;
@@ -21,7 +20,6 @@ const defaultDependencies: PrettyConsoleBackendDependencies = {
 	withLogTime: () => envOption.withLogTime,
 };
 
-/** Pretty形式でだけnull prototypeを通常のオブジェクトへ変換し、正規化済みの値自体は変更しません。 */
 function toPrettyLogValue(value: LogAttributeValue): LogAttributeValue {
 	if (Array.isArray(value)) return value.map(item => toPrettyLogValue(item));
 	if (value !== null && typeof value === 'object') {
@@ -30,17 +28,9 @@ function toPrettyLogValue(value: LogAttributeValue): LogAttributeValue {
 	return value;
 }
 
-/**
- * 人が読みやすい従来形式へ整形し、コンソールへ出力します。
- * 色、ラベル、時刻などの見た目だけを担当し、出力可否はLogManagerへ任せます。
- */
 export class PrettyConsoleBackend implements LogBackend {
 	private readonly dependencies: PrettyConsoleBackendDependencies;
 
-	/**
-	 * 出力処理と時刻表示の判定処理を受け取ります。
-	 * 省略時は従来どおり、標準のコンソールと環境設定を使用します。
-	 */
 	constructor(dependencies: Partial<PrettyConsoleBackendDependencies> = {}) {
 		this.dependencies = {
 			...defaultDependencies,
@@ -48,12 +38,8 @@ export class PrettyConsoleBackend implements LogBackend {
 		};
 	}
 
-	/**
-	 * 共通のログを従来形式へ整形して一件出力します。
-	 */
 	public write(record: LogRecord): void {
 		const legacyLevel = record.compatibility?.legacyLevel;
-		// `fatal`は重大なエラーとして扱い、従来の`important`と同じ強調表示にします。
 		const important = record.level === 'fatal' || (record.compatibility?.important ?? false);
 		const presentationLevel = record.level === 'fatal' ? 'error' : (legacyLevel ?? record.level);
 		const label =
@@ -73,7 +59,6 @@ export class PrettyConsoleBackend implements LogBackend {
 			presentationLevel === 'debug' ? chalk.gray(record.message) :
 			presentationLevel === 'info' ? record.message :
 			null;
-		// 主プロセスは「*」で示し、子プロセスはワーカー番号で識別します。
 		const worker = record.isPrimary ? '*' : record.workerId;
 
 		let log = `${label} ${worker}\t[${contexts.join(' ')}]\t${message}`;
@@ -81,13 +66,10 @@ export class PrettyConsoleBackend implements LogBackend {
 			log = chalk.gray(dateFormat(new Date(record.timestamp), 'HH:mm:ss')) + ' ' + log;
 		}
 
-		// `data`は文字列へ埋め込まず、第2引数として渡す従来の挙動を維持します。
 		const args: unknown[] = [important ? chalk.bold(log) : log];
 		if (record.compatibility?.data != null) {
-			// 旧形式の値はそのまま第2引数へ渡し、既存の表示と調査方法を保ちます。
 			args.push(record.compatibility.data);
 		} else if (record.eventName != null || record.attributes != null || record.error != null) {
-			// 構造化ログは、専用の出力先がなくても調査情報を確認できるようにします。
 			args.push({
 				...(record.eventName != null ? { eventName: record.eventName } : {}),
 				...(record.attributes != null ? { attributes: record.attributes } : {}),
@@ -97,7 +79,6 @@ export class PrettyConsoleBackend implements LogBackend {
 		this.dependencies.output(...args);
 	}
 
-	/** Access logを人が読みやすい1行へ整形し、本文は追加情報として表示します。 */
 	public writeAccess(record: AccessLogRecord): void {
 		const statusLevel = record.statusCode >= 500 ? 'error' : record.statusCode >= 400 ? 'warn' : 'info';
 		const label =

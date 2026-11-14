@@ -172,7 +172,6 @@ export async function deleteCloudBackup(key: string) {
 export async function restoreFromCloudBackup() {
 	if ($i == null) return;
 
-	// TODO: 更新日時でソートしたい
 	const backups = await listCloudBackups();
 
 	if (backups.length === 0) {
@@ -224,7 +223,7 @@ export async function enableAutoBackup() {
 export const shouldSuggestRestoreBackup = ref(false);
 
 if ($i != null) {
-	if (new Date($i.createdAt).getTime() > (Date.now() - 1000 * 60 * 30)) { // アカウント作成直後は意味ないので除外
+	if (new Date($i.createdAt).getTime() > (Date.now() - 1000 * 60 * 30)) {
 		miLocalStorage.setItem('hidePreferencesRestoreSuggestion', 'true');
 	} else {
 		if (miLocalStorage.getItem('hidePreferencesRestoreSuggestion') !== 'true') {

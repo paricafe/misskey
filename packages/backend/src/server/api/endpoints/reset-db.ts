@@ -53,8 +53,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 			await this.redisClient.flushdb();
 			await resetDb(this.db);
 
-			// DIコンテナで管理しているmetaのインスタンスには上記のリセット処理が届かないため、
-			// 初期値を流して明示的にリフレッシュする
 			const meta = await this.metaService.fetch(true);
 			this.globalEventService.publishInternalEvent('metaUpdated', { after: meta });
 

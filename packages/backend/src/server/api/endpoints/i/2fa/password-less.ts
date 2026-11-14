@@ -47,7 +47,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 	) {
 		super(meta, paramDef, async (ps, me) => {
 			if (ps.value === true) {
-				// セキュリティキーがなければパスワードレスを有効にはできない
 				const keyCount = await this.userSecurityKeysRepository.count({
 					where: {
 						userId: me.id,
@@ -72,7 +71,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				usePasswordLessLogin: ps.value,
 			});
 
-			// Publish meUpdated event
 			this.globalEventService.publishMainStream(me.id, 'meUpdated', await this.userEntityService.pack(me.id, me, {
 				schema: 'MeDetailed',
 				includeSecrets: true,

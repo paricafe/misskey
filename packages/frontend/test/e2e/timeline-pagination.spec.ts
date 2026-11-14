@@ -95,7 +95,6 @@ for (const scenario of [
 		});
 		release.resolve();
 		await expect.poll(() => loaded).toBeGreaterThan(initialCount);
-		// Include the appear directive's throttle window; an idle reader must not fetch another page.
 		await page.waitForTimeout(1000);
 		const after = await list.evaluate((element, id) => {
 			let container = element.parentElement;
@@ -113,7 +112,6 @@ for (const scenario of [
 		expect(Math.abs(after.anchorTop! - anchor.top)).toBeLessThan(3);
 		expect(after.mounted).toBeLessThan(40);
 
-		// Automatic paging must remain available on the next deliberate scroll to the bottom.
 		await expect.poll(async () => {
 			if (olderRequests === 1) await scrollList(list, true);
 			return olderRequests;

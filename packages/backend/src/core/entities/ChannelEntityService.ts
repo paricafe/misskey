@@ -124,7 +124,7 @@ export class ChannelEntityService {
 				isFollowing,
 				isFavorited,
 				isMuting,
-				hasUnreadNote: false, // 後方互換性のため
+				hasUnreadNote: false,
 			} : {}),
 
 			...(detailed ? {
@@ -139,7 +139,6 @@ export class ChannelEntityService {
 		me?: { id: MiUser['id'] } | null | undefined,
 		detailed?: boolean,
 	): Promise<Packed<'Channel'>[]> {
-		// IDのみの要素がある場合、DBからオブジェクトを取得して補う
 		const channels = src.filter(it => typeof it === 'object') as MiChannel[];
 		channels.push(
 			...(await this.channelsRepository.find({

@@ -78,7 +78,6 @@ defineExpose({
 
 <style lang="scss" module>
 .pagination {
-	// Footer buttons must not become browser scroll anchors when virtual rows change.
 	overflow-anchor: none;
 }
 

@@ -52,7 +52,6 @@ export interface StoreEntry {
 
 export type StoreKey = Pick<StoreEntry, 'namespace' | 'owner' | 'key'>;
 
-/** Storage adapters must serialize mutations with their transaction lock. */
 export interface StoreAdapter {
 	close(): Promise<void>;
 	transaction<T>(callback: () => T | Promise<T>): Promise<T>;
@@ -77,7 +76,6 @@ const entryKey = (namespace: string, owner: string, key: string): string => JSON
 
 interface MemoryTransaction { entries: Map<string, StoreEntry>; active: boolean; }
 
-/** Explicit test storage, with the same async isolation boundary as PostgreSQL. */
 class MemoryAdapter implements StoreAdapter {
 	private entries = new Map<string, StoreEntry>();
 	private queue: Promise<void> = Promise.resolve();
@@ -171,7 +169,6 @@ class MemoryAdapter implements StoreAdapter {
 	}
 }
 
-/** PostgreSQL is production storage; ':memory:' is available only when explicitly requested. */
 export class CompatStore {
 	private readonly adapter: StoreAdapter;
 
@@ -182,7 +179,6 @@ export class CompatStore {
 
 	async close(): Promise<void> { await this.adapter.close(); }
 
-	/** Keep callbacks limited to short store operations; never perform network writes here. */
 	async transaction<T>(callback: () => T | Promise<T>): Promise<T> { return this.adapter.transaction(callback); }
 
 	async createClient(input: Omit<CompatClient, 'id' | 'createdAt'>, now = Date.now()): Promise<{ client: CompatClient; clientSecret: string }> {

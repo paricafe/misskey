@@ -3,8 +3,6 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-// This script checks if the database migrations has been generated correctly.
-
 import dataSource from '../ormconfig.js';
 
 await dataSource.initialize();

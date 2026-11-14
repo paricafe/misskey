@@ -66,7 +66,6 @@ export class ApNoteService {
 		private apMfmService: ApMfmService,
 		private apResolverService: ApResolverService,
 
-		// 循環参照のため / for circular dependency
 		@Inject(forwardRef(() => ApPersonService))
 		private apPersonService: ApPersonService,
 
@@ -117,19 +116,11 @@ export class ApNoteService {
 		return null;
 	}
 
-	/**
-	 * Noteをフェッチします。
-	 *
-	 * Misskeyに対象のNoteが登録されていればそれを返します。
-	 */
 	@bindThis
 	public async fetchNote(object: string | IObject): Promise<MiNote | null> {
 		return await this.apDbResolverService.getNoteFromApId(object);
 	}
 
-	/**
-	 * Noteを作成します。
-	 */
 	@bindThis
 	public async createNote(value: string | IObject, actor?: MiRemoteUser, resolver?: Resolver, silent = false): Promise<MiNote | null> {
 		// eslint-disable-next-line no-param-reassign
@@ -168,14 +159,12 @@ export class ApNoteService {
 
 		this.logger.info(`Creating the Note: ${note.id}`);
 
-		// 投稿者をフェッチ
 		if (note.attributedTo == null) {
 			throw new Error('invalid note.attributedTo: ' + note.attributedTo);
 		}
 
 		const uri = getOneApId(note.attributedTo);
 
-		// ローカルで投稿者を検索し、もし凍結されていたらスキップ
 		// eslint-disable-next-line no-param-reassign
 		actor ??= await this.apPersonService.fetchPerson(uri) as MiRemoteUser | undefined;
 		if (actor && actor.isSuspended) {
@@ -188,7 +177,6 @@ export class ApNoteService {
 
 		const cw = note.summary === '' ? null : note.summary;
 
-		// テキストのパース
 		let text: string | null = null;
 		if (note.source?.mediaType === 'text/x.misskeymarkdown' && typeof note.source.content === 'string') {
 			text = note.source.content;
@@ -200,21 +188,14 @@ export class ApNoteService {
 
 		const poll = await this.apQuestionService.extractPollFromQuestion(note, resolver).catch(() => undefined);
 
-		//#region Contents Check
-		// 添付ファイルとユーザーをこのサーバーで登録する前に内容をチェックする
-		/**
-		 * 禁止ワードチェック
-		 */
 		const hasProhibitedWords = this.noteCreateService.checkProhibitedWordsContain({ cw, text, pollChoices: poll?.choices });
 		if (hasProhibitedWords) {
 			throw new IdentifiableError('689ee33f-f97c-479a-ac49-1b9f8140af99', 'Note contains prohibited words');
 		}
-		//#endregion
 
 		// eslint-disable-next-line no-param-reassign
 		actor ??= await this.apPersonService.resolvePerson(uri, resolver) as MiRemoteUser;
 
-		// 解決した投稿者が凍結されていたらスキップ
 		if (actor.isSuspended) {
 			throw new IdentifiableError('85ab9bd7-3a41-4530-959d-f07073900109', 'actor has been suspended');
 		}
@@ -223,15 +204,12 @@ export class ApNoteService {
 		let visibility = noteAudience.visibility;
 		const visibleUsers = noteAudience.visibleUsers;
 
-		// Audience (to, cc) が指定されてなかった場合
 		if (visibility === 'specified' && visibleUsers.length === 0) {
-			if (typeof value === 'string') {	// 入力がstringならばresolverでGETが発生している
-				// こちらから匿名GET出来たものならばpublic
+			if (typeof value === 'string') {
 				visibility = 'public';
 			}
 		}
 
-		// 添付ファイル
 		const files: MiDriveFile[] = [];
 
 		for (const attach of toArray(note.attachment)) {
@@ -240,7 +218,6 @@ export class ApNoteService {
 			if (file) files.push(file);
 		}
 
-		// リプライ
 		const reply: MiNote | null = note.inReplyTo
 			? await this.resolveNote(note.inReplyTo, { resolver })
 				.then(x => {
@@ -257,7 +234,6 @@ export class ApNoteService {
 				})
 			: null;
 
-		// 引用
 		let quote: MiNote | undefined | null = null;
 
 		if (note._misskey_quote ?? note.quoteUrl) {
@@ -288,7 +264,6 @@ export class ApNoteService {
 			}
 		}
 
-		// vote
 		if (reply && reply.hasPoll) {
 			const poll = await this.pollsRepository.findOneByOrFail({ noteId: reply.id });
 
@@ -299,7 +274,6 @@ export class ApNoteService {
 					this.logger.info(`vote from AP: actor=${actor.username}@${actor.host}, note=${note.id}, choice=${name}`);
 					await this.pollService.vote(actor, reply, index);
 
-					// リモートフォロワーにUpdate配信
 					this.pollService.deliverQuestionUpdate(reply.id);
 				}
 				return null;
@@ -351,14 +325,10 @@ export class ApNoteService {
 	}
 
 	@bindThis
-	/**
-	 * @returns a skip reason when the update cannot apply to any stored note
-	 */
 	public async updateNote(value: string | IObject, resolver?: Resolver, silent = false): Promise<string | undefined> {
 		const uri = typeof value === 'string' ? value : value.id;
 		if (uri == null) throw new Error('uri is null');
 
-		// Check if note is from local
 		if (uri.startsWith(`${this.config.url}/`)) throw new Error('uri points local');
 
 		const unlock = await acquireApObjectLock(this.redisClient, uri);
@@ -377,20 +347,16 @@ export class ApNoteService {
 		assertLockOwned: () => Promise<void>,
 	): Promise<string | undefined> {
 		const registeredNote = await this.notesRepository.findOneBy({ uri });
-		// Notes received before following, or never received, have nothing to update.
 		if (registeredNote === null) return 'skip: note is not registered';
 		const originNote = await this.noteUpdateService.withHistory(registeredNote);
 
-		// Process new note
 		const note = value as IPost;
 
-		// Check updated timestamp
 		const updatedAt = typeof note.updated === 'string' ? new Date(note.updated) : null;
 		if (updatedAt == null || Number.isNaN(updatedAt.getTime())) {
 			throw new IdentifiableError('d450b8a9-48e4-4dab-ae36-f4db763fda7c', 'invalid Note: updated timestamp is missing or malformed');
 		}
 
-		// Fetch note author
 		if (!note.attributedTo) {
 			throw new IdentifiableError('d450b8a9-48e4-4dab-ae36-f4db763fda7c', 'invalid Note: attributedTo is missing');
 		}
@@ -405,7 +371,6 @@ export class ApNoteService {
 
 		const cw = note.summary || null;
 
-		// Text parsing
 		let text: string | null = null;
 		if (note.source?.mediaType === 'text/x.misskeymarkdown' && typeof note.source.content === 'string') {
 			text = note.source.content;
@@ -417,11 +382,6 @@ export class ApNoteService {
 
 		await this.noteUpdateService.prepareUpdate(actor, originNote);
 
-		// This may register a remote input-cache artifact and its Drive cache events,
-		// so it must finish before NoteUpdateService opens its database transaction.
-		// A rare later rollback can leave that artifact unattached; non-link cache
-		// bytes are capacity-bounded, but isLink rows are not universally swept.
-		// 添付ファイル
 		let files: MiDriveFile[] | undefined;
 		if (Object.hasOwn(note, 'attachment')) {
 			files = [];
@@ -454,12 +414,6 @@ export class ApNoteService {
 		return undefined;
 	}
 
-	/**
-	 * Noteを解決します。
-	 *
-	 * Misskeyに対象のNoteが登録されていればそれを返し、そうでなければ
-	 * リモートサーバーからフェッチしてMisskeyに登録しそれを返します。
-	 */
 	@bindThis
 	public async resolveNote(value: string | IObject, options: { sentFrom?: URL, resolver?: Resolver } = {}): Promise<MiNote | null> {
 		const uri = getApId(value);
@@ -471,18 +425,13 @@ export class ApNoteService {
 		const unlock = await acquireApObjectLock(this.redisClient, uri);
 
 		try {
-			//#region このサーバーに既に登録されていたらそれを返す
 			const exist = await this.fetchNote(uri);
 			if (exist) return exist;
-			//#endregion
 
 			if (this.utilityService.isUriLocal(uri)) {
 				throw new StatusError('cannot resolve local note', 400, 'cannot resolve local note');
 			}
 
-			// リモートサーバーからフェッチしてきて登録
-			// ここでuriの代わりに添付されてきたNote Objectが指定されていると、サーバーフェッチを経ずにノートが生成されるが
-			// 添付されてきたNote Objectは偽装されている可能性があるため、常にuriを指定してサーバーフェッチを行う。
 			const createFrom = options.sentFrom?.origin === new URL(uri).origin ? value : uri;
 			return await this.createNote(createFrom, undefined, options.resolver, true);
 		} finally {
@@ -522,7 +471,6 @@ export class ApNoteService {
 						originalUrl: tag.icon.url,
 						publicUrl: tag.icon.url,
 						updatedAt: new Date(),
-						// _misskey_license が存在しなければ `null`
 						license: (tag._misskey_license?.freeText ?? null)
 					});
 
@@ -545,7 +493,6 @@ export class ApNoteService {
 				publicUrl: tag.icon.url,
 				updatedAt: new Date(),
 				aliases: [],
-				// _misskey_license が存在しなければ `null`
 				license: (tag._misskey_license?.freeText ?? null)
 			});
 		}));

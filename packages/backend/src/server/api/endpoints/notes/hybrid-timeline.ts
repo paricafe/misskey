@@ -61,7 +61,7 @@ export const paramDef = {
 		untilId: { type: 'string', format: 'misskey:id' },
 		sinceDate: { type: 'integer' },
 		untilDate: { type: 'integer' },
-		allowPartial: { type: 'boolean', default: false }, // true is recommended but for compatibility false by default
+		allowPartial: { type: 'boolean', default: false },
 		includeMyRenotes: { type: 'boolean', default: true },
 		includeRenotedMyNotes: { type: 'boolean', default: true },
 		includeLocalRenotes: { type: 'boolean', default: true },
@@ -241,9 +241,9 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 		if (!ps.withReplies) {
 			query.andWhere(new Brackets(qb => {
 				qb
-					.where('note.replyId IS NULL') // 返信ではない
+					.where('note.replyId IS NULL')
 					.orWhere(new Brackets(qb => {
-						qb // 返信だけど投稿者自身への返信
+						qb
 							.where('note.replyId IS NOT NULL')
 							.andWhere('note.replyUserId = note.userId');
 					}));
@@ -287,7 +287,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 		if (ps.withFiles) {
 			query.andWhere('note.fileIds != \'{}\'');
 		}
-		//#endregion
 
 		return await query.limit(ps.limit).getMany();
 	}

@@ -32,7 +32,6 @@ async function respondToNavigation(request: Request): Promise<Response> {
 		globalThis.clearTimeout(timeout);
 	}
 
-	// Only show offline page when network request actually fails
 	const html = await offlineContentHTML();
 	return new Response(html, {
 		status: 200,
@@ -60,29 +59,20 @@ async function offlineContentHTML() {
 }
 
 globalThis.addEventListener('install', (ev) => {
-	// 次の問題が発生するため、ServiceWorkerAutoPreload をオプトアウトする必要がある
-	// ルールを1つでも登録すればオプトアウトされる
-	// https://issues.chromium.org/issues/466790291
 	if ('addRoutes' in ev) {
-		// doc: https://developer.mozilla.org/en-US/docs/Web/API/InstallEvent/addRoutes
 		const addRoutes = (rules: unknown) => (ev.addRoutes as (rules: unknown) => Promise<void>).call(ev, rules);
 
-		// doc: https://developer.mozilla.org/ja/docs/Web/API/URLPattern
 		const anyUrl = new URLPattern({});
 		const urlEndsWithSlash = new URLPattern({ pathname: '*/', search: '' });
 
 		ev.waitUntil(addRoutes([
 			{ condition: { requestMode: 'navigate' }, source: 'fetch-event' },
-			// fetchハンドラーはURLが/で終わるリクエストもHTMLとして扱う (クエリが付くと/では終わらない)
 			{ condition: { urlPattern: urlEndsWithSlash }, source: 'fetch-event' },
-			// ルールは先に一致したものが優先されるので、これは上記以外のすべてに当たる
 			{ condition: { urlPattern: anyUrl }, source: 'network' },
 		]).catch(() => addRoutes({
-			// 上記のルールを受け付けないブラウザでも、オプトアウトは維持する
 			condition: { urlPattern: anyUrl },
 			source: 'fetch-event',
 		})).catch(() => {
-			// ルールの登録に失敗してもインストールは止めない
 		}));
 	}
 });
@@ -114,7 +104,6 @@ globalThis.addEventListener('fetch', ev => {
 });
 
 globalThis.addEventListener('push', ev => {
-	// クライアント取得
 	ev.waitUntil(globalThis.clients.matchAll({
 		includeUncontrolled: true,
 		type: 'window',
@@ -122,11 +111,9 @@ globalThis.addEventListener('push', ev => {
 		const data: PushNotificationDataMap[keyof PushNotificationDataMap] = ev.data?.json();
 
 		switch (data.type) {
-			// case 'driveFileCreated':
 			case 'notification':
 			case 'unreadAntennaNote':
 			case 'newChatMessage':
-				// 1日以上経過している場合は無視
 				if (Date.now() - data.dateTime > 1000 * 60 * 60 * 24) break;
 
 				return createNotification(data);
@@ -251,16 +238,14 @@ globalThis.addEventListener('message', (ev: ServiceWorkerGlobalScopeEventMap['me
 	ev.waitUntil((async (): Promise<void> => {
 		switch (ev.data) {
 			case 'clear':
-				// Cache Storage全削除
 				await caches.keys()
 					.then(cacheNames => Promise.all(
 						cacheNames.map(name => caches.delete(name)),
 					));
-				return; // TODO
+				return;
 		}
 
 		if (typeof ev.data === 'object') {
-			// E.g. '[object Array]' → 'array'
 			const otype = Object.prototype.toString.call(ev.data).slice(8, -1).toLowerCase();
 
 			if (otype === 'object') {

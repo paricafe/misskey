@@ -8,8 +8,6 @@ import { Plugin } from 'vite';
 import { createFilter, dataToEsm } from '@rollup/pluginutils';
 import { RollupJsonOptions } from '@rollup/plugin-json';
 
-// json5 extends SyntaxError with additional fields (without subclassing)
-// https://github.com/json5/json5/blob/de344f0619bda1465a6e25c76f1c0c3dda8108d9/lib/parse.js#L1111-L1112
 interface Json5SyntaxError extends SyntaxError {
 	lineNumber: number;
 	columnNumber: number;

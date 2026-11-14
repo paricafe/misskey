@@ -10,7 +10,6 @@ import type { WebhooksRepository } from '@/models/_.js';
 import { DI } from '@/di-symbols.js';
 import { ApiError } from '../../../error.js';
 
-// TODO: UserWebhook schemaの適用
 export const meta = {
 	tags: ['webhooks'],
 

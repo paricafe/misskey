@@ -7,8 +7,6 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { Pool, type PoolClient, type PoolConfig, type QueryResultRow } from 'pg';
 import { CompatStore, type StoreAdapter, type StoreEntry, type StoreKey } from './store.js';
 
-// Stable across every gateway process sharing this database. All mutations use
-// this transaction lock, including single writes and one-time consumption.
 const lockKeys = [0x4d434f4d, 0x53544f52];
 const columns = '"namespace", "owner", "key", "value", "expiresAt"';
 interface TransactionContext { client: PoolClient; active: boolean; }
@@ -100,11 +98,8 @@ class PostgresAdapter implements StoreAdapter {
 	}
 }
 
-/** The native migration owns this table; startup must never create its schema. */
 export async function createPostgresStore(config: PoolConfig): Promise<CompatStore> {
 	const pool = new Pool(config);
-	// pg removes failed idle clients before emitting this event. Active query
-	// failures still reject their callers; future requests can open a new client.
 	pool.on('error', () => {});
 	try {
 		await pool.query(`SELECT ${columns} FROM "mastodon_compat_entry" LIMIT 0`);

@@ -23,9 +23,7 @@ const levelMap: Record<NestLogLevel, MisskeyLogLevel> = {
 export class NestLogger extends ConsoleLogger {
 	constructor() {
 		super({
-			// 整形はMisskey側のLogBackendが行うため、ConsoleLoggerによる着色は無効化する。
 			colors: false,
-			// ログ1件が複数行へ割れないよう、objectのinspectを1行へ収める。
 			compact: true,
 			logLevels: process.env.NODE_ENV === 'production'
 				? LOG_LEVELS.filter(level => level !== 'debug' && level !== 'verbose')
@@ -42,7 +40,6 @@ export class NestLogger extends ConsoleLogger {
 		params?: Record<string, any>,
 	): void {
 		for (const message of messages) {
-			// Errorはinspectするとstackが本文へ展開されるため、構造化したerrorへ寄せる
 			const body = message instanceof Error
 				? message.toString()
 				: String(this.stringifyMessage(message, logLevel));
@@ -62,8 +59,6 @@ export class NestLogger extends ConsoleLogger {
 		}
 	}
 
-	// ConsoleLogger.error()はprintMessages()の後にstackをprocess.stderrへ直接書く。
-	// stackはprintMessages()で構造化したerrorへ載せているため、ここでは何もしない。
 	protected override printStackTrace(): void {
 	}
 }

@@ -3,9 +3,6 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-/*
- * Language manager for SW
- */
 import { get, set } from 'idb-keyval';
 import { I18n } from '@@/js/i18n.js';
 import { FETCH_TIMEOUT_MS } from '@/const.js';
@@ -32,11 +29,9 @@ class SwLang {
 	}
 
 	private async _fetch(): Promise<I18n<Locale>> {
-		// Service Workerは何度も起動しそのたびにlocaleを読み込むので、CacheStorageを使う
 		const localeUrl = `/assets/locales/${await this.lang}.${_VERSION_}.json`;
 		let localeRes = await caches.match(localeUrl);
 
-		// _DEV_がtrueの場合は常に最新化
 		if (!localeRes || _DEV_) {
 			const controller = new AbortController();
 			const timeout = globalThis.setTimeout(() => {

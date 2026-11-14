@@ -38,8 +38,6 @@ describe('[シナリオ] ユーザ作成', () => {
 		return res.body;
 	}
 
-	// -------------------------------------------------------------------------------------------
-
 	beforeAll(async () => {
 		queue = await startJobQueue();
 		admin = await signup({ username: 'admin' });
@@ -50,8 +48,6 @@ describe('[シナリオ] ユーザ作成', () => {
 	afterAll(async () => {
 		await queue.close();
 	});
-
-	// -------------------------------------------------------------------------------------------
 
 	describe('SystemWebhook', () => {
 		beforeEach(async () => {
@@ -72,7 +68,6 @@ describe('[シナリオ] ユーザ作成', () => {
 				alice = await signup({ username: 'alice' });
 			});
 
-			// webhookの送出後にいろいろやってるのでちょっと待つ必要がある
 			await setTimeout(2000);
 
 			console.log(alice);

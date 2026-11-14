@@ -47,7 +47,7 @@ export class SystemAccountService implements OnApplicationShutdown {
 
 		private idService: IdService,
 	) {
-		this.cache = new MemoryKVCache<MiLocalUser>(1000 * 60 * 10); // 10m
+		this.cache = new MemoryKVCache<MiLocalUser>(1000 * 60 * 10);
 
 		this.redisForSub.on('message', this.onMessage);
 	}
@@ -97,7 +97,7 @@ export class SystemAccountService implements OnApplicationShutdown {
 			return systemAccount.user as MiLocalUser;
 		} else {
 			const created = await this.createCorrespondingUser(type, {
-				username: `system.${type}`, // NOTE: (できれば避けたいが) . が含まれるかどうかでシステムアカウントかどうかを判定している処理もあるので変えないように
+				username: `system.${type}`,
 				name: this.meta.name,
 			});
 			this.cache.set(type, created);
@@ -112,18 +112,15 @@ export class SystemAccountService implements OnApplicationShutdown {
 	}): Promise<MiLocalUser> {
 		const password = randomUUID();
 
-		// Generate hash of password
 		const salt = await bcrypt.genSalt(8);
 		const hash = await bcrypt.hash(password, salt);
 
-		// Generate secret
 		const secret = generateNativeUserToken();
 
 		const keyPair = await genRsaKeyPair();
 
 		let account!: MiUser;
 
-		// Start transaction
 		await this.db.transaction(async transactionalEntityManager => {
 			const exist = await transactionalEntityManager.findOneBy(MiUser, {
 				usernameLower: extra.username.toLowerCase(),

@@ -65,7 +65,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 		private globalEventService: GlobalEventService,
 	) {
 		super(meta, paramDef, async (ps, me) => {
-			// Fetch folder
 			const folder = await this.driveFoldersRepository.findOneBy({
 				id: ps.folderId,
 				userId: me.id,
@@ -83,7 +82,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				} else if (ps.parentId === null) {
 					folder.parentId = null;
 				} else {
-					// Get parent folder
 					const parent = await this.driveFoldersRepository.findOneBy({
 						id: ps.parentId,
 						userId: me.id,
@@ -93,7 +91,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 						throw new ApiError(meta.errors.noSuchParentFolder);
 					}
 
-					// Check if the circular reference will occur
 					const checkCircle = async (folderId: string): Promise<boolean> => {
 						const folder2 = await this.driveFoldersRepository.findOneByOrFail({
 							id: folderId,
@@ -118,7 +115,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				}
 			}
 
-			// Update
 			await this.driveFoldersRepository.update(folder.id, {
 				name: folder.name,
 				parentId: folder.parentId,
@@ -126,7 +122,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 
 			const folderObj = await this.driveFolderEntityService.pack(folder);
 
-			// Publish folderUpdated event
 			this.globalEventService.publishDriveStream(me.id, 'folderUpdated', folderObj);
 
 			return folderObj;

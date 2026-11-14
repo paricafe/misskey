@@ -45,7 +45,6 @@ export class MiFollowing {
 	})
 	public isFollowerHibernated: boolean;
 
-	// タイムラインにその人のリプライまで含めるかどうか
 	@Column('boolean', {
 		default: false,
 	})
@@ -58,7 +57,6 @@ export class MiFollowing {
 	})
 	public notify: 'normal' | null;
 
-	//#region Denormalized fields
 	@Index()
 	@Column('varchar', {
 		length: 128, nullable: true,
@@ -96,5 +94,4 @@ export class MiFollowing {
 		comment: '[Denormalized]',
 	})
 	public followeeSharedInbox: string | null;
-	//#endregion
 }

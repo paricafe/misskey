@@ -9,7 +9,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 		<div v-if="!gameLoaded" :class="$style.loadingScreen">
 			<div>{{ i18n.ts.loading }}<MkEllipsis/></div>
 		</div>
-		<!-- ↓に対してTransitionコンポーネントを使うと何故かkeyを指定していてもキャッシュが効かず様々なコンポーネントが都度再評価されてパフォーマンスが低下する -->
 		<div v-show="gameLoaded" class="_gaps_s">
 			<div v-if="readyGo === 'ready'" :class="$style.readyGo_bg">
 			</div>
@@ -69,7 +68,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 					<div v-show="combo > 1" :class="$style.combo" :style="{ fontSize: `${100 + ((comboPrev - 2) * 15)}%` }">{{ comboPrev }} Chain!</div>
 				</Transition>
 				<div v-if="!isGameOver && !replaying && readyGo !== 'ready'" :class="$style.dropperContainer" :style="{ left: dropperX + 'px' }">
-					<!--<img v-if="currentPick" src="/client-assets/drop-and-fusion/dropper.png" :class="$style.dropper" :style="{ left: dropperX + 'px' }"/>-->
 					<Transition
 						:enterActiveClass="$style.transition_picked_enterActive"
 						:leaveActiveClass="$style.transition_picked_leaveActive"
@@ -607,8 +605,8 @@ function createRendererInstance(game: DropAndFusionGame) {
 		options: {
 			width: game.GAME_WIDTH,
 			height: game.GAME_HEIGHT,
-			background: 'transparent', // transparent to hide
-			wireframeBackground: 'transparent', // transparent to hide
+			background: 'transparent',
+			wireframeBackground: 'transparent',
 			wireframes: false,
 			showSleeping: false,
 			pixelRatio: Math.max(2, window.devicePixelRatio),
@@ -620,7 +618,6 @@ function loadMonoTextures() {
 	async function loadSingleMonoTexture(mono: FrontendMonoDefinition) {
 		if (renderer == null) return;
 
-		// Matter-js内にキャッシュがある場合はスキップ
 		if (renderer.textures[mono.img]) return;
 
 		let src = mono.img;
@@ -655,7 +652,6 @@ function getTextureImageUrl(mono: Mono) {
 
 		// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
 	} else if (monoTextures[def.img]) {
-		// Gameクラス内にキャッシュがある場合はそれを使う
 		const out = URL.createObjectURL(monoTextures[def.img]);
 		monoTextureUrls[def.img] = out;
 		return out;
@@ -1044,7 +1040,6 @@ function attachGameEvents() {
 			}
 		} else {
 			if (!props.mute) {
-				// TODO: 融合後のモノがない場合でも何らかの効果音を再生
 			}
 		}
 	});
@@ -1084,7 +1079,6 @@ function attachGameEvents() {
 	game.addListener('monoAdded', (mono) => {
 		if (replaying.value) return;
 
-		// 実績関連
 		if (mono.level === 10) {
 			claimAchievement('bubbleGameExplodingHead');
 
@@ -1174,7 +1168,6 @@ onMounted(async () => {
 			});
 		} catch (err: any) {
 			if (err.code === 'NO_SUCH_KEY') {
-				// nop
 			} else {
 				os.alert({
 					type: 'error',
@@ -1184,27 +1177,6 @@ onMounted(async () => {
 			}
 		}
 	}
-
-	/*
-	const getVerticesFromSvg = async (path: string) => {
-		const svgDoc = await fetch(path)
-			.then((response) => response.text())
-			.then((svgString) => {
-				const parser = new DOMParser();
-				return parser.parseFromString(svgString, 'image/svg+xml');
-			});
-		const pathDatas = svgDoc.querySelectorAll('path');
-		if (!pathDatas) return;
-		const vertices = Array.from(pathDatas).map((pathData) => {
-			return Matter.Svg.pathToVertices(pathData);
-		});
-		return vertices;
-	};
-
-	getVerticesFromSvg('/client-assets/drop-and-fusion/sweets_monos/verts/doughnut_color.svg').then((vertices) => {
-		console.log('doughnut_color', vertices);
-	});
-	*/
 
 	await start();
 
@@ -1364,8 +1336,6 @@ definePage(() => ({
 	top: 0;
 	left: 0;
 	width: 100%;
-	// なんかiOSでちらつく
-	//filter: drop-shadow(0 6px 16px #0007);
 	pointer-events: none;
 	user-select: none;
 }

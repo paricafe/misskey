@@ -17,7 +17,6 @@ function remoteUser(inbox: string | null, sharedInbox: string | null = null): Mi
 }
 
 function createService(rows: { inbox: string | null; isSharedInbox: boolean }[] = []) {
-	// Build the real PostgreSQL query without opening a database connection.
 	const query = new DataSource({ type: 'postgres' }).createQueryBuilder().from('following', 'following');
 	const getRawMany = vi.spyOn(query, 'getRawMany').mockResolvedValue(rows);
 	const followings = { createQueryBuilder: vi.fn().mockReturnValue(query) };

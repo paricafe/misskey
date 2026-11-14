@@ -85,7 +85,6 @@ export class ImportMutingProcessorService {
 					throw new Error(`cannot resolve user: @${username}@${host}`);
 				}
 
-				// skip myself
 				if (target.id === job.data.user.id) continue;
 
 				this.logger.info(`Mute[${linenum}] ${target.id} ...`);

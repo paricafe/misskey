@@ -8,10 +8,6 @@ import * as fs from 'node:fs/promises';
 export const procStatusKeys = ['VmPeak', 'VmSize', 'VmHWM', 'VmRSS', 'VmData', 'VmStk', 'VmExe', 'VmLib', 'VmPTE', 'VmSwap'] as const;
 export const smapsRollupKeys = ['Pss', 'Shared_Clean', 'Shared_Dirty', 'Private_Clean', 'Private_Dirty', 'Swap', 'SwapPss'] as const;
 
-/**
- * `/proc` 配下の `Key:  1234 kB` 形式のファイルから指定キーを取り出す。
- * 1つでも欠けていると以降の集計が静かに壊れるため、見つからなければ例外にする。
- */
 export function parseMemoryFile<KS extends readonly string[]>(content: string, keys: KS, path: string): Record<KS[number], number> {
 	const result = {} as Record<KS[number], number>;
 	for (const _key of keys) {

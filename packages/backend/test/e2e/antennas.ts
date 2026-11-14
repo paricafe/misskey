@@ -26,14 +26,11 @@ const compareBy = <T extends { id: string }>(selector: (s: T) => string = (s: T)
 };
 
 describe('アンテナ', () => {
-	// エンティティとしてのアンテナを主眼においたテストを記述する
-	// (Antennaを返すエンドポイント、Antennaエンティティを書き換えるエンドポイント、Antennaからノートを取得するエンドポイントをテストする)
 
 	type Antenna = misskey.entities.Antenna;
 	type User = misskey.entities.SignupResponse;
 	type Note = misskey.entities.Note;
 
-	// アンテナを作成できる最小のパラメタ
 	const defaultParam = {
 		caseSensitive: false,
 		excludeKeywords: [['']],
@@ -131,7 +128,6 @@ describe('アンテナ', () => {
 	}, 1000 * 60 * 10);
 
 	beforeEach(async () => {
-		// テスト間で影響し合わないように毎回全部消す。
 		for (const user of [alice, bob]) {
 			const list = await api('antennas/list', {}, user);
 			for (const antenna of list.body) {
@@ -139,8 +135,6 @@ describe('アンテナ', () => {
 			}
 		}
 	});
-
-	//#region 作成(antennas/create)
 
 	test('が作成できること、キーが過不足なく入っていること。', async () => {
 		const response = await successfulApiCall({
@@ -250,8 +244,6 @@ describe('アンテナ', () => {
 			id: '53ee222e-1ddd-4f9a-92e5-9fb82ddb463a',
 		});
 	});
-	//#endregion
-	//#region 更新(antennas/update)
 
 	test.each(antennaParamPattern)('を変更できること($#)', async ({ parameters }) => {
 		const antenna = await successfulApiCall({ endpoint: 'antennas/create', parameters: defaultParam, user: alice });
@@ -290,9 +282,6 @@ describe('アンテナ', () => {
 		});
 	});
 
-	//#endregion
-	//#region 表示(antennas/show)
-
 	test('をID指定で表示できること。', async () => {
 		const antenna = await successfulApiCall({ endpoint: 'antennas/create', parameters: defaultParam, user: alice });
 		const response = await successfulApiCall({
@@ -305,9 +294,6 @@ describe('アンテナ', () => {
 	});
 	test.todo('は他人のものをID指定で表示できない');
 
-	//#endregion
-	//#region 一覧(antennas/list)
-
 	test('をリスト形式で取得できること。', async () => {
 		const antenna = await successfulApiCall({ endpoint: 'antennas/create', parameters: defaultParam, user: alice });
 		await successfulApiCall({ endpoint: 'antennas/create', parameters: defaultParam, user: bob });
@@ -319,9 +305,6 @@ describe('アンテナ', () => {
 		const expected = [{ ...antenna }];
 		assert.deepStrictEqual(response, expected);
 	});
-
-	//#endregion
-	//#region 削除(antennas/delete)
 
 	test('を削除できること。', async () => {
 		const antenna = await successfulApiCall({ endpoint: 'antennas/create', parameters: defaultParam, user: alice });
@@ -336,10 +319,7 @@ describe('アンテナ', () => {
 	});
 	test.todo('は他人のものを削除できない');
 
-	//#endregion
-
 	describe('のノート', () => {
-		//#region アンテナのノート取得(antennas/notes)
 
 		test('を取得できること。', async () => {
 			const keyword = 'キーワード';
@@ -447,7 +427,6 @@ describe('アンテナ', () => {
 				],
 			},
 			{
-				// BUG e4144a1 以降home指定は壊れている(allと同じ)
 				label: 'ホーム指定はallと同じ',
 				parameters: () => ({ src: 'home' }),
 				posts: [
@@ -710,14 +689,12 @@ describe('アンテナ', () => {
 			});
 
 			const notes = await posts.reduce(async (prev, current) => {
-				// includedに関わらずnote()は評価して投稿する。
 				const p = await prev;
 				const n = await current.note();
 				if (current.included) return p.concat(n);
 				return p;
 			}, Promise.resolve([] as Note[]));
 
-			// alice視点でNoteを取り直す
 			const expected = await Promise.all(notes.reverse().map(s => successfulApiCall({
 				endpoint: 'notes/show',
 				parameters: { noteId: s.id },
@@ -762,7 +739,6 @@ describe('アンテナ', () => {
 				parameters: { antennaId: antenna.id },
 				user: alice,
 			});
-			// 最後に投稿したものが先頭に来る。
 			const expected = [
 				noteInNonSensitiveChannel,
 				noteInLocal,
@@ -774,8 +750,6 @@ describe('アンテナ', () => {
 		test.each([
 			{ label: 'ID指定', offsetBy: 'id' },
 
-			// BUG sinceDate, untilDateはsinceIdや他のエンドポイントとは異なり、その時刻に一致するレコードを含んでしまう。
-			// { label: '日付指定', offsetBy: 'createdAt' },
 		] as const)('が取得でき、$labelのPaginationに一貫性があること', async ({ offsetBy }) => {
 			const antenna = await successfulApiCall({
 				endpoint: 'antennas/create',
@@ -788,7 +762,6 @@ describe('アンテナ', () => {
 				return [n].concat(p);
 			}, Promise.resolve([] as Note[]));
 
-			// antennas/notesは降順のみで、昇順をサポートしない。
 			await testPaginationConsistency(notes, async (paginationParam) => {
 				return successfulApiCall({
 					endpoint: 'antennas/notes',
@@ -798,9 +771,7 @@ describe('アンテナ', () => {
 			}, offsetBy, 'desc');
 		});
 
-		// BUG 7日過ぎると作り直すしかない。 https://github.com/misskey-dev/misskey/issues/10476
 		test.todo('を取得したときActiveに戻る');
 
-		//#endregion
 	});
 });

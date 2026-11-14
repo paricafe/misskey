@@ -64,9 +64,6 @@ export class NotificationEntityService implements OnModuleInit {
 		this.chatEntityService = this.moduleRef.get('ChatEntityService');
 	}
 
-	/**
-	 * 通知をパックする共通処理
-	*/
 	async #packInternal <T extends MiNotification | MiGroupedNotification> (
 		src: T,
 		meId: MiUser['id'],
@@ -90,7 +87,6 @@ export class NotificationEntityService implements OnModuleInit {
 					detail: true,
 				})
 		) : undefined;
-		// if the note has been deleted, don't show this notification
 		if (needsNote && !noteIfNeed) return null;
 
 		const needsUser = 'notifierId' in notification;
@@ -99,10 +95,8 @@ export class NotificationEntityService implements OnModuleInit {
 				? hint.packedUsers.get(notification.notifierId)
 				: this.userEntityService.pack(notification.notifierId, { id: meId })
 		) : undefined;
-		// if the user has been deleted, don't show this notification
 		if (needsUser && !userIfNeed) return null;
 
-		//#region Grouped notifications
 		if (notification.type === 'reaction:grouped') {
 			const reactions = (await Promise.all(notification.reactions.map(async reaction => {
 				const user = hint?.packedUsers != null
@@ -113,7 +107,6 @@ export class NotificationEntityService implements OnModuleInit {
 					reaction: reaction.reaction,
 				};
 			}))).filter(r => r.user != null);
-			// if all users have been deleted, don't show this notification
 			if (reactions.length === 0) {
 				return null;
 			}
@@ -134,7 +127,6 @@ export class NotificationEntityService implements OnModuleInit {
 
 				return this.userEntityService.pack(userId, { id: meId });
 			}))).filter(x => x != null);
-			// if all users have been deleted, don't show this notification
 			if (users.length === 0) {
 				return null;
 			}
@@ -147,18 +139,15 @@ export class NotificationEntityService implements OnModuleInit {
 				users,
 			});
 		}
-		//#endregion
 
 		const needsRole = notification.type === 'roleAssigned';
 		const role = needsRole ? await this.roleEntityService.pack(notification.roleId) : undefined;
-		// if the role has been deleted, don't show this notification
 		if (needsRole && !role) {
 			return null;
 		}
 
 		const needsChatRoomInvitation = notification.type === 'chatRoomInvitationReceived';
 		const chatRoomInvitation = needsChatRoomInvitation ? await this.chatEntityService.packRoomInvitation(notification.invitationId, { id: meId }).catch(() => null) : undefined;
-		// if the invitation has been deleted, don't show this notification
 		if (needsChatRoomInvitation && !chatRoomInvitation) {
 			return null;
 		}
@@ -239,7 +228,6 @@ export class NotificationEntityService implements OnModuleInit {
 		const packedUsersArray = await this.userEntityService.packMany(users, { id: meId });
 		const packedUsers = new Map(packedUsersArray.map(p => [p.id, p]));
 
-		// 既に解決されたフォローリクエストの通知を除外
 		const followRequestNotifications = validNotifications.filter((x): x is FilterUnionByProperty<T, 'type', 'receiveFollowRequest'> => x.type === 'receiveFollowRequest');
 		if (followRequestNotifications.length > 0) {
 			const reqs = await this.followRequestsRepository.find({
@@ -292,9 +280,6 @@ export class NotificationEntityService implements OnModuleInit {
 		return await this.#packManyInternal(notifications, meId);
 	}
 
-	/**
-	 * notifierが存在するか、ミュートされていないか、サスペンドされていないかを確認するvalidator
-	 */
 	#validateNotifier <T extends MiNotification | MiGroupedNotification> (
 		notification: T,
 		userIdsWhoMeMuting: Set<MiUser['id']>,
@@ -314,9 +299,6 @@ export class NotificationEntityService implements OnModuleInit {
 		return true;
 	}
 
-	/**
-	 * notifierが存在するか、ミュートされていないか、サスペンドされていないかを実際に確認する
-	 */
 	async #isValidNotifier(
 		notification: MiNotification | MiGroupedNotification,
 		meId: MiUser['id'],
@@ -324,9 +306,6 @@ export class NotificationEntityService implements OnModuleInit {
 		return (await this.#filterValidNotifier([notification], meId)).length === 1;
 	}
 
-	/**
-	 * notifierが存在するか、ミュートされていないか、サスペンドされていないかを実際に複数確認する
-	 */
 	async #filterValidNotifier <T extends MiNotification | MiGroupedNotification> (
 		notifications: T[],
 		meId: MiUser['id'],

@@ -30,7 +30,6 @@ export type CompareOptions = {
 };
 
 const HEAP_SNAPSHOT_BREAKDOWN_TOP_N = readIntegerEnv('MK_MEMORY_HEAP_SNAPSHOT_BREAKDOWN_TOP_N', defaultHeapSnapshotBreakdownTopN, 1);
-// 成果物 (artifact) としてアップロードされるファイルの出力先。CIではworkspace直下を指す
 const HEAP_SNAPSHOT_OUTPUT_DIR = resolve(readOptionalEnv('MK_MEMORY_HEAP_SNAPSHOT_OUTPUT_DIR') ?? process.cwd());
 const HEAP_SNAPSHOT_WORK_DIRS = {
 	base: join(HEAP_SNAPSHOT_OUTPUT_DIR, 'base-heap-snapshots'),
@@ -82,7 +81,6 @@ async function genSample(label: string, repoDir: string, round: number, options:
 	await resetState();
 
 	process.stderr.write(`[${label}] Running migrations\n`);
-	// 出力はログとして流しつつ手元にも残す (失敗時にexecaが例外メッセージへ含めてくれる)
 	await execa('pnpm', ['--filter', 'backend', 'migrate'], {
 		cwd: repoDir,
 		stdout: ['pipe', process.stderr],
@@ -91,7 +89,6 @@ async function genSample(label: string, repoDir: string, round: number, options:
 
 	process.stderr.write(`[${label}] Measuring memory\n`);
 	return await measureBackendMemory(resolve(repoDir, 'packages/backend'), {
-		// warmupラウンド (round <= 0) は捨てるので、重いheap snapshotは取らない
 		...(round <= 0 || options.collectHeapSnapshot === false ? { heapSnapshot: false } : {}),
 		heapSnapshotSavePath: options.heapSnapshotSavePath ?? null,
 	});
@@ -114,10 +111,6 @@ async function saveRepresentativeHeapSnapshot(label: HeapSnapshotLabel, samples:
 	await rm(HEAP_SNAPSHOT_WORK_DIRS[label], { recursive: true, force: true });
 }
 
-/**
- * base / head を交互に計測してJSONレポートを書き出す。
- * 交互にするのは、実行順やマシンの状態による偏りを両者に均等に載せるため。
- */
 export async function compareBackendMemory(options: CompareOptions) {
 	const rounds = readIntegerEnv('MK_MEMORY_COMPARE_ROUNDS', 5, 1);
 	const warmupRounds = readIntegerEnv('MK_MEMORY_COMPARE_WARMUP_ROUNDS', 1, 0);

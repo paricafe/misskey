@@ -73,7 +73,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 							<MkUserName :user="page.user" :class="$style.name"/>
 							<MkAcct :user="page.user" :class="$style.acct"/>
 						</MkA>
-						<!--<MkFollowButton v-if="!$i || $i.id != page.user.id" :user="page.user!" :inline="true" :transparent="false" :full="true" :class="$style.follow"/>-->
 					</div>
 					<div :class="$style.pageDate">
 						<div><i class="ti ti-clock"></i> {{ i18n.ts.createdAt }}: <MkTime :time="page.createdAt" mode="detail"/></div>
@@ -149,7 +148,6 @@ function fetchPage() {
 	}).then(async _page => {
 		page.value = _page;
 
-		// plugin
 		const pageViewInterruptors = getPluginHandlers('page_view_interruptor');
 		if (pageViewInterruptors.length > 0) {
 			let result = deepClone(_page);

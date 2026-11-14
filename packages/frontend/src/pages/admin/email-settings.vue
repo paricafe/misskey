@@ -117,14 +117,11 @@ function getSettings() {
 	};
 }
 
-// 未入力を表す値（null・空文字・数値欄を空にしたときの NaN）を同じものとして比べる
 function normalizeSettingValue(value: unknown) {
 	if (value === '' || (typeof value === 'number' && Number.isNaN(value))) return null;
 	return value;
 }
 
-// 配信テストは保存済みの設定で行われるため、未保存の変更がある間や、SMTP サーバーが保存されていない間はテストできないようにする
-// メール配信が無効だと送信されずに正常終了し、テストが成功したように見えるため、配信が無効な間もテストできないようにする
 const savedSettings = ref(getSettings());
 const hasUnsavedChanges = computed(() => {
 	const current = getSettings();

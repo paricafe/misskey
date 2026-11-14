@@ -47,7 +47,6 @@ export class CleanProcessorService {
 			createdAt: LessThan(new Date(Date.now() - (1000 * 60 * 60 * 24 * 90))),
 		});
 
-		// 使われてないアンテナを停止
 		if (this.config.deactivateAntennaThreshold > 0) {
 			this.antennasRepository.update({
 				lastUsedAt: LessThan(new Date(Date.now() - this.config.deactivateAntennaThreshold)),

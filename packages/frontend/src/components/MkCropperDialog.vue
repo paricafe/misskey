@@ -62,7 +62,6 @@ async function ok() {
 		const croppedImage = await cropper.getCropperImage()!;
 		const croppedSection = await cropper.getCropperSelection()!;
 
-		// 拡大率を計算し、(ほぼ)元の大きさに戻す
 		const zoomedRate = croppedImage.getBoundingClientRect().width / croppedImage.clientWidth;
 		const widthToRender = croppedSection.getBoundingClientRect().width / zoomedRate;
 
@@ -100,7 +99,7 @@ function onImageLoad() {
 }
 
 onMounted(() => {
-	if (imgEl.value == null) return; // TSを黙らすため
+	if (imgEl.value == null) return;
 
 	cropper = new Cropper(imgEl.value, {
 	});
@@ -119,7 +118,6 @@ onMounted(() => {
 		selection.$center();
 	}, 100);
 
-	// モーダルオープンアニメーションが終わったあとで再度調整
 	window.setTimeout(() => {
 		if (cropper == null) return;
 		cropper.getCropperImage()!.$center('contain');

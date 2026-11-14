@@ -34,10 +34,6 @@ import { ref, useTemplateRef, computed, onMounted, onBeforeUnmount, watch, onUnm
 import type Reciever_typeReferenceOnly from '@mcaptcha/core-glue';
 import { store } from '@/store.js';
 
-// APIs provided by Captcha services
-// see: https://docs.hcaptcha.com/configuration/#javascript-api
-// see: https://developers.google.com/recaptcha/docs/display?hl=ja
-// see: https://developers.cloudflare.com/turnstile/get-started/client-side-rendering/#explicitly-render-the-turnstile-widget
 export type Captcha = {
 	render(container: string | Node, options: {
 		readonly [_ in 'sitekey' | 'theme' | 'type' | 'size' | 'tabindex' | 'callback' | 'expired' | 'expired-callback' | 'error-callback' | 'endpoint']?: unknown;
@@ -55,14 +51,13 @@ type CaptchaContainer = {
 };
 
 declare global {
-	// Window を拡張してるため、空ではない
 	// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 	interface Window extends CaptchaContainer { }
 }
 
 const props = defineProps<{
 	provider: CaptchaProvider;
-	sitekey: string | null; // null will show error on request
+	sitekey: string | null;
 	secretKey?: string | null;
 	instanceUrl?: string | null;
 	modelValue?: string | null;
@@ -119,7 +114,6 @@ const scriptId = computed(() => `script-${props.provider}`);
 const captcha = computed<Captcha>(() => (window as any)[variable.value] ?? {} as unknown as Captcha);
 
 watch(() => [props.instanceUrl, props.sitekey, props.secretKey], async () => {
-	// 変更があったときはリフレッシュと再レンダリングをしておかないと、変更後の値で再検証が出来ない
 	if (available.value) {
 		callback(undefined);
 		clearWidget();
@@ -143,7 +137,6 @@ function reset() {
 		try {
 			captcha.value.reset(captchaWidgetId.value);
 		} catch (error: unknown) {
-			// ignore
 			if (_DEV_) console.warn(error);
 		}
 	}
@@ -163,7 +156,6 @@ function remove() {
 			if (_DEV_) console.log('remove', props.provider, captchaWidgetId.value);
 			captcha.value.remove(captchaWidgetId.value);
 		} catch (error: unknown) {
-			// ignore
 			if (_DEV_) console.warn(error);
 		}
 	}
@@ -175,8 +167,6 @@ function remove() {
 
 async function requestRender() {
 	if (captcha.value.render && captchaEl.value instanceof Element && props.sitekey) {
-		// reCAPTCHAのレンダリング重複判定を回避するため、captchaEl配下に仮のdivを用意する.
-		// （同じdivに対して複数回renderを呼び出すとreCAPTCHAはエラーを返すので）
 		const elem = window.document.createElement('div');
 		captchaEl.value.appendChild(elem);
 
@@ -209,7 +199,6 @@ function clearWidget() {
 	remove();
 
 	if (captchaEl.value) {
-		// レンダリング先のコンテナの中身を掃除し、フォームが増殖するのを抑止
 		captchaEl.value.innerHTML = '';
 	}
 }

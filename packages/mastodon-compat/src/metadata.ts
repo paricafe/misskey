@@ -10,7 +10,6 @@ import { NativeError } from './native-client.js';
 export type StatusStore = Pick<CompatStore, 'get' | 'list' | 'delete'>;
 const storeKey = (key: StoreKey): string => JSON.stringify([key.namespace, key.owner, key.key]);
 
-/** Lists the compatibility records that decorating and hydrating these statuses reads. */
 export function statusStoreKeys(statuses: Json[], userId: string | undefined): { keys: StoreKey[]; authors: string[] } {
 	const keys = new Map<string, StoreKey>();
 	const authors = new Set<string>();
@@ -30,7 +29,6 @@ export function statusStoreKeys(statuses: Json[], userId: string | undefined): {
 	return { keys: [...keys.values()], authors: [...authors] };
 }
 
-/** Serves reads from preloaded entries and filters; deletes still reach the store. */
 export function preloadedStatusStore(store: Pick<CompatStore, 'delete'>, entries: StoreEntry[], filters: Array<{ key: string; value: unknown }>): StatusStore {
 	const values = new Map(entries.map(entry => [storeKey(entry), entry.value]));
 	return {
@@ -43,7 +41,6 @@ export function preloadedStatusStore(store: Pick<CompatStore, 'delete'>, entries
 	};
 }
 
-/** Shared by REST and streaming; only compatibility-owned properties come from this store. */
 export async function decorateStatus(store: Pick<CompatStore, 'get'>, status: Json, userId?: string): Promise<Json> {
 	const result = { ...status };
 	const owner = String(status.account.id);
@@ -53,8 +50,6 @@ export async function decorateStatus(store: Pick<CompatStore, 'get'>, status: Js
 		const media = await store.get<Json>('media', owner, file.id);
 		return media?.focus ? { ...file, meta: { ...file.meta, focus: media.focus } } : file;
 	}));
-	// Bookmark, mute, reblog and pin state can change in native clients. Stored
-	// compatibility metadata must never override values obtained from the native API.
 	if (status.reblog) result.reblog = await decorateStatus(store, status.reblog, userId);
 	if (status.quote?.quoted_status) result.quote = { ...status.quote, quoted_status: await decorateStatus(store, status.quote.quoted_status, userId) };
 	return result;
@@ -62,7 +57,6 @@ export async function decorateStatus(store: Pick<CompatStore, 'get'>, status: Js
 
 type NativeRead = (endpoint: string, body: Json) => Promise<Json>;
 
-/** A stored renote ID is only a lookup hint; the native note decides whether it still exists. */
 export async function liveReblog(store: Pick<CompatStore, 'get' | 'delete'>, userId: string, noteId: string, call: NativeRead): Promise<string | undefined> {
 	const hint = await store.get<string>('reblog', userId, noteId);
 	if (!hint) return undefined;
@@ -77,7 +71,6 @@ export async function liveReblog(store: Pick<CompatStore, 'get' | 'delete'>, use
 	return undefined;
 }
 
-/** Optional viewer state is omitted when the granted native permissions cannot read it. */
 export async function hydrateStatus(store: Pick<CompatStore, 'get' | 'delete'>, status: Json, userId: string | undefined, canReadAccount: boolean, call: NativeRead): Promise<Json> {
 	const result = { ...status };
 	if (userId && canReadAccount) {

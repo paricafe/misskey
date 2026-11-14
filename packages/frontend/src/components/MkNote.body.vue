@@ -201,10 +201,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 	</I18n>
 </div>
 <div v-else>
-	<!--
-		MkDateSeparatedList uses TransitionGroup which requires single element in the child elements
-		so MkNote create empty div instead of no elements
-	-->
 </div>
 </template>
 
@@ -224,7 +220,6 @@ import number from '@/filters/number.js';
 import { DI } from '@/di.js';
 import { useRouter } from '@/router';
 
-// コンポーネント外部の依存関係
 import MkNoteSub from '@/components/MkNoteSub.vue';
 import MkNoteHeader from '@/components/MkNoteHeader.vue';
 import MkNoteSimple from '@/components/MkNoteSimple.vue';
@@ -252,14 +247,12 @@ const router = useRouter();
 
 provide(DI.mock, props.mock);
 
-// 周辺コンテキストのインジェクト
 const inTimeline = inject<boolean>('inTimeline', false);
 const tl_withSensitive = inject<Ref<boolean>>('tl_withSensitive', ref(true));
 const inChannel = inject(DI.inChannel, null);
 const currentClip = inject<Ref<Misskey.entities.Clip> | null>('currentClip', null);
 const currentAntenna = inject<Ref<Misskey.entities.Antenna | null> | null>('currentAntenna', null);
 
-// Template Refsの定義
 const rootEl = useTemplateRef('rootEl');
 const menuButton = useTemplateRef('menuButton');
 const renoteButton = useTemplateRef('renoteButton');
@@ -269,7 +262,6 @@ const clipButton = useTemplateRef('clipButton');
 const likeButton = useTemplateRef('likeButton');
 const galleryEl = useTemplateRef('galleryEl');
 
-// コンポーサブルの呼び出し
 const {
 	note,
 	appearNote,
@@ -316,10 +308,8 @@ const {
 	currentAntenna,
 });
 
-// provide
 provide(DI.mfmEmojiReactCallback, reactViaMfmEmoji);
 
-// MkNote固有
 const showSoftWordMutedWord = computed(() => prefer.s.showSoftWordMutedWord);
 const disableReactionsViewer = ref(prefer.s.disableReactionsViewer);
 const inReplyToCollapsed = ref(prefer.s.collapseNotesRepliedTo);
@@ -347,7 +337,6 @@ function emitUpdReaction(emoji: string, delta: number) {
 }
 
 function noteClickToOpen(id: string, ev: MouseEvent) {
-	// Let links and controls inside the note handle their own clicks.
 	if (ev.target instanceof Element && ev.target.closest('a, button, [role="button"], input, textarea, summary, label') != null) return;
 	const selection = window.document.getSelection();
 	if (selection?.toString().length === 0) {
@@ -359,7 +348,6 @@ function like() {
 	react(prefer.s.defaultLike);
 }
 
-// キーボードショートカットマップ
 const keymap = {
 	'r': () => {
 		if (renoteCollapsed.value) return;
@@ -483,8 +471,6 @@ const keymap = {
 }
 
 .skipRender {
-	// TODO: これが有効だとTransitionGroupでnoteを追加するときに一瞬がくっとなってしまうのをどうにかしたい
-	// Transitionが完了するのを待ってからskipRenderを付与すれば解決しそうだけどパフォーマンス的な影響が不明
 	content-visibility: auto;
 	contain-intrinsic-size: 0 150px;
 }
@@ -729,7 +715,7 @@ const keymap = {
 .footerButton {
 	margin: 0;
 	padding: 8px;
-	color: color-mix(in srgb, var(--MI_THEME-panel), var(--MI_THEME-fg) 70%); // opacityなど不透明度で表現するとレンダリングパフォーマンスに影響するので通常の色の混合で代用
+	color: color-mix(in srgb, var(--MI_THEME-panel), var(--MI_THEME-fg) 70%);
 
 	&:not(:last-child) {
 		margin-right: 1.5em;

@@ -21,7 +21,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 		</Transition>
 	</template>
 	<template v-else-if="display === 'oneByOne'">
-		<!-- TODO -->
 	</template>
 </span>
 </template>

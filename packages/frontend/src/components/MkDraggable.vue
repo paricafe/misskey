@@ -52,7 +52,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 <script lang="ts">
 import { ref } from 'vue';
 
-// 別々のコンポーネントインスタンス間でD&Dを融通するためにグローバルに状態を持っておく必要がある
 const dragging = ref(false);
 let dropCallback: ((targetInstanceId: string) => void) | null = null;
 </script>
@@ -107,9 +106,6 @@ function onDragstart(ev: DragEvent, item: T) {
 		emit('update:modelValue', newValue);
 	};
 
-	// Chromeのバグで、Dragstartハンドラ内ですぐにDOMを変更する(=リアクティブなプロパティを変更する)とDragが終了してしまう
-	// SEE: https://stackoverflow.com/questions/19639969/html5-dragend-event-firing-immediately
-	// SEE: https://issues.chromium.org/issues/41150279
 	window.setTimeout(() => {
 		dragging.value = true;
 	}, 10);

@@ -86,7 +86,6 @@ onDeactivated(() => {
 });
 
 useInterval(() => {
-	// TODO: DOM的にバックグラウンドになっていないかどうかも考慮する
 	if (isActivated) {
 		fetchHistory();
 	}

@@ -92,7 +92,7 @@ async function measure(run: () => Promise<void>) {
 }
 
 async function repeat(run: () => Promise<void>) {
-	await run(); // Same warmup for each revision.
+	await run();
 	const measurements = [];
 	for (let sample = 0; sample < samples; sample++) measurements.push(await measure(run));
 	return { medianMs: percentile(measurements.map(m => m.durationMs), 0.5), measurements };
@@ -158,7 +158,6 @@ async function timeline() {
 	const service = new FanoutTimelineService(redis, idService);
 	const key = 'list:localTimeline';
 	const ids = Array.from({ length: size }, (_, index) => idService.gen(Date.now() - index * 1000));
-	// Include out-of-order arrivals: Redis list position is not an ID cursor.
 	for (let index = 0; index + 1 < ids.length; index += 7) [ids[index], ids[index + 1]] = [ids[index + 1], ids[index]];
 	const notes = new Map(ids.map(id => [id, {
 		id, userId: 'author', userHost: null, renoteUserId: null, replyUserId: null, user: { isSuspended: false },
@@ -290,6 +289,4 @@ const result = {
 };
 const json = JSON.stringify(result, null, 2) + '\n';
 if (options.output) await writeFile(options.output, json);
-// Some optional dependencies retain maintenance timers after Nest shutdown.
-// Finish the isolated benchmark only after its result has been flushed.
 process.stdout.write(json, () => process.exit(0));

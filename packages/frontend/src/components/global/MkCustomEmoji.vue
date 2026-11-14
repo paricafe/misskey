@@ -104,8 +104,6 @@ const url = computed(() => {
 const alt = computed(() => `:${customEmojiName.value}:`);
 const errored = ref(url.value == null);
 
-// url が差し替わったときに前の絵文字の読み込み失敗状態を引きずらないようにする
-// (errored が立っている間は <img> 自体が描画されないので load イベントでは復帰できない)
 watch(url, (v) => {
 	errored.value = v == null;
 });
@@ -214,7 +212,6 @@ async function edit(name: string) {
 }
 
 function mute() {
-	// 確認ダイアログを開いている間に props が変わっても、ダイアログに出したものと同じ絵文字を対象にする
 	const targetEmojiCode = emojiCodeToMute.value;
 	const titleEmojiName = isLocal.value
 		? `:${customEmojiName.value}:`

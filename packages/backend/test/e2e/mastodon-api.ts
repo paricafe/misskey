@@ -238,7 +238,6 @@ describe('Mastodon gateway against real Misskey HTTP and streaming APIs', () => 
 			const timer = setTimeout(() => reject(new Error('Missing streaming update')), 10000);
 			socket.on('message', data => { const frame = JSON.parse(data.toString()); if (frame.event === 'update' && JSON.parse(frame.payload).content.includes('real streaming event')) { clearTimeout(timer); resolve(frame); } });
 		});
-		// Native channel connect has no acknowledgement; allow the subscription frame to arrive.
 		await new Promise(resolve => setTimeout(resolve, 150));
 		const note = await ok('/api/v1/statuses', aliceToken, 'POST', { status: 'real streaming event' });
 		const frame = await event; assert.deepEqual(frame.stream, ['public:local']); assert.equal(JSON.parse(frame.payload).id, note.id);
@@ -285,8 +284,6 @@ describe('Mastodon gateway against real Misskey HTTP and streaming APIs', () => 
 		await sendEnvResetRequest();
 		await closed;
 		assert.equal(socket.readyState, WebSocket.CLOSED);
-		// The native test host deliberately drops its PostgreSQL schema when it
-		// starts. Persistence is exercised above without resetting the upstream.
 		assert.ok((await ok('/api/v1/instance')).version);
 	});
 });

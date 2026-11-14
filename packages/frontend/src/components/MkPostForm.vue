@@ -108,7 +108,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 		<div :class="$style.footerRight">
 			<button v-tooltip="i18n.ts.previewNoteText" class="_button" :class="[$style.footerButton, { [$style.previewButtonActive]: showPreview }]" @click="showPreview = !showPreview"><i class="ti ti-eye"></i></button>
 			<button v-if="showTextManageButton && enableUndoClearPostForm" v-tooltip="currentHistoryIndex >= 0 ? i18n.ts.undoPostForm : i18n.ts.clearPostForm" class="_button" :class="$style.footerButton" @click="handleTextManageClick"><i :class="textManageButtonIcon"></i></button>
-			<!--<button v-tooltip="i18n.ts.more" class="_button" :class="$style.footerButton" @click="showingOptions = !showingOptions"><i class="ti ti-dots"></i></button>-->
 		</div>
 	</footer>
 	<datalist id="hashtags">
@@ -187,7 +186,6 @@ const emit = defineEmits<{
 	(ev: 'cancel'): void;
 	(ev: 'esc'): void;
 
-	// Mock用
 	(ev: 'fileChangeSensitive', fileId: string, to: boolean): void;
 }>();
 
@@ -338,7 +336,6 @@ const canPost = computed((): boolean => {
 		(!poll.value || poll.value.choices.length >= 2);
 });
 
-// cannot save pure renote as draft
 const canSaveAsServerDraft = computed((): boolean => {
 	return canPost.value && (textLength.value > 0 || files.value.length > 0 || poll.value != null);
 });
@@ -437,10 +434,8 @@ if (replyTargetNote.value && replyTargetNote.value.text != null) {
 				`@${x.username}` :
 				`@${x.username}@${toASCII(otherHost)}`;
 
-		// 自分は除外
 		if ($i.username === x.username && (x.host == null || x.host === host)) continue;
 
-		// 重複は除外
 		if (text.value.includes(`${mention} `)) continue;
 
 		text.value += `${mention} `;
@@ -453,10 +448,9 @@ if ($i.isSilenced && visibility.value === 'public') {
 
 if (targetChannel.value) {
 	visibility.value = 'public';
-	localOnly.value = true; // TODO: チャンネルが連合するようになった折には消す
+	localOnly.value = true;
 }
 
-// 公開以外へのリプライ時は元の公開範囲を引き継ぐ
 if (replyTargetNote.value && ['home', 'followers', 'specified'].includes(replyTargetNote.value.visibility)) {
 	if (replyTargetNote.value.visibility === 'home' && visibility.value === 'followers') {
 		visibility.value = 'followers';
@@ -486,7 +480,6 @@ if (props.specified) {
 	pushVisibleUser(props.specified);
 }
 
-// keep cw when reply
 if (prefer.s.keepCw && replyTargetNote.value && replyTargetNote.value.cw) {
 	useCw.value = true;
 	cw.value = replyTargetNote.value.cw;
@@ -601,7 +594,7 @@ function setVisibility() {
 	if (props.updateMode) return;
 	if (targetChannel.value) {
 		visibility.value = 'public';
-		localOnly.value = true; // TODO: チャンネルが連合するようになった折には消す
+		localOnly.value = true;
 		return;
 	}
 
@@ -625,7 +618,7 @@ async function toggleLocalOnly() {
 	if (props.updateMode) return;
 	if (targetChannel.value) {
 		visibility.value = 'public';
-		localOnly.value = true; // TODO: チャンネルが連合するようになった折には消す
+		localOnly.value = true;
 		return;
 	}
 
@@ -683,7 +676,6 @@ async function toggleReactionAcceptance() {
 	reactionAcceptance.value = select.result;
 }
 
-//#region その他の設定メニューpopup
 function showOtherSettings() {
 	let reactionAcceptanceIcon = 'ti ti-icons';
 	let reactionAcceptanceCaption = '';
@@ -766,7 +758,6 @@ function showOtherSettings() {
 
 	os.popupMenu(menuItems, otherSettingsButton.value);
 }
-//#endregion
 
 function pushVisibleUser(user: Misskey.entities.UserLite) {
 	if (!visibleUsers.value.some(u => u.username === user.username && u.host === user.host)) {
@@ -810,8 +801,6 @@ function onKeydown(ev: KeyboardEvent) {
 		saveToHistory();
 	}
 
-	// justEndedComposition.value is for Safari, which keyDown occurs after compositionend.
-	// ev.isComposing is for another browsers.
 	if (ev.key === 'Escape' && !justEndedComposition.value && !ev.isComposing) emit('esc');
 
 	nextTick(() => textareaEl.value && autosize.update(textareaEl.value));
@@ -934,14 +923,12 @@ function onDragleave() {
 function onDrop(ev: DragEvent): void {
 	draghover.value = false;
 
-	// ファイルだったら
 	if (ev.dataTransfer && ev.dataTransfer.files.length > 0) {
 		ev.preventDefault();
 		uploader.addFiles(Array.from(ev.dataTransfer.files));
 		return;
 	}
 
-	//#region ドライブのファイル
 	{
 		const droppedData = getDragData(ev, 'driveFiles');
 		if (droppedData != null) {
@@ -949,7 +936,6 @@ function onDrop(ev: DragEvent): void {
 			ev.preventDefault();
 		}
 	}
-	//#endregion
 }
 
 type StoredDrafts = {
@@ -972,7 +958,6 @@ type StoredDrafts = {
 };
 
 function saveDraft() {
-	// Editing a note must not touch the draft of the regular post form, which shares the draft key.
 	if (props.instant || props.mock || props.updateMode) return;
 
 	const draftsData = JSON.parse(miLocalStorage.getItem('drafts') ?? '{}') as StoredDrafts;
@@ -1064,7 +1049,6 @@ async function post(ev?: PointerEvent) {
 		if (uploader.items.value.some(x => x.uploaded == null)) {
 			await uploadFiles();
 
-			// アップロード失敗したものがあったら中止
 			if (uploader.items.value.some(x => x.uploaded == null)) {
 				return;
 			}
@@ -1078,8 +1062,8 @@ async function post(ev?: PointerEvent) {
 	if (props.mock) return;
 
 	if (visibility.value === 'public' && (
-		(useCw.value && cw.value != null && cw.value.trim() !== '' && isAnnoying(cw.value)) || // CWが迷惑になる場合
-		((!useCw.value || cw.value == null || cw.value.trim() === '') && text.value != null && text.value.trim() !== '' && isAnnoying(text.value)) // CWが無い かつ 本文が迷惑になる場合
+		(useCw.value && cw.value != null && cw.value.trim() !== '' && isAnnoying(cw.value)) ||
+		((!useCw.value || cw.value == null || cw.value.trim() === '') && text.value != null && text.value.trim() !== '' && isAnnoying(text.value))
 	)) {
 		const { canceled, result } = await os.actions({
 			type: 'warning',
@@ -1107,7 +1091,6 @@ async function post(ev?: PointerEvent) {
 	if (uploader.items.value.some(x => x.uploaded == null)) {
 		await uploadFiles();
 
-		// アップロード失敗したものがあったら中止
 		if (uploader.items.value.some(x => x.uploaded == null)) {
 			return;
 		}
@@ -1128,7 +1111,6 @@ async function post(ev?: PointerEvent) {
 		noteId: props.updateMode ? props.initialNote?.id : undefined,
 	};
 
-	// The edited text already contains the hashtags that were appended when it was first posted.
 	if (!props.updateMode && withHashtags.value && hashtags.value && hashtags.value.trim() !== '') {
 		const hashtags_ = hashtags.value.trim().split(' ').map(x => x.startsWith('#') ? x : '#' + x).join(' ');
 		if (!postData.text) {
@@ -1144,7 +1126,6 @@ async function post(ev?: PointerEvent) {
 		}
 	}
 
-	// plugin
 	const notePostInterruptors = getPluginHandlers('note_post_interruptor');
 	if (notePostInterruptors.length > 0) {
 		for (const interruptor of notePostInterruptors) {
@@ -1295,12 +1276,6 @@ async function insertEmoji(ev: PointerEvent) {
 	const target = ev.currentTarget ?? ev.target;
 	if (target == null) return;
 
-	// emojiPickerはダイアログが閉じずにtextareaとやりとりするので、
-	// focustrapをかけているとinsertTextAtCursorが効かない
-	// そのため、投稿フォームのテキストに直接注入する
-	// See: https://github.com/misskey-dev/misskey/pull/14282
-	//      https://github.com/misskey-dev/misskey/issues/14274
-
 	let pos = textareaEl.value?.selectionStart ?? 0;
 	let posEnd = textareaEl.value?.selectionEnd ?? text.value.length;
 
@@ -1409,7 +1384,6 @@ async function openAccountMenu(ev: PointerEvent) {
 				hashtags.value = draft.hashtag ?? '';
 				if (draft.hashtag) withHashtags.value = true;
 				if (draft.poll) {
-					// 投票を一時的に空にしないと反映されないため
 					poll.value = null;
 					nextTick(() => {
 						poll.value = {
@@ -1551,7 +1525,6 @@ onMounted(() => {
 	if (hashtagsInputEl.value) hashtagAutocomplete = new Autocomplete(hashtagsInputEl.value, hashtags);
 
 	nextTick(() => {
-		// 書きかけの投稿を復元
 		if (!props.instant && !props.mention && !props.specified && !props.mock && !props.updateMode) {
 			const draft = JSON.parse(miLocalStorage.getItem('drafts') ?? '{}')[draftKey.value] as StoredDrafts[string] | undefined;
 			if (draft != null) {
@@ -1575,7 +1548,6 @@ onMounted(() => {
 			}
 		}
 
-		// 削除して編集
 		if (props.initialNote) {
 			const init = props.initialNote;
 			text.value = init.text ? init.text : '';
@@ -1647,7 +1619,6 @@ defineExpose({
 	container-type: inline-size;
 }
 
-//#region header
 .header {
 	z-index: 1000;
 	min-height: 50px;
@@ -1778,7 +1749,6 @@ defineExpose({
 		}
 	}
 }
-//#endregion
 
 .preview {
 	padding: 16px 20px 0 20px;

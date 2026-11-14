@@ -62,7 +62,7 @@ function enter(el: Element) {
 	if (!(el instanceof HTMLElement)) return;
 	const elementHeight = el.getBoundingClientRect().height;
 	el.style.height = '0';
-	el.offsetHeight; // reflow
+	el.offsetHeight;
 	el.style.height = `${elementHeight}px`;
 }
 
@@ -75,7 +75,7 @@ function leave(el: Element) {
 	if (!(el instanceof HTMLElement)) return;
 	const elementHeight = el.getBoundingClientRect().height;
 	el.style.height = `${elementHeight}px`;
-	el.offsetHeight; // reflow
+	el.offsetHeight;
 	el.style.height = '0';
 }
 

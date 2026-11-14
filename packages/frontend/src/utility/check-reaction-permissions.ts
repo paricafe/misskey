@@ -7,8 +7,8 @@ import * as Misskey from 'misskey-js';
 import type { UnicodeEmojiDef } from '@@/js/emojilist.js';
 
 export function checkReactionPermissions(me: Misskey.entities.MeDetailed, note: Misskey.entities.Note, emoji: Misskey.entities.EmojiSimple | UnicodeEmojiDef | string): boolean {
-	if (typeof emoji === 'string') return true; // UnicodeEmojiDefにも無い絵文字であれば文字列で来る。Unicode絵文字であることには変わりないので常にリアクション可能とする;
-	if ('char' in emoji) return true; // UnicodeEmojiDefなら常にリアクション可能
+	if (typeof emoji === 'string') return true;
+	if ('char' in emoji) return true;
 
 	const roleIdsThatCanBeUsedThisEmojiAsReaction = emoji.roleIdsThatCanBeUsedThisEmojiAsReaction ?? [];
 	const canUseLocalOnlyEmoji = note.user.host === me.host && (note.renote?.user.host == null || note.renote.user.host === me.host);

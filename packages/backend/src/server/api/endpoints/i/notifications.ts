@@ -47,7 +47,6 @@ export const paramDef = {
 		sinceDate: { type: 'integer' },
 		untilDate: { type: 'integer' },
 		markAsRead: { type: 'boolean', default: true },
-		// 後方互換のため、廃止された通知タイプも受け付ける
 		includeTypes: { type: 'array', items: {
 			type: 'string', enum: [...notificationTypes, ...obsoleteNotificationTypes],
 		} },
@@ -69,11 +68,9 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 			const untilId = ps.untilId ?? (ps.untilDate ? this.idService.gen(ps.untilDate!) : undefined);
 			const sinceId = ps.sinceId ?? (ps.sinceDate ? this.idService.gen(ps.sinceDate!) : undefined);
 
-			// includeTypes が空の場合はクエリしない
 			if (ps.includeTypes && ps.includeTypes.length === 0) {
 				return [];
 			}
-			// excludeTypes に全指定されている場合はクエリしない
 			if (notificationTypes.every(type => ps.excludeTypes?.includes(type))) {
 				return [];
 			}
@@ -89,7 +86,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				excludeTypes,
 			});
 
-			// Mark all as read
 			if (ps.markAsRead) {
 				this.notificationService.readAllNotification(me.id);
 			}

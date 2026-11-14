@@ -162,7 +162,6 @@ export class NoteDraftEntityService implements OnModuleInit {
 	) {
 		if (noteDrafts.length === 0) return [];
 
-		// TODO: 本当は renote とか reply がないのに renoteId とか replyId があったらここで解決しておく
 		const fileIds = noteDrafts.map(n => [n.fileIds, n.renote?.fileIds, n.reply?.fileIds]).flat(2).filter(x => x != null);
 		const packedFiles = fileIds.length > 0 ? await this.driveFileEntityService.packManyByIdsMap(fileIds) : new Map();
 		const users = [

@@ -5,7 +5,7 @@
 
 import { secureRndstr } from './secure-rndstr.js';
 
-const CHARS = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ'; // [0-9A-Z] w/o [01IO] (32 patterns)
+const CHARS = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
 
 export function generateInviteCode(): string {
 	const code = secureRndstr(8, {

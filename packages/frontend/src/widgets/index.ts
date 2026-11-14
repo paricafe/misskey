@@ -38,7 +38,6 @@ export default function(app: App) {
 	app.component('WidgetChat', defineAsyncComponent(() => import('./WidgetChat.vue')));
 }
 
-// 連合関連のウィジェット（連合無効時に隠す）
 export const federationWidgets = [
 	'federation',
 	'instanceCloud',

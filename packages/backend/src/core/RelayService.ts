@@ -29,7 +29,7 @@ export class RelayService {
 		private systemAccountService: SystemAccountService,
 		private apRendererService: ApRendererService,
 	) {
-		this.relaysCache = new MemorySingleCache<MiRelay[]>(1000 * 60 * 10); // 10m
+		this.relaysCache = new MemorySingleCache<MiRelay[]>(1000 * 60 * 10);
 	}
 
 	@bindThis
@@ -87,7 +87,6 @@ export class RelayService {
 	private async updateRequestingRelayStatus(id: string, actor: { inbox: string | null; sharedInbox: string | null; }, status: 'accepted' | 'rejected') {
 		const relay = await this.relaysRepository.findOneBy({ id });
 		if (relay == null) return { affected: 0 };
-		// 応答してきたのがリレー自身でなければ受け付けない
 		if (actor.inbox !== relay.inbox && actor.sharedInbox !== relay.inbox) return { affected: 0 };
 
 		const result = await this.relaysRepository.update({ id, status: 'requesting' }, { status });

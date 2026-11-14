@@ -130,7 +130,6 @@ const {
 	initialValue: props.select?.default ?? null,
 });
 
-// overload function を使いたいので lint エラーを無視する
 function done(canceled: true): void;
 function done(canceled: false, result: Result): void; // eslint-disable-line no-redeclare
 
@@ -153,11 +152,6 @@ function cancel() {
 	done(true);
 }
 
-/*
-function onBgClick() {
-	if (props.cancelableByBgClick) cancel();
-}
-*/
 function onInputKeydown(evt: KeyboardEvent) {
 	if (evt.key === 'Enter' && okButtonDisabledReason.value === null) {
 		evt.preventDefault();

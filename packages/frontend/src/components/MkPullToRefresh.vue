@@ -5,7 +5,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 
 <template>
 <div ref="rootEl" :class="isPulling ? $style.isPulling : null">
-	<!-- 小数が含まれるとレンダリングが高頻度になりすぎパフォーマンスが悪化するためround -->
 	<div v-if="isPulling" :class="$style.frame" :style="`--frame-min-height: ${Math.round(pullDistance / (PULL_BRAKE_BASE + (pullDistance / PULL_BRAKE_FACTOR)))}px;`">
 		<div :class="$style.frameContent">
 			<MkLoading v-if="isRefreshing" :class="$style.loader" :em="true"/>
@@ -62,11 +61,10 @@ function getScreenY(event: TouchEvent | MouseEvent | PointerEvent): number {
 	} else if ('screenY' in event) {
 		return event.screenY;
 	} else {
-		return 0; // TSを黙らせるため
+		return 0;
 	}
 }
 
-// When at the top of the page, disable vertical overscroll so passive touch listeners can take over.
 function lockDownScroll() {
 	if (scrollEl == null) return;
 	scrollEl.style.touchAction = 'pan-x pan-down pinch-zoom';
@@ -91,7 +89,7 @@ function moveStartByMouse(event: MouseEvent) {
 
 	lockDownScroll();
 
-	event.preventDefault(); // 中クリックによるスクロール、テキスト選択などを防ぐ
+	event.preventDefault();
 
 	isPulling.value = true;
 	startScreenY = getScreenY(event);
@@ -208,11 +206,6 @@ function moving(event: MouseEvent | TouchEvent) {
 	if (isPulledEnough.value) haptic();
 }
 
-/**
- * emit(refresh)が完了したことを知らせる関数
- *
- * タイムアウトがないのでこれを最終的に実行しないと出たままになる
- */
 function refreshFinished() {
 	closeContent().then(() => {
 		isPulling.value = false;
@@ -224,7 +217,7 @@ onMounted(() => {
 	if (rootEl.value == null) return;
 	scrollEl = getScrollContainer(rootEl.value);
 	lockDownScroll();
-	rootEl.value.addEventListener('mousedown', moveStartByMouse, { passive: false }); // preventDefaultするため
+	rootEl.value.addEventListener('mousedown', moveStartByMouse, { passive: false });
 	rootEl.value.addEventListener('touchstart', moveStartByTouch, { passive: true });
 	rootEl.value.addEventListener('touchend', toggleScrollLockOnTouchEnd, { passive: true });
 });

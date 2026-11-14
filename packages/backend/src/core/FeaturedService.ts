@@ -9,10 +9,10 @@ import type { MiGalleryPost, MiNote, MiUser } from '@/models/_.js';
 import { DI } from '@/di-symbols.js';
 import { bindThis } from '@/decorators.js';
 
-const GLOBAL_NOTES_RANKING_WINDOW = 1000 * 60 * 60 * 24 * 3; // 3日ごと
-export const GALLERY_POSTS_RANKING_WINDOW = 1000 * 60 * 60 * 24 * 3; // 3日ごと
-const PER_USER_NOTES_RANKING_WINDOW = 1000 * 60 * 60 * 24 * 7; // 1週間ごと
-const HASHTAG_RANKING_WINDOW = 1000 * 60 * 60 * 48; // 48時間ごと
+const GLOBAL_NOTES_RANKING_WINDOW = 1000 * 60 * 60 * 24 * 3;
+export const GALLERY_POSTS_RANKING_WINDOW = 1000 * 60 * 60 * 24 * 3;
+const PER_USER_NOTES_RANKING_WINDOW = 1000 * 60 * 60 * 24 * 7;
+const HASHTAG_RANKING_WINDOW = 1000 * 60 * 60 * 48;
 
 const featuredEpoc = new Date('2023-01-01T00:00:00Z').getTime();
 
@@ -20,7 +20,7 @@ const featuredEpoc = new Date('2023-01-01T00:00:00Z').getTime();
 export class FeaturedService {
 	constructor(
 		@Inject(DI.redis)
-		private redisClient: Redis.Redis, // TODO: 専用のRedisサーバーを設定できるようにする
+		private redisClient: Redis.Redis,
 	) {
 	}
 
@@ -41,7 +41,7 @@ export class FeaturedService {
 		redisTransaction.expire(
 			`${name}:${currentWindow}`,
 			(windowRange * 3) / 1000,
-			'NX'); // "NX -- Set expiry only when the key has no expiry" = 有効期限がないときだけ設定
+			'NX');
 		await redisTransaction.exec();
 	}
 

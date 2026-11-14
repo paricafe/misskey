@@ -34,7 +34,6 @@ export class MfmService {
 			hasQuote?: boolean,
 		} = {},
 	): string {
-		// some AP servers like Pixelfed use br tags as well as newlines
 		html = html.replace(/<br\s?\/?>\r?\n/gi, '\n');
 
 		const normalizedHashtagNames = options.hashtagNames == null ? undefined : new Set<string>(options.hashtagNames.map(x => normalizeTag(x)));
@@ -84,7 +83,6 @@ export class MfmService {
 				return;
 			}
 
-			// Skip comment or document type node
 			if (!(node instanceof htmlParser.HTMLElement)) {
 				return;
 			}
@@ -100,22 +98,17 @@ export class MfmService {
 					const rel = node.attributes.rel;
 					const href = node.attributes.href;
 
-					// ハッシュタグ
 					if (normalizedHashtagNames && href != null && normalizedHashtagNames.has(normalizeTag(txt))) {
 						text += txt;
-						// メンション
 					} else if (txt.startsWith('@') && !(rel != null && rel.startsWith('me '))) {
 						const part = txt.split('@');
 
 						if (part.length === 2 && href) {
-							//#region ホスト名部分が省略されているので復元する
 							const acct = `${txt}@${(new URL(href)).hostname}`;
 							text += acct;
-							//#endregion
 						} else if (part.length === 3) {
 							text += txt;
 						}
-						// その他
 					} else {
 						const generateLink = () => {
 							if (!href && !txt) {
@@ -124,7 +117,7 @@ export class MfmService {
 							if (!href) {
 								return txt;
 							}
-							if (!txt || txt === href) {	// #6383: Missing text node
+							if (!txt || txt === href) {
 								if (href.match(urlRegexFull)) {
 									return href;
 								} else {
@@ -132,7 +125,7 @@ export class MfmService {
 								}
 							}
 							if (href.match(urlRegex) && !href.match(urlRegexFull)) {
-								return `[${txt}](<${href}>)`;	// #6846
+								return `[${txt}](<${href}>)`;
 							} else {
 								return `[${txt}](${href})`;
 							}
@@ -198,7 +191,6 @@ export class MfmService {
 						if (child.tagName === 'RT' && ruby.length > 0) {
 							const rt = getText(child);
 							if (/\s|\[|\]/.test(rt)) {
-								// If any space is included in rt, it is treated as a normal text
 								ruby = [];
 								analyzeChildren(node.childNodes);
 								break;
@@ -207,7 +199,6 @@ export class MfmService {
 								continue;
 							}
 						}
-						// If any other element is included in ruby, it is treated as a normal text
 						ruby = [];
 						analyzeChildren(node.childNodes);
 						break;
@@ -218,7 +209,6 @@ export class MfmService {
 					break;
 				}
 
-				// block code (<pre><code>)
 				case 'PRE': {
 					if (node.childNodes.length === 1 && (node.childNodes[0] instanceof htmlParser.HTMLElement) && node.childNodes[0].tagName === 'CODE') {
 						text += '\n```\n';
@@ -234,7 +224,6 @@ export class MfmService {
 					break;
 				}
 
-				// inline code (<code>)
 				case 'CODE': {
 					text += '`';
 					analyzeChildren(node.childNodes);
@@ -262,7 +251,6 @@ export class MfmService {
 					break;
 				}
 
-				// other block elements
 				case 'DIV':
 				case 'HEADER':
 				case 'FOOTER':
@@ -275,7 +263,7 @@ export class MfmService {
 					break;
 				}
 
-				default:	// includes inline elements
+				default:
 				{
 					analyzeChildren(node.childNodes);
 					break;
@@ -333,7 +321,6 @@ export class MfmService {
 							const child = node.children[0];
 							const text = child.type === 'text' ? child.props.text : '';
 
-							// ruby未対応のHTMLサニタイザーを通したときにルビが「対象テキスト（ルビテキスト）」にフォールバックするようにする
 							return `<ruby>${escapeHtml(text.split(' ')[0])}<rp>(</rp><rt>${escapeHtml(text.split(' ')[1])}</rt><rp>)</rp></ruby>`;
 						} else {
 							const rt = node.children.at(-1);
@@ -344,7 +331,6 @@ export class MfmService {
 
 							const text = rt.type === 'text' ? rt.props.text : '';
 
-							// ruby未対応のHTMLサニタイザーを通したときにルビが「対象テキスト（ルビテキスト）」にフォールバックするようにする
 							return `<ruby>${toHtml(node.children.slice(0, node.children.length - 1))}<rp>(</rp><rt>${escapeHtml(text.trim())}</rt><rp>)</rp></ruby>`;
 						}
 					}

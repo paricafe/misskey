@@ -265,7 +265,6 @@ import number from '@/filters/number.js';
 import { DI } from '@/di.js';
 import type { Keymap } from '@/utility/hotkey.js';
 
-// コンポーネント外部の依存関係
 import MkNoteSub from '@/components/MkNoteSub.vue';
 import MkNoteSimple from '@/components/MkNoteSimple.vue';
 import MkReactionsViewer from '@/components/MkReactionsViewer.vue';
@@ -286,10 +285,8 @@ const props = withDefaults(defineProps<{
 	initialTab: 'replies',
 });
 
-// 周辺コンテキストのインジェクト
 const inChannel = inject(DI.inChannel, null);
 
-// Template Refsの定義
 const rootEl = useTemplateRef('rootEl');
 const menuButton = useTemplateRef('menuButton');
 const renoteButton = useTemplateRef('renoteButton');
@@ -299,7 +296,6 @@ const clipButton = useTemplateRef('clipButton');
 const likeButton = useTemplateRef('likeButton');
 const galleryEl = useTemplateRef('galleryEl');
 
-// コンポーサブルの呼び出し
 const {
 	note,
 	appearNote,
@@ -318,7 +314,6 @@ const {
 	urls,
 	showTicker,
 
-	// 関数群
 	renote,
 	reply,
 	react,
@@ -344,10 +339,8 @@ const {
 	forceNoteCapture: true,
 });
 
-// provide
 provide(DI.mfmEmojiReactCallback, reactViaMfmEmoji);
 
-// pari-specific
 const disableReactionsViewer = ref(prefer.s.disableReactionsViewer);
 const enableTranslateButton = ref(prefer.s.enableTranslateButton);
 
@@ -355,7 +348,6 @@ function like() {
 	react(prefer.s.defaultLike);
 }
 
-// MkNoteDetailed固有
 const tab = ref(props.initialTab);
 const reactionTabType = ref<string | null>(null);
 
@@ -433,7 +425,6 @@ onMounted(() => {
 	loadConversation();
 });
 
-// キーボードショートカットマップ
 const keymap = {
 	'r': () => reply(),
 	'e|a|plus': () => react(),

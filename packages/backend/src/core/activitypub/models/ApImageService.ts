@@ -36,12 +36,8 @@ export class ApImageService {
 		this.logger = this.apLoggerService.logger;
 	}
 
-	/**
-	 * Imageを作成します。
-	 */
 	@bindThis
 	public async createImage(actor: MiRemoteUser, value: string | IObject): Promise<MiDriveFile | null> {
-		// 投稿者が凍結されていたらスキップ
 		if (actor.isSuspended) {
 			throw new Error('actor has been suspended');
 		}
@@ -64,9 +60,6 @@ export class ApImageService {
 
 		this.logger.info(`Creating the Image: ${image.url}`);
 
-		// Cache if remote file cache is on AND either
-		// 1. remote sensitive file is also on
-		// 2. or the image is not sensitive
 		const shouldBeCached = this.meta.cacheRemoteFiles && (this.meta.cacheRemoteSensitiveFiles || !image.sensitive);
 
 		const file = await this.driveService.uploadFromUrl({
@@ -79,21 +72,12 @@ export class ApImageService {
 		});
 		if (!file.isLink || file.url === image.url) return file;
 
-		// URLが異なっている場合、同じ画像が以前に異なるURLで登録されていたということなので、URLを更新する
 		await this.driveFilesRepository.update({ id: file.id }, { url: image.url, uri: image.url });
 		return await this.driveFilesRepository.findOneByOrFail({ id: file.id });
 	}
 
-	/**
-	 * Imageを解決します。
-	 *
-	 * ImageをリモートサーバーからフェッチしてMisskeyに登録しそれを返します。
-	 */
 	@bindThis
 	public async resolveImage(actor: MiRemoteUser, value: string | IObject): Promise<MiDriveFile | null> {
-		// TODO: Misskeyに対象のImageが登録されていればそれを返す
-
-		// リモートサーバーからフェッチしてきて登録
 		return await this.createImage(actor, value);
 	}
 }

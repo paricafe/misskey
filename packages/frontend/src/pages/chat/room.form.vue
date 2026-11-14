@@ -36,7 +36,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 <script lang="ts" setup>
 import { onMounted, watch, ref, shallowRef, computed, nextTick, readonly, onBeforeUnmount } from 'vue';
 import * as Misskey from 'misskey-js';
-//import insertTextAtCursor from 'insert-text-at-cursor';
 import { formatTimeString } from '@/utility/format-time-string.js';
 import { selectFile } from '@/utility/drive.js';
 import * as os from '@/os.js';
@@ -128,7 +127,6 @@ function onDragover(ev: DragEvent) {
 function onDrop(ev: DragEvent): void {
 	if (!ev.dataTransfer) return;
 
-	// ファイルだったら
 	if (ev.dataTransfer.files.length === 1) {
 		ev.preventDefault();
 		os.launchUploader([Array.from(ev.dataTransfer.files)[0]], { multiple: false });
@@ -142,7 +140,6 @@ function onDrop(ev: DragEvent): void {
 		return;
 	}
 
-	//#region ドライブのファイル
 	{
 		const droppedData = getDragData(ev, 'driveFiles');
 		if (droppedData != null) {
@@ -150,7 +147,6 @@ function onDrop(ev: DragEvent): void {
 			ev.preventDefault();
 		}
 	}
-	//#endregion
 }
 
 function onKeydown(ev: KeyboardEvent) {
@@ -253,12 +249,6 @@ async function insertEmoji(ev: MouseEvent) {
 	const target = ev.currentTarget ?? ev.target;
 	if (target == null) return;
 
-	// emojiPickerはダイアログが閉じずにtextareaとやりとりするので、
-	// focustrapをかけているとinsertTextAtCursorが効かない
-	// そのため、投稿フォームのテキストに直接注入する
-	// See: https://github.com/misskey-dev/misskey/pull/14282
-	//      https://github.com/misskey-dev/misskey/issues/14274
-
 	let pos = textareaEl.value?.selectionStart ?? 0;
 	let posEnd = textareaEl.value?.selectionEnd ?? text.value.length;
 	emojiPicker.show(
@@ -282,7 +272,6 @@ onMounted(() => {
 		autocompleteInstance = new Autocomplete(textareaEl.value, text);
 	}
 
-	// 書きかけの投稿を復元
 	const draft = JSON.parse(miLocalStorage.getItem('chatMessageDrafts') || '{}')[getDraftKey()];
 	if (draft) {
 		text.value = draft.data.text;

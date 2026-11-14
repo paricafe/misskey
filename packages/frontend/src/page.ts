@@ -38,10 +38,8 @@ export const definePage = (maybeRefOrGetterMetadata: MaybeRefOrGetter<PageMetada
 	const metadataGetter = () => metadataRef.value;
 	const receiver = getReceiver();
 
-	// setup handler
 	receiver?.(metadataGetter);
 
-	// update handler
 	onBeforeUnmount(watch(
 		() => toValue(maybeRefOrGetterMetadata),
 		(metadata) => {

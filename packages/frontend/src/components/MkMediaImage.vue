@@ -124,7 +124,6 @@ async function onClick(ev: PointerEvent) {
 	}
 }
 
-// Plugin:register_note_view_interruptor を使って書き換えられる可能性があるためwatchする
 watch(() => props.image, (newImage) => {
 	hide.value = shouldHideFileByDefault(newImage);
 }, {
@@ -188,7 +187,6 @@ defineExpose<MediaComponentExposes>({
 
 .visible {
 	position: relative;
-	//box-shadow: 0 0 0 1px var(--MI_THEME-divider) inset;
 	background: var(--MI_THEME-bg);
 	background-size: 16px 16px;
 }
@@ -249,7 +247,6 @@ html[data-color-scheme=light] .visible {
 }
 
 .indicator {
-	/* Hardcode to black because either --MI_THEME-bg or --MI_THEME-fg makes it hard to read in dark/light mode */
 	background-color: black;
 	border-radius: 6px;
 	color: hsl(from var(--MI_THEME-accent) h s calc(l + 10));

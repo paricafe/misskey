@@ -69,7 +69,6 @@ const change = () => {
 
 	slideB.value.classList.add('anime');
 	window.setTimeout(() => {
-		// 既にこのウィジェットがunmountされていたら要素がない
 		if (slideA.value == null) return;
 
 		slideA.value.style.backgroundImage = img;

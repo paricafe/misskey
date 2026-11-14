@@ -3,7 +3,6 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-// TODO: sharedに置いてフロントエンドのと統合したい
 export const langmap = {
 	'ach': {
 		nativeName: 'Lwo',

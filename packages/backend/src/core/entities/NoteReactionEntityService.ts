@@ -31,10 +31,6 @@ export class NoteReactionEntityService implements OnModuleInit {
 		@Inject(DI.noteReactionsRepository)
 		private noteReactionsRepository: NoteReactionsRepository,
 
-		//private userEntityService: UserEntityService,
-		//private noteEntityService: NoteEntityService,
-		//private reactionService: ReactionService,
-		//private idService: IdService,
 	) {
 	}
 

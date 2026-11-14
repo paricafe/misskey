@@ -163,7 +163,6 @@ const user = shallowRef<Misskey.entities.UserLite | null>(null);
 
 const noteSearchableScope = instance.noteSearchableScope ?? 'local';
 
-//#region set user
 let fetchedUser: Misskey.entities.UserDetailed | null = null;
 
 if (props.userId) {
@@ -184,7 +183,6 @@ if (fetchedUser != null) {
 		user.value = fetchedUser;
 	}
 }
-//#endregion
 
 const searchScope = ref<'all' | 'local' | 'server' | 'user'>((() => {
 	if (user.value != null) return 'user';
@@ -251,7 +249,7 @@ const searchParams = computed<SearchParams | null>(() => {
 		if (trimmedHost.startsWith('https://') || trimmedHost.startsWith('http://')) {
 			try {
 				trimmedHost = new URL(trimmedHost).host;
-			} catch (err) { /* empty */ }
+			} catch (err) { }
 		}
 		return {
 			query: trimmedQuery,
@@ -294,7 +292,6 @@ function removeUser() {
 async function search() {
 	if (searchParams.value == null) return;
 
-	//#region AP lookup
 	if (searchParams.value.query.startsWith('https://') && !searchParams.value.query.includes(' ')) {
 		const confirm = await os.confirm({
 			type: 'info',
@@ -321,7 +318,6 @@ async function search() {
 			return;
 		}
 	}
-	//#endregion
 
 	if (searchParams.value.query.length > 1 && !searchParams.value.query.includes(' ')) {
 		if (searchParams.value.query.startsWith('@')) {
@@ -331,7 +327,6 @@ async function search() {
 			});
 			if (!confirm.canceled) {
 				if (searchParams.value.query.endsWith('.bsky.social')) {
-					// convert to bsky bridge
 					router.pushByPath(`/${searchParams.value.query}@bsky.brid.gy`);
 				} else {
 					router.pushByPath(`/${searchParams.value.query}`);

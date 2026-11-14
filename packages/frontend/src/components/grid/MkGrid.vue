@@ -95,43 +95,21 @@ const rootSetting: Required<GridSetting['root']> = {
 	...props.settings.root,
 };
 
-// non-reactive
 // eslint-disable-next-line vue/no-setup-props-reactivity-loss
 const rowSetting: Required<GridRowSetting> = {
 	...defaultGridRowSetting,
 	...props.settings.row,
 };
 
-// non-reactive
 // eslint-disable-next-line vue/no-setup-props-reactivity-loss
 const columnSettings = props.settings.cols;
 
-// non-reactive
 const cellSettings = props.settings.cells ?? {};
 
 const { data } = toRefs(props);
 
-// #region Event Definitions
-// region Event Definitions
-
-/**
- * grid -> 各子コンポーネントのイベント経路を担う{@link GridEventEmitter}。おもにpropsでの伝搬が難しいイベントを伝搬するために使用する。
- * 子コンポーネント -> gridのイベントでは原則使用せず、{@link emit}を使用する。
- */
 const bus = new GridEventEmitter();
-/**
- * {@link resizeObserver}が発行した、まだ実行されていない{@link setTimeout}のID。アンマウント時にまとめて破棄するために保持する。
- */
 const resizeTimeoutIds = new Set<number>();
-/**
- * テーブルコンポーネントのリサイズイベントを監視するための{@link ResizeObserver}。
- * 表示切替を検知し、サイズの再計算要求を発行するために使用する（マウント時にコンテンツが表示されていない場合、初手のサイズの自動計算が正常に働かないため）
- *
- * {@link setTimeout}を経由している理由は、{@link onResize}の中でサイズ再計算要求→サイズ変更が発生するとループとみなされ、
- * 「ResizeObserver loop completed with undelivered notifications.」という警告が発生するため（再計算が完全に終われば通知は発生しなくなるので実際にはループしない）
- *
- * @see {@link onResize}
- */
 const resizeObserver = new ResizeObserver((entries) => {
 	const timeoutId = window.setTimeout(() => {
 		resizeTimeoutIds.delete(timeoutId);
@@ -141,57 +119,21 @@ const resizeObserver = new ResizeObserver((entries) => {
 });
 
 const rootEl = useTemplateRef('rootEl');
-/**
- * グリッドの最も上位にある状態。
- */
 const state = ref<GridState>('normal');
-/**
- * グリッドの列定義。列定義の元の設定値は非リアクティブなので、初期値を生成して以降は変更しない。
- */
 const columns = ref<GridColumn[]>(columnSettings.map(createColumn));
-/**
- * グリッドの行定義。propsで受け取った{@link data}をもとに、{@link refreshData}で再計算される。
- */
 const rows = ref<GridRow[]>([]);
-/**
- * グリッドのセル定義。propsで受け取った{@link data}をもとに、{@link refreshData}で再計算される。
- */
 const cells = ref<RowHolder[]>([]);
 
-/**
- * mousemoveイベントが発生した際に、イベントから取得したセルアドレスを保持するための変数。
- * セルアドレスが変わった瞬間にイベントを起こしたい時のために前回値として使用する。
- */
 const previousCellAddress = ref<CellAddress>(CELL_ADDRESS_NONE);
-/**
- * 編集中のセルのアドレスを保持するための変数。
- */
 const editingCellAddress = ref<CellAddress>(CELL_ADDRESS_NONE);
-/**
- * 列の範囲選択をする際の開始地点となるインデックスを保持するための変数。
- * この開始地点からマウスが動いた地点までの範囲を選択する。
- */
 const firstSelectionColumnIdx = ref<number>(CELL_ADDRESS_NONE.col);
-/**
- * 行の範囲選択をする際の開始地点となるインデックスを保持するための変数。
- * この開始地点からマウスが動いた地点までの範囲を選択する。
- */
 const firstSelectionRowIdx = ref<number>(CELL_ADDRESS_NONE.row);
 
-/**
- * 選択状態のセルを取得するための計算プロパティ。選択状態とは{@link GridCell.selected}がtrueのセルのこと。
- */
 const selectedCell = computed(() => {
 	const selected = cells.value.flatMap(it => it.cells).filter(it => it.selected);
 	return selected.length > 0 ? selected[0] : undefined;
 });
-/**
- * 範囲選択状態のセルを取得するための計算プロパティ。範囲選択状態とは{@link GridCell.ranged}がtrueのセルのこと。
- */
 const rangedCells = computed(() => cells.value.flatMap(it => it.cells).filter(it => it.ranged));
-/**
- * 範囲選択状態のセルの範囲を取得するための計算プロパティ。左上のセル番地と右下のセル番地を計算する。
- */
 const rangedBounds = computed(() => {
 	const _cells = rangedCells.value;
 	const _cols = _cells.map(it => it.address.col);
@@ -211,9 +153,6 @@ const rangedBounds = computed(() => {
 		rightBottom,
 	};
 });
-/**
- * グリッドの中で使用可能なセルの範囲を取得するための計算プロパティ。左上のセル番地と右下のセル番地を計算する。
- */
 const availableBounds = computed(() => {
 	const leftTop = {
 		col: 0,
@@ -225,15 +164,9 @@ const availableBounds = computed(() => {
 	};
 	return { leftTop, rightBottom };
 });
-/**
- * 範囲選択状態の行を取得するための計算プロパティ。範囲選択状態とは{@link GridRow.ranged}がtrueの行のこと。
- */
 const rangedRows = computed(() => rows.value.filter(it => it.ranged));
 
 const lastLine = computed(() => rows.value.filter(it => it.using).length - 1);
-
-// endregion
-// #endregion
 
 watch(data, patchData, { deep: true });
 
@@ -242,9 +175,6 @@ if (_DEV_) {
 		console.log(`[grid][state] ${oldValue} -> ${value}`);
 	});
 }
-
-// #region Event Handlers
-// region Event Handlers
 
 function onResize(entries: ResizeObserverEntry[]) {
 	if (entries.length !== 1 || entries[0].target !== rootEl.value) {
@@ -259,13 +189,10 @@ function onResize(entries: ResizeObserverEntry[]) {
 	switch (state.value) {
 		case 'hidden': {
 			if (contentRect.width > 0 && contentRect.height > 0) {
-				// 先に状態を変更しておき、再計算要求が複数回走らないようにする
 				state.value = 'normal';
 
-				// 選択状態が狂うかもしれないので解除しておく
 				unSelectionRangeAll();
 
-				// 再計算要求を発行。各セル側で最低限必要な横幅を算出し、emitで返してくるようになっている
 				bus.emit('forceRefreshContentSize');
 			}
 			break;
@@ -537,7 +464,6 @@ function onLeftMouseDown(ev: MouseEvent) {
 				previousCellAddress.value = cellAddress;
 				state.value = 'colSelecting';
 
-				// フォーカスを当てないとキーイベントが拾えないので
 				getCellElement(ev.target as HTMLElement)?.focus();
 			} else if (isRowNumberCellAddress(cellAddress)) {
 				if (ev.shiftKey) {
@@ -581,7 +507,6 @@ function onLeftMouseDown(ev: MouseEvent) {
 				previousCellAddress.value = cellAddress;
 				state.value = 'rowSelecting';
 
-				// フォーカスを当てないとキーイベントが拾えないので
 				getCellElement(ev.target as HTMLElement)?.focus();
 			}
 			break;
@@ -603,7 +528,6 @@ function onRightMouseDown(ev: MouseEvent) {
 
 			const _rangedCells = [...rangedCells.value];
 			if (!_rangedCells.some(it => equalCellAddress(it.address, cellAddress))) {
-				// 範囲選択外を右クリックした場合は、範囲選択を解除（範囲選択内であれば範囲選択を維持する）
 				selectionCell(cellAddress);
 			}
 
@@ -617,7 +541,6 @@ function onMouseMove(ev: MouseEvent) {
 
 	const targetCellAddress = getCellAddress(ev.target as HTMLElement);
 	if (equalCellAddress(previousCellAddress.value, targetCellAddress)) {
-		// セルが変わるまでイベントを起こしたくない
 		return;
 	}
 
@@ -629,7 +552,6 @@ function onMouseMove(ev: MouseEvent) {
 		case 'cellSelecting': {
 			const selectedCellAddress = selectedCell.value?.address;
 			if (!availableCellAddress(targetCellAddress) || !selectedCellAddress) {
-				// 正しいセル範囲ではない
 				return;
 			}
 
@@ -643,7 +565,6 @@ function onMouseMove(ev: MouseEvent) {
 				row: Math.max(targetCellAddress.row, selectedCellAddress.row),
 			};
 
-			// 範囲外のセルは選択解除し、範囲内のセルは選択状態にする
 			unSelectionOutOfRange(leftTop, rightBottom);
 			expandCellRange(leftTop, rightBottom);
 			previousCellAddress.value = targetCellAddress;
@@ -652,7 +573,6 @@ function onMouseMove(ev: MouseEvent) {
 		}
 		case 'colSelecting': {
 			if (!isColumnHeaderCellAddress(targetCellAddress) || previousCellAddress.value.col === targetCellAddress.col) {
-				// セルが変わるまでイベントを起こしたくない
 				return;
 			}
 
@@ -666,19 +586,16 @@ function onMouseMove(ev: MouseEvent) {
 				row: cells.value.length - 1,
 			};
 
-			// 範囲外のセルは選択解除し、範囲内のセルは選択状態にする
 			unSelectionOutOfRange(leftTop, rightBottom);
 			expandCellRange(leftTop, rightBottom);
 			previousCellAddress.value = targetCellAddress;
 
-			// フォーカスを当てないとキーイベントが拾えないので
 			getCellElement(ev.target as HTMLElement)?.focus();
 
 			break;
 		}
 		case 'rowSelecting': {
 			if (!isRowNumberCellAddress(targetCellAddress) || previousCellAddress.value.row === targetCellAddress.row) {
-				// セルが変わるまでイベントを起こしたくない
 				return;
 			}
 
@@ -692,17 +609,14 @@ function onMouseMove(ev: MouseEvent) {
 				row: Math.max(targetCellAddress.row, firstSelectionRowIdx.value),
 			};
 
-			// 範囲外のセルは選択解除し、範囲内のセルは選択状態にする
 			unSelectionOutOfRange(leftTop, rightBottom);
 			expandCellRange(leftTop, rightBottom);
 
-			// 行も同様に
 			const rangedRowIndexes = [rows.value[targetCellAddress.row].index, ...rangedRows.value.map(it => it.index)];
 			expandRowRange(Math.min(...rangedRowIndexes), Math.max(...rangedRowIndexes));
 
 			previousCellAddress.value = targetCellAddress;
 
-			// フォーカスを当てないとキーイベントが拾えないので
 			getCellElement(ev.target as HTMLElement)?.focus();
 
 			break;
@@ -734,7 +648,6 @@ function onContextMenu(ev: PointerEvent) {
 	const context = createContext();
 	const menuItems = Array.of<MenuItem>();
 	switch (true) {
-		// 通常セルのコンテキストメニュー作成
 		case availableCellAddress(cellAddress): {
 			const cell = cells.value[cellAddress.row].cells[cellAddress.col];
 			if (cell.setting.contextMenuFactory) {
@@ -742,7 +655,6 @@ function onContextMenu(ev: PointerEvent) {
 			}
 			break;
 		}
-		// 列ヘッダセルのコンテキストメニュー作成
 		case isColumnHeaderCellAddress(cellAddress): {
 			const col = columns.value[cellAddress.col];
 			if (col.setting.contextMenuFactory) {
@@ -750,7 +662,6 @@ function onContextMenu(ev: PointerEvent) {
 			}
 			break;
 		}
-		// 行ヘッダセルのコンテキストメニュー作成
 		case isRowNumberCellAddress(cellAddress): {
 			const row = rows.value[cellAddress.row];
 			if (row.setting.contextMenuFactory) {
@@ -770,7 +681,6 @@ function onCellEditBegin(sender: GridCell) {
 	editingCellAddress.value = sender.address;
 	for (const cell of cells.value.flatMap(it => it.cells)) {
 		if (cell.address.col !== sender.address.col || cell.address.row !== sender.address.row) {
-			// 編集状態となったセル以外は全部選択解除
 			cell.selected = false;
 		}
 	}
@@ -791,7 +701,6 @@ function onChangeCellContentSize(sender: GridCell, contentSize: Size) {
 	if (_cells.length > sender.address.row && _cells[sender.address.row].cells.length > sender.address.col) {
 		const currentSize = _cells[sender.address.row].cells[sender.address.col].contentSize;
 		if (currentSize.width !== contentSize.width || currentSize.height !== contentSize.height) {
-			// 通常セルのセル幅が確定したら、そのサイズを保持しておく（内容に引っ張られて想定よりも大きいセルサイズにならないようにするためのCSS作成に使用）
 			_cells[sender.address.row].cells[sender.address.col].contentSize = contentSize;
 
 			if (sender.column.setting.width === 'auto') {
@@ -834,7 +743,6 @@ function onHeaderCellChangeContentSize(sender: GridColumn, newSize: Size) {
 		case 'normal': {
 			const currentSize = columns.value[sender.index].contentSize;
 			if (currentSize.width !== newSize.width || currentSize.height !== newSize.height) {
-				// ヘッダセルのセル幅が確定したら、そのサイズを保持しておく（内容に引っ張られて想定よりも大きいセルサイズにならないようにするためのCSS作成に使用）
 				columns.value[sender.index].contentSize = newSize;
 
 				if (sender.setting.width === 'auto') {
@@ -855,15 +763,6 @@ function onHeaderCellWidthLargest(sender: GridColumn) {
 	}
 }
 
-// endregion
-// #endregion
-
-// #region Methods
-// region Methods
-
-/**
- * カラム内のコンテンツを表示しきるために必要な横幅と、各セルのコンテンツを表示しきるために必要な横幅を比較し、大きい方を列全体の横幅として採用する。
- */
 function calcLargestCellWidth(column: GridColumn) {
 	const _cells = cells.value;
 	const largestColumnWidth = columns.value[column.index].contentSize.width;
@@ -884,9 +783,6 @@ function calcLargestCellWidth(column: GridColumn) {
 	column.width = `${Math.max(largestColumnWidth, largestCellWidth)}px`;
 }
 
-/**
- * {@link emit}を使用してイベントを発行する。
- */
 function emitGridEvent(ev: GridEvent) {
 	const currentState: GridContext = {
 		selectedCell: selectedCell.value,
@@ -906,10 +802,6 @@ function emitGridEvent(ev: GridEvent) {
 	);
 }
 
-/**
- * 親コンポーネントに新しい値を通知する。
- * 新しい値は、イベント通知→元データへの反映→再計算（バリデーション含む）→再描画の流れで反映される。
- */
 function emitCellValue(sender: GridCell | CellAddress, newValue: CellValue) {
 	const cellAddress = 'address' in sender ? sender.address : sender;
 	const cell = cells.value[cellAddress.row].cells[cellAddress.col];
@@ -927,10 +819,6 @@ function emitCellValue(sender: GridCell | CellAddress, newValue: CellValue) {
 	}
 }
 
-/**
- * {@link target}のセルを選択状態にする。
- * その際、{@link target}以外の行およびセルの範囲選択状態を解除する。
- */
 function selectionCell(target: CellAddress) {
 	if (!availableCellAddress(target)) {
 		return;
@@ -943,9 +831,6 @@ function selectionCell(target: CellAddress) {
 	_cells[target.row].cells[target.col].ranged = true;
 }
 
-/**
- * {@link targets}のセルを範囲選択状態にする。
- */
 function selectionRange(...targets: CellAddress[]) {
 	const _cells = cells.value;
 	for (const target of targets) {
@@ -956,9 +841,6 @@ function selectionRange(...targets: CellAddress[]) {
 	}
 }
 
-/**
- * 行およびセルの範囲選択状態をすべて解除する。
- */
 function unSelectionRangeAll() {
 	const _cells = rangedCells.value;
 	for (const cell of _cells) {
@@ -972,9 +854,6 @@ function unSelectionRangeAll() {
 	}
 }
 
-/**
- * {@link leftTop}から{@link rightBottom}の範囲外にあるセルを範囲選択状態から外す。
- */
 function unSelectionOutOfRange(leftTop: CellAddress, rightBottom: CellAddress) {
 	const safeBounds = getSafeAddressBounds({ leftTop, rightBottom });
 
@@ -993,9 +872,6 @@ function unSelectionOutOfRange(leftTop: CellAddress, rightBottom: CellAddress) {
 	}
 }
 
-/**
- * {@link leftTop}から{@link rightBottom}の範囲内にあるセルを範囲選択状態にする。
- */
 function expandCellRange(leftTop: CellAddress, rightBottom: CellAddress) {
 	const safeBounds = getSafeAddressBounds({ leftTop, rightBottom });
 	const targetRows = cells.value.slice(safeBounds.leftTop.row, safeBounds.rightBottom.row + 1);
@@ -1006,9 +882,6 @@ function expandCellRange(leftTop: CellAddress, rightBottom: CellAddress) {
 	}
 }
 
-/**
- * {@link top}から{@link bottom}までの行を範囲選択状態にする。
- */
 function expandRowRange(top: number, bottom: number) {
 	if (!rowSetting.selectable) {
 		return;
@@ -1020,9 +893,6 @@ function expandRowRange(top: number, bottom: number) {
 	}
 }
 
-/**
- * 特定の条件下でのみ適用されるCSSを反映する。
- */
 function applyRowRules(targetCells: GridCell[]) {
 	const _rows = rows.value;
 	const targetRowIdxes = [...new Set(targetCells.map(it => it.address.row))];
@@ -1117,17 +987,12 @@ function refreshData() {
 		console.log('[grid][refresh-data][begin]');
 	}
 
-	// データを元に行・列・セルを作成する。
-	// 行は元データの配列の長さに応じて作成するが、最低限の行数は設定によって決まる。
-	// 行数が変わるたびに都度レンダリングするとパフォーマンスがイマイチなので、あらかじめ多めにセルを用意しておくための措置。
 	const _data: DataSource[] = data.value;
 	const _rows: GridRow[] = (_data.length > rowSetting.minimumDefinitionCount)
 		? _data.map((_, index) => createRow(index, true, rowSetting))
 		: Array.from({ length: rowSetting.minimumDefinitionCount }, (_, index) => createRow(index, index < _data.length, rowSetting));
 	const _cols: GridColumn[] = columns.value;
 
-	// 行・列の定義から、元データの配列より値を取得してセルを作成する。
-	// 行・列の定義はそれぞれインデックスを持っており、そのインデックスは元データの配列番地に対応している。
 	const _cells: RowHolder[] = _rows.map(row => {
 		const newCells = row.using
 			? _cols.map(col => createCell(col, row, _data[row.index][col.setting.bindTo], cellSettings))
@@ -1151,16 +1016,6 @@ function refreshData() {
 	}
 }
 
-/**
- * セル値を部分更新する。この関数は、外部起因でデータが変更された場合に呼ばれる。
- *
- * 外部起因でデータが変更された場合は{@link data}の値が変更されるが、何処の番地がどのように変わったのかまでは検知できない。
- * セルをすべて作り直せばいいが、その手法だと以下のデメリットがある。
- * - 描画負荷がかかる
- * - 各セルが持つ個別の状態（選択中状態やバリデーション結果など）が失われる
- *
- * そこで、新しい値とセルが持つ値を突き合わせ、変更があった場合のみ値を更新し、セルそのものは使いまわしつつ値を最新化する。
- */
 function patchData(newItems: DataSource[]) {
 	if (_DEV_) {
 		console.log('[grid][patch-data][begin]');
@@ -1172,7 +1027,6 @@ function patchData(newItems: DataSource[]) {
 		const newRows = Array.of<GridRow>();
 		const newCells = Array.of<RowHolder>();
 
-		// 未使用の行を含めても足りないので新しい行を追加する
 		for (let rowIdx = rows.value.length; rowIdx < newItems.length; rowIdx++) {
 			const newRow = createRow(rowIdx, true, rowSetting);
 			newRows.push(newRow);
@@ -1189,11 +1043,8 @@ function patchData(newItems: DataSource[]) {
 		applyRowRules(newCells.flatMap(it => it.cells));
 	}
 
-	// 行数の上限が欲しい場合はここに設けてもいいかもしれない
-
 	const usingRows = rows.value.filter(it => it.using);
 	if (usingRows.length > newItems.length) {
-		// 行数が減っているので古い行をクリアする（再マウント・再レンダリングが重いので要素そのものは消さない）
 		for (let rowIdx = newItems.length; rowIdx < usingRows.length; rowIdx++) {
 			resetRow(rows.value[rowIdx]);
 			for (let colIdx = 0; colIdx < _cols.length; colIdx++) {
@@ -1204,7 +1055,6 @@ function patchData(newItems: DataSource[]) {
 		}
 	}
 
-	// 新しい値と既に設定されていた値を入れ替える
 	const changedCells = Array.of<GridCell>();
 	for (let rowIdx = 0; rowIdx < newItems.length; rowIdx++) {
 		const holder = cells.value[rowIdx];
@@ -1234,7 +1084,6 @@ function patchData(newItems: DataSource[]) {
 
 		applyRowRules(changedCells);
 
-		// セル値が書き換わっており、バリデーションの結果も変わっているので外部に通知する必要がある
 		emitGridEvent({
 			type: 'cell-validation',
 			all: cells.value
@@ -1250,23 +1099,17 @@ function patchData(newItems: DataSource[]) {
 	}
 }
 
-// endregion
-// #endregion
-
 onMounted(() => {
 	state.value = 'normal';
 
 	const bindToList = columnSettings.map(it => it.bindTo);
 	if (new Set(bindToList).size !== columnSettings.length) {
-		// 取得元のプロパティ名重複は許容したくない
 		throw new Error(`Duplicate bindTo setting : [${bindToList.join(',')}]}]`);
 	}
 
 	if (rootEl.value) {
 		resizeObserver.observe(rootEl.value);
 
-		// 初期表示時にコンテンツが表示されていない場合はhidden状態にしておく。
-		// コンテンツ表示時にresizeイベントが発生するが、そのときにhidden状態にしておかないとサイズの再計算が走らないので
 		const bounds = rootEl.value.getBoundingClientRect();
 		if (bounds.width === 0 || bounds.height === 0) {
 			state.value = 'hidden';
@@ -1283,7 +1126,6 @@ onUnmounted(() => {
 	}
 	resizeTimeoutIds.clear();
 
-	// 選択操作の途中でアンマウントされた場合、windowに登録したままのリスナーが残ってしまうので解除しておく
 	unregisterMouseMove();
 	unregisterMouseUp();
 });
@@ -1293,7 +1135,6 @@ onUnmounted(() => {
 .grid {
 	font-size: 90%;
 	overflow-x: scroll;
-	// firefoxだとスクロールバーがセルに重なって見づらくなってしまうのでスペースを空けておく
 	padding-bottom: 8px;
 
 	&.noOverflowHandling {
@@ -1304,7 +1145,6 @@ onUnmounted(() => {
 </style>
 
 <style lang="scss">
-// 配下コンポーネントを含めて一括してコントロールするため、scopedもmoduleも使用できない
 .mk_grid_border {
 	--rootBorderSetting: none;
 	--borderRadius: 0;

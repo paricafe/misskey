@@ -34,7 +34,7 @@ export class CacheService implements OnApplicationShutdown {
 	public userProfileCache: RedisKVCache<MiUserProfile>;
 	public userMutingsCache: RedisKVCache<Set<string>>;
 	public userBlockingCache: RedisKVCache<Set<string>>;
-	public userBlockedCache: RedisKVCache<Set<string>>; // NOTE: 「被」Blockキャッシュ
+	public userBlockedCache: RedisKVCache<Set<string>>;
 	public renoteMutingsCache: RedisKVCache<Set<string>>;
 	public userFollowingsCache: RedisKVCache<Record<string, Pick<MiFollowing, 'withReplies'> | undefined>>;
 	public pariRemoteUserDecorationsCache: RedisKVCache<PariRemoteUserDecorationsCacheType>;
@@ -71,24 +71,22 @@ export class CacheService implements OnApplicationShutdown {
 
 		private httpRequestService: HttpRequestService,
 	) {
-		//this.onMessage = this.onMessage.bind(this);
-
-		this.userByIdCache = new MemoryKVCache<MiUser>(1000 * 60 * 5); // 5m
-		this.localUserByNativeTokenCache = new MemoryKVCache<MiLocalUser | null>(1000 * 60 * 5); // 5m
-		this.localUserByIdCache = new MemoryKVCache<MiLocalUser>(1000 * 60 * 5); // 5m
-		this.uriPersonCache = new MemoryKVCache<MiUser | null>(1000 * 60 * 5); // 5m
+		this.userByIdCache = new MemoryKVCache<MiUser>(1000 * 60 * 5);
+		this.localUserByNativeTokenCache = new MemoryKVCache<MiLocalUser | null>(1000 * 60 * 5);
+		this.localUserByIdCache = new MemoryKVCache<MiLocalUser>(1000 * 60 * 5);
+		this.uriPersonCache = new MemoryKVCache<MiUser | null>(1000 * 60 * 5);
 
 		this.userProfileCache = new RedisKVCache<MiUserProfile>(this.redisClient, 'userProfile', {
-			lifetime: 1000 * 60 * 30, // 30m
-			memoryCacheLifetime: 1000 * 60, // 1m
+			lifetime: 1000 * 60 * 30,
+			memoryCacheLifetime: 1000 * 60,
 			fetcher: (key) => this.userProfilesRepository.findOneByOrFail({ userId: key }),
 			toRedisConverter: (value) => JSON.stringify(value),
-			fromRedisConverter: (value) => JSON.parse(value), // TODO: date型の考慮
+			fromRedisConverter: (value) => JSON.parse(value),
 		});
 
 		this.userMutingsCache = new RedisKVCache<Set<string>>(this.redisClient, 'userMutings', {
-			lifetime: 1000 * 60 * 30, // 30m
-			memoryCacheLifetime: 1000 * 60, // 1m
+			lifetime: 1000 * 60 * 30,
+			memoryCacheLifetime: 1000 * 60,
 			fetcher: (key) => this.mutingsRepository.find({
 				where: { muterId: key },
 				select: { muteeId: true },
@@ -98,8 +96,8 @@ export class CacheService implements OnApplicationShutdown {
 		});
 
 		this.userBlockingCache = new RedisKVCache<Set<string>>(this.redisClient, 'userBlocking', {
-			lifetime: 1000 * 60 * 30, // 30m
-			memoryCacheLifetime: 1000 * 60, // 1m
+			lifetime: 1000 * 60 * 30,
+			memoryCacheLifetime: 1000 * 60,
 			fetcher: (key) => this.blockingsRepository.find({
 				where: { blockerId: key },
 				select: { blockeeId: true },
@@ -109,8 +107,8 @@ export class CacheService implements OnApplicationShutdown {
 		});
 
 		this.userBlockedCache = new RedisKVCache<Set<string>>(this.redisClient, 'userBlocked', {
-			lifetime: 1000 * 60 * 30, // 30m
-			memoryCacheLifetime: 1000 * 60, // 1m
+			lifetime: 1000 * 60 * 30,
+			memoryCacheLifetime: 1000 * 60,
 			fetcher: (key) => this.blockingsRepository.find({
 				where: { blockeeId: key },
 				select: { blockerId: true },
@@ -120,8 +118,8 @@ export class CacheService implements OnApplicationShutdown {
 		});
 
 		this.renoteMutingsCache = new RedisKVCache<Set<string>>(this.redisClient, 'renoteMutings', {
-			lifetime: 1000 * 60 * 30, // 30m
-			memoryCacheLifetime: 1000 * 60, // 1m
+			lifetime: 1000 * 60 * 30,
+			memoryCacheLifetime: 1000 * 60,
 			fetcher: (key) => this.renoteMutingsRepository.find({
 				where: { muterId: key },
 				select: { muteeId: true },
@@ -131,8 +129,8 @@ export class CacheService implements OnApplicationShutdown {
 		});
 
 		this.userFollowingsCache = new RedisKVCache<Record<string, Pick<MiFollowing, 'withReplies'> | undefined>>(this.redisClient, 'userFollowings', {
-			lifetime: 1000 * 60 * 30, // 30m
-			memoryCacheLifetime: 1000 * 60, // 1m
+			lifetime: 1000 * 60 * 30,
+			memoryCacheLifetime: 1000 * 60,
 			fetcher: (key) => this.followingsRepository.find({
 				where: { followerId: key },
 				select: { followeeId: true, withReplies: true },
@@ -147,13 +145,10 @@ export class CacheService implements OnApplicationShutdown {
 			fromRedisConverter: (value) => JSON.parse(value),
 		});
 
-		// NOTE: チャンネルのフォロー状況キャッシュはChannelFollowingServiceで行っている
-
 		this.pariRemoteUserDecorationsCache = new RedisKVCache<PariRemoteUserDecorationsCacheType>(this.redisClient, 'pariRemoteUserDecorationsCache', {
-			lifetime: 1000 * 60 * 30, // 30m
-			memoryCacheLifetime: 1000 * 60, // 1m
+			lifetime: 1000 * 60 * 30,
+			memoryCacheLifetime: 1000 * 60,
 			fetcher: (key) => this.usersRepository.findOneBy({ id: key }).then(user => {
-				// A deleted or local user has no remote decorations.
 				if (user == null || user.host == null) return [];
 				if (!(this.config.avatarDecorationAllowedHosts?.includes(user.host))) return [];
 				return this.httpRequestService.send(`https://${user.host}/api/users/show`, {

@@ -25,7 +25,6 @@ const probes = vi.hoisted(() => {
 					inheritAttrs: false,
 					setup(_, { attrs, slots }) {
 						const instanceId = ++state.nextId;
-						// Model children that capture their initial props during setup.
 						const initialProps = JSON.stringify(attrs);
 						state.mounted.push(name);
 						onUnmounted(() => state.unmounted.push(name));

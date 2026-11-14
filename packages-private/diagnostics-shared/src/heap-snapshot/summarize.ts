@@ -16,10 +16,6 @@ function isComplete(values: Partial<Record<HeapSnapshotCategory, number>>): valu
 	return heapSnapshotCategories.every(category => values[category] != null);
 }
 
-/**
- * 複数ラウンド分のheap snapshotを、カテゴリ・内訳ごとの中央値にまとめる。
- * 全カテゴリ分の値が揃わなければ null を返す。
- */
 export function summarizeHeapSnapshotDataSamples<T>(
 	samples: T[],
 	getData: (sample: T) => HeapSnapshotData | null | undefined,
@@ -37,8 +33,6 @@ export function summarizeHeapSnapshotDataSamples<T>(
 		if (nodeCountValue != null) nodeCounts[category] = nodeCountValue;
 	}
 
-	// 一部のカテゴリだけ欠けた状態で返すと、呼び出し側が完全な値として扱って
-	// undefined を描画してしまう。全カテゴリ揃っていなければサマリ自体を無しとする
 	if (!isComplete(categories) || !isComplete(nodeCounts)) return null;
 
 	const breakdowns: NonNullable<HeapSnapshotData['breakdowns']> = {};

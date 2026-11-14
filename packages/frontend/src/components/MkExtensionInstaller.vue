@@ -8,7 +8,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 	<div :class="$style.extInstallerIconWrapper">
 		<i v-if="isPlugin" class="ti ti-plug"></i>
 		<i v-else-if="isTheme" class="ti ti-palette"></i>
-		<!-- 拡張用？ -->
 		<i v-else class="ti ti-download"></i>
 	</div>
 

@@ -129,11 +129,6 @@ export class ApPersonService implements OnModuleInit {
 		this.logger = this.apLoggerService.logger;
 	}
 
-	/**
-	 * Validate and convert to actor object
-	 * @param x Fetched object
-	 * @param uri Fetch target URI
-	 */
 	@bindThis
 	private validateActor(x: IObject, uri: string): IActor {
 		const expectHost = this.utilityService.punyHost(uri);
@@ -184,16 +179,12 @@ export class ApPersonService implements OnModuleInit {
 			throw new Error('invalid Actor: wrong username');
 		}
 
-		// These fields are only informational, and some AP software allows these
-		// fields to be very long. If they are too long, we cut them off. This way
-		// we can at least see these users and their activities.
 		if (x.name) {
 			if (!(typeof x.name === 'string' && x.name.length > 0)) {
 				throw new Error('invalid Actor: wrong name');
 			}
 			x.name = truncate(x.name, nameLength);
 		} else if (x.name === '') {
-			// Mastodon emits empty string when the name is not set.
 			x.name = undefined;
 		}
 		if (x.summary) {
@@ -222,17 +213,11 @@ export class ApPersonService implements OnModuleInit {
 		return x;
 	}
 
-	/**
-	 * uriからUser(Person)をフェッチします。
-	 *
-	 * Misskeyに対象のPersonが登録されていればそれを返し、登録がなければnullを返します。
-	 */
 	@bindThis
 	public async fetchPerson(uri: string): Promise<MiLocalUser | MiRemoteUser | null> {
 		const cached = this.cacheService.uriPersonCache.get(uri) as MiLocalUser | MiRemoteUser | null | undefined;
 		if (cached) return cached;
 
-		// URIがこのサーバーを指しているならデータベースからフェッチ
 		if (uri.startsWith(`${this.config.url}/`)) {
 			const id = uri.split('/').pop();
 			const u = await this.usersRepository.findOneBy({ id }) as MiLocalUser | null;
@@ -240,14 +225,12 @@ export class ApPersonService implements OnModuleInit {
 			return u;
 		}
 
-		//#region このサーバーに既に登録されていたらそれを返す
 		const exist = await this.usersRepository.findOneBy({ uri }) as MiLocalUser | MiRemoteUser | null;
 
 		if (exist) {
 			this.cacheService.uriPersonCache.set(uri, exist);
 			return exist;
 		}
-		//#endregion
 
 		return null;
 	}
@@ -256,14 +239,10 @@ export class ApPersonService implements OnModuleInit {
 		if (user == null) throw new Error('failed to create user: user is null');
 
 		const [avatar, banner] = await Promise.all([icon, image].map(img => {
-			// icon and image may be arrays
-			// see https://www.w3.org/TR/activitystreams-vocabulary/#dfn-icon
 			if (Array.isArray(img)) {
 				img = img.find(item => item && item.url) ?? null;
 			}
 
-			// if we have an explicitly missing image, return an
-			// explicitly-null set of values
 			if ((img == null) || (typeof img === 'object' && img.url == null)) {
 				return { id: null, url: null, blurhash: null };
 			}
@@ -276,13 +255,6 @@ export class ApPersonService implements OnModuleInit {
 			return {};
 		}
 
-		/*
-			we don't want to return nulls on errors! if the database fields
-			are already null, nothing changes; if the database has old
-			values, we should keep those. The exception is if the remote has
-			actually removed the images: in that case, the block above
-			returns the special {id:null}&c value, and we return those
-		*/
 		return {
 			...( avatar ? {
 				avatarId: avatar.id,
@@ -297,9 +269,6 @@ export class ApPersonService implements OnModuleInit {
 		};
 	}
 
-	/**
-	 * Personを作成します。
-	 */
 	@bindThis
 	public async createPerson(uri: string, resolver?: Resolver): Promise<MiRemoteUser> {
 		if (typeof uri !== 'string') throw new Error('uri is not string');
@@ -352,20 +321,16 @@ export class ApPersonService implements OnModuleInit {
 			throw new Error('unexpected schema of person url: ' + url);
 		}
 
-		// Create user
 		let user: MiRemoteUser | null = null;
 
-		//#region カスタム絵文字取得
 		const emojis = await this.apNoteService.extractEmojis(person.tag ?? [], host)
 			.then(_emojis => _emojis.map(emoji => emoji.name))
 			.catch(err => {
 				this.logger.error('error occurred while fetching user emojis', { stack: err });
 				return [];
 			});
-		//#endregion
 
 		try {
-			// Start transaction
 			await this.db.transaction(async transactionalEntityManager => {
 				user = await transactionalEntityManager.save(new MiUser({
 					id: this.idService.gen(),
@@ -426,9 +391,7 @@ export class ApPersonService implements OnModuleInit {
 				}
 			});
 		} catch (e) {
-			// duplicate key error
 			if (isDuplicateKeyValueError(e)) {
-				// /users/@a => /users/:id のように入力がaliasなときにエラーになることがあるのを対応
 				const u = await this.usersRepository.findOneBy({ uri: person.id });
 				if (u == null) throw new Error('already registered');
 
@@ -441,10 +404,8 @@ export class ApPersonService implements OnModuleInit {
 
 		if (user == null) throw new Error('failed to create user: user is null');
 
-		// Register to the cache
 		this.cacheService.uriPersonCache.set(user.uri, user);
 
-		// Register host
 		if (this.meta.enableStatsForFederatedInstances) {
 			this.federatedInstanceService.fetchOrRegister(host).then(i => {
 				this.instancesRepository.increment({ id: i.id }, 'usersCount', 1);
@@ -457,48 +418,31 @@ export class ApPersonService implements OnModuleInit {
 
 		this.usersChart.update(user, true);
 
-		// ハッシュタグ更新
 		this.hashtagService.updateUsertags(user, tags);
 
-		//#region アバターとヘッダー画像をフェッチ
 		try {
 			const updates = await this.resolveAvatarAndBanner(user, person.icon, person.image);
 			await this.usersRepository.update(user.id, updates);
 			user = { ...user, ...updates };
 
-			// Register to the cache
 			this.cacheService.uriPersonCache.set(user.uri, user);
 		} catch (err) {
 			this.logger.error('error occurred while fetching user avatar/banner', { stack: err });
 		}
-		//#endregion
 
 		await this.updateFeatured(user.id, resolver).catch(err => this.logger.error(err));
 
 		return user;
 	}
 
-	/**
-	 * Personの情報を更新します。
-	 * Misskeyに対象のPersonが登録されていなければ無視します。
-	 * もしアカウントの移行が確認された場合、アカウント移行処理を行います。
-	 *
-	 * @param uri URI of Person
-	 * @param resolver Resolver
-	 * @param hint Hint of Person object (この値が正当なPersonの場合、Remote resolveをせずに更新に利用します)
-	 * @param movePreventUris ここに指定されたURIがPersonのmovedToに指定されていたり10回より多く回っている場合これ以上アカウント移行を行わない（無限ループ防止）
-	 */
 	@bindThis
 	public async updatePerson(uri: string, resolver?: Resolver | null, hint?: IObject, movePreventUris: string[] = []): Promise<string | void> {
 		if (typeof uri !== 'string') throw new Error('uri is not string');
 
-		// URIがこのサーバーを指しているならスキップ
 		if (this.utilityService.isUriLocal(uri)) return;
 
-		//#region このサーバーに既に登録されているか
 		const exist = await this.fetchPerson(uri) as MiRemoteUser | null;
 		if (exist === null) return;
-		//#endregion
 
 		// eslint-disable-next-line no-param-reassign
 		if (resolver == null) resolver = await this.apResolverService.createResolver();
@@ -509,7 +453,6 @@ export class ApPersonService implements OnModuleInit {
 
 		this.logger.info(`Updating the Person: ${person.id}`);
 
-		// カスタム絵文字取得
 		const emojis = await this.apNoteService.extractEmojis(person.tag ?? [], exist.host).catch(e => {
 			this.logger.info(`extractEmojis: ${e}`);
 			return [];
@@ -530,7 +473,6 @@ export class ApPersonService implements OnModuleInit {
 				.catch(err => {
 					if (!(err instanceof StatusError) || err.isRetryable) {
 						this.logger.error('error occurred while fetching following/followers collection', { stack: err });
-						// Do not update the visibiility on transient errors.
 						return undefined;
 					}
 					return 'private';
@@ -576,26 +518,22 @@ export class ApPersonService implements OnModuleInit {
 		} as Partial<MiRemoteUser> & Pick<MiRemoteUser, 'isBot' | 'isCat' | 'isLocked' | 'movedToUri' | 'alsoKnownAs' | 'isExplorable'>;
 
 		const moving = ((): boolean => {
-			// 移行先がない→ある
 			if (
 				exist.movedToUri === null &&
 				updates.movedToUri
 			) return true;
 
-			// 移行先がある→別のもの
 			if (
 				exist.movedToUri !== null &&
 				updates.movedToUri !== null &&
 				exist.movedToUri !== updates.movedToUri
 			) return true;
 
-			// 移行先がある→ない、ない→ないは無視
 			return false;
 		})();
 
 		if (moving) updates.movedAt = new Date();
 
-		// Update user
 		if (!(await this.usersRepository.update({ id: exist.id, isDeleted: false }, updates)).affected) {
 			return 'skip';
 		}
@@ -628,10 +566,8 @@ export class ApPersonService implements OnModuleInit {
 
 		this.globalEventService.publishInternalEvent('remoteUserUpdated', { id: exist.id });
 
-		// ハッシュタグ更新
 		this.hashtagService.updateUsertags(exist, tags);
 
-		// 該当ユーザーが既にフォロワーになっていた場合はFollowingもアップデートする
 		await this.followingsRepository.update(
 			{ followerId: exist.id },
 			{ followerSharedInbox: person.sharedInbox ?? person.endpoints?.sharedInbox ?? null },
@@ -643,12 +579,8 @@ export class ApPersonService implements OnModuleInit {
 
 		this.cacheService.uriPersonCache.set(uri, updated);
 
-		// 移行処理を行う
 		if (updated.movedAt && (
-			// 初めて移行する場合はmovedAtがnullなので移行処理を許可
 			exist.movedAt == null ||
-			// 以前のmovingから14日以上経過した場合のみ移行処理を許可
-			// （Mastodonのクールダウン期間は30日だが若干緩めに設定しておく）
 			exist.movedAt.getTime() + 1000 * 60 * 60 * 24 * 14 < updated.movedAt.getTime()
 		)) {
 			this.logger.info(`Start to process Move of @${updated.username}@${updated.host} (${uri})`);
@@ -665,27 +597,17 @@ export class ApPersonService implements OnModuleInit {
 		return 'skip';
 	}
 
-	/**
-	 * Personを解決します。
-	 *
-	 * Misskeyに対象のPersonが登録されていればそれを返し、そうでなければ
-	 * リモートサーバーからフェッチしてMisskeyに登録しそれを返します。
-	 */
 	@bindThis
 	public async resolvePerson(uri: string, resolver?: Resolver): Promise<MiLocalUser | MiRemoteUser> {
-		//#region このサーバーに既に登録されていたらそれを返す
 		const exist = await this.fetchPerson(uri);
 		if (exist) return exist;
-		//#endregion
 
-		// リモートサーバーからフェッチしてきて登録
 		// eslint-disable-next-line no-param-reassign
 		if (resolver == null) resolver = await this.apResolverService.createResolver();
 		return await this.createPerson(uri, resolver);
 	}
 
 	@bindThis
-	// TODO: `attachments`が`IObject`だった場合、返り値が`[]`になるようだが構わないのか？
 	public analyzeAttachments(attachments: IObject | IObject[] | undefined): Field[] {
 		const fields: Field[] = [];
 
@@ -711,33 +633,27 @@ export class ApPersonService implements OnModuleInit {
 
 		const _resolver = resolver ?? await this.apResolverService.createResolver();
 
-		// Resolve to (Ordered)Collection Object
 		const collection = await _resolver.resolveCollection(user.featured);
 		if (!isCollectionOrOrderedCollection(collection)) throw new Error('Object is not Collection or OrderedCollection');
 
-		// Resolve to Object(may be Note) arrays
-		// Limit before resolving: each item costs a request from the shared resolver budget.
 		const unresolvedItems = isCollection(collection) ? collection.items : collection.orderedItems;
 		const items = await Promise.all(toArray(unresolvedItems).slice(0, 5).map(x => _resolver.resolve(x)));
 
-		// Resolve and regist Notes
 		const limit = promiseLimit<MiNote | null>(2);
 		const featuredNotes = await Promise.all(items
-			.filter(item => getApType(item) === 'Note')	// TODO: Noteでなくてもいいかも
+			.filter(item => getApType(item) === 'Note')
 			.map(item => limit(() => this.apNoteService.resolveNote(item, {
 				resolver: _resolver,
 				sentFrom: new URL(user.uri),
 			}))));
 
 		await this.db.transaction(async transactionalEntityManager => {
-			// Serialize replacements across workers, including when the user has no pins.
 			await transactionalEntityManager.findOneOrFail(MiUser, {
 				where: { id: user.id, isDeleted: false },
 				lock: { mode: 'pessimistic_write' },
 			});
 			await transactionalEntityManager.delete(MiUserNotePining, { userId: user.id });
 
-			// とりあえずidを別の時間で生成して順番を維持
 			const now = Date.now();
 			let td = 0;
 			const pinnedNoteIds = new Set<MiNote['id']>();
@@ -754,43 +670,32 @@ export class ApPersonService implements OnModuleInit {
 		});
 	}
 
-	/**
-	 * リモート由来のアカウント移行処理を行います
-	 * @param src 移行元アカウント（リモートかつupdatePerson後である必要がある、というかこれ自体がupdatePersonで呼ばれる前提）
-	 * @param movePreventUris ここに列挙されたURIにsrc.movedToUriが含まれる場合、移行処理はしない（無限ループ防止）
-	 */
 	@bindThis
 	private async processRemoteMove(src: MiRemoteUser, movePreventUris: string[] = []): Promise<string> {
 		if (!src.movedToUri) return 'skip: no movedToUri';
-		if (src.uri === src.movedToUri) return 'skip: movedTo itself (src)'; // ？？？
+		if (src.uri === src.movedToUri) return 'skip: movedTo itself (src)';
 		if (movePreventUris.length > 10) return 'skip: too many moves';
 
-		// まずサーバー内で検索して様子見
 		let dst = await this.fetchPerson(src.movedToUri);
 
 		if (dst && this.userEntityService.isLocalUser(dst)) {
-			// ローカルユーザーの uri は null なので、ID で最新の移行設定を取得する
 			dst = await this.usersRepository.findOneByOrFail({ id: dst.id }) as MiLocalUser;
 		} else if (dst) {
 			if (movePreventUris.includes(src.movedToUri)) return 'skip: circular move';
 
-			// targetを見つけたことがあるならtargetをupdatePersonする
 			await this.updatePerson(src.movedToUri, undefined, undefined, [...movePreventUris, src.uri]);
 			dst = await this.fetchPerson(src.movedToUri) ?? dst;
 		} else {
 			if (this.utilityService.isUriLocal(src.movedToUri)) {
-				// ローカルユーザーっぽいのにfetchPersonで見つからないということはmovedToUriが間違っている
 				return 'failed: movedTo is local but not found';
 			}
 
-			// targetが知らない人だったらresolvePerson
-			// (uriが存在しなかったり応答がなかったりする場合resolvePersonはthrow Errorする)
 			dst = await this.resolvePerson(src.movedToUri);
 		}
 
 		const dstUri = this.userEntityService.getUserUri(dst);
-		if (dst.movedToUri === dstUri) return 'skip: movedTo itself (dst)'; // ？？？
-		if (src.movedToUri !== dstUri) return 'skip: missmatch uri'; // ？？？
+		if (dst.movedToUri === dstUri) return 'skip: movedTo itself (dst)';
+		if (src.movedToUri !== dstUri) return 'skip: missmatch uri';
 		if (dst.movedToUri === src.uri) return 'skip: dst.movedToUri === src.uri';
 		if (!dst.alsoKnownAs || dst.alsoKnownAs.length === 0) {
 			return 'skip: dst.alsoKnownAs is empty';

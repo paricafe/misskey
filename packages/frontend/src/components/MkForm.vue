@@ -70,10 +70,8 @@ const emit = defineEmits<{
 	(ev: 'canSaveStateChange', canSave: boolean): void;
 }>();
 
-// TODO: ジェネリックにしたい
 const values = defineModel<Record<string, any>>({ required: true });
 
-// 保存可能状態の管理
 const inputSavingStates = ref<Record<string, { changed: boolean; invalid: boolean }>>({});
 
 function onSavingStateChange(key: string, changed: boolean, invalid: boolean) {

@@ -92,7 +92,6 @@ describe('SearchService', () => {
 
 		app.enableShutdownHooks();
 		const db = app.get<DataSource>(DI.db);
-		// Test schema synchronization does not create SQL functions or expression indexes.
 		const runner = db.createQueryRunner();
 		try {
 			await applySearchMigrations(runner);
@@ -607,7 +606,6 @@ describe('SearchService', () => {
 		defineSearchNoteTests(() => ctx, { supportsFollowersVisibility: true, sinceIdOrder: 'asc', excludesReplyMentions: true });
 	});
 
-	// Run with MISSKEY_TEST_PGROONGA=1 and the PGroonga extension installed in the test DB.
 	describe.skipIf(process.env.MISSKEY_TEST_PGROONGA !== '1')('sqlPgroonga', () => {
 		let ctx: TestContext;
 
@@ -708,7 +706,6 @@ describe('SearchService', () => {
 				await new RestoreSingleColumnNoteSearchIndex1792058058152().down(runner);
 				const reverted = await indexes();
 				expect(reverted.map(index => index.indexname)).toEqual(['IDX_note_search_text_id']);
-				// pg_indexes omits pgroonga_varchar_term_search_ops_v2 because it is the default opclass.
 				expect(reverted[0].indexdef).toContain('"replyId")::text), id)');
 				expect(reverted[0].indexdef).toContain('remove_symbol');
 			} finally {
@@ -787,7 +784,6 @@ describe('SearchService', () => {
 			expect(candidateSql).toContain('"note"."userHost" IS NULL');
 			expect(candidateSql).toContain('"note"."id" >=');
 			expect(candidateSql).not.toMatch(/ORDER BY|LIMIT/);
-			// Candidate retrieval must not merge-join the CTE against the note table.
 			expect(sql).not.toContain('JOIN');
 			const hydration = logQuery.mock.calls.find(([query]) => query.includes('"note"."id" IN ('));
 			expect(hydration).toBeDefined();
@@ -795,8 +791,6 @@ describe('SearchService', () => {
 			expect(hydration![0]).not.toContain('note_search_text(');
 			expect(hydration![1]).toContain(expected.id);
 
-			// A tiny fixture normally prefers a sequential scan. Check that the real
-			// expression index is usable, without imposing planner settings on searches.
 			const runner = ctx.db.createQueryRunner();
 			await runner.startTransaction();
 			try {

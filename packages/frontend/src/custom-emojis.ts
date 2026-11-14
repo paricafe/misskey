@@ -21,7 +21,6 @@ export const customEmojiCategories = computed<[ ...string[], null ]>(() => {
 });
 
 export const customEmojisMap = shallowReactive(new Map<string, Misskey.entities.EmojiSimple>());
-// Every rendered emoji and MFM block reads this map, so only names whose emoji changed are written.
 watch(customEmojis, emojis => {
 	const names = new Set<string>();
 	for (const emoji of emojis) {
@@ -69,7 +68,6 @@ export async function fetchCustomEmojis(force = false) {
 }
 
 export async function fetchCustomEmojisForBoot(): Promise<void> {
-	// The shell and text fallback can render before the catalog, including on the first visit.
 	void fetchCustomEmojis().catch(error => console.error('Failed to refresh emojis:', error));
 }
 

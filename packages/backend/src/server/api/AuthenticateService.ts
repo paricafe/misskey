@@ -37,7 +37,7 @@ export class AuthenticateService implements OnApplicationShutdown {
 
 		private cacheService: CacheService,
 	) {
-		this.appCache = new MemoryKVCache<MiApp>(1000 * 60 * 60 * 24 * 7); // 1w
+		this.appCache = new MemoryKVCache<MiApp>(1000 * 60 * 60 * 24 * 7);
 	}
 
 	@bindThis
@@ -58,9 +58,9 @@ export class AuthenticateService implements OnApplicationShutdown {
 		} else {
 			const accessToken = await this.accessTokensRepository.findOne({
 				where: [{
-					hash: token.toLowerCase(), // app
+					hash: token.toLowerCase(),
 				}, {
-					token: token, // miauth
+					token: token,
 				}],
 			});
 

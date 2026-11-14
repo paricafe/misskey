@@ -151,7 +151,6 @@ onMounted(async () => {
 					},
 					ticks: {
 						display: true,
-						//mirror: true,
 						callback: (value, index, values) => (value as number) < 0 ? -value : value,
 					},
 				},
@@ -181,7 +180,7 @@ onMounted(async () => {
 						label: context => `${context.dataset.label}: ${Math.abs(context.parsed.y)}`,
 					},
 				},
-				...({ // TSを黙らすため
+				...({
 					gradient,
 				}),
 			},
@@ -269,7 +268,7 @@ onMounted(async () => {
 					},
 					external: externalTooltipHandler2,
 				},
-				...({ // TSを黙らすため
+				...({
 					gradient,
 				}),
 			},

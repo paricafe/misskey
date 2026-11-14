@@ -27,7 +27,6 @@ export {
 
 export const BASE_URL = 'http://localhost:61812';
 
-//#region Misc
 export async function resetState(): Promise<void> {
 	await resetStateWithBaseUrl(BASE_URL);
 }
@@ -39,9 +38,7 @@ export async function registerUser(
 ): ReturnType<typeof registerUserWithBaseUrl> {
 	return registerUserWithBaseUrl(BASE_URL, username, password, isAdmin);
 }
-//#endregion
 
-//#region Page Helpers
 export async function visitHome(page: Page): Promise<void> {
 	await visitHomeWithBaseUrl(page, BASE_URL);
 }
@@ -49,4 +46,3 @@ export async function visitHome(page: Page): Promise<void> {
 export async function signIn(page: Page, username: string, password: string): Promise<void> {
 	await signInWithBaseUrl(page, BASE_URL, username, password);
 }
-//#endregion

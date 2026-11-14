@@ -49,7 +49,6 @@ export const Default = {
 	parameters: {
 		layout: 'centered',
 		chromatic: {
-			// FIXME: flaky
 			disableSnapshot: true,
 		},
 	},

@@ -37,16 +37,13 @@ export type Keys = (
 	'isSafeMode' |
 	`miux:${string}` |
 	`ui:folder:${string}` |
-	`themes:${string}` | // DEPRECATED
+	`themes:${string}` |
 	`aiscript:${string}` |
-	'lastEmojisFetchedAt' | // DEPRECATED, stored in indexeddb (13.9.0~)
-	'emojis' | // DEPRECATED, stored in indexeddb (13.9.0~);
+	'lastEmojisFetchedAt' |
+	'emojis' |
 	`channelLastReadedAt:${string}` |
 	`idbfallback::${string}`
 );
-
-// セッション毎に廃棄されるLocalStorage代替（セーフモードなどで使用できそう）
-//const safeSessionStorage = new Map<Keys, string>();
 
 export const miLocalStorage = {
 	getItem: (key: Keys): string | null => {

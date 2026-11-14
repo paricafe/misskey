@@ -95,24 +95,20 @@ export class FollowingEntityService {
 		if (!await this.roleService.isModerator(me)) {
 			query.setParameter('me', me.id);
 
-			// Make sure that the followee doesn't block us, if their profile will be included.
 			if (params.includeFollowee) {
 				query.leftJoin(MiBlocking, 'followee_blocking', 'followee_blocking."blockerId" = following."followeeId" AND followee_blocking."blockeeId" = :me');
 				query.andWhere('followee_blocking.id IS NULL');
 			}
 
-			// Make sure that the follower doesn't block us, if their profile will be included.
 			if (params.includeFollower) {
 				query.leftJoin(MiBlocking, 'follower_blocking', 'follower_blocking."blockerId" = following."followerId" AND follower_blocking."blockeeId" = :me');
 				query.andWhere('follower_blocking.id IS NULL');
 			}
 
-			// Make sure that the followee hasn't hidden this connection.
 			query.leftJoin(MiUserProfile, 'followee', 'followee."userId" = following."followeeId"');
 			query.leftJoin(MiFollowing, 'me_following_followee', 'me_following_followee."followerId" = :me AND me_following_followee."followeeId" = following."followerId"');
 			query.andWhere('(followee."userId" = :me OR followee."followersVisibility" = \'public\' OR (followee."followersVisibility" = \'followers\' AND me_following_followee.id IS NOT NULL))');
 
-			// Make sure that the follower hasn't hidden this connection.
 			query.leftJoin(MiUserProfile, 'follower', 'follower."userId" = following."followerId"');
 			query.leftJoin(MiFollowing, 'me_following_follower', 'me_following_follower."followerId" = :me AND me_following_follower."followeeId" = following."followerId"');
 			query.andWhere('(follower."userId" = :me OR follower."followingVisibility" = \'public\' OR (follower."followingVisibility" = \'followers\' AND me_following_follower.id IS NOT NULL))');

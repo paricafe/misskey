@@ -71,7 +71,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 			const file = await this.driveFilesRepository.findOneBy({ id: ps.fileId, userId: me.id });
 
 			if (file == null) throw new ApiError(meta.errors.noSuchFile);
-			//if (!file.type.endsWith('/csv')) throw new ApiError(meta.errors.unexpectedFileType);
 			if (file.size === 0) throw new ApiError(meta.errors.emptyFile);
 
 			const checkMoving = await this.accountMoveService.validateAlsoKnownAs(

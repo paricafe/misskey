@@ -8,19 +8,12 @@ import type { I18n } from './i18n.js';
 
 type Tsx = I18n<Locale>['tsx'];
 
-/**
- * {@link formatRelativeTime} で使う翻訳文字列
- * locale-inliner でビルド時に埋め込まれるよう、呼び出し側で `i18n.tsx._ago` などを渡す
- */
 export type RelativeTimeLocale = {
 	ago: Tsx['_ago'];
 	timeIn: Tsx['_timeIn'];
 	justNow: string;
 };
 
-/**
- * 日時をUNIXミリ秒に変換する。不正な値の場合は NaN を返す
- */
 export function parseTime(time: Date | string | number | null): number {
 	if (time == null) return NaN;
 	try {
@@ -33,10 +26,6 @@ export function parseTime(time: Date | string | number | null): number {
 	}
 }
 
-/**
- * 「n分前」「n日後」のような相対時刻の文字列を返す
- * @param ago 経過秒数 (未来の場合は負の値)
- */
 export function formatRelativeTime(ago: number, locale: RelativeTimeLocale): string {
 	return (
 		ago >= 31536000 ? locale.ago.yearsAgo({ n: Math.round(ago / 31536000).toString() }) :

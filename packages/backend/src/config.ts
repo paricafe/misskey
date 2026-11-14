@@ -31,9 +31,6 @@ type SentryBackendConfig = {
 	disabledIntegrations?: string[];
 };
 
-/**
- * 設定ファイルの型
- */
 type Source = {
 	url?: string;
 	port?: number;
@@ -253,9 +250,7 @@ export type FulltextSearchProvider = 'sqlLike' | 'sqlPgroonga' | 'meilisearch';
 const _filename = fileURLToPath(import.meta.url);
 const _dirname = dirname(_filename);
 
-/** Path of repository root directory */
 let rootDir = _dirname;
-// 見つかるまで上に遡る
 while (!fs.existsSync(resolve(rootDir, 'packages'))) {
 	const parentDir = dirname(rootDir);
 	if (parentDir === rootDir) {
@@ -264,14 +259,9 @@ while (!fs.existsSync(resolve(rootDir, 'packages'))) {
 	rootDir = parentDir;
 }
 
-/** Path of configuration directory */
 const configDir = resolve(rootDir, '.config');
-/** Path of built directory */
 const projectBuiltDir = resolve(rootDir, 'built');
 
-/**
- * Path of configuration file
- */
 export const path = process.env.MISSKEY_CONFIG_YML
 	? resolve(configDir, process.env.MISSKEY_CONFIG_YML)
 	: process.env.NODE_ENV === 'test'
@@ -390,7 +380,6 @@ function tryCreateUrl(url: string) {
 
 function validateJobConcurrency(key: string, value: number | undefined) {
 	if (value == null) return undefined;
-	// BullMQ の Worker は 1 未満の concurrency を受け付けないため、起動時に設定キーを明示して落とす
 	if (typeof value !== 'number' || !Number.isFinite(value) || value < 1) {
 		throw new Error(`${key}=${JSON.stringify(value)} is invalid. It must be a finite number greater than or equal to 1.`);
 	}

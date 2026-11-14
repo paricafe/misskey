@@ -324,7 +324,6 @@ export function getNoteMenu(props: {
 					localStorageLang = localStorageLang.split('-')[0];
 				}
 
-				// 翻訳元と翻訳先の言語が同じ場合はTranslatorがthrowするのでそのまま返す
 				if (langResult[0]?.detectedLanguage === localStorageLang || langResult[0]?.detectedLanguage === navigator.language) {
 					props.translation.value = {
 						sourceLang: langResult[0]?.detectedLanguage ?? 'unknown',
@@ -633,7 +632,6 @@ function smallerVisibility(a: Visibility, b: Visibility): Visibility {
 	if (a === 'specified' || b === 'specified') return 'specified';
 	if (a === 'followers' || b === 'followers') return 'followers';
 	if (a === 'home' || b === 'home') return 'home';
-	// if (a === 'public' || b === 'public')
 	return 'public';
 }
 

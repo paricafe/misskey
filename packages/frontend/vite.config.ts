@@ -53,9 +53,6 @@ function getBundleVisualizerPlugin(): PluginOption[] {
 	return plugins;
 }
 
-/**
- * 検索インデックスの生成設定
- */
 export const searchIndexes = [{
 	targetFilePaths: ['src/pages/settings/*.vue'],
 	mainVirtualModule: 'search-index:settings',
@@ -68,12 +65,7 @@ export const searchIndexes = [{
 	verbose: process.env.FRONTEND_SEARCH_INDEX_VERBOSE === 'true',
 }] satisfies SearchIndexOptions[];
 
-/**
- * Misskeyのフロントエンドにバンドルせず、CDNなどから別途読み込むリソースを記述する。
- * CDNを使わずにバンドルしたい場合、以下の配列から該当要素を削除orコメントアウトすればOK
- */
 const externalPackages = [
-	// shiki（コードブロックのシンタックスハイライトで使用中）はテーマ・言語の定義の容量が大きいため、それらはCDNから読み込む
 	{
 		name: 'shiki',
 		match: /^shiki\/(?<subPkg>(langs|themes))$/,
@@ -122,22 +114,17 @@ export function getConfig(): UserConfig {
 	return {
 		base: '/vite/',
 
-		// The console is shared with backend, so clearing the console will also clear the backend log.
 		clearScreen: false,
 
 		server: {
-			// The backend allows access from any addresses, so vite also allows access from any addresses.
 			host: '0.0.0.0',
 			allowedHosts: host ? [host] : undefined,
 			port: 5173,
 			strictPort: true,
 			hmr: {
-				// バックエンド経由での起動時、Viteは5173経由でアセットを参照していると思い込んでいるが実際は3000から配信される
-				// そのため、バックエンドのWSサーバーにHMRのWSリクエストが吸収されてしまい、正しくHMRが機能しない
-				// クライアント側のWSポートをViteサーバーのポートに強制させることで、正しくHMRが機能するようになる
 				clientPort: 5173,
 			},
-			headers: { // なんか効かない
+			headers: {
 				'X-Frame-Options': 'DENY',
 			},
 		},
@@ -222,7 +209,6 @@ export function getConfig(): UserConfig {
 							name: 'vue',
 							test: /node_modules[\\/]vue/,
 						}, {
-							// split i18n related module to distinct module
 							name: 'i18n',
 							includeDependenciesRecursively: false,
 							test: /i18n\.ts|locale\.ts/,
@@ -249,7 +235,6 @@ export function getConfig(): UserConfig {
 			sourcemap: process.env.NODE_ENV === 'development',
 			reportCompressedSize: false,
 
-			// https://vitejs.dev/guide/dep-pre-bundling.html#monorepos-and-linked-dependencies
 			commonjsOptions: {
 				include: [/misskey-js/, /misskey-reversi/, /misskey-bubble-game/, /node_modules/],
 			},

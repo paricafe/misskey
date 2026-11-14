@@ -7,7 +7,6 @@ import { parseBigInt16 } from '@/misc/bigint.js';
 
 const CHARS = '0123456789abcdef';
 
-// same as object-id
 export const meidRegExp = /^[0-9a-f]{24}$/;
 
 function getTime(time: number) {

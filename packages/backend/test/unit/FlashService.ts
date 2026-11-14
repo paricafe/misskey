@@ -17,21 +17,15 @@ describe('FlashService', () => {
 	let app: TestingModule;
 	let service: FlashService;
 
-	// --------------------------------------------------------------------------------------
-
 	let flashsRepository: FlashsRepository;
 	let flashLikesRepository: FlashLikesRepository;
 	let usersRepository: UsersRepository;
 	let userProfilesRepository: UserProfilesRepository;
 	let idService: IdService;
 
-	// --------------------------------------------------------------------------------------
-
 	let root: MiUser;
 	let alice: MiUser;
 	let bob: MiUser;
-
-	// --------------------------------------------------------------------------------------
 
 	async function createFlash(data: Partial<MiFlash>) {
 		return flashsRepository.insert({
@@ -61,8 +55,6 @@ describe('FlashService', () => {
 
 		return user;
 	}
-
-	// --------------------------------------------------------------------------------------
 
 	beforeEach(async () => {
 		app = await Test.createTestingModule({
@@ -99,8 +91,6 @@ describe('FlashService', () => {
 	afterAll(async () => {
 		await app.close();
 	});
-
-	// --------------------------------------------------------------------------------------
 
 	describe('featured', () => {
 		test('should return featured flashes', async () => {

@@ -345,7 +345,6 @@ test('reads compatibility state once per streamed note for all matching subscrip
 		for (const stream of ['public', 'public:remote']) {
 			await c.messages.take(message => message.stream?.[0] === stream && JSON.parse(message.payload ?? '{}').id === id);
 		}
-		// Every native frame reads the filter revision; the remaining reads belong to this note.
 		const expected = ['getMany', ...(id === 'first-remote' ? ['list:filter'] : []), 'getGrant'];
 		assert.deepEqual(reads.filter(read => read !== 'get:filter-revision').sort(), expected.sort());
 	}
@@ -415,7 +414,6 @@ test('cancels an in-flight list subscription before native channel registration'
 	await started.promise;
 	c.socket.send(JSON.stringify({ type: 'unsubscribe', stream: 'list', list: 'pending-list' }));
 	c.socket.send(JSON.stringify({ type: 'subscribe', stream: 'public' }));
-	// The unsubscribe is processed synchronously, even while native HTTP is pending.
 	await new Promise(resolve => setTimeout(resolve, 10));
 	resume.resolve();
 	await channel(c.native, 'globalTimeline');
@@ -505,7 +503,6 @@ test('propagates native disconnects and releases gateway listeners and sockets o
 	await f.bridge.close();
 	assert.equal(f.gateway.listenerCount('upgrade'), 0);
 });
-
 
 test('awaits the final asynchronous grant check and rejects revocation before the WebSocket handshake', async t => {
 	const f = await fixture();

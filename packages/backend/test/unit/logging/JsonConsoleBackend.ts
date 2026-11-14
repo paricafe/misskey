@@ -7,7 +7,6 @@ import { describe, expect, test, vi } from 'vitest';
 import type { AccessLogRecord, LogRecord } from '@/logging/types.js';
 import { JsonConsoleBackend } from '@/logging/JsonConsoleBackend.js';
 
-/** JSON形式のテストで使う共通のログを作成します。 */
 function createRecord(overrides: Partial<LogRecord> = {}): LogRecord {
 	return {
 		level: 'error',

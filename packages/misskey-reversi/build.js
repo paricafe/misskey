@@ -24,7 +24,6 @@ const options = {
 
 const args = process.argv.slice(2).map(arg => arg.toLowerCase());
 
-// built配下をすべて削除する
 if (!args.includes('--no-clean')) {
 	fs.rmSync('./built', { recursive: true, force: true });
 }

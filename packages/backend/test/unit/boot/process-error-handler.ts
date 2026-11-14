@@ -9,7 +9,6 @@ import { installProcessErrorHandlers } from '@/boot/process-error-handler.js';
 
 type ProcessListener = (...args: unknown[]) => void;
 
-/** テスト用に、登録されたプロセスイベントを呼び出せる処理対象を作成します。 */
 function createProcessLike(): {
 	readonly process: { on: (event: string, listener: ProcessListener) => void };
 	readonly listeners: Map<string, ProcessListener>;

@@ -151,7 +151,6 @@ function keywordMatches(keyword: FilterKeyword, text: string): boolean {
 	return new RegExp(expression, 'iu').test(text);
 }
 
-/** Mastodon v2 delegates hide/warn/blur presentation to clients through FilterResult metadata. */
 export async function applyFilters(store: Pick<CompatStore, 'list'>, userId: string, status: Json, context?: FilterContext, now = Date.now()): Promise<Json> {
 	const filters = userId ? (await store.list<Filter>('filter', userId)).map(item => item.value)
 		.filter(filter => (!filter.expires_at || Date.parse(filter.expires_at) > now) && (!context || filter.context.includes(context))) : [];
@@ -172,7 +171,6 @@ export async function applyFilters(store: Pick<CompatStore, 'list'>, userId: str
 	return visit(status, 0);
 }
 
-/** The thread root is stable for both the HTTP conversation view and streamed direct notes. */
 export async function conversationRootId(note: Json, call: NativeCall): Promise<string> {
 	let current = note;
 	const seen = new Set<string>();
@@ -230,7 +228,6 @@ export async function conversationFromNote(store: CompatStore, userId: string, n
 	return { id, accounts, unread: state.unread, last_status: await applyFilters(store, userId, await decorateStatus(store, lastStatus, userId)) };
 }
 
-/** Recover a conversation after its last visible note was removed, using only native APIs. */
 export async function latestConversationNote(store: CompatStore, userId: string, rootId: string, call: NativeCall, removedId: string): Promise<Json | null> {
 	const previous = await store.get<ConversationState>('conversation', userId, rootId);
 	if (previous?.latestId && previous.latestId !== removedId) {
@@ -292,7 +289,6 @@ async function conversations(routes: Routes, context: RequestContext): Promise<J
 	let outgoingCursor: string | undefined;
 	let incomingDone = false;
 	let outgoingDone = false;
-	// The native user timeline has no visibility selector. Advance past public notes as needed.
 	for (let page = 0; page < 10 && !(incomingDone && outgoingDone); page++) {
 		const [incoming, outgoing]: [Json[], Json[]] = await Promise.all([
 			incomingDone ? [] : context.call<Json[]>('notes/mentions', { limit: 100, visibility: 'specified', ...(incomingCursor ? { untilId: incomingCursor } : {}) }),

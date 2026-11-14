@@ -229,7 +229,6 @@ onMounted(async () => {
 .filePreviewRoot {
 	background: var(--MI_THEME-panel);
 	border-radius: var(--MI-radius);
-	// MkMediaList 内の上部マージン 4px
 	padding: calc(1rem - 4px) 1rem 1rem;
 }
 

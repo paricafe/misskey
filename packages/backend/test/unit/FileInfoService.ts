@@ -13,7 +13,6 @@ import { afterAll, beforeAll, describe, test } from 'vitest';
 import { mockDeep } from 'vitest-mock-extended';
 import { GlobalModule } from '@/GlobalModule.js';
 import { FileInfo, FileInfoService } from '@/core/FileInfoService.js';
-//import { DI } from '@/di-symbols.js';
 import { SensitiveMediaDetectionService } from '@/core/SensitiveMediaDetectionService.js';
 import { LoggerService } from '@/core/LoggerService.js';
 import type { TestingModule } from '@nestjs/testing';
@@ -47,9 +46,6 @@ describe('FileInfoService', () => {
 			],
 		})
 			.useMocker((token) => {
-				//if (token === SensitiveMediaDetectionService) {
-				//	return {  };
-				//}
 				if (typeof token === 'function') {
 					return mockDeep<typeof token>();
 				}
@@ -163,7 +159,6 @@ describe('FileInfoService', () => {
 		});
 
 		test('SVG with XML definition', async () => {
-			// https://github.com/misskey-dev/misskey/issues/4413
 			const path = `${resources}/with-xml-def.svg`;
 			const info = strip(await fileInfoService.getFileInfo(path, { skipSensitiveDetection: true }));
 			assert.deepStrictEqual(info, {
@@ -186,7 +181,7 @@ describe('FileInfoService', () => {
 				size: 75933,
 				md5: '268c5dde99e17cf8fe09f1ab3f97df56',
 				type: {
-					mime: 'application/octet-stream',	// do not treat as image
+					mime: 'application/octet-stream',
 					ext: null,
 				},
 				width: 25000,

@@ -267,7 +267,6 @@ describe('ChannelMutingService', () => {
 
 	describe('isMuted', () => {
 		test('isMuted: true', async () => {
-			// キャッシュを読むのでServiceの機能を使って登録し、キャッシュを作成する
 			await service.mute({ requestUserId: alice.id, targetChannelId: channel1.id });
 			await service.mute({ requestUserId: alice.id, targetChannelId: channel2.id });
 

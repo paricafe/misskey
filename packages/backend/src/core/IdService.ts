@@ -39,10 +39,6 @@ export class IdService {
 		}
 	}
 
-	/**
-	 * 時間を元にIDを生成します(省略時は現在日時)
-	 * @param time 日時
-	 */
 	@bindThis
 	public gen(time?: number): string {
 		const t = (!time || (time > Date.now())) ? Date.now() : time;
@@ -71,7 +67,6 @@ export class IdService {
 		}
 	}
 
-	// Note: additional is at most 64 bits
 	@bindThis
 	public parseFull(id: string): { date: number; additional: bigint; } {
 		switch (this.method) {

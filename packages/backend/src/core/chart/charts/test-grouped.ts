@@ -14,9 +14,6 @@ import Chart from '../core.js';
 import { name, schema } from './entities/test-grouped.js';
 import type { KVs } from '../core.js';
 
-/**
- * For testing
- */
 @Injectable()
 export default class TestGroupedChart extends Chart<typeof schema> { // eslint-disable-line import/no-default-export
 	private total = {} as Record<string, number>;

@@ -66,18 +66,15 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 		super(meta, paramDef, async (ps, me) => {
 			const muter = me;
 
-			// 自分自身
 			if (me.id === ps.userId) {
 				throw new ApiError(meta.errors.muteeIsYourself);
 			}
 
-			// Get mutee
 			const mutee = await this.getterService.getUser(ps.userId).catch(err => {
 				if (err.id === '15348ddd-432d-49c2-8a5a-8069753becff') throw new ApiError(meta.errors.noSuchUser);
 				throw err;
 			});
 
-			// Check if already muting
 			const exist = await this.renoteMutingsRepository.exists({
 				where: {
 					muterId: muter.id,
@@ -89,7 +86,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				throw new ApiError(meta.errors.alreadyMuting);
 			}
 
-			// Create mute
 			await this.userRenoteMutingService.mute(muter, mutee);
 		});
 	}

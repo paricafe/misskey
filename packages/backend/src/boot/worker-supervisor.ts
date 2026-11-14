@@ -17,7 +17,6 @@ type WorkerSupervisorOptions = {
 	onFatal(error: Error): void;
 };
 
-/** One slot owns its initial readiness and every subsequent replacement. */
 export function superviseWorker(options: WorkerSupervisorOptions): Promise<void> {
 	return new Promise((resolve, reject) => {
 		let ready = false;

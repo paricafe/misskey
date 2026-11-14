@@ -46,8 +46,6 @@ export class APIClient {
 	}) {
 		this.origin = opts.origin.replace(/\/$/, '');
 		this.credential = opts.credential;
-		// ネイティブ関数をそのまま変数に代入して使おうとするとChromiumではIllegal invocationエラーが発生するため、
-		// 環境で実装されているfetchを使う場合は無名関数でラップして使用する
 		this.fetch = opts.fetch ?? ((...args) => fetch(...args));
 	}
 
@@ -67,7 +65,6 @@ export class APIClient {
 	): Promise<SwitchCaseResponseType<E, P>> {
 		return new Promise((resolve, reject) => {
 			let mediaType = 'application/json';
-			// （autogenがバグったときのため、念の為nullチェックも行う）
 			// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
 			if (this.assertSpecialEpReqType(endpoint) && endpointReqTypes[endpoint] != null) {
 				mediaType = endpointReqTypes[endpoint];

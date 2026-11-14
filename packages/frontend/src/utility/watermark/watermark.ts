@@ -18,7 +18,6 @@ export const fn = defineImageCompositorFunction<Partial<{
 }>>({
 	shader,
 	main: ({ gl, u, params, textures }) => {
-		// 基本パラメータ
 		gl.uniform1f(u.opacity, params.opacity ?? 1.0);
 		gl.uniform1f(u.scale, params.scale ?? 0.3);
 		gl.uniform1f(u.angle, params.angle ?? 0.0);
@@ -32,13 +31,11 @@ export const fn = defineImageCompositorFunction<Partial<{
 		gl.uniform1f(u.repeatMargin, (params.align?.margin ?? 0));
 		gl.uniform1i(u.noBBoxExpansion, params.noBoundingBoxExpansion ? 1 : 0);
 
-		// ウォーターマークテクスチャ
 		const wm = params.watermark ? textures.get(params.watermark) : null;
 		if (wm) {
 			gl.activeTexture(gl.TEXTURE1);
 			gl.bindTexture(gl.TEXTURE_2D, wm.texture);
 
-			// リピートモードに応じてWRAP属性を設定
 			if (params.repeat) {
 				gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
 				gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);

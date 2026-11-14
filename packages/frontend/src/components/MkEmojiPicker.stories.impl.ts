@@ -40,11 +40,11 @@ export const Default = {
 		await waitFor(() => userEvent.click(faceSection));
 		const grinning = canvasElement.querySelector('[data-emoji="😀"]');
 		await expect(grinning).toBeInTheDocument();
-		if (grinning == null) throw new Error(); // NOTE: not called
+		if (grinning == null) throw new Error();
 		await waitFor(() => userEvent.click(grinning));
 		const recentUsedSection = canvas.getByText(new RegExp(i18n.ts.recentUsed)).parentElement;
 		await expect(recentUsedSection).toBeInTheDocument();
-		if (recentUsedSection == null) throw new Error(); // NOTE: not called
+		if (recentUsedSection == null) throw new Error();
 		await expect(within(recentUsedSection).getByAltText('😀')).toBeInTheDocument();
 		await expect(within(recentUsedSection).queryByAltText('😬')).toEqual(null);
 	},

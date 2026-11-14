@@ -108,7 +108,6 @@ async function renderChart() {
 
 	const color = store.s.darkMode ? '#b4e900' : '#86b300';
 
-	// 視覚上の分かりやすさのため上から最も大きい3つの値の平均を最大値とする
 	const max = values.slice().sort((a, b) => b - a).slice(0, 3).reduce((a, b) => a + b, 0) / 3;
 
 	const min = Math.max(0, Math.min(...values) - 1);
@@ -128,7 +127,7 @@ async function renderChart() {
 				backgroundColor(c: any) {
 					const value = c.dataset.data[c.dataIndex].v as number;
 					let a = (value - min) / max;
-					if (value !== 0) { // 0でない限りは完全に不可視にはしない
+					if (value !== 0) {
 						a = Math.max(a, 0.05);
 					}
 					return alpha(color, a);
@@ -141,9 +140,6 @@ async function renderChart() {
 					const a = c.chart.chartArea ?? {};
 					return (a.bottom - a.top) / 7 - marginEachCell;
 				},
-			/* @see <https://github.com/misskey-dev/misskey/pull/10365#discussion_r1155511107>
-			}] satisfies ChartData[],
-			 */
 			}],
 		},
 		options: {
@@ -216,7 +212,6 @@ async function renderChart() {
 							return [v.v];
 						},
 					},
-					//mode: 'index',
 					animation: {
 						duration: 0,
 					},

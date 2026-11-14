@@ -17,15 +17,8 @@ export type BundleManifestChunk = {
 
 export type BundleManifest = Record<string, BundleManifestChunk>;
 
-/**
- * 比較対象とするロケール。ロケール別チャンクは全ロケール分だと数が多すぎるため、
- * 代表として ja-JP のみを見る。
- */
 const locale = 'ja-JP';
 
-/**
- * `src` を持たないチャンクのうち、名前がビルド間で安定していて比較可能なもの。
- */
 const stableNamedChunks = new Set(['vue', 'i18n']);
 
 export type FileEntry = {
@@ -52,19 +45,12 @@ export function findEntryKey(manifest: BundleManifest) {
 		?? null;
 }
 
-/**
- * ビルド間で安定するチャンク識別子。出力ファイル名はハッシュ付きで毎回変わるため、
- * これが取れないチャンクは base/head の対応付けができない。
- */
 export function stableChunkKey(chunk: BundleManifestChunk) {
 	if (chunk.src != null) return `src:${normalizePath(chunk.src)}`;
 	if (chunk.name != null && stableNamedChunks.has(chunk.name)) return `named:${chunk.name}`;
 	return null;
 }
 
-/**
- * 起動時に必ず読み込まれるチャンク (entry とその静的 import) の manifest キーを集める。
- */
 export function collectStartupManifestKeys(manifest: BundleManifest) {
 	const entryKey = findEntryKey(manifest);
 	const keys = new Set<string>();
@@ -87,10 +73,6 @@ export function collectStartupManifestKeys(manifest: BundleManifest) {
 	return keys;
 }
 
-/**
- * manifest 上の出力パスを実ファイルへ解決する。`scripts/` 配下はロケール別に
- * 複製されて出力されるため、代表ロケールのものへ読み替える。
- */
 export async function resolveBuiltFile(outDir: string, file: string) {
 	if (file.startsWith('scripts/')) {
 		const localizedFile = file.slice('scripts/'.length);
@@ -147,7 +129,6 @@ export async function collectBundleReport(repoDir: string): Promise<CollectedBun
 		}
 	}
 
-	// manifest に載らないロケール別チャンクも合計サイズには含めたいので拾っておく
 	const localeDir = path.join(outDir, locale);
 	if (await fileExists(localeDir)) {
 		for await (const fullPath of traverseDirectory(localeDir)) {

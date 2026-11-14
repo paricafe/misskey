@@ -16,9 +16,6 @@ import { ChartLoggerService } from '../ChartLoggerService.js';
 import { name, schema } from './entities/notes.js';
 import type { KVs } from '../core.js';
 
-/**
- * ノートに関するチャート
- */
 @Injectable()
 export default class NotesChart extends Chart<typeof schema> { // eslint-disable-line import/no-default-export
 	constructor(

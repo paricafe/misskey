@@ -178,17 +178,14 @@ import MkInfo from '@/components/MkInfo.vue';
 const MkCaptcha = defineAsyncComponent(() => import('@/components/MkCaptcha.vue'));
 
 const errorHandler: ApiWithDialogCustomErrors = {
-	// 検証リクエストそのものに失敗
 	'0f4fe2f1-2c15-4d6e-b714-efbfcde231cd': {
 		title: i18n.ts._captcha._error._requestFailed.title,
 		text: i18n.ts._captcha._error._requestFailed.text,
 	},
-	// 検証リクエストの結果が不正
 	'c41c067f-24f3-4150-84b2-b5a3ae8c2214': {
 		title: i18n.ts._captcha._error._verificationFailed.title,
 		text: i18n.ts._captcha._error._verificationFailed.text,
 	},
-	// 不明なエラー
 	'f868d509-e257-42a9-99c1-42614b031a97': {
 		title: i18n.ts._captcha._error._unknown.title,
 		text: i18n.ts._captcha._error._unknown.text,

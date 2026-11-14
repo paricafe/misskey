@@ -34,7 +34,7 @@ export const paramDef = {
 		isPublic: { type: 'boolean' },
 		isModerator: { type: 'boolean' },
 		isAdministrator: { type: 'boolean' },
-		isExplorable: { type: 'boolean', default: false }, // optional for backward compatibility
+		isExplorable: { type: 'boolean', default: false },
 		asBadge: { type: 'boolean' },
 		preserveAssignmentOnMoveAccount: { type: 'boolean' },
 		canEditMembersByModerator: { type: 'boolean' },

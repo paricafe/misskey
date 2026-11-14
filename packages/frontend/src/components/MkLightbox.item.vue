@@ -215,7 +215,7 @@ import { getFileMenu } from '@/utility/get-file-menu.js';
 
 const props = withDefaults(defineProps<{
 	content: Content;
-	user?: Misskey.entities.User | null; // DriveFileのuserはnullになることがある。その場合に使用する所有者情報
+	user?: Misskey.entities.User | null;
 	activated: boolean;
 	initiallyRevealed?: boolean;
 }>(), {
@@ -232,15 +232,13 @@ const emit = defineEmits<{
 
 const XAudioVisualizer = defineAsyncComponent(() => import('./MkLightbox.item.audio-visualizer.vue'));
 
-// 一回のビューワー操作内では状態を維持するためにmodelで親に伝えて親で状態を保持する
-// TODO: drivefileのproperties側にピクセルアートかどうかのフラグを立ててそちらを元にデフォルトの挙動を決めるようにする
 const pixelatedZoom = defineModel<boolean>('pixelatedZoom', { required: true });
 
 const rootEl = useTemplateRef('rootEl');
 const mainEl = useTemplateRef('mainEl');
 const videoEl = useTemplateRef('videoEl');
-const audioEl = useTemplateRef('audioEl'); // ネイティブUI時
-const audioVisualizer = useTemplateRef<InstanceType<typeof XAudioVisualizer__TypeReferenceOnly>>('audioVisualizer'); // ネイティブUIじゃない場合
+const audioEl = useTemplateRef('audioEl');
+const audioVisualizer = useTemplateRef<InstanceType<typeof XAudioVisualizer__TypeReferenceOnly>>('audioVisualizer');
 const mediaControl = useTemplateRef<InstanceType<typeof XControl>>('mediaControl');
 
 const mediaEl = computed<HTMLVideoElement | HTMLAudioElement | null>(() => {
@@ -265,7 +263,6 @@ const enableTransition = ref(false);
 const infoShowing = ref(false);
 const hide = ref(true);
 const isMediaControlledByMisskey = computed(() => ['video', 'audio'].includes(props.content.type) && !prefer.s.useNativeUiForVideoAudioPlayer);
-// ビジュアライザー使用時は音量の適用をGainNode側が担当する (メディア要素は100%固定にして、波形が音量レベルに依存しないようにするため)
 const isVolumeHandledByVisualizer = computed(() => props.content.type === 'audio' && !prefer.s.useNativeUiForVideoAudioPlayer);
 const volume = ref(0.25);
 const isMediaReady = computed(() => mediaControl.value?.isReady ?? false);
@@ -307,7 +304,6 @@ const videoAspectRatio = ref<number | null>(
 function onVideoLoadedMetadata() {
 	originalContentLoaded.value = true;
 
-	// ドライブ上のメタデータが無い場合に限り、動画自体の初期サイズから縦横比を確定させる
 	if (videoAspectRatio.value != null) return;
 	if (videoEl.value == null || videoEl.value.videoWidth === 0 || videoEl.value.videoHeight === 0) return;
 	videoAspectRatio.value = videoEl.value.videoWidth / videoEl.value.videoHeight;
@@ -328,7 +324,6 @@ const padding = deviceKind === 'smartphone' ? {
 	left: 30,
 };
 
-// maxからはみ出す場合は縮小、maxに満たない場合は拡大する(contain)
 function calcContentRenderingSize(content: Content) {
 	if (content.width == null || content.height == null || content.width === 0 || content.height === 0) return null;
 
@@ -372,7 +367,6 @@ function shouldHideInGallery(content: Content): boolean {
 	const hiddenByDefault = shouldHideFileByDefault(content.file, true);
 	if (!hiddenByDefault) return false;
 
-	// 呼び出し元で既にぼかしが解除されているものは初期表示で隠さない
 	if (props.initiallyRevealed) {
 		return false;
 	}
@@ -386,7 +380,6 @@ function isValidRect(rect: Rect | null): rect is Rect {
 
 const transform = ref({ x: 0, y: 0, scale: 1 });
 
-// 元のimg要素の位置・サイズ(とobject-fitの設定値)を取得して、そこからneutralの位置にアニメーションするためのscaleとtranslationを計算する
 function getScaleAndTranslationForSourceElement() {
 	const sourceElement = props.content.sourceElement;
 	const contentRenderingRect = getContentRenderingRect();
@@ -474,7 +467,7 @@ function resetToNeutral() {
 	isZooming.value = false;
 
 	enableTransition.value = true;
-	rootEl.value.offsetHeight; // reflow
+	rootEl.value.offsetHeight;
 	transform.value.scale = 1;
 	transform.value.x = 0;
 	transform.value.y = 0;
@@ -490,7 +483,7 @@ function closeThis() {
 	const sourceTransform = getScaleAndTranslationForSourceElement();
 	if (sourceTransform != null) {
 		enableTransition.value = true;
-		rootEl.value.offsetHeight; // reflow
+		rootEl.value.offsetHeight;
 		transform.value.x = sourceTransform.x;
 		transform.value.y = sourceTransform.y;
 		transform.value.scale = sourceTransform.scale;
@@ -540,15 +533,10 @@ function onZoomGestureEnd() {
 	transform.value = clampedTransform;
 }
 
-/** 縦・横どちらのスワイプかを確定させるのに必要な、開始点からの移動量 (px) */
 const AXIS_SWIPE_HYSTERISIS = 10;
-/** スワイプが成立する速度 (px/ms) */
 const MIN_VELOCITY_TO_SWIPE = 0.5;
-/**縦スワイプで閉じるのに必要な移動量の、ビューポート高の1/3に対する比 */
 const MIN_RATIO_TO_CLOSE = 0.4;
-/** 横スワイプで前後のコンテンツに移動するのに必要な移動量 (px) */
 const HORIZONTAL_SWIPE_DISTANCE_THRESHOLD = 150;
-/** 速度を平均する時間窓 (ms) */
 const VELOCITY_WINDOW = 100;
 
 let isDragging = false;
@@ -561,14 +549,11 @@ let currentPointerStartOffset = { x: 0, y: 0 };
 let isVerticalSwiping = false;
 let isHorizontalSwiping = false;
 let horizontalSwipeDelta = 0;
-/** 軸が確定した時点のポインタ位置。ここを基準にスワイプ量を測ることで、確定時に描画が飛ぶのを防ぐ */
 let swipeOrigin = { x: 0, y: 0 };
 
 const pointerEventCache = new Map<number, PointerEvent>();
 let pointerVec = { x: 0, y: 0 };
 
-// 単発のpointermoveの増分から速度を求めると、表示のリフレッシュレートを超える頻度で
-// pointermoveを発火する環境では値が暴れるため、直近VELOCITY_WINDOW msの平均を取る
 let velocitySamples: { time: number; x: number; y: number }[] = [];
 
 function pushVelocitySample(time: number, x: number, y: number) {
@@ -583,8 +568,6 @@ function getVelocity(now: number): { x: number; y: number } {
 
 	const latest = velocitySamples[velocitySamples.length - 1];
 
-	// 指を止めたまま離した場合、pointermoveが発火しなくなる環境 (iOS・マウス) では直前のフリックの速度が
-	// 残り続けてしまい、静止状態で離したのにスワイプが成立してしまう。最後のサンプルが古ければ速度なしとして扱う
 	if (now - latest.time > VELOCITY_WINDOW) return { x: 0, y: 0 };
 
 	const oldest = velocitySamples[0];
@@ -621,8 +604,6 @@ function onPointerdown(ev: PointerEvent) {
 	pointerVec = { x: 0, y: 0 };
 	velocitySamples = [];
 	horizontalSwipeDelta = 0;
-	// スワイプで閉じた直後はitemがv-showで残ったままなので (MkLightbox.vue参照)、閉じるアニメーション中に
-	// 触るとロック済みの軸が引き継がれてヒステリシスを経ずにスワイプが始まってしまう。ここで必ず解除する
 	isVerticalSwiping = false;
 	isHorizontalSwiping = false;
 	swipeOrigin = { x: ev.clientX, y: ev.clientY };
@@ -632,8 +613,6 @@ function onPointerdown(ev: PointerEvent) {
 			x: ev.clientX,
 			y: ev.clientY,
 		};
-		// pointerdown自体を最初のサンプルとして積む。これがないとpointermoveが1回しか発生しないような
-		// 素早いフリックでサンプルが1つしか溜まらず、速度が常に0と評価されてスワイプが成立しない
 		pushVelocitySample(ev.timeStamp, ev.clientX, ev.clientY);
 	}
 }
@@ -649,7 +628,7 @@ function onPointermove(ev: PointerEvent) {
 
 	pointerEventCache.set(ev.pointerId, ev);
 
-	if (pointerEventCache.size > 1) { // 2本指での操作
+	if (pointerEventCache.size > 1) {
 		pointerVec = { x: 0, y: 0 };
 		currentPointerId = null;
 		isVerticalSwiping = false;
@@ -689,17 +668,14 @@ function onPointermove(ev: PointerEvent) {
 				horizontalSwipeDelta = ev.clientX - swipeOrigin.x;
 				emit('horizontalSwipe', horizontalSwipeDelta);
 			} else {
-				// 軸を確定させるまでは、開始点からの累積移動量で毎回評価し直す。
 				const totalX = ev.clientX - currentPointerStartOffset.x;
 				const totalY = ev.clientY - currentPointerStartOffset.y;
 				const diff = Math.abs(totalX) - Math.abs(totalY);
 
 				if (diff !== 0) {
-					// 完全に同値の場合はどちらにもロックしない
 					const isVerticalVector = diff < 0;
 					const dominantDelta = isVerticalVector ? totalY : totalX;
 
-					// 意図が読み取れる程度に動いてからロックする
 					if (Math.abs(dominantDelta) >= AXIS_SWIPE_HYSTERISIS) {
 						swipeOrigin = { x: ev.clientX, y: ev.clientY };
 						if (isVerticalVector) {
@@ -731,20 +707,15 @@ function onPointerup(ev: PointerEvent) {
 	if (currentPointerId === ev.pointerId) {
 		currentPointerId = null;
 
-		// 離した時点で取り直す。指を止めたまま離した場合はここで速度が0になり、
-		// 直前のフリックの速度で誤ってスワイプが成立するのを防ぐことができる
 		pointerVec = getVelocity(ev.timeStamp);
 
-		// 判定にはジェスチャー開始点からの総移動量を使う。描画用のdelta (transform.y / horizontalSwipeDelta) は
-		// 軸が確定した地点を基準にしており、確定までのヒステリシス分と確定したpointermove自体の移動量を含まないため、
-		// pointermoveが1回しか発生しないような素早いフリックがそのまま握り潰されてしまう
 		const totalSwipeX = ev.clientX - currentPointerStartOffset.x;
 		const totalSwipeY = ev.clientY - currentPointerStartOffset.y;
 
 		if (isVerticalSwiping) {
 			const closeThreshold = (window.innerHeight / 3) * MIN_RATIO_TO_CLOSE;
-			const shouldCloseByUpwardSwipe = totalSwipeY < -closeThreshold || (totalSwipeY < 0 && pointerVec.y < -MIN_VELOCITY_TO_SWIPE); // 上の方で離された、または上に向かって強めに弾かれた
-			const shouldCloseByDownwardSwipe = totalSwipeY > closeThreshold || (totalSwipeY > 0 && pointerVec.y > MIN_VELOCITY_TO_SWIPE); // 下の方で離された、または下に向かって強めに弾かれた
+			const shouldCloseByUpwardSwipe = totalSwipeY < -closeThreshold || (totalSwipeY < 0 && pointerVec.y < -MIN_VELOCITY_TO_SWIPE);
+			const shouldCloseByDownwardSwipe = totalSwipeY > closeThreshold || (totalSwipeY > 0 && pointerVec.y > MIN_VELOCITY_TO_SWIPE);
 			if (shouldCloseByUpwardSwipe || shouldCloseByDownwardSwipe) {
 				closeThis();
 				return;
@@ -752,8 +723,8 @@ function onPointerup(ev: PointerEvent) {
 
 			resetToNeutral();
 		} else if (isHorizontalSwiping) {
-			const shouldNext = totalSwipeX < -HORIZONTAL_SWIPE_DISTANCE_THRESHOLD || (totalSwipeX < 0 && pointerVec.x < -MIN_VELOCITY_TO_SWIPE); // 左の方で離された、または左に向かって強めに弾かれた
-			const shouldPrev = totalSwipeX > HORIZONTAL_SWIPE_DISTANCE_THRESHOLD || (totalSwipeX > 0 && pointerVec.x > MIN_VELOCITY_TO_SWIPE); // 右の方で離された、または右に向かって強めに弾かれた
+			const shouldNext = totalSwipeX < -HORIZONTAL_SWIPE_DISTANCE_THRESHOLD || (totalSwipeX < 0 && pointerVec.x < -MIN_VELOCITY_TO_SWIPE);
+			const shouldPrev = totalSwipeX > HORIZONTAL_SWIPE_DISTANCE_THRESHOLD || (totalSwipeX > 0 && pointerVec.x > MIN_VELOCITY_TO_SWIPE);
 			if (shouldNext) {
 				emit('next');
 			} else if (shouldPrev) {
@@ -781,7 +752,6 @@ const doubleTapDetector = makeDoubleTapDetector((ev) => {
 	}
 });
 
-// これがないと例えばiOSで画像長押しでのコンテキストメニューを表示させた後にそれを閉じるとタッチ判定が残ったままになり不具合の原因になる
 function cancelPointerGesture() {
 	const wasVerticalSwiping = isVerticalSwiping;
 	const wasHorizontalSwiping = isHorizontalSwiping;
@@ -811,15 +781,11 @@ function onTouchstart(ev: TouchEvent) {
 function onTouchmove(ev: TouchEvent) {
 	doubleTapDetector.onTouchmove(ev);
 
-	// スワイプ操作中は、ブラウザがタッチを慣性スクロールとして認識するのを防ぐためにpreventDefaultする必要がある
-	// touch-action: noneが指定されているが、それだけではブラウザによっては慣性スクロールが発生した扱いになり、
-	// その後のタップが慣性スクロールを止めるためのタップという扱いで握りつぶされてしまうことがあるので必要
 	if (isVerticalSwiping || isHorizontalSwiping || isZooming.value || pointerEventCache.size > 1) {
 		ev.preventDefault();
 	}
 }
 
-//#region inertia
 let rafHandle: ReturnType<typeof window['requestAnimationFrame']> | null = null;
 let latestInertiaTimeStamp = 0;
 const inertiaFactor = 0.9;
@@ -850,7 +816,6 @@ watch(isZooming, () => {
 		if (rafHandle != null) window.cancelAnimationFrame(rafHandle);
 	}
 });
-//#endregion
 
 function animateFromSourceToNeutral() {
 	if (rootEl.value == null) return;
@@ -859,7 +824,7 @@ function animateFromSourceToNeutral() {
 	if (sourceElement == null || !props.activated) return;
 
 	enableTransition.value = true;
-	rootEl.value.offsetHeight; // reflow
+	rootEl.value.offsetHeight;
 	transform.value.x = 0;
 	transform.value.y = 0;
 	transform.value.scale = 1;
@@ -886,7 +851,7 @@ watch(rootEl, (newRootEl) => {
 	if (newRootEl == null) return;
 
 	infoShowing.value = true;
-	newRootEl.offsetHeight; // reflow
+	newRootEl.offsetHeight;
 	hideForFallback.value = false;
 }, { immediate: true });
 
@@ -916,10 +881,6 @@ function onClick(ev: MouseEvent) {
 	}
 }
 
-/**
- * play() は自動再生のブロックや、再生が始まる前の pause() によって reject することがある。
- * いずれも再生ボタンが出たままになるだけで復帰不能ではないので、握りつぶす
- */
 function safePlay(el: HTMLMediaElement) {
 	el.play().catch(err => {
 		if (_DEV_) console.warn('Failed to play media:', err);
@@ -932,7 +893,6 @@ function playWhenAvailable() {
 		return;
 	}
 
-	// オーディオビジュアライザはlazy-loadのため、この時点ではまだ要素が無い可能性がある
 	const watchStop = watch(mediaEl, (newMediaEl) => {
 		if (newMediaEl == null) return;
 		safePlay(newMediaEl);
@@ -966,7 +926,6 @@ function onMediaClick() {
 function openMenu(ev: PointerEvent) {
 	const menu: MenuItem[] = [];
 
-	// isTouchUsingにする？
 	menu.push({
 		type: 'component',
 		component: markRaw(XFileInfo),
@@ -1126,7 +1085,6 @@ defineExpose({
 	position: relative;
 	width: 100%;
 	height: 100%;
-	// .videoSizedが使う100cqw / 100cqhの基準 (= paddingを除いた実際の表示領域)
 	container-type: size;
 	transition: scale 200ms ease, opacity 200ms ease !important;
 }
@@ -1160,7 +1118,6 @@ defineExpose({
 	transition: scale 100ms ease;
 }
 
-// アイコン自体はクリックを受け取らないので、hoverは下のvideo要素を経由して拾う
 .video:hover ~ .playIconWrapper .playIcon {
 	scale: 1.2;
 }

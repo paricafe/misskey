@@ -91,7 +91,6 @@ export async function getAuthorization(request: FastifyRequest, store: CompatSto
 	return grant;
 }
 
-/** For embedding alongside native OAuth. Call after body parsing, before dispatch. */
 export function handlesOAuth(request: FastifyRequest): boolean {
 	const route = pathname(request);
 	if (route === '/mastodon/oauth/callback' || route === '/api/v1/apps' || route === '/api/v1/apps/verify_credentials') return true;
@@ -156,7 +155,6 @@ async function beginAuthorization(query: Parameters, reply: FastifyReply, deps: 
 	requireSubset(requested, client.scopes);
 	const forceLogin = field(query, 'force_login');
 	if (forceLogin && !['0', 'false', 'f', 'off'].includes(forceLogin.toLowerCase())) throw new OAuthError(400, 'unsupported_parameter', 'force_login is not supported by the native MiAuth consent page');
-	// MiAuth uses the user's native UI language. OAuth's optional lang hint is not enforced.
 	const challenge = field(query, 'code_challenge');
 	if ((query.code_challenge !== undefined && !challenge) || (challenge && (!/^[A-Za-z\d_-]{43}$/u.test(challenge) || query.code_challenge_method !== 'S256')) || (!challenge && query.code_challenge_method !== undefined)) {
 		throw new OAuthError(400, 'invalid_request', 'PKCE requires an S256 code challenge');
@@ -252,7 +250,6 @@ async function revoke(request: FastifyRequest, body: Parameters, deps: OAuthDepe
 	return {};
 }
 
-/** The same dispatcher can be mounted independently or called by an existing server's route wrapper. */
 export async function dispatchHandler(request: FastifyRequest, reply: FastifyReply, deps: OAuthDependencies): Promise<unknown> {
 	reply.header('Cache-Control', 'no-store').header('Pragma', 'no-cache').header('Referrer-Policy', 'no-referrer');
 	try {

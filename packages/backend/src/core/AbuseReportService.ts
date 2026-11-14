@@ -33,15 +33,6 @@ export class AbuseReportService {
 	) {
 	}
 
-	/**
-	 * ユーザからの通報をDBに記録し、その内容を下記の手段で管理者各位に通知する.
-	 * - 管理者用Redisイベント
-	 * - EMail（モデレータ権限所有者ユーザ＋metaテーブルに設定されているメールアドレス）
-	 * - SystemWebhook
-	 *
-	 * @param params 通報内容. もし複数件の通報に対応した時のために、あらかじめ複数件を処理できる前提で考える
-	 * @see AbuseReportNotificationService.notify
-	 */
 	@bindThis
 	public async report(params: {
 		targetUserId: MiAbuseUserReport['targetUserId'],
@@ -74,14 +65,6 @@ export class AbuseReportService {
 		]);
 	}
 
-	/**
-	 * 通報を解決し、その内容を下記の手段で管理者各位に通知する.
-	 * - SystemWebhook
-	 *
-	 * @param params 通報内容. もし複数件の通報に対応した時のために、あらかじめ複数件を処理できる前提で考える
-	 * @param moderator 通報を処理したユーザ
-	 * @see AbuseReportNotificationService.notify
-	 */
 	@bindThis
 	public async resolve(
 		params: {

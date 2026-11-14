@@ -16,9 +16,7 @@ import { jobQueue } from '@/boot/common.js';
 import { api, castAsError, initTestDb, signup, successfulApiCall, uploadFile } from '../utils.js';
 import type * as misskey from 'misskey-js';
 
-// i/move 呼び出しで大部分が同期的に完了する後続ジョブ (フォロー解除/ブロック・ミュート引き継ぎ/リスト更新等) を待つ
 const waitForMoveJobOptions = { timeout: 5000, interval: 50 };
-// AccountMoveService がテスト環境向けに 10000ms に短縮している遅延アンフォロージョブを待つ (安全マージンを載せた上限)
 const waitForDelayedUnfollowJobOptions = { timeout: 15000, interval: 100 };
 
 describe('Account Move', () => {
@@ -277,7 +275,6 @@ describe('Account Move', () => {
 
 			assert.strictEqual(move.status, 200);
 
-			// Unfollow delayed?
 			await vi.waitFor(async () => {
 				const aliceFollowings = await api('users/following', {
 					userId: alice.id,
@@ -468,7 +465,6 @@ describe('Account Move', () => {
 		});
 
 		test('Prohibit access after moving: /drive/files/create', async () => {
-			// FIXME: 一旦逃げておく
 			const res = await uploadFile(alice);
 
 			assert.strictEqual(res.status, 403);

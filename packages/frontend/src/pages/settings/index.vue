@@ -201,7 +201,7 @@ const menuDef = computed<SuperMenuDef[]>(() => [{
 }]);
 
 onMounted(() => {
-	if (el.value == null) return; // TSを黙らすため
+	if (el.value == null) return;
 
 	ro.observe(el.value);
 
@@ -213,7 +213,7 @@ onMounted(() => {
 });
 
 onActivated(() => {
-	if (el.value == null) return; // TSを黙らすため
+	if (el.value == null) return;
 
 	narrow.value = el.value.offsetWidth < NARROW_THRESHOLD;
 
@@ -250,8 +250,6 @@ const headerActions = computed(() => []);
 const headerTabs = computed(() => []);
 
 definePage(() => INFO.value);
-// w 890
-// h 700
 </script>
 
 <style lang="scss" scoped>

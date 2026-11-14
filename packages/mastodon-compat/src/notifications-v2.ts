@@ -35,7 +35,6 @@ async function convert(routes: Routes, c: RequestContext, row: Json): Promise<Js
 	return result;
 }
 
-/** A native notification is always one stable group; no temporal aggregation is fabricated. */
 function grouped(notifications: Json[], c: RequestContext, paginated: boolean): Json {
 	const accounts = new Map<string, Json>();
 	const statuses = new Map<string, Json>();
@@ -61,7 +60,6 @@ function validateQuery(query: Json): void {
 	boolean(query.include_filtered);
 }
 
-/** Fill a protocol page after filtering while retaining native cursors for progress. */
 async function readPage(routes: Routes, c: RequestContext, limit: number, query = c.query): Promise<NotificationPage> {
 	validateQuery(query);
 	const types = strings(query.types);
@@ -82,8 +80,6 @@ async function readPage(routes: Routes, c: RequestContext, limit: number, query 
 	while (notifications.length < limit) {
 		if (visited.has(cursor)) break;
 		visited.add(cursor);
-		// since_id means newest-after, while min_id selects the immediately newer
-		// page. Native sinceId alone is ascending, so use it only for min_id.
 		const rows = await c.call<Json[]>('i/notifications', { limit: Math.min(100, limit - notifications.length), markAsRead: false, ...(cursor ? { [ascending ? 'sinceId' : 'untilId']: cursor } : {}) });
 		if (!rows.length) break;
 		const ordered = [...rows].sort((a, b) => (ascending ? 1 : -1) * compareIds(string(a.id), string(b.id)));
@@ -147,7 +143,6 @@ async function unreadCount(routes: Routes, c: RequestContext): Promise<Json> {
 	return { count: page.notifications.length };
 }
 
-/** Both API versions share native pagination, dismissal and the notification read marker. */
 export function registerNotifications(routes: Routes): void {
 	routes.add('GET', '/api/v1/notifications', 'read:notifications', async c => {
 		const page = await readPage(routes, c, integer(c.query.limit, 20, 1, 80));

@@ -3,16 +3,6 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-/**
- * 組み込みマップ定義
- *
- * データ値:
- * (スペース) ... マス無し
- * - ... マス
- * b ... 初期配置される黒石
- * w ... 初期配置される白石
- */
-
 export type Map = {
 	name?: string;
 	category?: string;

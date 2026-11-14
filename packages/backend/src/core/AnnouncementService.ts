@@ -38,7 +38,6 @@ export class AnnouncementService implements OnModuleInit {
 
 	@bindThis
 	public async onModuleInit(): Promise<void> {
-		// Redisのデータ消失・再構築などでジョブが失われた場合にも予約を復元する
 		const announcements = await this.announcementsRepository.findBy({
 			isActive: true,
 			autoArchiveAt: Not(IsNull()),
@@ -109,7 +108,6 @@ export class AnnouncementService implements OnModuleInit {
 			await this.queueService.scheduleAnnouncementArchive(announcement.id, announcement.autoArchiveAt);
 		}
 
-		// 作成処理中にautoArchiveAtを過ぎる可能性があるため、insert完了時点で非アクティブなお知らせはイベント配信しない
 		if (values.userId) {
 			if (announcement.isActive) {
 				this.globalEventService.publishMainStream(values.userId, 'announcementCreated', {
@@ -150,7 +148,6 @@ export class AnnouncementService implements OnModuleInit {
 
 	@bindThis
 	public async update(announcement: MiAnnouncement, values: Partial<MiAnnouncement>, moderator?: MiUser): Promise<void> {
-		// レプリカから古い値を読まないよう、更新後の値はRETURNINGで取得する
 		const after: MiAnnouncement | undefined = await this.announcementsRepository.createQueryBuilder().update()
 			.set({
 				updatedAt: new Date(),
@@ -210,7 +207,6 @@ export class AnnouncementService implements OnModuleInit {
 	public async archiveAnnouncement(announcementId: MiAnnouncement['id'], autoArchiveAt: Date): Promise<boolean> {
 		const now = new Date();
 
-		// 日時も照合し、日時変更前に予約された古いジョブがお知らせをアーカイブしないようにする
 		const result = await this.announcementsRepository.createQueryBuilder()
 			.update()
 			.set({

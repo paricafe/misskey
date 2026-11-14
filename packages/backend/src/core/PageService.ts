@@ -165,7 +165,7 @@ export class PageService {
 				where: {
 					id: pageId,
 				},
-				lock: { mode: 'pessimistic_write' }, // same lock level as DELETE
+				lock: { mode: 'pessimistic_write' },
 			});
 
 			if (page == null) {

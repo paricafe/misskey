@@ -178,7 +178,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 							<SearchMarker :keywords="['pinned', 'list']">
 								<MkFolder>
 									<template #label><SearchLabel>{{ i18n.ts.pinnedList }}</SearchLabel></template>
-									<!-- 複数ピン止め管理できるようにしたいけどめんどいので一旦ひとつのみ -->
 									<MkButton v-if="prefer.r.pinnedUserLists.value.length === 0" @click="setPinnedList()">{{ i18n.ts.add }}</MkButton>
 									<MkButton v-else danger @click="removePinnedList()"><i class="ti ti-trash"></i> {{ i18n.ts.remove }}</MkButton>
 								</MkFolder>
@@ -1037,7 +1036,6 @@ function getEmojiIndexLangName(targetLang: typeof emojiIndexLangs[number]) {
 	if (langs.find(x => x[0] === targetLang)) {
 		return langs.find(x => x[0] === targetLang)![1];
 	} else {
-		// 絵文字辞書限定の言語定義
 		switch (targetLang) {
 			case 'ja-JP_hira': return 'ひらがな';
 			default: return targetLang;
@@ -1126,7 +1124,6 @@ function testNotification(): void {
 
 	globalEvents.emit('clientNotification', notification);
 
-	// セルフ通知破壊 実績関連
 	smashCount++;
 	if (smashCount >= 10) {
 		claimAchievement('smashTestNotificationButton');

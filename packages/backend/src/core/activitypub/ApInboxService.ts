@@ -128,11 +128,9 @@ export class ApInboxService {
 			result = await this.performOneActivity(actor, activity, resolver);
 		}
 
-		// ついでにリモートユーザーの情報が古かったら更新しておく
 		if (actor.uri) {
 			if (actor.lastFetchedAt == null || Date.now() - actor.lastFetchedAt.getTime() > 1000 * 60 * 60 * 24) {
 				setImmediate(() => {
-					// 同一ユーザーの情報を再度処理するので、使用済みのresolverを再利用してはいけない
 					void this.apPersonService.updatePerson(actor.uri).catch(err => {
 						this.logger.warn(`Failed to refresh remote actor ${actor.uri}: ${err}`);
 					});
@@ -191,7 +189,6 @@ export class ApInboxService {
 			return 'skip: フォローしようとしているユーザーはローカルユーザーではありません';
 		}
 
-		// don't queue because the sender may attempt again when timeout
 		await this.userFollowingService.follow(actor, followee, { requestId: activity.id });
 		return 'ok';
 	}
@@ -238,8 +235,6 @@ export class ApInboxService {
 
 	@bindThis
 	private async acceptFollow(actor: MiRemoteUser, activity: IFollow): Promise<string> {
-		// ※ activityはこっちから投げたフォローリクエストなので、activity.actorは存在するローカルユーザーである必要がある
-
 		const follower = await this.apDbResolverService.getUserFromApId(activity.actor);
 
 		if (follower == null) {
@@ -250,7 +245,6 @@ export class ApInboxService {
 			return 'skip: follower is not a local user';
 		}
 
-		// relay
 		const match = activity.id?.match(/follow-relay\/(\w+)/);
 		if (match) {
 			return await this.relayService.relayAccepted(match[1], actor);
@@ -309,30 +303,25 @@ export class ApInboxService {
 			return;
 		}
 
-		// リレーからのAnnounceかチェック
 		const fromRelay = await this.relayService.isRelayActor(actor);
 		const uri = getApId(fromRelay ? target : activity);
 
-		// アナウンス先が許可されているかチェック
 		if (!this.utilityService.isFederationAllowedUri(uri)) return;
 
 		const activityUri = getApId(activity);
 		const unlock = await acquireApObjectLock(this.redisClient, activityUri);
 
 		try {
-			// 既に同じURIを持つものが登録されていないかチェック
 			const exist = await this.apNoteService.fetchNote(uri);
 			if (exist) {
 				return;
 			}
 
-			// Announce対象をresolve
 			let renote;
 			try {
 				renote = await this.apNoteService.resolveNote(target, { resolver });
 				if (renote == null) return 'announce target is null';
 			} catch (err) {
-				// 対象が4xxならスキップ
 				if (err instanceof StatusError) {
 					if (!err.isRetryable) {
 						return `Ignored announce target ${target.id} - ${err.statusCode}`;
@@ -342,7 +331,6 @@ export class ApInboxService {
 				throw err;
 			}
 
-			// リレーからのAnnounceはリノートを作成せず、ノートを直接公開する
 			if (fromRelay) {
 				this.logger.info(`Publishing relay-delivered note: ${uri}`);
 				const noteObj = await this.noteEntityService.pack(renote, null, { skipHide: true, withReactionAndUserPairCache: true });
@@ -377,8 +365,6 @@ export class ApInboxService {
 
 	@bindThis
 	private async block(actor: MiRemoteUser, activity: IBlock): Promise<string> {
-		// ※ activity.objectにブロック対象があり、それは存在するローカルユーザーのはず
-
 		const blockee = await this.apDbResolverService.getUserFromApId(activity.object);
 
 		if (blockee == null) {
@@ -403,7 +389,6 @@ export class ApInboxService {
 		const targetUri = getApId(activity.object);
 		if (targetUri.startsWith('bear:')) return 'skip: bearcaps url not supported.';
 
-		// copy audiences between activity <=> object.
 		if (typeof activity.object === 'object') {
 			const to = unique(concat([toArray(activity.to), toArray(activity.object.to)]));
 			const cc = unique(concat([toArray(activity.cc), toArray(activity.object.cc)]));
@@ -414,7 +399,6 @@ export class ApInboxService {
 			activity.object.cc = cc;
 		}
 
-		// If there is no attributedTo, use Activity actor.
 		if (typeof activity.object === 'object' && !activity.object.attributedTo) {
 			activity.object.attributedTo = activity.actor;
 		}
@@ -477,11 +461,9 @@ export class ApInboxService {
 			return 'invalid actor';
 		}
 
-		// 削除対象objectのtype
 		let formerType: string | undefined;
 
 		if (typeof activity.object === 'string') {
-			// typeが不明だけど、どうせ消えてるのでremote resolveしない
 			formerType = undefined;
 		} else {
 			const object = activity.object;
@@ -494,12 +476,10 @@ export class ApInboxService {
 
 		const uri = getApId(activity.object);
 
-		// type不明でもactorとobjectが同じならばそれはPersonに違いない
 		if (!formerType && actor.uri === uri) {
 			formerType = 'Person';
 		}
 
-		// それでもなかったらおそらくNote
 		if (!formerType) {
 			formerType = 'Note';
 		}
@@ -558,8 +538,6 @@ export class ApInboxService {
 
 	@bindThis
 	private async flag(actor: MiRemoteUser, activity: IFlag): Promise<string> {
-		// objectは `(User|Note) | (User|Note)[]` だけど、全パターンDBスキーマと対応させられないので
-		// 対象ユーザーは一番最初のユーザー として あとはコメントとして格納する
 		const uris = getApIds(activity.object);
 
 		const userIds = uris
@@ -603,8 +581,6 @@ export class ApInboxService {
 
 	@bindThis
 	private async rejectFollow(actor: MiRemoteUser, activity: IFollow): Promise<string> {
-		// ※ activityはこっちから投げたフォローリクエストなので、activity.actorは存在するローカルユーザーである必要がある
-
 		const follower = await this.apDbResolverService.getUserFromApId(activity.actor);
 
 		if (follower == null) {
@@ -615,7 +591,6 @@ export class ApInboxService {
 			return 'skip: follower is not a local user';
 		}
 
-		// relay
 		const match = activity.id?.match(/follow-relay\/(\w+)/);
 		if (match) {
 			return await this.relayService.relayRejected(match[1], actor);
@@ -663,7 +638,6 @@ export class ApInboxService {
 			throw e;
 		});
 
-		// don't queue because the sender may attempt again when timeout
 		if (isFollow(object)) return await this.undoFollow(actor, object);
 		if (isBlock(object)) return await this.undoBlock(actor, object);
 		if (isLike(object)) return await this.undoLike(actor, object);
@@ -818,7 +792,6 @@ export class ApInboxService {
 			try {
 				return await this.apNoteService.updateNote(object, resolver) ?? 'ok: Post updated';
 			} catch (err) {
-				// These edits can never apply, so retrying the job cannot succeed.
 				if (err instanceof IdentifiableError && [NOTE_NOT_FOUND_ERROR_ID, NOTE_NO_CONTENT_ERROR_ID, NOTE_HISTORY_LIMIT_ERROR_ID].includes(err.id)) {
 					return `skip: ${err.message}`;
 				}
@@ -834,7 +807,6 @@ export class ApInboxService {
 
 	@bindThis
 	private async move(actor: MiRemoteUser, activity: IMove, resolver?: Resolver): Promise<string> {
-		// fetch the new and old accounts
 		const targetUri = getApHrefNullable(activity.target);
 		if (!targetUri) return 'skip: invalid activity target';
 

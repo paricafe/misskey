@@ -25,8 +25,6 @@ export class RegistryApiService {
 
 	@bindThis
 	public async set(userId: MiUser['id'], domain: string | null, scope: string[], key: string, value: any) {
-		// TODO: 作成できるキーの数を制限する
-
 		const query = this.registryItemsRepository.createQueryBuilder('item');
 		if (domain) {
 			query.where('item.domain = :domain', { domain: domain });
@@ -57,7 +55,6 @@ export class RegistryApiService {
 		}
 
 		if (domain == null) {
-			// TODO: サードパーティアプリが傍受出来てしまうのでどうにかする
 			this.globalEventService.publishMainStream(userId, 'registryUpdated', {
 				scope: scope,
 				key: key,

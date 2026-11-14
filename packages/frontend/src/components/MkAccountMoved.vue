@@ -22,7 +22,7 @@ import { misskeyApi } from '@/utility/misskey-api.js';
 const user = ref<Misskey.entities.UserLite>();
 
 const props = defineProps<{
-	movedTo: string; // user id
+	movedTo: string;
 }>();
 
 misskeyApi('users/show', { userId: props.movedTo }).then(u => user.value = u);

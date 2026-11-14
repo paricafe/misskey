@@ -77,7 +77,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 		private userEntityService: UserEntityService,
 	) {
 		super(meta, paramDef, async (ps, me) => {
-			// Lookup app
 			const app = await this.appsRepository.findOneBy({
 				secret: ps.appSecret,
 			});
@@ -86,7 +85,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				throw new ApiError(meta.errors.noSuchApp);
 			}
 
-			// Fetch token
 			const session = await this.authSessionsRepository.findOneBy({
 				token: ps.token,
 				appId: app.id,
@@ -100,13 +98,11 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				throw new ApiError(meta.errors.pendingSession);
 			}
 
-			// Lookup access token
 			const accessToken = await this.accessTokensRepository.findOneByOrFail({
 				appId: app.id,
 				userId: session.userId,
 			});
 
-			// Delete session
 			this.authSessionsRepository.delete(session.id);
 
 			return {

@@ -8,7 +8,7 @@ import { id } from './util/id.js';
 import { MiDriveFile } from './DriveFile.js';
 
 @Entity('user')
-@Index('IDX_065d4d8f3b5adb4a08841eae3c', { synchronize: false }) // PGroonga index managed by migration.
+@Index('IDX_065d4d8f3b5adb4a08841eae3c', { synchronize: false })
 @Index(['usernameLower', 'host'], { unique: true })
 export class MiUser {
 	@PrimaryColumn(id())
@@ -119,25 +119,21 @@ export class MiUser {
 	@JoinColumn()
 	public banner: MiDriveFile | null;
 
-	// avatarId が null になったとしてもこれが null でない可能性があるため、このフィールドを使うときは avatarId の non-null チェックをすること
 	@Column('varchar', {
 		length: 1024, nullable: true,
 	})
 	public avatarUrl: string | null;
 
-	// bannerId が null になったとしてもこれが null でない可能性があるため、このフィールドを使うときは bannerId の non-null チェックをすること
 	@Column('varchar', {
 		length: 512, nullable: true,
 	})
 	public bannerUrl: string | null;
 
-	// avatarId が null になったとしてもこれが null でない可能性があるため、このフィールドを使うときは avatarId の non-null チェックをすること
 	@Column('varchar', {
 		length: 128, nullable: true,
 	})
 	public avatarBlurhash: string | null;
 
-	// bannerId が null になったとしてもこれが null でない可能性があるため、このフィールドを使うときは bannerId の non-null チェックをすること
 	@Column('varchar', {
 		length: 128, nullable: true,
 	})
@@ -206,19 +202,16 @@ export class MiUser {
 	})
 	public requireSigninToViewContents: boolean;
 
-	// in sec, マイナスで相対時間
 	@Column('integer', {
 		nullable: true,
 	})
 	public makeNotesFollowersOnlyBefore: number | null;
 
-	// in sec, マイナスで相対時間
 	@Column('integer', {
 		nullable: true,
 	})
 	public makeNotesHiddenBefore: number | null;
 
-	// アカウントが削除されたかどうかのフラグだが、完全に削除される際は物理削除なので実質削除されるまでの「削除が進行しているかどうか」のフラグ
 	@Column('boolean', {
 		default: false,
 		comment: 'Whether the User is deleted.',
@@ -230,12 +223,6 @@ export class MiUser {
 	})
 	public emojis: string[];
 
-	// チャットを許可する相手
-	// everyone: 誰からでも
-	// followers: フォロワーのみ
-	// following: フォローしているユーザーのみ
-	// mutual: 相互フォローのみ
-	// none: 誰からも受け付けない
 	@Column('varchar', {
 		length: 128, default: 'mutual',
 	})

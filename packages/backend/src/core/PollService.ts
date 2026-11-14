@@ -47,10 +47,8 @@ export class PollService {
 
 		if (poll == null) throw new Error('poll not found');
 
-		// Check whether is valid choice
 		if (poll.choices[choice] == null) throw new Error('invalid choice param');
 
-		// Check blocking
 		if (note.userId !== user.id) {
 			const blocked = await this.userBlockingService.checkBlocked(note.userId, user.id);
 			if (blocked) {
@@ -58,7 +56,6 @@ export class PollService {
 			}
 		}
 
-		// if already voted
 		const exist = await this.pollVotesRepository.findBy({
 			noteId: note.id,
 			userId: user.id,
@@ -79,8 +76,7 @@ export class PollService {
 			choice: choice,
 		});
 
-		// Increment votes count
-		const index = choice + 1; // In SQL, array index is 1 based
+		const index = choice + 1;
 		await this.pollsRepository.query('UPDATE poll SET votes[$1] = votes[$1] + 1 WHERE "noteId" = $2', [index, poll.noteId]);
 
 		this.globalEventService.publishNoteStream(note, 'pollVoted', {

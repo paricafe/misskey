@@ -35,7 +35,6 @@ vi.mock('chalk', () => ({
 
 import { PrettyConsoleBackend } from '@/logging/PrettyConsoleBackend.js';
 
-/** 見やすい形式のテストで使う共通のログを作成します。 */
 function createRecord(overrides: Partial<LogRecord> = {}): LogRecord {
 	return {
 		level: 'info',
@@ -50,7 +49,6 @@ function createRecord(overrides: Partial<LogRecord> = {}): LogRecord {
 	};
 }
 
-/** Access logの表示確認用に、正規化後と同じnull prototypeの本文を作成します。 */
 function createAccessRecord(requestBody: AccessLogRecord['requestBody']): AccessLogRecord {
 	return {
 		type: 'access',

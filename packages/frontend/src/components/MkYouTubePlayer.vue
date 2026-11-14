@@ -58,7 +58,6 @@ async function ytFetch() {
 	if (typeof props.urlOrSummalyResult === 'string') {
 		const requestUrl = new URL(props.urlOrSummalyResult, window.location.href);
 		if (requestUrl.protocol !== 'http:' && requestUrl.protocol !== 'https:') {
-			// Invalid URL
 			fetching.value = false;
 			return;
 		}
@@ -70,13 +69,11 @@ async function ytFetch() {
 	}
 
 	if (info.url == null || info.player?.url == null) {
-		// No URL or player info
 		fetching.value = false;
 		return;
 	}
 
 	if (!info.player.url.startsWith('https://') && !info.player.url.startsWith('http://')) {
-		// Invalid player URL
 		fetching.value = false;
 		return;
 	}

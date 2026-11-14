@@ -24,7 +24,6 @@ describe('follower note notifications', () => {
 			notificationService,
 			userEntityService: { isLocalUser: () => true },
 		});
-		// @bindThis methods are prototype getters, so stub them as own properties.
 		for (const method of ['incNotesCountOfUser', 'pushToTl', 'index']) {
 			Object.defineProperty(service, method, { value: vi.fn() });
 		}
@@ -52,7 +51,6 @@ describe('follower note notifications', () => {
 
 	test('notifies followers who enabled note notifications for ordinary notes', async () => {
 		const { notificationService, postNoteCreated } = createService();
-		// Only the follower path is stubbed; the later non-silent side effects may reject.
 		await postNoteCreated(false).catch(() => {});
 
 		await vi.waitFor(() => expect(notificationService.createNotification).toHaveBeenCalledWith('follower', 'note', { noteId: 'note' }, 'author'));
@@ -145,7 +143,6 @@ describe('federation of created notes', () => {
 		});
 		Object.defineProperty(service, 'renderNoteOrRenoteActivity', { value: vi.fn().mockResolvedValue({ type: 'Create' }) });
 
-		// The service fixture stubs deliverNote, so call the real method from the prototype.
 		await NoteCreateService.prototype['deliverNote'].call(service, note, { id: 'author', host: null }, { visibility: 'public' }, []);
 
 		expect(dm.addFollowersRecipe).toHaveBeenCalledOnce();

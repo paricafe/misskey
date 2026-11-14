@@ -3,7 +3,6 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-/** 差分HTMLは単体のファイルとして配布されるので、CSSも埋め込みで持つ */
 export const networkDiffHtmlStyles = `		:root {
 			color-scheme: light dark;
 			--bg: #f7f7f8;

@@ -15,7 +15,6 @@ export type SwMessage = {
 	[x: string]: unknown;
 };
 
-// Defined also @/core/PushNotificationService.ts#L12
 type PushNotificationDataSourceMap = {
 	notification: Misskey.entities.Notification;
 	unreadAntennaNote: {

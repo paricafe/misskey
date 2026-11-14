@@ -32,7 +32,6 @@ export class RoleTimelineChannel extends Channel {
 		private noteStreamingHidingService: NoteStreamingHidingService,
 	) {
 		super(request);
-		//this.onNote = this.onNote.bind(this);
 	}
 
 	@bindThis
@@ -79,7 +78,6 @@ export class RoleTimelineChannel extends Channel {
 
 	@bindThis
 	public dispose() {
-		// Unsubscribe events
 		this.subscriber.off(`roleTimelineStream:${this.roleId}`, this.onEvent);
 	}
 }

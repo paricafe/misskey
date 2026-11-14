@@ -29,7 +29,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 </template>
 
 <script lang="ts" setup>
-// SPECIFICATION: https://misskey-hub.net/docs/for-users/features/share-form/
 
 import { ref, computed } from 'vue';
 import * as Misskey from 'misskey-js';
@@ -62,43 +61,19 @@ async function init() {
 	if (title.value) {
 		noteText += `[ ${title.value} ]\n`;
 
-		//#region add text to note text
 		if (text?.startsWith(title.value)) {
-			// For the Google app https://github.com/misskey-dev/misskey/issues/16224
 			noteText += text.replace(title.value, '').trimStart();
 		} else if (text) {
 			noteText += `${text}\n`;
 		}
-		//#endregion
 	} else if (text) {
 		noteText += `${text}\n`;
 	}
 
 	if (url) {
 		try {
-			// Normalize the URL to URL-encoded and puny-coded from with the URL constructor.
-			//
-			// It's common to use unicode characters in the URL for better visibility of URL
-			//     like: https://ja.wikipedia.org/wiki/ミスキー
-			//  or like: https://藍.moe/
-			// However, in the MFM, the unicode characters must be URL-encoded to be parsed as `url` node
-			//     like: https://ja.wikipedia.org/wiki/%E3%83%9F%E3%82%B9%E3%82%AD%E3%83%BC
-			//  or like: https://xn--931a.moe/
-			// Therefore, we need to normalize the URL to URL-encoded form.
-			//
-			// The URL constructor will parse the URL and normalize unicode characters
-			//   in the host to punycode and in the path component to URL-encoded form.
-			//   (see url.spec.whatwg.org)
-			//
-			// In addition, the current MFM renderer decodes the URL-encoded path and / punycode encoded host name so
-			//   this normalization doesn't make the visible URL ugly.
-			//   (see MkUrl.vue)
-
 			noteText += new URL(url).href;
 		} catch {
-			// fallback to original URL if the URL is invalid.
-			// note that this is extremely rare since the `url` parameter is designed to share a URL and
-			// the URL constructor will throw TypeError only if failure, which means the URL is not valid.
 			noteText += url;
 		}
 	}
@@ -124,7 +99,6 @@ async function init() {
 	}
 
 	try {
-		//#region Reply
 		const replyId = urlParams.get('replyId');
 		const replyUri = urlParams.get('replyUri');
 		if (replyId) {
@@ -139,9 +113,7 @@ async function init() {
 				reply.value = obj.object;
 			}
 		}
-		//#endregion
 
-		//#region Renote
 		const renoteId = urlParams.get('renoteId');
 		const renoteUri = urlParams.get('renoteUri');
 		if (renoteId) {
@@ -156,9 +128,7 @@ async function init() {
 				renote.value = obj.object;
 			}
 		}
-		//#endregion
 
-		//#region Drive files
 		const fileIds = urlParams.get('fileIds');
 		if (fileIds) {
 			await Promise.all(
@@ -172,7 +142,6 @@ async function init() {
 					),
 			);
 		}
-		//#endregion
 	} catch (err: any) {
 		os.alert({
 			type: 'error',
@@ -189,7 +158,6 @@ init();
 function close(): void {
 	window.close();
 
-	// 閉じなければ100ms後タイムラインに
 	window.setTimeout(() => {
 		window.location.href = '/';
 	}, 100);

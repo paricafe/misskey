@@ -1,21 +1,8 @@
 import * as ts from 'typescript';
 
-/**
- * TypeScript AST ノードから 'never' 型のプロパティを削除します。
- * この関数は、特に 'paths' という名前の TypeAliasDeclaration 内や
- * 'operations' という名前の InterfaceDeclaration 内を再帰的に探索し、
- * そこに含まれるすべての TypeLiteralNode/Interfaceから 'PropertySignature' で型が 'never' であるものを削除します。
- * さらに、すべてのプロパティが 'never' で除去された場合は、そのオブジェクト自体も削除します。
- *
- * @param astNodes 処理対象の ts.Node 配列 (例: `openapi-typescript` から出力されたもの)。
- * @returns 'never' 型プロパティが削除された新しい ts.Node 配列。
- */
 export function removeNeverPropertiesFromAST(astNodes: readonly ts.Node[]): ts.Node[] {
 	const factory = ts.factory;
 
-	/**
-	 * TypeLiteralNodeやInterfaceDeclarationのmembersからneverプロパティを除去し、必要なら型も再帰的に処理する共通関数
-	 */
 	function removeNeverPropertiesFromMembers(
 		members: readonly ts.TypeElement[],
 		visitType: (node: ts.Node) => ts.Node | undefined,
@@ -42,7 +29,6 @@ export function removeNeverPropertiesFromAST(astNodes: readonly ts.Node[]): ts.N
 						);
 						hasChanged = true;
 					} else if (visitedMemberType === undefined) {
-						// 子の型が消された場合、このプロパティも消す
 						hasChanged = true;
 						continue;
 					}
@@ -60,7 +46,6 @@ export function removeNeverPropertiesFromAST(astNodes: readonly ts.Node[]): ts.N
 			const { newMembers, hasChanged } = removeNeverPropertiesFromMembers(node.members, typeNodeRecursiveVisitor);
 
 			if (newMembers.length === 0) {
-				// すべてのプロパティがneverで消された場合、このTypeLiteralNode自体も消す
 				return undefined;
 			}
 

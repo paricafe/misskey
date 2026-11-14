@@ -128,7 +128,6 @@ export function createAiScriptEnv(opts: { storageKey: string, token?: string }) 
 			let actualToken: string | null = null;
 			if (token != null && !utils.isNull(token)) {
 				utils.assertString(token);
-				// バグがあればundefinedもあり得るため念のため
 				if (typeof token.value !== 'string') throw new errors.AiScriptRuntimeError('invalid token');
 				actualToken = token.value;
 			}
@@ -148,18 +147,6 @@ export function createAiScriptEnv(opts: { storageKey: string, token?: string }) 
 				return values.ERROR('request_failed', utils.jsToVal(err));
 			});
 		}),
-		/* セキュリティ上の問題があるため無効化
-		'Mk:apiExternal': values.FN_NATIVE(async ([host, ep, param, token]) => {
-			utils.assertString(host);
-			utils.assertString(ep);
-			if (token) utils.assertString(token);
-			return os.apiExternal(host.value, ep.value, utils.valToJs(param), token?.value).then(res => {
-				return utils.jsToVal(res);
-			}, err => {
-				return values.ERROR('request_failed', utils.jsToVal(err));
-			});
-		}),
-		*/
 		'Mk:save': values.FN_NATIVE(([key, value]) => {
 			utils.assertString(key);
 			utils.expectAny(value);

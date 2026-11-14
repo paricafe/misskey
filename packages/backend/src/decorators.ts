@@ -3,13 +3,6 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-// https://github.com/andreypopp/autobind-decorator
-
-/**
- * Return a descriptor removing the value and returning a getter
- * The getter will return a .bind version of the function
- * and memoize the result against a symbol on the instance
- */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function bindThis(target: any, key: string, descriptor: any) {
 	const fn = descriptor.value;

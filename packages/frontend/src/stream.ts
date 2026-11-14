@@ -8,7 +8,6 @@ import { markRaw } from 'vue';
 import { $i } from '@/i.js';
 import { wsOrigin } from '@@/js/config.js';
 
-// heart beat interval in ms
 const HEART_BEAT_INTERVAL = 1000 * 60;
 
 let stream: Misskey.IStream | null = null;
@@ -25,7 +24,6 @@ export function useStream(): Misskey.IStream {
 	if (timeoutHeartBeat) window.clearTimeout(timeoutHeartBeat);
 	timeoutHeartBeat = window.setTimeout(heartbeat, HEART_BEAT_INTERVAL);
 
-	// send heartbeat right now when last send time is over HEART_BEAT_INTERVAL
 	window.document.addEventListener('visibilitychange', () => {
 		if (
 			!stream

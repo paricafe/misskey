@@ -12,17 +12,10 @@ import { copyToClipboard } from '@/utility/copy-to-clipboard.js';
 
 const MOBILE_THRESHOLD = 500;
 
-/**
- * パラメータを正規化する（埋め込みコード作成用）
- * @param params パラメータ
- * @returns 正規化されたパラメータ
- */
 export function normalizeEmbedParams(params: EmbedParams): Record<string, string> {
-	// paramsのvalueをすべてstringに変換。undefinedやnullはプロパティごと消す
 	const normalizedParams: Record<string, string> = {};
 	for (const key in params) {
 		const k = key as keyof EmbedParams;
-		// デフォルトの値と同じならparamsに含めない
 		if (params[k] == null || params[k] === defaultEmbedParams[k]) {
 			continue;
 		}
@@ -41,11 +34,8 @@ export function normalizeEmbedParams(params: EmbedParams): Record<string, string
 	return normalizedParams;
 }
 
-/**
- * 埋め込みコードを生成（iframe IDの発番もやる）
- */
 export function getEmbedCode(path: string, params?: EmbedParams): string {
-	const iframeId = 'v1_' + genId(); // 将来embed.jsのバージョンが上がったとき用にv1_を付けておく
+	const iframeId = 'v1_' + genId();
 
 	let paramString = '';
 	if (params) {
@@ -60,11 +50,6 @@ export function getEmbedCode(path: string, params?: EmbedParams): string {
 	return iframeCode.join('\n');
 }
 
-/**
- * 埋め込みコードを生成してコピーする（カスタマイズ機能つき）
- *
- * カスタマイズ機能がいらない場合（事前にパラメータを指定する場合）は getEmbedCode を直接使ってください
- */
 export async function genEmbedCode(entity: EmbeddableEntity, id: string, params?: EmbedParams) {
 	const _params = { ...params };
 
@@ -72,7 +57,6 @@ export async function genEmbedCode(entity: EmbeddableEntity, id: string, params?
 		_params.maxHeight = 700;
 	}
 
-	// PCじゃない場合はコードカスタマイズ画面を出さずにそのままコピー
 	if (window.innerWidth < MOBILE_THRESHOLD) {
 		copyToClipboard(getEmbedCode(`/embed/${entity}/${id}`, _params));
 	} else {

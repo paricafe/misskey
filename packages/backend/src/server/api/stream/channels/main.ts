@@ -40,7 +40,6 @@ export class MainChannel extends Channel {
 	private async onData(data: EventTypesToEventPayload<MainEventTypes>) {
 		switch (data.type) {
 			case 'notification': {
-				// Ignore notifications from instances the user has muted
 				if (isUserFromMutedInstance(data.body, this.userMutedInstances)) return;
 				if (data.body.userId && this.userIdsWhoMeMuting.has(data.body.userId)) return;
 

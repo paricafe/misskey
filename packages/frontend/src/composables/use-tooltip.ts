@@ -13,9 +13,6 @@ export function useTooltip(
 ): void {
 	let isHovering = false;
 
-	// iOS(Androidも？)では、要素をタップした直後に(おせっかいで)mouseoverイベントを発火させたりするため、それを無視するためのフラグ
-	// 無視しないと、画面に触れてないのにツールチップが出たりし、ユーザビリティが損なわれる
-	// TODO: 一度でもタップすると二度とマウスでツールチップ出せなくなるのをどうにかする 定期的にfalseに戻すとか...？
 	let shouldIgnoreMouseover = false;
 
 	let timeoutId: number;
@@ -29,7 +26,7 @@ export function useTooltip(
 		if (!isHovering) return;
 		if (elRef.value == null) return;
 		const el = elRef.value instanceof Element ? elRef.value : elRef.value.$el;
-		if (!window.document.body.contains(el)) return; // openしようとしたときに既に元要素がDOMから消えている場合があるため
+		if (!window.document.body.contains(el)) return;
 
 		const showing = ref(true);
 		onShow(showing);
@@ -103,7 +100,6 @@ export function useTooltip(
 
 	let boundEl: HTMLElement | null = null;
 
-	// 要素が差し替えられた場合 (動的コンポーネントの切り替え等) は旧要素のツールチップを閉じ、リスナーを付け替える
 	watch(() => elRef.value == null ? null : elRef.value instanceof Element ? elRef.value : elRef.value.$el, (el) => {
 		if (el === boundEl) return;
 		if (boundEl != null) {

@@ -141,7 +141,7 @@ onMounted(async () => {
 
 	const closeWaiting = os.waiting();
 
-	await nextTick(); // waitingがレンダリングされるまで待つ
+	await nextTick();
 
 	try {
 		imageBitmap = await window.createImageBitmap(props.image);
@@ -195,10 +195,10 @@ async function save() {
 
 	const closeWaiting = os.waiting();
 
-	await nextTick(); // waitingがレンダリングされるまで待つ
+	await nextTick();
 
-	renderer.changeResolution(imageBitmap.width, imageBitmap.height); // 本番レンダリングのためオリジナル画質に戻す
-	await renderer.render(layers); // toBlobの直前にレンダリングしないと何故か壊れる
+	renderer.changeResolution(imageBitmap.width, imageBitmap.height);
+	await renderer.render(layers);
 	canvasEl.value.toBlob((blob) => {
 		emit('ok', new File([blob!], `image-${Date.now()}.png`, { type: 'image/png' }));
 		dialog.value?.close();
@@ -249,9 +249,9 @@ function onImagePointerdown(ev: PointerEvent) {
 	let xOffset = 0;
 	let yOffset = 0;
 
-	if (AW / AH < BW / BH) { // 横長
+	if (AW / AH < BW / BH) {
 		yOffset = AH - BH * (AW / BW);
-	} else { // 縦長
+	} else {
 		xOffset = AW - BW * (AH / BH);
 	}
 
@@ -261,10 +261,10 @@ function onImagePointerdown(ev: PointerEvent) {
 	let startX = ev.offsetX - xOffset;
 	let startY = ev.offsetY - yOffset;
 
-	if (AW / AH < BW / BH) { // 横長
+	if (AW / AH < BW / BH) {
 		startX = startX / (Math.max(AW, AH) / Math.max(BH / BW, 1));
 		startY = startY / (Math.max(AW, AH) / Math.max(BW / BH, 1));
-	} else { // 縦長
+	} else {
 		startX = startX / (Math.min(AW, AH) / Math.max(BH / BW, 1));
 		startY = startY / (Math.min(AW, AH) / Math.max(BW / BH, 1));
 	}
@@ -321,10 +321,10 @@ function onImagePointerdown(ev: PointerEvent) {
 		let x = pointerX - xOffset;
 		let y = pointerY - yOffset;
 
-		if (AW / AH < BW / BH) { // 横長
+		if (AW / AH < BW / BH) {
 			x = x / (Math.max(AW, AH) / Math.max(BH / BW, 1));
 			y = y / (Math.max(AW, AH) / Math.max(BW / BH, 1));
-		} else { // 縦長
+		} else {
 			x = x / (Math.min(AW, AH) / Math.max(BH / BW, 1));
 			y = y / (Math.min(AW, AH) / Math.max(BW / BH, 1));
 		}
@@ -415,10 +415,6 @@ function onImagePointerdown(ev: PointerEvent) {
 	position: absolute;
 	top: 0;
 	left: 0;
-	/* なんかiOSでレンダリングがおかしい
-	width: stretch;
-	height: stretch;
-	*/
 	width: calc(100% - 40px);
 	height: calc(100% - 40px);
 	margin: 20px;

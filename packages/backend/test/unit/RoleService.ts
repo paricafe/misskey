@@ -102,7 +102,6 @@ describe('RoleService', () => {
 
 	beforeEach(async () => {
 		clock = lolex.install({
-			// https://github.com/sinonjs/sinon/issues/2620
 			toFake: Object.keys(lolex.timers).filter((key) => !['nextTick', 'queueMicrotask'].includes(key)) as lolex.FakeMethod[],
 			now: new Date(),
 			shouldClearNativeTimers: true,
@@ -156,10 +155,6 @@ describe('RoleService', () => {
 	afterEach(async () => {
 		clock.uninstall();
 
-		/**
-		 * Delete meta and roleAssignment first to avoid deadlock due to schema dependencies
-		 * https://github.com/misskey-dev/misskey/issues/16783
-		 */
 		await app.get(DI.metasRepository).createQueryBuilder().delete().execute();
 		await roleAssignmentsRepository.createQueryBuilder().delete().execute();
 		await Promise.all([
@@ -191,14 +186,11 @@ describe('RoleService', () => {
 			const roleNotExpired = await createRole({ name: 'not-expired' });
 			const roleExpired = await createRole({ name: 'expired' });
 
-			// expiresAtなし
 			await roleService.assign(user.id, roleNoExpiry.id);
 
-			// expiresAtあり（期限切れでない）
-			const future = new Date(Date.now() + 1000 * 60 * 60); // +1 hour
+			const future = new Date(Date.now() + 1000 * 60 * 60);
 			await roleService.assign(user.id, roleNotExpired.id, future);
 
-			// expiresAtあり（期限切れ）
 			await assignRole({ userId: user.id, roleId: roleExpired.id, expiresAt: new Date(Date.now() - 1000) });
 
 			const assigns = await roleService.getUserAssigns(user.id);
@@ -330,7 +322,6 @@ describe('RoleService', () => {
 
 			await roleService.assign(user.id, role.id);
 
-			// ストリーミング経由で反映されるまでちょっと待つ
 			clock.uninstall();
 			await setTimeout(100);
 
@@ -352,7 +343,7 @@ describe('RoleService', () => {
 			});
 			const roleWithoutPolicy = await createRole({
 				name: 'roleWithoutPolicy',
-				policies: {}, // ポリシーが空
+				policies: {},
 			});
 			await roleService.assign(user.id, roleWithPolicy.id);
 			await roleService.assign(user.id, roleWithoutPolicy.id);
@@ -362,7 +353,6 @@ describe('RoleService', () => {
 
 			const result = await roleService.getUserPolicies(user.id);
 
-			// roleWithoutPolicy は default 値 (5) を使い、roleWithPolicy の 10 と比較して大きい方が採用される
 			expect(result.pinLimit).toBe(10);
 		});
 	});
@@ -422,14 +412,11 @@ describe('RoleService', () => {
 			const roleNotExpired = await createRole({ name: 'not-expired', asBadge: true });
 			const roleExpired = await createRole({ name: 'expired', asBadge: true });
 
-			// expiresAt なし
 			await roleService.assign(user.id, roleNoExpiry.id);
 
-			// expiresAt あり（期限切れでない）
-			const future = new Date(Date.now() + 1000 * 60 * 60); // +1 hour
+			const future = new Date(Date.now() + 1000 * 60 * 60);
 			await roleService.assign(user.id, roleNotExpired.id, future);
 
-			// expiresAt あり（期限切れ）
 			await assignRole({ userId: user.id, roleId: roleExpired.id, expiresAt: new Date(Date.now() - 1000) });
 
 			const rolesBefore = await roleService.getUserBadgeRoles(user.id);
@@ -437,7 +424,6 @@ describe('RoleService', () => {
 			expect(rolesBefore.some(r => r.id === roleNotExpired.id)).toBe(true);
 			expect(rolesBefore.some(r => r.id === roleExpired.id)).toBe(false);
 
-			// 時間経過で roleNotExpired を失効させる
 			clock.tick('02:00:00');
 			const rolesAfter = await roleService.getUserBadgeRoles(user.id);
 			expect(rolesAfter.some(r => r.id === roleNoExpiry.id)).toBe(true);
@@ -673,7 +659,6 @@ describe('RoleService', () => {
 
 			const adminIds = await roleService.getAdministratorIds();
 
-			// sort for deterministic order
 			adminIds.sort();
 			const expectedIds = [adminUser1.id, adminUser2.id].sort();
 
@@ -691,7 +676,7 @@ describe('RoleService', () => {
 		});
 
 		test('should return an empty array if there are no administrator roles defined', async () => {
-			await createUser(); // create user to ensure not empty db
+			await createUser();
 			const adminIds = await roleService.getAdministratorIds();
 			expect(adminIds).toHaveLength(0);
 		});
@@ -709,7 +694,6 @@ describe('RoleService', () => {
 			expect(adminIds).toEqual([adminUser.id]);
 		});
 
-		// TODO: rootユーザーは現在実装に含まれていないため、テストもそれに倣う
 		test('should not include the root user', async () => {
 			const rootUser = await createUser();
 			meta.rootUserId = rootUser.id;
@@ -965,17 +949,13 @@ describe('RoleService', () => {
 			d3.setSeconds(d3.getSeconds() + 1);
 
 			const [user1, user2, user3] = await Promise.all([
-				// 4:59
 				createUser({ id: genAidx(d1.getTime()) }),
-				// 5:00
 				createUser({ id: genAidx(d2.getTime()) }),
-				// 5:01
 				createUser({ id: genAidx(d3.getTime()) }),
 			]);
 			const role = await createConditionalRole({
 				id: aidx(),
 				type: 'createdLessThan',
-				// 5 minutes
 				sec: 300,
 			});
 
@@ -998,17 +978,13 @@ describe('RoleService', () => {
 			d3.setSeconds(d3.getSeconds() + 1);
 
 			const [user1, user2, user3] = await Promise.all([
-				// 4:59
 				createUser({ id: genAidx(d1.getTime()) }),
-				// 5:00
 				createUser({ id: genAidx(d2.getTime()) }),
-				// 5:01
 				createUser({ id: genAidx(d3.getTime()) }),
 			]);
 			const role = await createConditionalRole({
 				id: aidx(),
 				type: 'createdMoreThan',
-				// 5 minutes
 				sec: 300,
 			});
 

@@ -12,13 +12,7 @@ const koRegex3 = /(야(?=\?))|(야$)|(야(?= ))/gm;
 
 export function nyaize(text: string): string {
 	return text
-		// ja-JP
 		.replaceAll('な', 'にゃ').replaceAll('ナ', 'ニャ').replaceAll('ﾅ', 'ﾆｬ')
-		// en-US
-		//.replace(enRegex1, x => x === 'A' ? 'YA' : 'ya')
-		//.replace(enRegex2, x => x === 'ING' ? 'YAN' : 'yan')
-		//.replace(enRegex3, x => x === 'ONE' ? 'NYAN' : 'nyan')
-		// ko-KR
 		.replace(koRegex1, match => !isNaN(match.charCodeAt(0)) ? String.fromCharCode(
 			match.charCodeAt(0) + '냐'.charCodeAt(0) - '나'.charCodeAt(0),
 		) : match)

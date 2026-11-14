@@ -49,7 +49,6 @@ import { genEmbedCode } from '@/utility/get-embed-code.js';
 import { assertServerContext, serverContext } from '@/server-context.js';
 import { Paginator } from '@/utility/paginator.js';
 
-// contextは非ログイン状態の情報しかないためログイン時は利用できない
 const CTX_CLIP = !$i && assertServerContext(serverContext, 'clip') ? serverContext.clip : null;
 
 const props = defineProps<{

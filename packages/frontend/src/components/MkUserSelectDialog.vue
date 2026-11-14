@@ -125,7 +125,6 @@ function ok() {
 
 	dialogEl.value?.close();
 
-	// 最近使ったユーザー更新
 	let recents = store.s.recentlyUsedUsers;
 	recents = recents.filter(x => x !== user.id);
 	recents.unshift(user.id);

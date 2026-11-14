@@ -24,7 +24,6 @@ async function generateBaseTypes(
 	}
 	lines.push('');
 
-	// NOTE: Align `operationId` of GET and POST to avoid duplication of type definitions
 	const openApi = JSON.parse(await readFile(openApiJsonPath, 'utf8')) as OpenAPI3;
 	// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
 	for (const [key, item] of Object.entries(openApi.paths!)) {
@@ -96,7 +95,6 @@ async function generateEndpoints(
 	const endpointReqMediaTypes: EndpointReqMediaType[] = [];
 	const endpointReqMediaTypesSet = new Set<string>();
 
-	// misskey-jsはPOST固定で送っているので、こちらも決め打ちする。別メソッドに対応することがあればこちらも直す必要あり
 	const paths = openApiDocs.paths ?? {};
 	const postPathItems = Object.keys(paths)
 		.map(it => ({
@@ -116,7 +114,6 @@ async function generateEndpoints(
 			const reqContent = operation.requestBody.content;
 			const supportMediaTypes = Object.keys(reqContent);
 			if (supportMediaTypes.length > 0) {
-				// いまのところ複数のメディアタイプをとるエンドポイントは無いので決め打ちする
 				const req = new OperationTypeAlias(
 					operationId,
 					path,
@@ -137,7 +134,6 @@ async function generateEndpoints(
 			const resContent = operation.responses['200'].content;
 			const supportMediaTypes = Object.keys(resContent);
 			if (supportMediaTypes.length > 0) {
-				// いまのところ複数のメディアタイプを返すエンドポイントは無いので決め打ちする
 				endpoint.response = new OperationTypeAlias(
 					operationId,
 					path,
@@ -214,7 +210,6 @@ async function generateApiClientJSDoc(
 		description: string;
 	}[] = [];
 
-	// misskey-jsはPOST固定で送っているので、こちらも決め打ちする。別メソッドに対応することがあればこちらも直す必要あり
 	const paths = openApiDocs.paths ?? {};
 	const postPathItems = Object.keys(paths)
 		.map(it => ({

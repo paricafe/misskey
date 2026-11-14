@@ -59,7 +59,6 @@ const props = withDefaults(defineProps<{
 	note: Misskey.entities.Note | null;
 	detail?: boolean;
 
-	// how many notes are in between this one and the note being viewed in detail
 	depth?: number;
 }>(), {
 	depth: 1,

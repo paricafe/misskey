@@ -29,8 +29,6 @@ export function swInject() {
 		switch (ev.data.order) {
 			case 'post': {
 				const props = deepClone(ev.data.options);
-				// プッシュ通知から来たreply,renoteはtruncateBodyが通されているため、
-				// 完全なノートを取得しなおす
 				if (props.reply) {
 					props.reply = await misskeyApi('notes/show', { noteId: props.reply.id });
 				}

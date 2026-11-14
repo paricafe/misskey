@@ -58,7 +58,6 @@ describe('DriveService', () => {
 		});
 
 		test('delete a file with no valid key', async () => {
-			// Some S3 implementations returns 404 Not Found on deleting with a non-existent key
 			s3Mock.on(DeleteObjectCommand)
 				.rejects(new NoSuchKey({ $metadata: {}, message: 'allowed error.' }));
 

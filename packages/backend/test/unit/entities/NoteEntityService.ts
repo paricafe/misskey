@@ -193,7 +193,6 @@ describe('NoteEntityService poll packing', () => {
 
 describe('NoteEntityService viewer reactions', () => {
 	test('batches the viewer reaction of a quoted note with its quote', async () => {
-		// More reactions than cached pairs make both notes read the database.
 		const crowded = { hasPoll: false, reactions: { like: 2 }, reactionAndUserPairCache: [] };
 		const quoted = note('quoted', crowded);
 		const quote = note('quote', { ...crowded, renoteId: quoted.id, renote: quoted });

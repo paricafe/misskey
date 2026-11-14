@@ -51,7 +51,7 @@ export const paramDef = {
 		untilId: { type: 'string', format: 'misskey:id' },
 		sinceDate: { type: 'integer' },
 		untilDate: { type: 'integer' },
-		allowPartial: { type: 'boolean', default: false }, // true is recommended but for compatibility false by default
+		allowPartial: { type: 'boolean', default: false },
 		includeMyRenotes: { type: 'boolean', default: true },
 		includeRenotedMyNotes: { type: 'boolean', default: true },
 		includeLocalRenotes: { type: 'boolean', default: true },
@@ -155,7 +155,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 		withFiles: boolean,
 		withRenotes: boolean,
 	}, me: MiLocalUser) {
-		//#region Construct query
 		const query = this.queryService.makePaginationQuery(this.notesRepository.createQueryBuilder('note'), ps.sinceId, ps.untilId)
 			.innerJoin(this.userListMembershipsRepository.metadata.targetName, 'userListMemberships', 'userListMemberships.userId = note.userId')
 			.innerJoinAndSelect('note.user', 'user')
@@ -164,22 +163,22 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 			.leftJoinAndSelect('reply.user', 'replyUser')
 			.leftJoinAndSelect('renote.user', 'renoteUser')
 			.andWhere('userListMemberships.userListId = :userListId', { userListId: list.id })
-			.andWhere('note.channelId IS NULL') // チャンネルノートではない
+			.andWhere('note.channelId IS NULL')
 			.andWhere(new Brackets(qb => {
 				qb
-					.where('note.replyId IS NULL') // 返信ではない
+					.where('note.replyId IS NULL')
 					.orWhere(new Brackets(qb => {
-						qb // 返信だけど投稿者自身への返信
+						qb
 							.where('note.replyId IS NOT NULL')
 							.andWhere('note.replyUserId = note.userId');
 					}))
 					.orWhere(new Brackets(qb => {
-						qb // 返信だけど自分宛ての返信
+						qb
 							.where('note.replyId IS NOT NULL')
 							.andWhere('note.replyUserId = :meId', { meId: me.id });
 					}))
 					.orWhere(new Brackets(qb => {
-						qb // 返信だけどwithRepliesがtrueの場合
+						qb
 							.where('note.replyId IS NOT NULL')
 							.andWhere('userListMemberships.withReplies = true');
 					}));
@@ -189,7 +188,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 		this.queryService.generateBaseNoteFilteringQuery(query, me);
 		this.queryService.generateMutedUserRenotesQueryForNotes(query, me);
 
-		// -- ミュートされたチャンネルのリノート対策
 		const mutedChannelIds = await this.channelMutingService
 			.list({ requestUserId: me.id }, { idOnly: true })
 			.then(x => x.map(x => x.id));
@@ -244,7 +242,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 		if (ps.withFiles) {
 			query.andWhere('note.fileIds != \'{}\'');
 		}
-		//#endregion
 
 		return await query.limit(ps.limit).getMany();
 	}

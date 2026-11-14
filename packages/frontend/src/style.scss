@@ -1,7 +1,7 @@
 @charset "utf-8";
 
 @font-face {
-	font-display: swap; /* Check https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-display for other options. */
+	font-display: swap;
 	font-family: 'Lexend';
 	font-style: normal;
 	font-weight: 400;
@@ -22,7 +22,6 @@
 	--MI-margin: var(--MI-marginFull);
 	--MI-textAutospace: no-autospace;
 
-	// switch dynamically
 	--MI-minBottomSpacingMobile: calc(72px + max(12px, env(safe-area-inset-bottom, 0px)));
 	--MI-minBottomSpacing: var(--MI-minBottomSpacingMobile);
 
@@ -136,7 +135,6 @@ body,
 }
 
 body {
-	/* NOTE: htmlにも overflow: clip を設定したいところだが、設定すると何故か少なくともChromeで html が main thread scrolling になりパフォーマンスが(多分)落ちる */
 	overflow: clip;
 }
 
@@ -204,19 +202,16 @@ rt {
 	text-align: center;
 }
 
-/* TODO: 引数は現在CSS変数経由で受け取っているが、将来的にはattr()を使った方が綺麗そう */
 ._spacer {
 	width: 100%;
 	max-width: min(var(--MI_SPACER-w, 100%), calc(100% - (var(--MI_SPACER-max, 24px) * 2)));
 
-	/* marginを使って余白を表現すると、margin特有の親突き抜け仕様などが厄介になってくるので上下はpaddingを使う */
 	padding: var(--MI_SPACER-max, 24px) 0;
 	margin: 0 auto;
 
 	box-sizing: border-box;
 	container-type: inline-size;
 
-	/* 子に継承させない */
 	--MI_SPACER-w: initial;
 	--MI_SPACER-min: initial;
 	--MI_SPACER-max: initial;
@@ -247,12 +242,6 @@ rt {
 	overflow-y: scroll;
 	overscroll-behavior: contain;
 
-	/*
-	理屈は知らないけど、ここでbackgroundを設定しておかないと
-	スクロールコンテナーが少なくともChromeにおいて
-	main thread scrolling になってしまい、パフォーマンスが(多分)落ちる。
-	backgroundが透明だと裏側を描画しないといけなくなるとかそういう理由かもしれない
-	*/
 	background: var(--MI_THEME-bg);
 }
 
@@ -308,7 +297,7 @@ rt {
 
 ._nowrap {
 	white-space: pre !important;
-	word-wrap: normal !important; // https://codeday.me/jp/qa/20190424/690106.html
+	word-wrap: normal !important;
 	overflow: hidden;
 	text-overflow: ellipsis;
 }
@@ -333,7 +322,7 @@ rt {
 	appearance: none;
 	display: inline-block;
 	padding: 0;
-	margin: 0; // for Safari
+	margin: 0;
 	background: none;
 	border: none;
 	cursor: pointer;
@@ -632,8 +621,6 @@ html[data-color-scheme=dark] ._woodenFrame {
   }
 }
 
-// MFM -----------------------------
-
 bdi.block { display: block }
 
 ._mfm_blur_ {
@@ -661,11 +648,9 @@ bdi.block { display: block }
 	font-size: var(--mfm-zoom-size);
 
 	.mfm-x2, .mfm-x3, .mfm-x4 {
-		/* only half effective */
 		font-size: calc(var(--mfm-zoom-size) / 2 + 50%);
 
 		.mfm-x2, .mfm-x3, .mfm-x4 {
-			/* disabled */
 			font-size: 100%;
 		}
 	}
@@ -709,9 +694,6 @@ bdi.block { display: block }
 	100% { transform: translateY(0) scale(1, 1); }
 }
 
-// const val = () => `translate(${Math.floor(Math.random() * 20) - 10}px, ${Math.floor(Math.random() * 20) - 10}px)`;
-// let css = '';
-// for (let i = 0; i <= 100; i += 5) { css += `${i}% { transform: ${val()} }\n`; }
 @keyframes mfm-twitch {
 	0% { transform: translate(7px, -2px) }
 	5% { transform: translate(-3px, 1px) }
@@ -736,9 +718,6 @@ bdi.block { display: block }
 	100% { transform: translate(-2px, -6px) }
 }
 
-// const val = () => `translate(${Math.floor(Math.random() * 6) - 3}px, ${Math.floor(Math.random() * 6) - 3}px) rotate(${Math.floor(Math.random() * 24) - 12}deg)`;
-// let css = '';
-// for (let i = 0; i <= 100; i += 5) { css += `${i}% { transform: ${val()} }\n`; }
 @keyframes mfm-shake {
 	0% { transform: translate(-3px, -1px) rotate(-8deg) }
 	5% { transform: translate(0px, -1px) rotate(-10deg) }

@@ -93,7 +93,6 @@ describe('UserSearchService', () => {
 					UserSearchService,
 					{
 						provide: UserEntityService, useFactory: vi.fn(() => ({
-							// とりあえずIDが返れば確認が出来るので
 							packMany: (value: any) => value,
 							validateLocalUsername: (value: string) => /^\w{1,20}$/.test(value),
 						})),
@@ -147,7 +146,6 @@ describe('UserSearchService', () => {
 				root,
 			);
 
-			// alycia, alysha, alysonは非アクティブなので後ろに行く
 			expect(result).toEqual([alice, alyce, alyssa, alycia, alysha, alyson].map(x => x.id));
 		});
 
@@ -161,7 +159,6 @@ describe('UserSearchService', () => {
 				root,
 			);
 
-			// alice, alyceはフォローしていないので後ろに行く
 			expect(result).toEqual([alycia, alysha, alyson, alyssa, alice, alyce].map(x => x.id));
 		});
 
@@ -175,7 +172,6 @@ describe('UserSearchService', () => {
 				root,
 			);
 
-			// alice, alyce, alyciaは非アクティブなので後ろに行く
 			expect(result).toEqual([alysha, alyson, alyssa, alice, alyce, alycia].map(x => x.id));
 		});
 
@@ -202,14 +198,6 @@ describe('UserSearchService', () => {
 				root,
 			);
 
-			// 見る用
-			// const users = await usersRepository.findBy({ id: In(result) }).then(it => new Map(it.map(x => [x.id, x])));
-			// console.log(result.map(x => users.get(x as any)).map(it => it?.username));
-
-			// フォローしててアクティブなので先頭: alyssa, bob, bobbi
-			// フォローしてて非アクティブなので次: alyson, bobbie
-			// フォローしてないけどアクティブなので次: alyce, alycia, root(アルファベット順的にここになる)
-			// フォローしてないし非アクティブなので最後: alice, alysha, bobby
 			expect(result).toEqual([alyssa, bob, bobbi, alyson, bobbie, alyce, alycia, root, alice, alysha, bobby].map(x => x.id));
 		});
 
@@ -222,7 +210,6 @@ describe('UserSearchService', () => {
 				{ limit: 100 },
 			);
 
-			// alice, alyce, alyciaは非アクティブなので後ろに行く
 			expect(result).toEqual([alysha, alyson, alyssa, alice, alyce, alycia].map(x => x.id));
 		});
 
@@ -263,7 +250,6 @@ describe('UserSearchService', () => {
 			expect(result).toEqual([alysha, alyson, alyssa].map(x => x.id));
 		});
 	});
-	// Run with MISSKEY_TEST_PGROONGA=1 and the PGroonga extension installed in the test DB.
 	describe.skipIf(process.env.MISSKEY_TEST_PGROONGA !== '1')('search', () => {
 		test.each(['a_b', '100%', 'c\\d'])('matches a name containing %j literally', async (name) => {
 			const expected = await createUser({ username: 'literal', usernameLower: 'literal', name });

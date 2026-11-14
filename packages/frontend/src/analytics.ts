@@ -6,9 +6,6 @@
 import * as Misskey from 'misskey-js';
 import type { AnalyticsInstance, AnalyticsPlugin } from 'analytics';
 
-/**
- * analytics moduleを読み込まなくても動作するようにするためのラッパー
- */
 class AnalyticsProxy implements AnalyticsInstance {
 	private analytics?: AnalyticsInstance;
 
@@ -80,7 +77,6 @@ class AnalyticsProxy implements AnalyticsInstance {
 export const analytics = new AnalyticsProxy();
 
 export async function initAnalytics(instance: Misskey.entities.MetaDetailed) {
-	// アナリティクスプロバイダに関する設定がひとつもない場合は、アナリティクスモジュールを読み込まない
 	if (!instance.googleAnalyticsMeasurementId) {
 		return;
 	}
@@ -88,7 +84,6 @@ export async function initAnalytics(instance: Misskey.entities.MetaDetailed) {
 	const { default: Analytics } = await import('analytics');
 	const plugins: AnalyticsPlugin[] = [];
 
-	// Google Analytics
 	if (instance.googleAnalyticsMeasurementId) {
 		//@ts-expect-error Dynamic import
 		const { default: googleAnalytics } = await import('@analytics/google-analytics');

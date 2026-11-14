@@ -39,33 +39,6 @@ export class UserSearchService {
 	) {
 	}
 
-	/**
-	 * ユーザ名とホスト名によるユーザ検索を行う.
-	 *
-	 * - 検索結果には優先順位がつけられており、以下の順序で検索が行われる.
-	 *   1. フォローしているユーザのうち、一定期間以内（※）に更新されたユーザ
-	 *   2. フォローしているユーザのうち、一定期間以内に更新されていないユーザ
-	 *   3. フォローしていないユーザのうち、一定期間以内に更新されたユーザ
-	 *   4. フォローしていないユーザのうち、一定期間以内に更新されていないユーザ
-	 * - ログインしていない場合は、以下の順序で検索が行われる.
-	 *   1. 一定期間以内に更新されたユーザ
-	 *   2. 一定期間以内に更新されていないユーザ
-	 * - それぞれの検索結果はユーザ名の昇順でソートされる.
-	 * - 動作的には先に登場した検索結果の登場位置が優先される(条件的にユーザIDが重複することはないが).
-	 *   （1で既にヒットしていた場合、2, 3, 4でヒットしても無視される）
-	 * - ユーザ名とホスト名の検索条件はそれぞれ前方一致で検索される.
-	 * - ユーザ名の検索は大文字小文字を区別しない.
-	 * - ホスト名の検索は大文字小文字を区別しない.
-	 * - 検索結果は最大で {@link opts.limit} 件までとなる.
-	 *
-	 * ※一定期間とは {@link params.activeThreshold} で指定された日時から現在までの期間を指す.
-	 *
-	 * @param params 検索条件.
-	 * @param opts 関数の動作を制御するオプション.
-	 * @param me 検索を実行するユーザの情報. 未ログインの場合は指定しない.
-	 * @see {@link UserSearchService#buildSearchUserQueries}
-	 * @see {@link UserSearchService#buildSearchUserNoLoginQueries}
-	 */
 	@bindThis
 	public async searchByUsernameAndHost(
 		params: {
@@ -104,12 +77,6 @@ export class UserSearchService {
 		);
 	}
 
-	/**
-	 * ログイン済みユーザによる検索実行時のクエリ一覧を構築する.
-	 * @param me
-	 * @param params
-	 * @private
-	 */
 	@bindThis
 	private buildSearchUserQueries(
 		me: MiUser,
@@ -119,7 +86,6 @@ export class UserSearchService {
 			activeThreshold?: Date,
 		},
 	) {
-		// デフォルト30日以内に更新されたユーザーをアクティブユーザーとする
 		const activeThreshold = params.activeThreshold ?? defaultActiveThreshold();
 
 		const followingUserQuery = this.followingsRepository.createQueryBuilder('following')
@@ -140,7 +106,6 @@ export class UserSearchService {
 			}));
 		inactiveFollowingUsersQuery.setParameters(followingUserQuery.getParameters());
 
-		// 自分自身がヒットするとしたらここ
 		const activeUserQuery = this.generateUserQueryBuilder(params)
 			.andWhere(`user.id NOT IN (${followingUserQuery.getQuery()})`)
 			.andWhere('user.updatedAt > :activeThreshold', { activeThreshold });
@@ -154,18 +119,12 @@ export class UserSearchService {
 		return [activeFollowingUsersQuery, inactiveFollowingUsersQuery, activeUserQuery, inactiveUserQuery];
 	}
 
-	/**
-	 * ログインしていないユーザによる検索実行時のクエリ一覧を構築する.
-	 * @param params
-	 * @private
-	 */
 	@bindThis
 	private buildSearchUserNoLoginQueries(params: {
 		username?: string | null,
 		host?: string | null,
 		activeThreshold?: Date,
 	}) {
-		// デフォルト30日以内に更新されたユーザーをアクティブユーザーとする
 		const activeThreshold = params.activeThreshold ?? defaultActiveThreshold();
 
 		const activeUserQuery = this.generateUserQueryBuilder(params)
@@ -181,11 +140,6 @@ export class UserSearchService {
 		return [activeUserQuery, inactiveUserQuery];
 	}
 
-	/**
-	 * ユーザ検索クエリで共通する抽出条件をあらかじめ設定したクエリビルダを生成する.
-	 * @param params
-	 * @private
-	 */
 	@bindThis
 	private generateUserQueryBuilder(params: {
 		username?: string | null,
@@ -218,7 +172,7 @@ export class UserSearchService {
 		offset: number;
 		origin: 'local' | 'remote' | 'combined';
 	}> = {}) {
-		const activeThreshold = new Date(Date.now() - (1000 * 60 * 60 * 24 * 30)); // 30日
+		const activeThreshold = new Date(Date.now() - (1000 * 60 * 60 * 24 * 30));
 
 		const isUsername = query.startsWith('@') && !query.includes(' ') && query.indexOf('@', 1) === -1;
 
@@ -230,12 +184,11 @@ export class UserSearchService {
 
 		const nameQuery = this.usersRepository.createQueryBuilder('user')
 			.where(new Brackets(qb => {
-				// &@ matches the input as one keyword; &@~ would parse it as query syntax.
 				qb.where('user.name &@ :query', { query });
 
 				if (isUsername) {
 					qb.orWhere('user.usernameLower LIKE :username', { username: sqlLikeEscape(query.replace('@', '').toLowerCase()) + '%' });
-				} else if (this.userEntityService.validateLocalUsername(query)) { // Also search username if it qualifies as username
+				} else if (this.userEntityService.validateLocalUsername(query)) {
 					qb.orWhere('user.usernameLower LIKE :username', { username: '%' + sqlLikeEscape(query.toLowerCase()) + '%' });
 				}
 			}))

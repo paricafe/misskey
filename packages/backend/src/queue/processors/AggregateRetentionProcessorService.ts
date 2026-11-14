@@ -39,12 +39,10 @@ export class AggregateRetentionProcessorService {
 		const now = new Date();
 		const dateKey = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
 
-		// 過去(だいたい)30日分のレコードを取得
 		const pastRecords = await this.retentionAggregationsRepository.findBy({
 			createdAt: MoreThan(new Date(Date.now() - (1000 * 60 * 60 * 24 * 31))),
 		});
 
-		// 今日登録したユーザーを全て取得
 		const targetUsers = await this.usersRepository.find({
 			select: { id: true },
 			where: {
@@ -71,7 +69,6 @@ export class AggregateRetentionProcessorService {
 			throw err;
 		}
 
-		// 今日活動したユーザーを全て取得
 		const activeUsers = await this.usersRepository.find({
 			select: { id: true },
 			where: {

@@ -61,7 +61,6 @@ const text = computed(() => {
 });
 
 watch(column, () => {
-	// 中身がセットされた直後はサイズが分からないので、次のタイミングで更新する
 	nextTick(emitContentSizeChanged);
 }, { immediate: true });
 
@@ -90,7 +89,6 @@ function onHandleMouseDown(ev: MouseEvent) {
 
 function onHandleMouseMove(ev: MouseEvent) {
 	if (!rootEl.value) {
-		// 型ガード
 		return;
 	}
 
@@ -148,7 +146,6 @@ function emitContentSizeChanged() {
 	const clientWidth = contentEl.value?.clientWidth ?? 0;
 	const clientHeight = contentEl.value?.clientHeight ?? 0;
 	emit('change:contentSize', column.value, {
-		// バーの横幅も考慮したいので、+3px
 		width: clientWidth + 3 + 3,
 		height: clientHeight,
 	});
@@ -197,7 +194,6 @@ $cellHeight: 28px;
 	}
 
 	.left {
-		// rightのぶんだけズレるのでそれを相殺するためのネガティブマージン
 		margin-left: -$handleWidth;
 		margin-right: auto;
 		width: $handleWidth;
@@ -206,7 +202,6 @@ $cellHeight: 28px;
 
 	.right {
 		margin-left: auto;
-		// 判定を罫線の上に重ねたいのでネガティブマージンを使う
 		margin-right: -$handleWidth;
 		width: $handleWidth;
 		min-width: $handleWidth;

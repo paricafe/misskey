@@ -50,7 +50,7 @@ const toggle = () => {
 	margin: 0;
 	box-sizing: border-box;
 	width: calc(var(--height) * 1.6);
-	height: calc(var(--height) + 2px); // 枠線
+	height: calc(var(--height) + 2px);
 	outline: none;
 	background: var(--MI_THEME-switchOffBg);
 	background-clip: content-box;

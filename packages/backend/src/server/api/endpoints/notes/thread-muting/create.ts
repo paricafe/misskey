@@ -65,7 +65,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				throw err;
 			});
 
-			// Check if already muting
 			const exist = await this.noteThreadMutingsRepository.exists({
 				where: {
 					threadId: note.threadId ?? note.id,

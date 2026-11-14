@@ -13,7 +13,6 @@ class ReactionPicker {
 	private reactionsRef = ref<string[]>([]);
 
 	constructor() {
-		// nop
 	}
 
 	public init() {
@@ -35,7 +34,6 @@ class ReactionPicker {
 		const anchorRef = shallowRef(anchorElement);
 		const targetNoteRef = ref(targetNote);
 
-		// defineAsyncComponentはiOS等でユーザーアクティベーションが失われてfocusが効かなくなるため使用不可
 		const { dispose } = popup(MkEmojiPickerDialog, {
 			anchorElement: anchorRef,
 			pinnedEmojis: this.reactionsRef,

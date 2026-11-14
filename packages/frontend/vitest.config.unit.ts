@@ -10,7 +10,6 @@ export default mergeConfig(getConfig(), defineConfig({
 			optimizer: {
 				web: {
 					include: [
-						// XXX: misskey-dev/browser-image-resizer has no "type": "module"
 						'browser-image-resizer',
 					],
 				},

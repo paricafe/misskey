@@ -20,13 +20,11 @@ type CapturedBody = {
 	value: unknown;
 };
 
-/** Content-Typeから本文の種類だけを取り出します。 */
 function getMediaType(value: string | string[] | number | undefined): string | undefined {
 	const first = Array.isArray(value) ? value[0] : value;
 	return typeof first === 'string' ? first.split(';', 1)[0].trim().toLowerCase() : undefined;
 }
 
-/** 秘匿処理を適用できるJSON・form・text本文か判定します。 */
 function isSupportedMediaType(value: string | undefined): boolean {
 	return value === 'application/json'
 		|| (value?.startsWith('application/') === true && value.endsWith('+json'))
@@ -34,13 +32,11 @@ function isSupportedMediaType(value: string | undefined): boolean {
 		|| (value?.startsWith('text/') === true && value !== 'text/event-stream');
 }
 
-/** application/jsonとapplication/*+jsonを構造化対象として判定します。 */
 function isJsonMediaType(value: string | undefined): boolean {
 	return value === 'application/json'
 		|| (value?.startsWith('application/') === true && value.endsWith('+json'));
 }
 
-/** Streamやバイナリを本文ログの対象から外します。 */
 function isStream(value: unknown): boolean {
 	if (typeof value !== 'object' || value === null) return false;
 	try {
@@ -53,12 +49,10 @@ function isStream(value: unknown): boolean {
 			|| typeof candidate.getReader === 'function'
 			|| typeof candidate[Symbol.asyncIterator] === 'function';
 	} catch {
-		// 本文のgetterが壊れていても、ログ処理が応答を失敗させないよう除外します。
 		return true;
 	}
 }
 
-/** JSON文字列を構造化し、解析できない場合は元の文字列を保持します。 */
 function parseJsonBody(value: string): unknown {
 	try {
 		return JSON.parse(value);
@@ -67,7 +61,6 @@ function parseJsonBody(value: string): unknown {
 	}
 }
 
-/** form本文を項目ごとの値へ分解し、キー単位の秘匿処理を可能にします。 */
 function parseFormBody(value: string): Record<string, string | string[]> {
 	const result: Record<string, string | string[]> = Object.create(null) as Record<string, string | string[]>;
 	for (const [key, item] of new URLSearchParams(value)) {
@@ -79,7 +72,6 @@ function parseFormBody(value: string): Record<string, string | string[]> {
 	return result;
 }
 
-/** 送受信本文から、ログへ渡せる値だけを取り出します。 */
 function captureBody(value: unknown, contentType: string | string[] | number | undefined): CapturedBody | undefined {
 	const mediaType = getMediaType(contentType);
 	if (!isSupportedMediaType(mediaType) || isStream(value)) return undefined;
@@ -96,12 +88,10 @@ function captureBody(value: unknown, contentType: string | string[] | number | u
 	}
 	if (typeof value === 'string') return { value };
 	if (Buffer.isBuffer(value)) return { value: value.toString('utf8') };
-	// form parserなどが返す構造化済みの本文も、通常の正規化処理へ渡します。
 	if (typeof value === 'object' && value !== null) return { value };
 	return undefined;
 }
 
-/** Errorから本文を含めない型名だけを取り出します。 */
 function getErrorType(error: unknown): string {
 	if (typeof error === 'object' && error !== null && typeof (error as { name?: unknown }).name === 'string') {
 		const name = (error as { name: string }).name;
@@ -110,20 +100,17 @@ function getErrorType(error: unknown): string {
 	return 'Error';
 }
 
-/** content-lengthを安全なバイト数へ変換し、未知の応答ではnullを返します。 */
 function getResponseSize(value: string | string[] | number | undefined): number | null {
 	const first = Array.isArray(value) ? value[0] : value;
 	const size = typeof first === 'number' ? first : typeof first === 'string' && /^\d+$/.test(first) ? Number(first) : NaN;
 	return Number.isSafeInteger(size) && size >= 0 ? size : null;
 }
 
-/** Fastify全体へAccess log用のリクエスト・エラー・応答フックを登録します。 */
 export function registerHttpAccessLog(fastify: FastifyInstance, manager: LogManager = logManager): void {
 	if (!manager.isAccessLogEnabled()) return;
 
 	const states = new WeakMap<object, AccessRequestState>();
 
-	// リクエスト開始時のactiveなTrace Contextを保存します。
 	fastify.addHook('onRequest', (request, _reply, done) => {
 		states.set(request, {
 			traceContext: manager.getActiveTraceContext(),
@@ -131,7 +118,6 @@ export function registerHttpAccessLog(fastify: FastifyInstance, manager: LogMana
 		done();
 	});
 
-	// Fastifyが応答へ変換したErrorから、型名だけをリクエストへ一時保存します。
 	fastify.addHook('onError', (request, _reply, error, done) => {
 		const state = states.get(request) ?? {};
 		state.errorType = getErrorType(error);
@@ -139,7 +125,6 @@ export function registerHttpAccessLog(fastify: FastifyInstance, manager: LogMana
 		done();
 	});
 
-	// 送信前のpayloadを読み取りますが、元の値は変更せず、そのまま次のhookへ渡します。
 	fastify.addHook('onSend', (request, reply, payload, done) => {
 		if (!manager.shouldWriteAccess(reply.statusCode)) {
 			done(null, payload);
@@ -149,7 +134,6 @@ export function registerHttpAccessLog(fastify: FastifyInstance, manager: LogMana
 		const bodyConfiguration = manager.getAccessLogConfiguration().bodies;
 		const state = states.get(request) ?? {};
 		if (bodyConfiguration.request && !('requestBody' in state)) {
-			// ActivityPubもFastifyが解析したrequest.bodyだけを対象にし、rawBodyやheaderは参照しません。
 			const captured = captureBody(request.body, request.headers['content-type']);
 			if (captured !== undefined) state.requestBody = captured.value;
 		}
@@ -161,7 +145,6 @@ export function registerHttpAccessLog(fastify: FastifyInstance, manager: LogMana
 		done(null, payload);
 	});
 
-	// 応答完了時にFastifyの値を集め、LogManagerへAccess logを渡します。
 	fastify.addHook('onResponse', (request, reply, done) => {
 		const state = states.get(request);
 		const input = {

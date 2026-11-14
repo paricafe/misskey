@@ -53,10 +53,9 @@ import { QueueLoggerService } from './QueueLoggerService.js';
 import { ImportNotesProcessorService } from './processors/ImportNotesProcessorService.js';
 import { QUEUE, baseWorkerOptions } from './const.js';
 
-// ref. https://github.com/misskey-dev/misskey/pull/7635#issue-971097019
 function httpRelatedBackoff(attemptsMade: number) {
-	const baseDelay = 60 * 1000;	// 1min
-	const maxBackoff = 8 * 60 * 60 * 1000;	// 8hours
+	const baseDelay = 60 * 1000;
+	const maxBackoff = 8 * 60 * 60 * 1000;
 	let backoff = (Math.pow(2, attemptsMade) - 1) * baseDelay;
 	backoff = Math.min(backoff, maxBackoff);
 	backoff += Math.round(backoff * Math.random() * 0.2);
@@ -72,7 +71,6 @@ function getJobInfo(job: Bull.Job | undefined, increment = false): string {
 		: age > 10000 ? `${Math.floor(age / 1000)}s`
 		: `${age}ms`;
 
-	// onActiveとかonCompletedのattemptsMadeがなぜか0始まりなのでインクリメントする
 	const currentAttempts = job.attemptsMade + (increment ? 1 : 0);
 	const maxAttempts = job.opts ? job.opts.attempts : 0;
 
@@ -141,7 +139,6 @@ export class QueueProcessorService implements OnApplicationShutdown {
 		this.logger = this.queueLoggerService.logger;
 
 		function renderError(e?: Error) {
-			// 何故かeがundefinedで来ることがある
 			if (!e) return '?';
 
 			if (e instanceof Bull.UnrecoverableError || e.name === 'AbortError') {
@@ -166,8 +163,6 @@ export class QueueProcessorService implements OnApplicationShutdown {
 			};
 		}
 
-		// 以下の各 Worker はジョブの実処理全体を worker span で囲む。
-		//#region system
 		{
 			const processer = (job: Bull.Job) => {
 				switch (job.name) {
@@ -211,9 +206,7 @@ export class QueueProcessorService implements OnApplicationShutdown {
 				.on('error', (err: Error) => logger.error(`error ${err.name}: ${err.message}`, { e: renderError(err) }))
 				.on('stalled', (jobId) => logger.warn(`stalled id=${jobId}`));
 		}
-		//#endregion
 
-		//#region db
 		{
 			const processer = (job: Bull.Job) => {
 				switch (job.name) {
@@ -273,9 +266,7 @@ export class QueueProcessorService implements OnApplicationShutdown {
 				.on('error', (err: Error) => logger.error(`error ${err.name}: ${err.message}`, { e: renderError(err) }))
 				.on('stalled', (jobId) => logger.warn(`stalled id=${jobId}`));
 		}
-		//#endregion
 
-		//#region deliver
 		{
 			const logger = this.logger.createSubLogger('deliver');
 
@@ -311,9 +302,7 @@ export class QueueProcessorService implements OnApplicationShutdown {
 				.on('error', (err: Error) => logger.error(`error ${err.name}: ${err.message}`, { e: renderError(err) }))
 				.on('stalled', (jobId) => logger.warn(`stalled id=${jobId}`));
 		}
-		//#endregion
 
-		//#region inbox
 		{
 			const logger = this.logger.createSubLogger('inbox');
 
@@ -350,9 +339,7 @@ export class QueueProcessorService implements OnApplicationShutdown {
 				.on('error', (err: Error) => logger.error(`error ${err.name}: ${err.message}`, { e: renderError(err) }))
 				.on('stalled', (jobId) => logger.warn(`stalled id=${jobId}`));
 		}
-		//#endregion
 
-		//#region user-webhook deliver
 		{
 			const logger = this.logger.createSubLogger('user-webhook');
 
@@ -388,9 +375,7 @@ export class QueueProcessorService implements OnApplicationShutdown {
 				.on('error', (err: Error) => logger.error(`error ${err.name}: ${err.message}`, { e: renderError(err) }))
 				.on('stalled', (jobId) => logger.warn(`stalled id=${jobId}`));
 		}
-		//#endregion
 
-		//#region system-webhook deliver
 		{
 			const logger = this.logger.createSubLogger('system-webhook');
 
@@ -426,9 +411,7 @@ export class QueueProcessorService implements OnApplicationShutdown {
 				.on('error', (err: Error) => logger.error(`error ${err.name}: ${err.message}`, { e: renderError(err) }))
 				.on('stalled', (jobId) => logger.warn(`stalled id=${jobId}`));
 		}
-		//#endregion
 
-		//#region relationship
 		{
 			const processer = (job: Bull.Job) => {
 				switch (job.name) {
@@ -470,9 +453,7 @@ export class QueueProcessorService implements OnApplicationShutdown {
 				.on('error', (err: Error) => logger.error(`error ${err.name}: ${err.message}`, { e: renderError(err) }))
 				.on('stalled', (jobId) => logger.warn(`stalled id=${jobId}`));
 		}
-		//#endregion
 
-		//#region object storage
 		{
 			const processer = (job: Bull.Job) => {
 				switch (job.name) {
@@ -508,9 +489,7 @@ export class QueueProcessorService implements OnApplicationShutdown {
 				.on('error', (err: Error) => logger.error(`error ${err.name}: ${err.message}`, { e: renderError(err) }))
 				.on('stalled', (jobId) => logger.warn(`stalled id=${jobId}`));
 		}
-		//#endregion
 
-		//#region ended poll notification
 		{
 			const logger = this.logger.createSubLogger('ended-poll-notification');
 
@@ -532,9 +511,7 @@ export class QueueProcessorService implements OnApplicationShutdown {
 				autorun: false,
 			});
 		}
-		//#endregion
 
-		//#region post scheduled note
 		{
 			const logger = this.logger.createSubLogger('post-scheduled-note');
 
@@ -556,7 +533,6 @@ export class QueueProcessorService implements OnApplicationShutdown {
 				autorun: false,
 			});
 		}
-		//#endregion
 	}
 
 	@bindThis

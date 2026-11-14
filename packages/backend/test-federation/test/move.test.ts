@@ -13,7 +13,6 @@ describe('Move', () => {
 		await alice.client.request('i/move', { moveToAccount: `@${bob.username}@b.test` });
 	});
 
-	/** @see https://github.com/misskey-dev/misskey/issues/18019 */
 	test('Following relation on the destination server is transferred after move', async () => {
 		const [alice, bob, carol] = await Promise.all([
 			createAccount('a.test'),
@@ -21,12 +20,10 @@ describe('Move', () => {
 			createAccount('b.test'),
 		]);
 
-		// Follow @carol@b.test ==> @alice@a.test and wait for Follow/Accept.
 		const remoteAlice = await resolveRemoteUser('a.test', alice.id, carol);
 		await carol.client.request('following/create', { userId: remoteAlice.id });
 		await waitForFollowRelation(carol, alice, 1);
 
-		// Move @alice@a.test ==> @bob@b.test.
 		await bob.client.request('i/update', { alsoKnownAs: [`@${alice.username}@a.test`] });
 		await alice.client.request('i/move', { moveToAccount: `@${bob.username}@b.test` });
 
@@ -46,7 +43,6 @@ describe('Move', () => {
 		strictEqual(follower.url, null);
 	});
 
-	/** @see https://github.com/misskey-dev/misskey/issues/11320 */
 	describe('Following relation is transferred after move', () => {
 		let alice: LoginUser, bob: LoginUser, carol: LoginUser;
 
@@ -57,10 +53,8 @@ describe('Move', () => {
 			]);
 			carol = await createAccount('a.test');
 
-			// Follow @carol@a.test ==> @alice@a.test
 			await carol.client.request('following/create', { userId: alice.id });
 
-			// Move @alice@a.test ==> @bob@b.test
 			await bob.client.request('i/update', { alsoKnownAs: [`@${alice.username}@a.test`] });
 			await alice.client.request('i/move', { moveToAccount: `@${bob.username}@b.test` });
 

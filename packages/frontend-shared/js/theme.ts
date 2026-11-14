@@ -13,7 +13,7 @@ export type Theme = {
 	author: string;
 	desc?: string;
 	base?: 'dark' | 'light';
-	kind?: 'dark' | 'light'; // legacy
+	kind?: 'dark' | 'light';
 	props: Record<string, string>;
 	codeHighlighter?: {
 		base: BundledTheme;
@@ -75,11 +75,11 @@ function getThemeReferenceColor(theme: Theme, key: string, stack: string[], dept
 }
 
 function getColor(theme: Theme, val: string, stack: string[] = [], depth = 0): tinycolor.Instance {
-	if (val[0] === '@') { // ref (prop)
+	if (val[0] === '@') {
 		return getThemeReferenceColor(theme, val.substring(1), stack, depth);
-	} else if (val[0] === '$') { // ref (const)
+	} else if (val[0] === '$') {
 		return getThemeReferenceColor(theme, val, stack, depth);
-	} else if (val[0] === ':') { // func
+	} else if (val[0] === ':') {
 		if (depth >= MAX_THEME_REFERENCE_DEPTH) {
 			throw new Error('Theme reference limit exceeded');
 		}
@@ -103,7 +103,6 @@ function getColor(theme: Theme, val: string, stack: string[] = [], depth = 0): t
 		}
 	}
 
-	// other case
 	return tinycolor(val);
 }
 
@@ -111,7 +110,7 @@ export function compile(theme: Theme): CompiledTheme {
 	const props = {} as CompiledTheme;
 
 	for (const [k, v] of Object.entries(theme.props)) {
-		if (k.startsWith('$')) continue; // ignore const
+		if (k.startsWith('$')) continue;
 
 		props[k] = v.startsWith('"') ? v.replace(/^"\s*/, '') : genValue(getColor(theme, v));
 	}

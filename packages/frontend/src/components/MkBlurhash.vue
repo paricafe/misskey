@@ -20,7 +20,6 @@ import DrawBlurhash from '@/workers/draw-blurhash?worker';
 import TestWebGL2 from '@/workers/test-webgl2?worker';
 import { WorkerMultiDispatch } from '@@/js/worker-multi-dispatch.js';
 
-// テスト環境で Web Worker インスタンスは作成できない
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-expect-error
 const isTest = (import.meta.env.MODE === 'test' || window.isPlaywright);
@@ -64,7 +63,6 @@ const props = withDefaults(defineProps<{
 	onlyAvgColor?: boolean;
 	width?: number;
 	height?: number;
-	// v-showが何故か動作しないため
 	show?: boolean;
 }>(), {
 	onlyAvgColor: false,
@@ -100,13 +98,11 @@ watch(() => props.blurhash, () => {
 });
 
 function drawImage(bitmap: CanvasImageSource) {
-	// canvasがない（mountedされていない）場合はTmpに保存しておく
 	if (!canvas.value) {
 		bitmapTmp.value = bitmap;
 		return;
 	}
 
-	// canvasがあれば描画する
 	bitmapTmp.value = undefined;
 	const ctx = canvas.value.getContext('2d');
 	if (!ctx) return;
@@ -121,7 +117,6 @@ function drawAvg() {
 	const ctx = canvas.value.getContext('2d');
 	if (!ctx) return;
 
-	// avgColorでお茶をにごす
 	ctx.beginPath();
 	ctx.fillStyle = color;
 	ctx.fillRect(0, 0, canvasWidth.value, canvasHeight.value);
@@ -170,7 +165,6 @@ canvasPromise.then(work => {
 });
 
 onMounted(() => {
-	// drawImageがmountedより先に呼ばれている場合はここで描画する
 	if (bitmapTmp.value) {
 		drawImage(bitmapTmp.value);
 	}

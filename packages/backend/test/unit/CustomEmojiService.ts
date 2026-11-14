@@ -62,7 +62,6 @@ describe('CustomEmojiService', () => {
 			return service.fetchEmojis(
 				params,
 				{
-					// テスト向けに
 					sortKeys: ['+id'],
 				},
 			);

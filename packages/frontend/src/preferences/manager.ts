@@ -16,12 +16,6 @@ import * as os from '@/os.js';
 import { deepEqual } from '@/utility/deep-equal.js';
 import { deepClone } from '@/utility/clone.js';
 
-// NOTE: 明示的な設定値のひとつとして null もあり得るため、設定が存在しないかどうかを判定する目的で null で比較したり ?? を使ってはいけない
-
-//type DottedToNested<T extends Record<string, any>> = {
-//	[K in keyof T as K extends string ? K extends `${infer A}.${infer B}` ? A : K : K]: K extends `${infer A}.${infer B}` ? DottedToNested<{ [key in B]: T[K] }> : T[K];
-//};
-
 type PREF = typeof PREF_DEF;
 type DefaultValues = {
 	[K in keyof PREF]: PREF[K]['default'] extends (...args: any) => infer R ? R : PREF[K]['default'];
@@ -29,9 +23,9 @@ type DefaultValues = {
 type ValueOf<K extends keyof PREF> = DefaultValues[K];
 
 type Scope = Partial<{
-	server: string | null; // host
-	account: string | null; // userId
-	device: string | null; // 将来のため
+	server: string | null;
+	account: string | null;
+	device: string | null;
 }>;
 
 type ValueMeta = Partial<{
@@ -65,7 +59,6 @@ function makeScope(scope: Partial<{
 }
 
 export function isSameScope(a: Scope, b: Scope): boolean {
-	// null と undefined (キー無し) は区別したくないので == で比較
 	// eslint-disable-next-line eqeqeq
 	return a.server == b.server && a.account == b.account && a.device == b.device;
 }
@@ -120,10 +113,9 @@ export function definePreferences<T extends Record<string, unknown>>(x: {
 
 export function getInitialPrefValue<K extends keyof PREF>(k: K): ValueOf<K> {
 	const _default = PREF_DEF[k].default;
-	if (typeof _default === 'function') { // factory
+	if (typeof _default === 'function') {
 		return _default() as ValueOf<K>;
 	} else {
-		// 参照渡しになるのを防ぐためclone
 		return deepClone(_default as unknown as ValueOf<K>);
 	}
 }
@@ -206,25 +198,16 @@ function normalizePreferences(preferences: PossiblyNonNormalizedPreferencesProfi
 	return data as PreferencesProfile['preferences'];
 }
 
-// TODO: PreferencesManagerForGuest のような非ログイン専用のクラスを分離すればthis.currentAccountのnullチェックやaccountがnullであるスコープのレコード挿入などが不要になり綺麗になるかもしれない
-//       と思ったけど操作アカウントが存在しない場合も考慮する現在の設計の方が汎用的かつ堅牢かもしれない
-// NOTE: accountDependentな設定は初期状態であってもアカウントごとのスコープでレコードを作成しておかないと、サーバー同期する際に正しく動作しなくなる
 export class PreferencesManager extends EventEmitter<PreferencesManagerEvents> {
 	private io: StorageProvider;
 	private currentAccount: { id: string } | null;
 	public profile: PreferencesProfile;
 	public cloudReady: Promise<void>;
 
-	/**
-	 * static / state の略 (static が予約語のため)
-	 */
 	public s = {} as {
 		[K in keyof PREF]: ValueOf<K>;
 	};
 
-	/**
-	 * reactive の略
-	 */
 	public r = {} as {
 		[K in keyof PREF]: Ref<ValueOf<K>>;
 	};
@@ -243,31 +226,26 @@ export class PreferencesManager extends EventEmitter<PreferencesManagerEvents> {
 
 		const states = this.genStates();
 
-		// apply states
 		for (const key in states) {
 			(this.s[key as keyof PREF] as any) = states[key as keyof PREF];
 			(this.r[key as keyof PREF] as Ref<any>) = ref(this.s[key as keyof PREF]);
 		}
 
-		// normalizeの結果変わっていたら保存
 		if (!deepEqual(loadedProfile, this.profile)) {
 			this.save();
 		}
 
 		this.cloudReady = this.fetchCloudValues();
-
-		// TODO: 定期的にクラウドの値をフェッチ
 	}
 
 	private rewriteRawState<K extends keyof PREF>(key: K, value: ValueOf<K>) {
-		const v = JSON.parse(JSON.stringify(value)); // deep copy 兼 vueのプロキシ解除
+		const v = JSON.parse(JSON.stringify(value));
 		this.r[key].value = this.s[key] = v;
 	}
 
-	// TODO: desync対策 cloudの値のfetchが正常に完了していない状態でcommitすると多分値が上書きされる
 	public commit<K extends keyof PREF>(key: K, value: ValueOf<K>) {
-		const currentAccount = this.currentAccount; // TSを黙らせるため
-		const v = JSON.parse(JSON.stringify(value)); // deep copy 兼 vueのプロキシ解除
+		const currentAccount = this.currentAccount;
+		const v = JSON.parse(JSON.stringify(value));
 
 		if (deepEqual(this.s[key], v)) {
 			if (_DEV_) console.log('(skip) prefer:commit', key, v);
@@ -310,16 +288,10 @@ export class PreferencesManager extends EventEmitter<PreferencesManagerEvents> {
 		_save();
 
 		if (record[2].sync) {
-			// awaitの必要なし
-			// TODO: リクエストを間引く
 			this.io.cloudSet({ key, scope: record[0], value: record[1] });
 		}
 	}
 
-	/**
-	 * 特定のキーの、簡易的なcomputed refを作ります
-	 * 主にvue上で設定コントロールのmodelとして使う用
-	 */
 	public model<K extends keyof PREF, V = ValueOf<K>>(
 		key: K,
 	): Ref<V>;
@@ -406,14 +378,13 @@ export class PreferencesManager extends EventEmitter<PreferencesManagerEvents> {
 	}
 
 	public getMatchedRecordOf<K extends keyof PREF>(key: K): PrefRecord<K> {
-		const currentAccount = this.currentAccount; // TSを黙らせるため
+		const currentAccount = this.currentAccount;
 
 		const records = this.profile.preferences[key];
 
 		if (currentAccount == null) {
 			const record = records.find(([scope, v]) => parseScope(scope).account == null);
 
-			// 設計上あり得ないけどTSに怒られるため
 			if (record == null) throw new Error(`no record found for key: ${key}`);
 
 			return record;
@@ -427,20 +398,19 @@ export class PreferencesManager extends EventEmitter<PreferencesManagerEvents> {
 
 		const record = records.find(([scope, v]) => parseScope(scope).account == null);
 
-		// 設計上あり得ないけどTSに怒られるため
 		if (record == null) throw new Error(`no record found for key: ${key}`);
 
 		return record;
 	}
 
 	public isAccountOverrided<K extends keyof PREF>(key: K): boolean {
-		const currentAccount = this.currentAccount; // TSを黙らせるため
+		const currentAccount = this.currentAccount;
 		if (currentAccount == null) return false;
 		return this.profile.preferences[key].some(([scope, v]) => parseScope(scope).server === host && parseScope(scope).account === currentAccount.id);
 	}
 
 	public setAccountOverride<K extends keyof PREF>(key: K) {
-		const currentAccount = this.currentAccount; // TSを黙らせるため
+		const currentAccount = this.currentAccount;
 		if (currentAccount == null) return;
 		if (isAccountDependentKey(key)) throw new Error('already account-dependent');
 		if (this.isAccountOverrided(key)) return;
@@ -455,7 +425,7 @@ export class PreferencesManager extends EventEmitter<PreferencesManagerEvents> {
 	}
 
 	public clearAccountOverride<K extends keyof PREF>(key: K) {
-		const currentAccount = this.currentAccount; // TSを黙らせるため
+		const currentAccount = this.currentAccount;
 		if (currentAccount == null) return;
 		if (isAccountDependentKey(key)) throw new Error('cannot clear override for this account-dependent property');
 
@@ -478,14 +448,12 @@ export class PreferencesManager extends EventEmitter<PreferencesManagerEvents> {
 	public async enableSync<K extends keyof PREF>(key: K): Promise<{ enabled: boolean; } | null> {
 		if (this.isSyncEnabled(key)) return Promise.resolve(null);
 
-		// undefined ... cancel
 		async function resolveConflict(local: ValueOf<K>, remote: ValueOf<K>): Promise<ValueOf<K> | undefined> {
 			const merge = (PREF_DEF as PreferencesDefinition)[key].mergeStrategy;
-			let mergedValue: ValueOf<K> | undefined = undefined; // null と区別したいため
+			let mergedValue: ValueOf<K> | undefined = undefined;
 			try {
 				if (merge != null) mergedValue = merge(local, remote);
 			} catch (_) {
-				// nop
 			}
 			const { canceled, result: choice } = await os.select({
 				title: i18n.ts.preferenceSyncConflictTitle,
@@ -513,7 +481,7 @@ export class PreferencesManager extends EventEmitter<PreferencesManagerEvents> {
 				return local;
 			} else if (choice === 'merge') {
 				return mergedValue!;
-			} else { // TSを黙らすため
+			} else {
 				return undefined;
 			}
 		}
@@ -525,7 +493,7 @@ export class PreferencesManager extends EventEmitter<PreferencesManagerEvents> {
 		const existing = await this.io.cloudGet({ key, scope: record[0] });
 		if (existing != null && !deepEqual(record[1], existing.value)) {
 			const resolvedValue = await resolveConflict(record[1], existing.value);
-			if (resolvedValue === undefined) return { enabled: false }; // canceled
+			if (resolvedValue === undefined) return { enabled: false };
 			newValue = resolvedValue;
 		}
 
@@ -566,8 +534,6 @@ export class PreferencesManager extends EventEmitter<PreferencesManagerEvents> {
 
 	public renameProfile(name: string) {
 		this.profile.name = name;
-		// TODO: バックアップのキーが名前ベースであることを考えると名前=IDであるから、idも再生成する方が自然かもしれない
-		// (将来名前ではなくIDをキーにするようになったとした場合、名前を変えたのにバックアップのキーが変わらないことになってしまう)
 		this.save();
 	}
 

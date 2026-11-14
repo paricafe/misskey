@@ -107,14 +107,12 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 			if (Object.hasOwn(ps.birthday, 'begin') && Object.hasOwn(ps.birthday, 'end')) {
 				const range = ps.birthday as { begin: { month: number; day: number }; end: { month: number; day: number }; };
 
-				// 誕生日は mmdd の形式の最大4桁の数字（例: 8月30日 → 830）でインデックスが効くようになっているので、その形式に変換
 				const begin = range.begin.month * 100 + range.begin.day;
 				const end = range.end.month * 100 + range.end.day;
 
 				if (begin <= end) {
 					query.andWhere('get_birthday_date(followeeProfile.birthday) BETWEEN :begin AND :end', { begin, end });
 				} else {
-					// 12/31 から 1/1 の範囲を取得するために OR で対応
 					query.andWhere(new Brackets(qb => {
 						qb.where('get_birthday_date(followeeProfile.birthday) BETWEEN :begin AND 1231', { begin });
 						qb.orWhere('get_birthday_date(followeeProfile.birthday) BETWEEN 101 AND :end', { end });
@@ -122,7 +120,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				}
 			} else {
 				const { month, day } = ps.birthday as { month: number; day: number };
-				// なぜか get_birthday_date() = :birthday だとインデックスが効かないので、BETWEEN で対応
 				query.andWhere('get_birthday_date(followeeProfile.birthday) BETWEEN :birthday AND :birthday', { birthday: month * 100 + day });
 			}
 
@@ -146,7 +143,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				.map(item => {
 					const birthday = new Date();
 					birthday.setHours(0, 0, 0, 0);
-					// item.birthday_date は mmdd の形式の最大4桁の数字（例: 8月30日 → 830）で出力されるので、日付に戻してDateオブジェクトに設定
 					birthday.setMonth(Math.floor(item.birthday_date / 100) - 1, item.birthday_date % 100);
 
 					if (birthday.getTime() < new Date().setHours(0, 0, 0, 0)) {

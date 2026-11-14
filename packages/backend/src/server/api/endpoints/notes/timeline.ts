@@ -44,7 +44,7 @@ export const paramDef = {
 		untilId: { type: 'string', format: 'misskey:id' },
 		sinceDate: { type: 'integer' },
 		untilDate: { type: 'integer' },
-		allowPartial: { type: 'boolean', default: false }, // true is recommended but for compatibility false by default
+		allowPartial: { type: 'boolean', default: false },
 		includeMyRenotes: { type: 'boolean', default: true },
 		includeRenotedMyNotes: { type: 'boolean', default: true },
 		includeLocalRenotes: { type: 'boolean', default: true },
@@ -149,7 +149,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 			.list({ requestUserId: me.id }, { idOnly: true })
 			.then(x => x.map(x => x.id).filter(x => !mutingChannelIds.includes(x)));
 
-		//#region Construct query
 		const query = this.queryService.makePaginationQuery(this.notesRepository.createQueryBuilder('note'), ps.sinceId, ps.untilId)
 			.innerJoinAndSelect('note.user', 'user')
 			.leftJoinAndSelect('note.reply', 'reply')
@@ -158,7 +157,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 			.leftJoinAndSelect('renote.user', 'renoteUser');
 
 		if (followees.length > 0 && followingChannelIds.length > 0) {
-			// ユーザー・チャンネルともにフォローあり
 			const meOrFolloweeIds = [me.id, ...followees.map(f => f.followeeId)];
 			query.andWhere(new Brackets(qb => {
 				qb
@@ -170,7 +168,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 					.orWhere('note.channelId IN (:...followingChannelIds)', { followingChannelIds });
 			}));
 		} else if (followees.length > 0) {
-			// ユーザーフォローのみ（チャンネルフォローなし）
 			const meOrFolloweeIds = [me.id, ...followees.map(f => f.followeeId)];
 			query.andWhere(new Brackets(qb => {
 				qb
@@ -184,18 +181,12 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				}
 			}));
 		} else if (followingChannelIds.length > 0) {
-			// チャンネルフォローのみ（ユーザーフォローなし）
 			query.andWhere(new Brackets(qb => {
 				qb
-					// renoteChannelIdは見る必要が無い
-					// ・HTLに流れてくるチャンネル＝フォローしているチャンネル
-					// ・HTLにフォロー外のチャンネルが流れるのは、フォローしているユーザがそのチャンネル投稿をリノートした場合のみ
-					// つまり、ユーザフォローしてない前提のこのブロックでは見る必要が無い
 					.where('note.channelId IN (:...followingChannelIds)', { followingChannelIds })
 					.orWhere('note.userId = :meId', { meId: me.id });
 			}));
 		} else {
-			// フォローなし
 			query.andWhere(new Brackets(qb => {
 				qb
 					.andWhere('note.channelId IS NULL')
@@ -205,9 +196,9 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 
 		query.andWhere(new Brackets(qb => {
 			qb
-				.where('note.replyId IS NULL') // 返信ではない
+				.where('note.replyId IS NULL')
 				.orWhere(new Brackets(qb => {
-					qb // 返信だけど投稿者自身への返信
+					qb
 						.where('note.replyId IS NOT NULL')
 						.andWhere('note.replyUserId = note.userId');
 				}));
@@ -261,7 +252,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				}));
 			}));
 		}
-		//#endregion
 
 		return await query.limit(ps.limit).getMany();
 	}

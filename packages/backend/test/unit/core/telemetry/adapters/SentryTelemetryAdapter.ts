@@ -94,7 +94,6 @@ describe('SentryTelemetryAdapter', () => {
 
 		expect(warn).toHaveBeenCalledOnce();
 		expect(warn.mock.calls[0][0]).toContain('sendDefaultPii');
-		// 削除されたオプションでは既定を緩めない
 		expect(options.dataCollection).toEqual(DEFAULT_SENTRY_DATA_COLLECTION);
 	});
 
@@ -106,7 +105,6 @@ describe('SentryTelemetryAdapter', () => {
 		expect(warn).not.toHaveBeenCalled();
 	});
 
-	// 呼び出し側が渡したロガーがintegrations側の警告にも届くこと(consoleへ逃げない)
 	test('forwards the warn callback to the integrations factory', () => {
 		const warn = vi.fn();
 

@@ -47,8 +47,8 @@ export class UserListService implements OnApplicationShutdown, OnModuleInit {
 		private systemAccountService: SystemAccountService,
 	) {
 		this.membersCache = new RedisKVCache<Set<string>>(this.redisClient, 'userListMembers', {
-			lifetime: 1000 * 60 * 30, // 30m
-			memoryCacheLifetime: 1000 * 60, // 1m
+			lifetime: 1000 * 60 * 30,
+			memoryCacheLifetime: 1000 * 60,
 			fetcher: (key) => this.userListMembershipsRepository.find({
 				where: { userListId: key },
 				select: { userId: true },
@@ -113,7 +113,6 @@ export class UserListService implements OnApplicationShutdown, OnModuleInit {
 		this.globalEventService.publishInternalEvent('userListMemberAdded', { userListId: list.id, memberId: target.id });
 		this.globalEventService.publishUserListStream(list.id, 'userAdded', await this.userEntityService.pack(target));
 
-		// このインスタンス内にこのリモートユーザーをフォローしているユーザーがいなくても投稿を受け取るためにダミーのユーザーがフォローしたということにする
 		if (this.userEntityService.isRemoteUser(target)) {
 			const proxy = await this.systemAccountService.fetch('proxy');
 			this.queueService.createFollowJob([{ from: { id: proxy.id }, to: { id: target.id } }]);

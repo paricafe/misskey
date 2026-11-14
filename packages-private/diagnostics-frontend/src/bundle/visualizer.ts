@@ -11,9 +11,6 @@ import {
 	formatNumber,
 } from 'diagnostics-shared/format';
 
-/**
- * rollup-plugin-visualizer が出力する `stats.json` のうち、ここで使う部分のみの型。
- */
 export type VisualizerReport = {
 	nodeParts?: Record<string, {
 		renderedLength: number;
@@ -93,7 +90,6 @@ export function collectVisualizerReport(data: VisualizerReport) {
 			bundleMap.set(bundleId, bundle);
 		}
 
-		// どのバンドルにも含まれないモジュール (tree-shake 済み等) は集計対象外
 		if (row.bundles > 0) {
 			moduleRows.push(row);
 		}
@@ -136,17 +132,11 @@ export function collectVisualizerReport(data: VisualizerReport) {
 	};
 }
 
-/**
- * NOTE: 以前はこの関数が `string[]` を返しており、呼び出し側の `[...].join('\n')` の
- * 要素として配列のまま埋め込まれていたため、テーブルがカンマ区切りの1行に潰れていた。
- * 呼び出し側で意識しなくて済むよう、ここで文字列にして返す。
- */
 export function renderVisualizerSummaryTable(base: ReturnType<typeof collectVisualizerReport>, head: ReturnType<typeof collectVisualizerReport>) {
 	const summary = [
 		'bundles',
 		'modules',
 		'entries',
-		//'externals',
 		'staticImports',
 		'dynamicImports',
 	] as const;

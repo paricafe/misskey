@@ -52,7 +52,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 			const now = new Date();
 			const today = `${now.getFullYear()}/${now.getMonth() + 1}/${now.getDate()}`;
 
-			// 渡ってきている user はキャッシュされていて古い可能性があるので改めて取得
 			const userProfile = await this.userProfilesRepository.findOne({
 				where: {
 					userId: user.id,

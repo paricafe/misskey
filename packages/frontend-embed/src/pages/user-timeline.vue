@@ -88,7 +88,6 @@ if (assertServerContext(serverContext, 'user')) {
 }
 
 if (user.value?.host != null) {
-	// リモートサーバーのユーザーは弾く
 	prohibited.value = true;
 }
 

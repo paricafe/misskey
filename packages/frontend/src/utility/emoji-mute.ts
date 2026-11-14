@@ -8,7 +8,6 @@ import type { MaybeRefOrGetter } from 'vue';
 import { normalizeCustomEmojiName } from '@@/js/emoji-name.js';
 import { prefer } from '@/preferences.js';
 
-// custom絵文字の情報からキーを作成する
 export function makeEmojiMuteKey(props: { name: string; host?: string | null }) {
 	return props.name.startsWith(':') ? props.name : `:${props.name}${props.host ? `@${props.host}` : ''}:`;
 }
@@ -18,8 +17,6 @@ export function extractCustomEmojiName (name:string) {
 }
 
 export function extractCustomEmojiHost (name:string) {
-	// nameは:emojiName@host:の形式
-	// 取り出したい部分はhostなので、@以降を取り出す
 	const index = name.indexOf('@');
 	if (index === -1) {
 		return null;
@@ -54,7 +51,6 @@ export function unmute(emoji:string) {
 	prefer.commit('mutingEmojis', mutedEmojis.filter((e) => e !== emojiMuteKey));
 }
 
-// 絵文字が変化しうる呼び出し元 (MFM のプレビュー等) のために ref / getter も受け付ける
 export function checkMuted(emoji: MaybeRefOrGetter<string>) {
 	return computed(() => {
 		const target = toValue(emoji);

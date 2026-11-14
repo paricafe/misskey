@@ -48,13 +48,6 @@ export class AbuseReportNotificationService implements OnApplicationShutdown {
 		this.redisForSub.on('message', this.onMessage);
 	}
 
-	/**
-	 * 管理者用Redisイベントを用いて{@link abuseReports}の内容を管理者各位に通知する.
-	 * 通知先ユーザは{@link getModeratorIds}の取得結果に依る.
-	 *
-	 * @see RoleService.getModeratorIds
-	 * @see GlobalEventService.publishAdminStream
-	 */
 	@bindThis
 	public async notifyAdminStream(abuseReports: MiAbuseUserReport[]) {
 		if (abuseReports.length <= 0) {
@@ -82,14 +75,6 @@ export class AbuseReportNotificationService implements OnApplicationShutdown {
 		}
 	}
 
-	/**
-	 * Mailを用いて{@link abuseReports}の内容を管理者各位に通知する.
-	 * メールアドレスの送信先は以下の通り.
-	 * - モデレータ権限所有者ユーザ(設定画面からメールアドレスの設定を行っているユーザに限る)
-	 * - metaテーブルに設定されているメールアドレス
-	 *
-	 * @see EmailService.sendEmail
-	 */
 	@bindThis
 	public async notifyMail(abuseReports: MiAbuseUserReport[]) {
 		if (abuseReports.length <= 0) {
@@ -113,7 +98,6 @@ export class AbuseReportNotificationService implements OnApplicationShutdown {
 		for (const mailAddress of recipientEMailAddresses) {
 			await Promise.all(
 				abuseReports.map(it => {
-					// TODO: 送信処理はJobQueue化したい
 					return this.emailService.sendEmail(
 						mailAddress,
 						'New Abuse Report',
@@ -125,12 +109,6 @@ export class AbuseReportNotificationService implements OnApplicationShutdown {
 		}
 	}
 
-	/**
-	 * SystemWebhookを用いて{@link abuseReports}の内容を管理者各位に通知する.
-	 * ここではJobQueueへのエンキューのみを行うため、即時実行されない.
-	 *
-	 * @see SystemWebhookService.enqueueSystemWebhook
-	 */
 	@bindThis
 	public async notifySystemWebhook(
 		abuseReports: MiAbuseUserReport[],
@@ -178,17 +156,6 @@ export class AbuseReportNotificationService implements OnApplicationShutdown {
 		);
 	}
 
-	/**
-	 * 通報の通知先一覧を取得する.
-	 *
-	 * @param {Object} [params] クエリの取得条件
-	 * @param {Object} [params.method] 取得する通知先の通知方法
-	 * @param {Object} [opts] 動作時の詳細なオプション
-	 * @param {boolean} [opts.removeUnauthorized] 副作用としてモデレータ権限を持たない送信先ユーザをDBから削除するかどうか(default: true)
-	 * @param {boolean} [opts.joinUser] 通知先のユーザ情報をJOINするかどうか(default: false)
-	 * @param {boolean} [opts.joinSystemWebhook] 通知先のSystemWebhook情報をJOINするかどうか(default: false)
-	 * @see removeUnauthorizedRecipientUsers
-	 */
 	@bindThis
 	public async fetchRecipients(
 		params?: {
@@ -232,20 +199,11 @@ export class AbuseReportNotificationService implements OnApplicationShutdown {
 			return [];
 		}
 
-		// アサイン有効期限切れはイベントで拾えないので、このタイミングでチェック及び削除（オプション）
 		return (opts?.removeUnauthorized ?? true)
 			? await this.removeUnauthorizedRecipientUsers(recipients)
 			: recipients;
 	}
 
-	/**
-	 * EMailの通知先一覧を取得する.
-	 * リレーション先の{@link MiUser}および{@link MiUserProfile}も同時に取得する.
-	 *
-	 * @param {Object} [opts]
-	 * @param {boolean} [opts.removeUnauthorized] 副作用としてモデレータ権限を持たない送信先ユーザをDBから削除するかどうか(default: true)
-	 * @see removeUnauthorizedRecipientUsers
-	 */
 	@bindThis
 	public async fetchEMailRecipients(opts?: {
 		removeUnauthorized?: boolean
@@ -253,18 +211,11 @@ export class AbuseReportNotificationService implements OnApplicationShutdown {
 		return this.fetchRecipients({ method: ['email'] }, { joinUser: true, ...opts });
 	}
 
-	/**
-	 * Webhookの通知先一覧を取得する.
-	 * リレーション先の{@link MiSystemWebhook}も同時に取得する.
-	 */
 	@bindThis
 	public fetchWebhookRecipients(): Promise<MiAbuseReportNotificationRecipient[]> {
 		return this.fetchRecipients({ method: ['webhook'] }, { joinSystemWebhook: true });
 	}
 
-	/**
-	 * 通知先を作成する.
-	 */
 	@bindThis
 	public async createRecipient(
 		params: {
@@ -293,9 +244,6 @@ export class AbuseReportNotificationService implements OnApplicationShutdown {
 		return created;
 	}
 
-	/**
-	 * 通知先を更新する.
-	 */
 	@bindThis
 	public async updateRecipient(
 		params: {
@@ -331,9 +279,6 @@ export class AbuseReportNotificationService implements OnApplicationShutdown {
 		return afterEntity;
 	}
 
-	/**
-	 * 通知先を削除する.
-	 */
 	@bindThis
 	public async deleteRecipient(
 		id: MiAbuseReportNotificationRecipient['id'],
@@ -350,26 +295,14 @@ export class AbuseReportNotificationService implements OnApplicationShutdown {
 			});
 	}
 
-	/**
-	 * モデレータ権限を持たない(*1)通知先ユーザを削除する.
-	 *
-	 * *1: 以下の両方を満たすものの事を言う
-	 * - 通知先にユーザIDが設定されている
-	 * - 付与ロールにモデレータ権限がない or アサインの有効期限が切れている
-	 *
-	 * @param recipients 通知先一覧の配列
-	 * @returns {@lisk recipients}からモデレータ権限を持たない通知先を削除した配列
-	 */
 	@bindThis
 	private async removeUnauthorizedRecipientUsers(recipients: MiAbuseReportNotificationRecipient[]): Promise<MiAbuseReportNotificationRecipient[]> {
 		const userRecipients = recipients.filter(it => it.userId !== null);
 		const recipientUserIds = new Set(userRecipients.map(it => it.userId).filter(x => x != null));
 		if (recipientUserIds.size <= 0) {
-			// ユーザが通知先として設定されていない場合、この関数での処理を行うべきレコードが無い
 			return recipients;
 		}
 
-		// モデレータ権限の有無で通知先設定を振り分ける
 		const authorizedUserIds = await this.roleService.getModeratorIds({
 			includeAdmins: true,
 			excludeExpire: true,
@@ -385,7 +318,6 @@ export class AbuseReportNotificationService implements OnApplicationShutdown {
 			}
 		}
 
-		// モデレータ権限を持たない通知先をDBから削除する
 		if (unauthorizedUserRecipients.length > 0) {
 			await this.abuseReportNotificationRecipientRepository.delete(unauthorizedUserRecipients.map(it => it.id));
 		}
@@ -405,7 +337,6 @@ export class AbuseReportNotificationService implements OnApplicationShutdown {
 			case 'roleUpdated':
 			case 'roleDeleted':
 			case 'userRoleUnassigned': {
-				// 場合によってはキャッシュ更新よりも先にここが呼ばれてしまう可能性があるのでnextTickで遅延実行
 				process.nextTick(async () => {
 					const recipients = await this.abuseReportNotificationRecipientRepository.findBy({
 						userId: Not(IsNull()),

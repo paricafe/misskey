@@ -3,11 +3,6 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-/**
- * Misskey の起動スクリプト
- *
- * 本体のエントリポイントの場所は内部仕様なので、起動手順はここに集約する
- */
 
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
@@ -21,12 +16,10 @@ const require = createRequire(resolve(backendDir, 'package.json'));
 const forwardedSignals = ['SIGTERM', 'SIGHUP'];
 let stopRequested = false;
 
-// 端末からの SIGINT は子プロセスにも直接届くので、このプロセスが先に終了しないよう既定の動作は無効にしておく
 process.on('SIGINT', () => {
 	stopRequested = true;
 });
 
-// モジュールを指定するオプション。パッケージ名の指定もできるため、相対パスの値だけを解決する
 const moduleOptions = new Set([
 	'--import',
 	'--require',
@@ -35,7 +28,6 @@ const moduleOptions = new Set([
 	'--experimental-loader',
 ]);
 
-// ファイルやディレクトリのパスを指定するオプション
 const pathOptions = new Set([
 	'--env-file',
 	'--env-file-if-exists',
@@ -87,7 +79,6 @@ function resolveOptionArgs(args) {
  * @param {string} nodeOptions
  */
 function resolveNodeOptions(nodeOptions) {
-	// 空白区切りで `"` によるクォートと、クォート内の `\` によるエスケープを解釈する
 	const tokens = [];
 	let token = null;
 	let inQuote = false;
@@ -154,7 +145,6 @@ async function runStep(args) {
 	});
 	const stopForwarding = forwardSignals(child);
 
-	// 端末からの SIGINT なら子プロセスにも届いて即座に終了するので、終了していない場合だけ転送する
 	const onSigint = () => {
 		setTimeout(() => {
 			if (child.exitCode == null && child.signalCode == null) child.kill('SIGINT');
@@ -178,22 +168,17 @@ if (process.argv.includes('--migrate')) {
 
 await runStep(['./scripts/check_connect.js']);
 
-// `node --max-old-space-size=... scripts/start.mjs` のように渡された Node.js のオプションを本体にも引き継ぐ。
-// 作業ディレクトリを移動するので、相対パスは元の作業ディレクトリ基準で解決しておく
 const execArgv = resolveOptionArgs(process.execArgv);
 
 process.chdir(backendDir);
 
 const entryArgs = [...execArgv, './built/entry.js'];
 
-// プロセスを本体に置き換える（PIDも引き継がれる）
 try {
 	process.execve(process.execPath, [process.execPath, ...entryArgs], process.env);
 } catch {
-	// Windows など process.execve が使えない環境では子プロセスとして起動する
 }
 
-// 本体が同じデバッグポートを使えるよう、このプロセスの Inspector を閉じておく
 const inspector = await import('node:inspector');
 if (inspector.url() != null) inspector.close();
 
@@ -202,7 +187,6 @@ forwardSignals(child);
 
 child.on('exit', (code, signal) => {
 	if (signal != null) {
-		// 本体と同じシグナルで終了する
 		process.removeAllListeners(signal);
 		process.kill(process.pid, signal);
 	} else {

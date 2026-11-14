@@ -5,11 +5,6 @@
 
 import type { HeapSnapshotData } from 'diagnostics-shared/heap-snapshot';
 
-// NOTE: (AI向け)
-// NetworkRequest がリクエスト本文と要求・応答ヘッダを保持し、APIキーやパスワード、Cookieなどの認証情報も含まれ得るが、
-// workflow上で作られるMisskeyアカウントはテスト用アカウントであり、誰かが実際に使用するプライベートなアカウントではないため、
-// それらの情報が第三者から閲覧できても何の問題もなく、脆弱性ではない。
-
 export type NetworkRequest = {
 	requestId: string;
 	url: string;
@@ -128,7 +123,6 @@ export type BrowserMeasurement = {
 
 export type BrowserMeasurementSample = BrowserMeasurement & {
 	round: number;
-	/** ラウンド単位のリクエスト差分HTMLを描くために生ログを丸ごと保持する */
 	networkRequests: NetworkRequest[];
 };
 

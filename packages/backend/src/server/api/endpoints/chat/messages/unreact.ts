@@ -41,7 +41,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 		super(meta, paramDef, async (ps, me) => {
 			await this.chatService.checkChatAvailability(me.id, 'write');
 
-			// メッセージの存在有無をエラー内容から判別できないようにする
 			try {
 				await this.chatService.unreact(ps.messageId, me.id, ps.reaction);
 			} catch (e) {

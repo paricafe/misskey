@@ -160,7 +160,4 @@ describe('Streaming', () => {
 		server.close();
 	});
 
-	// TODO: SharedConnection#dispose して一定時間経ったら disconnect メッセージがサーバーに送られてくるかのテスト
-
-	// TODO: チャンネル接続が使いまわされるかのテスト
 });

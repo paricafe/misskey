@@ -102,7 +102,6 @@ export class ApRequestCreator {
 		request.headers = this.#objectAssignWithLcKey(request.headers, {
 			Signature: signatureHeader,
 		});
-		// node-fetch will generate this for us. if we keep 'Host', it won't change with redirects!
 		delete request.headers['host'];
 
 		return {
@@ -156,7 +155,7 @@ export class ApRequestService {
 		private utilityService: UtilityService,
 	) {
 		// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-		this.logger = this.loggerService?.getLogger('ap-request'); // なぜか TypeError: Cannot read properties of undefined (reading 'getLogger') と言われる
+		this.logger = this.loggerService?.getLogger('ap-request');
 	}
 
 	@bindThis
@@ -184,11 +183,6 @@ export class ApRequestService {
 		});
 	}
 
-	/**
-	 * Get AP object with http-signature
-	 * @param user http-signature user
-	 * @param url URL to fetch
-	 */
 	@bindThis
 	public async signedGet(url: string, user: { id: MiUser['id'] }, allowSoftfail: FetchAllowSoftFailMask = FetchAllowSoftFailMask.Strict, followAlternate?: boolean): Promise<unknown> {
 		const _followAlternate = followAlternate ?? true;
@@ -211,7 +205,6 @@ export class ApRequestService {
 			throwErrorWhenResponseNotOk: true,
 		});
 
-		//#region リクエスト先がhtmlかつactivity+jsonへのalternate linkタグがあるとき
 		const contentType = res.headers.get('content-type');
 
 		if (
@@ -232,13 +225,11 @@ export class ApRequestService {
 					}
 				}
 			} catch (_) {
-				// something went wrong parsing the HTML, ignore the whole thing
 			}
 		}
-		//#endregion
 
 		validateContentTypeSetAsActivityPub(res);
-		const finalUrl = res.url; // redirects may have been involved
+		const finalUrl = res.url;
 		const activity = await res.json() as IObject;
 
 		assertActivityMatchesUrl(url, activity, finalUrl, allowSoftfail);

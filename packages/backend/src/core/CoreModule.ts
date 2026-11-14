@@ -159,7 +159,6 @@ import { LoggerService } from './LoggerService.js';
 import { TelemetryService } from './telemetry/TelemetryService.js';
 import type { Provider } from '@nestjs/common';
 
-//#region 文字列ベースでのinjection用(循環参照対応のため)
 const $LoggerService: Provider = { provide: 'LoggerService', useExisting: LoggerService };
 const $TelemetryService: Provider = { provide: 'TelemetryService', useExisting: TelemetryService };
 const $AbuseReportService: Provider = { provide: 'AbuseReportService', useExisting: AbuseReportService };
@@ -309,7 +308,6 @@ const $ApMentionService: Provider = { provide: 'ApMentionService', useExisting: 
 const $ApNoteService: Provider = { provide: 'ApNoteService', useExisting: ApNoteService };
 const $ApPersonService: Provider = { provide: 'ApPersonService', useExisting: ApPersonService };
 const $ApQuestionService: Provider = { provide: 'ApQuestionService', useExisting: ApQuestionService };
-//#endregion
 
 @Module({
 	imports: [
@@ -468,7 +466,6 @@ const $ApQuestionService: Provider = { provide: 'ApQuestionService', useExisting
 		QueueService,
 		TelemetryService,
 
-		//#region 文字列ベースでのinjection用(循環参照対応のため)
 		$LoggerService,
 		$AbuseReportService,
 		$AbuseReportNotificationService,
@@ -618,7 +615,6 @@ const $ApQuestionService: Provider = { provide: 'ApQuestionService', useExisting
 		$ApPersonService,
 		$ApQuestionService,
 		$TelemetryService,
-		//#endregion
 	],
 	exports: [
 		QueueModule,
@@ -773,7 +769,6 @@ const $ApQuestionService: Provider = { provide: 'ApQuestionService', useExisting
 		QueueService,
 		TelemetryService,
 
-		//#region 文字列ベースでのinjection用(循環参照対応のため)
 		$LoggerService,
 		$AbuseReportService,
 		$AbuseReportNotificationService,
@@ -921,7 +916,6 @@ const $ApQuestionService: Provider = { provide: 'ApQuestionService', useExisting
 		$ApPersonService,
 		$ApQuestionService,
 		$TelemetryService,
-		//#endregion
 	],
 })
 export class CoreModule { }

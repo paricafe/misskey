@@ -64,7 +64,6 @@ import { serverContext, assertServerContext } from '@/server-context.js';
 import { $i } from '@/i.js';
 import { Paginator } from '@/utility/paginator.js';
 
-// contextは非ログイン状態の情報しかないためログイン時は利用できない
 const CTX_NOTE = !$i && assertServerContext(serverContext, 'note') ? serverContext.note : null;
 
 const props = defineProps<{
@@ -133,7 +132,6 @@ function fetchNote() {
 	}).then(res => {
 		note.value = res;
 		const appearNote = getAppearNote(res) ?? res;
-		// 古いノートは被クリップ数をカウントしていないので、2023-10-01以前のものは強制的にnotes/clipsを叩く
 		if ((appearNote.clippedCount ?? 0) > 0 || new Date(appearNote.createdAt).getTime() < new Date('2023-10-01').getTime()) {
 			misskeyApi('notes/clips', {
 				noteId: appearNote.id,

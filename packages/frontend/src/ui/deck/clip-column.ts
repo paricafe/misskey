@@ -11,7 +11,6 @@ export function getClipColumnReloadDelayMs(
 	random: () => number = Math.random,
 ): number {
 	if (clipUserId != null && meId != null && clipUserId === meId) {
-		// 自分のクリップは即時更新してjitterによる体験悪化を極力抑える
 		return 0;
 	}
 

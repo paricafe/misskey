@@ -6,7 +6,6 @@
 import type { LogBackend } from './LogBackend.js';
 import type { AccessLogRecord, LogRecord } from './types.js';
 
-/** 設定読込前の最小出力処理が外部から受け取る依存関係です。 */
 export type BootstrapConsoleBackendDependencies = {
 	readonly output: (...args: unknown[]) => void;
 };
@@ -15,10 +14,6 @@ const defaultDependencies: BootstrapConsoleBackendDependencies = {
 	output: (...args) => console.log(...args),
 };
 
-/**
- * 設定読込前でも利用できる、依存の少ないコンソール出力です。
- * 設定ファイルの読み込み失敗を報告するため、Pretty backendやTelemetryには依存しません。
- */
 export class BootstrapConsoleBackend implements LogBackend {
 	private readonly dependencies: BootstrapConsoleBackendDependencies;
 
@@ -47,7 +42,6 @@ export class BootstrapConsoleBackend implements LogBackend {
 		this.dependencies.output(...args);
 	}
 
-	/** 設定前のAccess logは本文を含めず、最小限の情報だけを出力します。 */
 	public writeAccess(record: AccessLogRecord): void {
 		this.dependencies.output(`${record.timestamp} ACCESS ${record.method} ${record.route ?? '-'} ${record.statusCode}`);
 	}

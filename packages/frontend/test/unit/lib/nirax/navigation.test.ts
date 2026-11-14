@@ -23,7 +23,7 @@ describe('[NIRAX] ナビゲーションイベント', () => {
 
 		assert.strictEqual(router.getCurrentFullPath(), '/posts/redirected?from=legacy#intro');
 		assert.strictEqual(router.current.redirected, true);
-		assert.deepStrictEqual(changes, []); // 初回はchangeを発火しない
+		assert.deepStrictEqual(changes, []);
 		assert.deepStrictEqual(replacements, ['/posts/redirected?from=legacy#intro']);
 	});
 
@@ -78,7 +78,7 @@ describe('[NIRAX] ナビゲーションイベント', () => {
 		router.pushByPath('/posts/123');
 
 		assert.strictEqual(sameCount, 1);
-		assert.strictEqual(pushCount, 0); // sameのときはpushを発火しない
+		assert.strictEqual(pushCount, 0);
 	});
 
 	test('navHookでナビゲーションをキャンセルできる', () => {

@@ -28,7 +28,6 @@ function isHttpRequest(request: NetworkRequest) {
 }
 
 function requestKey(request: NetworkRequest) {
-	// URLに現れない文字で区切らないと、区切り文字を含むURLが別のキーと衝突しうる
 	return [
 		request.method,
 		request.resourceType,
@@ -52,10 +51,6 @@ function byRound(samples: BrowserMeasurementSample[]) {
 	return new Map(samples.map(sample => [sample.round, sample]));
 }
 
-/**
- * 同じラウンドどうしで、同一 (method, resourceType, URL) のリクエスト本数を突き合わせる。
- * 本数が増えていればhead側の増分を added、減っていればbase側の余りを removed として扱う。
- */
 function diffRound(round: number, baseSample: BrowserMeasurementSample | undefined, headSample: BrowserMeasurementSample | undefined) {
 	const baseRequests = groupRequests(baseSample?.networkRequests);
 	const headRequests = groupRequests(headSample?.networkRequests);

@@ -34,10 +34,8 @@ const options: BuildOptions = {
 	sourcemap: 'linked',
 };
 
-// コマンドライン引数を取得
 const args = process.argv.slice(2).map(arg => arg.toLowerCase());
 
-// built配下をすべて削除する
 if (!args.includes('--no-clean')) {
 	fs.rmSync('./built', { recursive: true, force: true });
 }
@@ -61,12 +59,7 @@ function copyLocales(): void {
 	console.log(`[${_package.name}] locales copied (${files.length} files).`);
 }
 
-/**
- * フロントエンド用の locale JSON を書き出す
- * Service Worker が HTTP 経由で取得するために必要
- */
 async function writeFrontendLocalesJson(): Promise<void> {
-	// 動的 import でビルド済みモジュールから読み込み（循環参照回避）
 	const { writeFrontendLocalesJson: write } = await import('./built/index.js');
 	await write(_frontendLocalesDir, _rootPackage.version);
 	console.log(`[${_package.name}] frontend locales JSON written to ${_frontendLocalesDir}`);

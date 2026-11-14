@@ -47,7 +47,6 @@ export class ExportBlockingProcessorService {
 			return;
 		}
 
-		// Create temp file
 		const [path, cleanup] = await createTemp();
 
 		this.logger.info(`Temp file is ${path}`);

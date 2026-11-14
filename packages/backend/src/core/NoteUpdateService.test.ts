@@ -704,7 +704,6 @@ describe(NoteUpdateService, () => {
 		releaseFirstWrite();
 		await Promise.all([firstUpdate, secondUpdate]);
 
-		// Each transaction locks the row, then loads its history (not selected by default).
 		expect(lockedFindOne).toHaveBeenCalledTimes(4);
 		expect(lockedFindOne).toHaveBeenNthCalledWith(1, expect.objectContaining({
 			lock: { mode: 'pessimistic_write' },

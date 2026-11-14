@@ -557,7 +557,6 @@ definePage(() => ({
 	align-items: flex-end;
 	border-radius: 6px;
 
-	/* (drag button) 32px + (drag button margin) 8px + (input width) 200px * 2 + (input gap) 12px = 452px */
 	@container (max-width: 452px) {
 		align-items: center;
 	}

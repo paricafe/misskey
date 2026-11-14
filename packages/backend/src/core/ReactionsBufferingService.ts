@@ -22,7 +22,6 @@ const REDIS_PAIR_PREFIX = 'reactionsBufferPairs';
 const REDIS_CHANGES_PREFIX = 'reactionsBufferChanges';
 const REDIS_PENDING_PREFIX = 'reactionsBufferPending';
 
-// Keep the count and the last operation for each user in the same atomic write.
 const MUTATE_SCRIPT = `
 redis.call('hincrby', KEYS[1], ARGV[1], ARGV[2])
 redis.call('hset', KEYS[2], ARGV[3], ARGV[4])
@@ -49,7 +48,6 @@ return {
 }
 `;
 
-// The pending batch survives process exits and database failures. New writes use the live keys.
 const PREPARE_SCRIPT = `
 local pending = redis.call('get', KEYS[4])
 if pending then return pending end
@@ -91,7 +89,6 @@ type RedisReadResult = [string[], string[], string[], string];
 
 function parseBatch(value: string): ReactionBatch {
 	const batch = JSON.parse(value) as ReactionBatch;
-	// Redis Lua encodes empty arrays as empty objects.
 	batch.pairs = Array.isArray(batch.pairs) ? batch.pairs : [];
 	batch.changes = Array.isArray(batch.changes) ? batch.changes : [];
 	return batch;
@@ -214,8 +211,6 @@ export class ReactionsBufferingService implements OnApplicationShutdown {
 
 	private applyPairChanges(pairs: string[], legacyPairs: string[], changes: Map<string, string>): string[] {
 		const map = new Map<string, string>();
-		// An empty user ID marks an overflow. Only retained operations are safe to cache;
-		// callers already query note_reaction when this cache cannot account for every reaction.
 		for (const pair of changes.has('') ? [] : [...pairs, ...legacyPairs]) {
 			const [userId, reaction] = pair.split('/');
 			map.set(userId, reaction);
@@ -241,7 +236,6 @@ export class ReactionsBufferingService implements OnApplicationShutdown {
 	}
 
 	private async bakeAll(): Promise<void> {
-		// Scan each store in bounded pages, including batches left by a previous worker.
 		const keyPrefix = this.config.redisForReactions.keyPrefix ?? '';
 		for (const prefix of [REDIS_PENDING_PREFIX, REDIS_DELTA_PREFIX]) {
 			let cursor = '0';
@@ -259,7 +253,6 @@ export class ReactionsBufferingService implements OnApplicationShutdown {
 		const keys = this.keys(noteId);
 		const batchId = await this.notesRepository.manager.transaction(async manager => {
 			const repository = manager.getRepository(this.notesRepository.target);
-			// The row lock serializes preparation and application across all workers.
 			const note = await repository.findOne({
 				where: { id: noteId },
 				select: { id: true, reactions: true, reactionAndUserPairCache: true, lastReactionsBufferId: true },
@@ -281,7 +274,6 @@ export class ReactionsBufferingService implements OnApplicationShutdown {
 			}
 			return batch.id;
 		});
-		// Never acknowledge a batch before its counts and checkpoint have committed together.
 		if (batchId != null) await this.redisForReactions.eval(ACK_SCRIPT, 1, keys[3], batchId);
 	}
 

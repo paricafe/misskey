@@ -29,7 +29,6 @@ describe('Chart', () => {
 	let redisClient = {
 		set: () => Promise.resolve('OK'),
 		get: () => Promise.resolve(null),
-		// Distributed lock renewal and release scripts report the lock as owned.
 		eval: () => Promise.resolve(1),
 	} as unknown as Mocked<Redis.Redis>;
 
@@ -67,14 +66,13 @@ describe('Chart', () => {
 
 		await db.initialize();
 
-		const logger = new Logger('chart'); // TODO: モックにする
+		const logger = new Logger('chart');
 		testChart = new TestChart(db, redisClient, logger);
 		testGroupedChart = new TestGroupedChart(db, redisClient, logger);
 		testUniqueChart = new TestUniqueChart(db, redisClient, logger);
 		testIntersectionChart = new TestIntersectionChart(db, redisClient, logger);
 
 		clock = lolex.install({
-			// https://github.com/sinonjs/sinon/issues/2620
 			toFake: Object.keys(lolex.timers).filter((key) => !['nextTick', 'queueMicrotask'].includes(key)) as lolex.FakeMethod[],
 			now: new Date(Date.UTC(2000, 0, 1, 0, 0, 0)),
 			shouldClearNativeTimers: true,
@@ -239,37 +237,6 @@ describe('Chart', () => {
 		});
 	});
 
-	// 仕様上はこうなってほしいけど、実装は難しそうなのでskip
-	/*
-	test('Can updates at different times without save', async () => {
-		await testChart.increment();
-
-		clock.tick('01:00:00');
-
-		await testChart.increment();
-		await testChart.save();
-
-		const chartHours = await testChart.getChart('hour', 3, null);
-		const chartDays = await testChart.getChart('day', 3, null);
-
-		assert.deepStrictEqual(chartHours, {
-			foo: {
-				dec: [0, 0, 0],
-				inc: [1, 1, 0],
-				total: [2, 1, 0]
-			},
-		});
-
-		assert.deepStrictEqual(chartDays, {
-			foo: {
-				dec: [0, 0, 0],
-				inc: [2, 0, 0],
-				total: [2, 0, 0]
-			},
-		});
-	});
-	*/
-
 	test('Can padding', async () => {
 		await testChart.increment();
 		await testChart.save();
@@ -299,7 +266,6 @@ describe('Chart', () => {
 		});
 	});
 
-	// 要求された範囲にログがひとつもない場合でもパディングできる
 	test('Can padding from past range', async () => {
 		await testChart.increment();
 		await testChart.save();
@@ -326,8 +292,6 @@ describe('Chart', () => {
 		});
 	});
 
-	// 要求された範囲の最も古い箇所に位置するログが存在しない場合でもパディングできる
-	// Issue #3190
 	test('Can padding from past range 2', async () => {
 		await testChart.increment();
 		await testChart.save();

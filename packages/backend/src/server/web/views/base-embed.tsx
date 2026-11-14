@@ -24,7 +24,6 @@ export function BaseEmbed(props: PropsWithChildren<CommonProps<{
 }>>) {
 	const now = Date.now();
 
-	// 変数名をsafeで始めることでエラーをスキップ
 	const safeMetaJson = props.metaJson;
 	const safeEmbedCtxJson = props.embedCtxJson;
 

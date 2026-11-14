@@ -29,8 +29,6 @@ describe('2要素認証', () => {
 	const password = 'test';
 	const username = 'alice';
 
-	// https://datatracker.ietf.org/doc/html/rfc8152
-	// 各値の定義は上記規格に基づく。鍵ペアは適当に生成したやつ
 	const coseKtyEc2 = 2;
 	const coseKid = 'meriadoc.brandybuck@buckland.example';
 	const coseAlgEs256 = -7;
@@ -38,7 +36,6 @@ describe('2要素認証', () => {
 	const coseEc2X = '4932eaacc657565705e4287e7870ce3aad55545d99d35a98a472dc52880cfc8f';
 	const coseEc2Y = '5ca68303bf2c0433473e3d5cb8586bc2c8c43a4945a496fce8dbeda8b23ab0b1';
 
-	// private key only for testing
 	const pemToSign = '-----BEGIN EC PRIVATE KEY-----\n' +
 		'MHcCAQEEIHqe/keuXyolbXzgLOu+YFJjDBGWVgXc3QCXfyqwDPf2oAoGCCqGSM49\n' +
 		'AwEHoUQDQgAESTLqrMZXVlcF5Ch+eHDOOq1VVF2Z01qYpHLcUogM/I9cpoMDvywE\n' +
@@ -69,7 +66,6 @@ describe('2要素認証', () => {
 		name: string,
 		credential: RegistrationResponseJSON,
 	} => {
-		// A COSE encoded public key
 		const credentialPublicKey = encodeToCbor(new Map<number, unknown>([
 			[-1, coseEc2CrvP256],
 			[-2, Uint8Array.from(Buffer.from(coseEc2X, 'hex'))],
@@ -79,15 +75,13 @@ describe('2要素認証', () => {
 			[3, coseAlgEs256],
 		]));
 
-		// AuthenticatorAssertionResponse.authenticatorData
-		// https://developer.mozilla.org/en-US/docs/Web/API/AuthenticatorAssertionResponse/authenticatorData
 		const credentialIdLength = Buffer.allocUnsafe(2);
 		credentialIdLength.writeUInt16BE(param.credentialId.length, 0);
 		const authData = Buffer.concat([
-			rpIdHash(), // rpIdHash(32)
-			new Uint8Array([0x45]), // flags(1)
-			new Uint8Array(4), // signCount(4)
-			new Uint8Array(16), // AAGUID(16)
+			rpIdHash(),
+			new Uint8Array([0x45]),
+			new Uint8Array(4),
+			new Uint8Array(16),
 			credentialIdLength,
 			param.credentialId,
 			credentialPublicKey,
@@ -140,12 +134,10 @@ describe('2要素認証', () => {
 		credentialId: Buffer,
 		requestOptions: PublicKeyCredentialRequestOptionsJSON,
 	}): misskey.entities.SigninFlowRequest => {
-		// AuthenticatorAssertionResponse.authenticatorData
-		// https://developer.mozilla.org/en-US/docs/Web/API/AuthenticatorAssertionResponse/authenticatorData
 		const authenticatorData = Buffer.concat([
 			rpIdHash(),
-			Buffer.from([0x05]), // flags(1)
-			Buffer.from([0x00, 0x00, 0x00, 0x01]), // signCount(4)
+			Buffer.from([0x05]),
+			Buffer.from([0x00, 0x00, 0x00, 0x01]),
 		]);
 		const clientDataJSONBuffer = Buffer.from(JSON.stringify({
 			type: 'webauthn.get',
@@ -219,7 +211,6 @@ describe('2要素認証', () => {
 		assert.strictEqual(signinResponse.body.finished, true);
 		assert.notEqual(signinResponse.body.i, undefined);
 
-		// 後片付け
 		await api('i/2fa/unregister', {
 			password,
 			token: otpToken(registerResponse.body.secret),
@@ -276,7 +267,6 @@ describe('2要素認証', () => {
 		assert.strictEqual(signinResponse2.body.finished, true);
 		assert.notEqual(signinResponse2.body.i, undefined);
 
-		// 後片付け
 		await api('i/2fa/unregister', {
 			password,
 			token: otpToken(registerResponse.body.secret),
@@ -341,7 +331,6 @@ describe('2要素認証', () => {
 		assert.strictEqual(signinResponse2.body.finished, true);
 		assert.notEqual(signinResponse2.body.i, undefined);
 
-		// 後片付け
 		await api('i/2fa/unregister', {
 			password,
 			token: otpToken(registerResponse.body.secret),
@@ -391,7 +380,6 @@ describe('2要素認証', () => {
 		assert.strictEqual(securityKeys[0].name, renamedKey);
 		assert.notEqual(securityKeys[0].lastUsed, undefined);
 
-		// 後片付け
 		await api('i/2fa/unregister', {
 			password,
 			token: otpToken(registerResponse.body.secret),
@@ -425,7 +413,6 @@ describe('2要素認証', () => {
 		} as any) as any, alice);
 		assert.strictEqual(keyDoneResponse.status, 200);
 
-		// テストの実行順によっては複数残ってるので全部消す
 		const beforeIResponse = await api('i', {
 		}, alice);
 		assert.strictEqual(beforeIResponse.status, 200);
@@ -451,7 +438,6 @@ describe('2要素認証', () => {
 		assert.strictEqual(signinResponse.body.finished, true);
 		assert.notEqual(signinResponse.body.i, undefined);
 
-		// 後片付け
 		await api('i/2fa/unregister', {
 			password,
 			token: otpToken(registerResponse.body.secret),
@@ -486,7 +472,6 @@ describe('2要素認証', () => {
 		assert.strictEqual(signinResponse.body.finished, true);
 		assert.notEqual(signinResponse.body.i, undefined);
 
-		// 後片付け
 		await api('i/2fa/unregister', {
 			password,
 			token: otpToken(registerResponse.body.secret),
@@ -515,7 +500,6 @@ describe('2要素認証', () => {
 
 		await sendEnvUpdateRequest({ key: 'MISSKEY_TEST_CHECK_DUPLICATED_TOTP', value: '' });
 
-		// 後片付け
 		await api('i/2fa/unregister', {
 			password,
 			token: otpToken(registerResponse.body.secret),

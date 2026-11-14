@@ -79,7 +79,6 @@ function createRender(params: {
 							});
 						}
 
-						// FIXME: ファイルのバイナリに0xEF 0xBF 0xBDが混入してしまい、うまく画像ファイルとして表示できない問題がある
 						const base64 = await new Promise<string>((resolve) => {
 							const reader = new FileReader();
 							reader.onload = () => {

@@ -37,14 +37,6 @@ class DeliverManager {
 	private activity: IActivity | null;
 	private recipes: IRecipe[] = [];
 
-	/**
-	 * Constructor
-	 * @param userEntityService
-	 * @param followingsRepository
-	 * @param queueService
-	 * @param actor Actor
-	 * @param activity Activity to deliver
-	 */
 	constructor(
 		private userEntityService: UserEntityService,
 		private followingsRepository: FollowingsRepository,
@@ -53,20 +45,15 @@ class DeliverManager {
 		actor: { id: MiUser['id']; host: null; },
 		activity: IActivity | null,
 	) {
-		// 型で弾いてはいるが一応ローカルユーザーかチェック
 		// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
 		if (actor.host != null) throw new Error('actor.host must be null');
 
-		// パフォーマンス向上のためキューに突っ込むのはidのみに絞る
 		this.actor = {
 			id: actor.id,
 		};
 		this.activity = activity;
 	}
 
-	/**
-	 * Add recipe for followers deliver
-	 */
 	@bindThis
 	public addFollowersRecipe(): void {
 		const deliver: IFollowersRecipe = {
@@ -76,10 +63,6 @@ class DeliverManager {
 		this.addRecipe(deliver);
 	}
 
-	/**
-	 * Add recipe for direct deliver
-	 * @param to To
-	 */
 	@bindThis
 	public addDirectRecipe(to: MiRemoteUser): void {
 		const recipe: IDirectRecipe = {
@@ -90,32 +73,19 @@ class DeliverManager {
 		this.addRecipe(recipe);
 	}
 
-	/**
-	 * Add recipe
-	 * @param recipe Recipe
-	 */
 	@bindThis
 	public addRecipe(recipe: IRecipe): void {
 		this.recipes.push(recipe);
 	}
 
-	/**
-	 * Execute delivers
-	 */
 	@bindThis
 	public async execute(): Promise<void> {
-		// The value flags whether it is shared or not.
-		// key: inbox URL, value: whether it is sharedInbox
 		const inboxes = new Map<string, boolean>();
 
-		// build inbox list
-		// Process follower recipes first to avoid duplication when processing direct recipes later.
 		if (this.recipes.some(r => isFollowers(r))) {
 			const inbox = 'COALESCE(following."followerSharedInbox", following."followerInbox")';
 			const followers = await this.followingsRepository.createQueryBuilder('following')
 				.select(inbox, 'inbox')
-				// If any follower identifies this URL as shared, keep that information
-				// regardless of row order (it determines how HTTP 410 is handled).
 				.addSelect('BOOL_OR(following."followerSharedInbox" IS NOT NULL)', 'isSharedInbox')
 				.where('following."followeeId" = :followeeId', { followeeId: this.actor.id })
 				.andWhere('following."followerHost" IS NOT NULL')
@@ -129,16 +99,13 @@ class DeliverManager {
 		}
 
 		for (const recipe of this.recipes.filter(isDirect)) {
-			// check that shared inbox has not been added yet
 			if (recipe.to.sharedInbox !== null && inboxes.has(recipe.to.sharedInbox)) continue;
 
-			// check that they actually have an inbox
 			if (recipe.to.inbox === null) continue;
 
 			inboxes.set(recipe.to.inbox, false);
 		}
 
-		// deliver
 		await this.queueService.deliverMany(this.actor, this.activity, inboxes);
 	}
 }
@@ -154,11 +121,6 @@ export class ApDeliverManagerService {
 	) {
 	}
 
-	/**
-	 * Deliver activity to followers
-	 * @param actor
-	 * @param activity Activity
-	 */
 	@bindThis
 	public async deliverToFollowers(actor: { id: MiLocalUser['id']; host: null; }, activity: IActivity): Promise<void> {
 		const manager = new DeliverManager(
@@ -172,12 +134,6 @@ export class ApDeliverManagerService {
 		await manager.execute();
 	}
 
-	/**
-	 * Deliver activity to user
-	 * @param actor
-	 * @param activity Activity
-	 * @param to Target user
-	 */
 	@bindThis
 	public async deliverToUser(actor: { id: MiLocalUser['id']; host: null; }, activity: IActivity, to: MiRemoteUser): Promise<void> {
 		const manager = new DeliverManager(
@@ -191,12 +147,6 @@ export class ApDeliverManagerService {
 		await manager.execute();
 	}
 
-	/**
-	 * Deliver activity to users
-	 * @param actor
-	 * @param activity Activity
-	 * @param targets Target users
-	 */
 	@bindThis
 	public async deliverToUsers(actor: { id: MiLocalUser['id']; host: null; }, activity: IActivity, targets: MiRemoteUser[]): Promise<void> {
 		const manager = new DeliverManager(

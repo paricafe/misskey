@@ -3,10 +3,6 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-// PIZZAX --- A lightweight store
-
-// TODO: Misskeyのドメイン知識があるのでutilityなどに移動する
-
 import { customRef, ref, watch, onScopeDispose } from 'vue';
 import type { Ref } from 'vue';
 import { $i } from '@/i.js';
@@ -45,20 +41,12 @@ export class Pizzax<T extends StateDef> {
 
 	public readonly def: T;
 
-	// TODO: これが実装されたらreadonlyにしたい: https://github.com/microsoft/TypeScript/issues/37487
-	/**
-	 * static / state の略 (static が予約語のため)
-	 */
 	public readonly s: State<T>;
 
-	/**
-	 * reactive の略
-	 */
 	public readonly r: ReactiveState<T>;
 
 	private pizzaxChannel: BroadcastChannel<PizzaxChannelMessage<T>>;
 
-	// 簡易的にキューイングして占有ロックとする
 	private currentIdbJob: Promise<unknown> = Promise.resolve();
 	private addIdbSetJob<T>(job: () => Promise<T>) {
 		const promise = this.currentIdbJob.then(job, err => {
@@ -82,7 +70,6 @@ export class Pizzax<T extends StateDef> {
 		this.r = {} as ReactiveState<T>;
 
 		for (const [k, v] of Object.entries(def) as [keyof T, T[keyof T]['default']][]) {
-			// 参照渡しになるのを防ぐためclone
 			const defaultValue = deepClone(v.default);
 			this.s[k] = defaultValue;
 			this.r[k] = ref(defaultValue);
@@ -122,15 +109,12 @@ export class Pizzax<T extends StateDef> {
 			} else if (v.where === 'deviceAccount' && Object.prototype.hasOwnProperty.call(deviceAccountState, k)) {
 				this.r[k].value = this.s[k] = this.mergeState<T[keyof T]['default']>(deviceAccountState[k], v.default);
 			} else {
-				// 参照渡しになるのを防ぐためclone
 				this.r[k].value = this.s[k] = deepClone(v.default);
 			}
 		}
 
 		this.pizzaxChannel.addEventListener('message', (ev) => {
 			const { where, key, value, userId } = ev.data;
-			// アカウント変更すればunisonReloadが効くため、このreturnが発火することは
-			// まずないと思うけど一応弾いておく
 			if (where === 'deviceAccount' && (!$i || userId !== $i.id)) return;
 			this.r[key].value = this.s[key] = value;
 		});
@@ -139,7 +123,6 @@ export class Pizzax<T extends StateDef> {
 	private load(): Promise<void> {
 		return new Promise((resolve, reject) => {
 			if ($i) {
-				// api関数と循環参照なので一応setTimeoutしておく
 				window.setTimeout(async () => {
 					await store.ready;
 
@@ -152,7 +135,6 @@ export class Pizzax<T extends StateDef> {
 										this.r[k].value = this.s[k] = (kvs as Partial<T>)[k];
 										cache[k] = (kvs as Partial<T>)[k];
 									} else {
-										// 参照渡しになるのを防ぐためclone
 										this.r[k].value = this.s[k] = deepClone(v.default);
 									}
 								}
@@ -169,8 +151,6 @@ export class Pizzax<T extends StateDef> {
 	}
 
 	public set<K extends keyof T>(key: K, value: T[K]['default']): Promise<void> {
-		// IndexedDBやBroadcastChannelで扱うために単純なオブジェクトにする
-		// (JSON.parse(JSON.stringify(value))の代わり)
 		const rawValue = deepClone(value);
 
 		this.r[key].value = this.s[key] = rawValue;
@@ -223,16 +203,11 @@ export class Pizzax<T extends StateDef> {
 	}
 
 	public reset(key: keyof T) {
-		// 参照渡しになるのを防ぐためclone
 		const defaultValue = deepClone(this.def[key].default);
 		this.set(key, defaultValue);
 		return defaultValue;
 	}
 
-	/**
-	 * 特定のキーの、簡易的なcomputed refを作ります
-	 * 主にvue上で設定コントロールのmodelとして使う用
-	 */
 	public model<K extends keyof T, R = T[K]['default']>(
 		key: K,
 	): Ref<R>;
@@ -269,7 +244,6 @@ export class Pizzax<T extends StateDef> {
 		});
 	}
 
-	// localStorage => indexedDBのマイグレーション
 	private async migrate() {
 		const deviceState = localStorage.getItem(this.deviceStateKeyName);
 		if (deviceState) {

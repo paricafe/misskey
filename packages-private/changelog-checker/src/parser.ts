@@ -48,19 +48,14 @@ export function parseChangeLog(path: string): Release[] {
 	let category: ReleaseCategory | null = null;
 	for (const it of root.children) {
 		if (isHeading(it) && it.depth === 2) {
-			// リリース
 			release = new Release(toString(it));
 			releases.push(release);
-			// 直前のリリースのカテゴリを引き継ぐと、カテゴリ見出しの無いリスト項目が
-			// 前のリリースに混入するのでリセットする
 			category = null;
 		} else if (isHeading(it) && it.depth === 3 && release) {
-			// リリース配下のカテゴリ
 			category = new ReleaseCategory(toString(it));
 			release.categories.push(category);
 		} else if (isList(it) && category) {
 			for (const listItem of it.children) {
-				// カテゴリ配下のリスト項目
 				category.items.push(toString(listItem));
 			}
 		}

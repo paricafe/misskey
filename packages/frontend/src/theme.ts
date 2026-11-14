@@ -3,8 +3,6 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-// TODO: (可能な部分を)sharedに抽出して frontend-embed と共通化
-
 import { ref, nextTick } from 'vue';
 import { EventEmitter } from 'eventemitter3';
 import lightTheme from '@@/themes/_light.json5';
@@ -27,20 +25,17 @@ type ThemeManagerEvents = {
 };
 
 class ThemeManager extends EventEmitter<ThemeManagerEvents> {
-	/** 現在常用しているテーマ */
 	private _theme: Theme | null = null;
 	get theme() { return this._theme; }
 	private _compiledTheme: CompiledTheme | null = null;
 	get compiledTheme() { return this._compiledTheme; }
 
-	/** 現在適用中のテーマ */
 	private _currentTheme: Theme | null = null;
 	get currentTheme() { return this._currentTheme; }
 	get currentThemeId() { return this._currentTheme?.id; }
 	private _currentCompiledTheme: CompiledTheme | null = null;
 	get currentCompiledTheme() { return this._currentCompiledTheme; }
 
-	/** プレビュー中かどうか */
 	private _isPreviewMode = false;
 	get isPreviewMode() { return this._isPreviewMode; }
 	set isPreviewMode(value: boolean) {
@@ -54,47 +49,39 @@ class ThemeManager extends EventEmitter<ThemeManagerEvents> {
 		super();
 	}
 
-	/** テーマを更新し、同時に適用します。 */
 	public updateTheme(newTheme: Theme) {
-		if (newTheme.id === this.theme?.id && version === miLocalStorage.getItem('themeCachedVersion')) return; // 変更なし
+		if (newTheme.id === this.theme?.id && version === miLocalStorage.getItem('themeCachedVersion')) return;
 
 		this.isPreviewMode = false;
 
-		// テーマを更新
 		this._theme = deepClone(newTheme);
 		const compiled = this.compile(newTheme);
 		this._compiledTheme = compiled;
 
-		// 適用中のテーマも更新
 		this._currentTheme = deepClone(this.theme);
 		this._currentCompiledTheme = deepClone(compiled);
 
 		this.applyTheme();
 	}
 
-	/** プレビュー用のテーマを適用します。 */
 	public previewTheme(theme: Theme) {
 		this.isPreviewMode = true;
 
-		// 適用中のテーマを更新
 		this._currentTheme = deepClone(theme);
 		this._currentCompiledTheme = this.compile(theme);
 
 		this.applyTheme();
 	}
 
-	/** プレビュー状態を解除し、適用中のテーマを常用しているテーマに戻します。 */
 	public clearPreview() {
 		this.isPreviewMode = false;
 
-		// 適用中のテーマを常用しているテーマに戻す
 		this._currentTheme = deepClone(this.theme);
 		this._currentCompiledTheme = deepClone(this.compiledTheme);
 
 		this.applyTheme();
 	}
 
-	/** 通常のテーマのコンパイルに加え、ベースとなるテーマの値を解決し代入します。 */
 	private compile(theme: Theme) {
 		const _theme = deepClone(theme);
 
@@ -106,12 +93,9 @@ class ThemeManager extends EventEmitter<ThemeManagerEvents> {
 		return compile(_theme);
 	}
 
-	/** currentThemeを適用します。 */
 	private applyTheme() {
 		if (this.currentTheme == null || this.currentCompiledTheme == null) return;
 
-		// visibilityStateがhiddenな状態でstartViewTransitionするとブラウザによってはエラーになる
-		// 通常hiddenな時に呼ばれることはないが、iOSのPWAだとアプリ切り替え時に(何故か)hiddenな状態で(何故か)一瞬デバイスのダークモード判定が変わりapplyThemeが呼ばれる場合がある
 		if (window.document.startViewTransition != null && window.document.visibilityState === 'visible') {
 			window.document.documentElement.classList.add('_themeChanging_');
 			try {
@@ -123,10 +107,6 @@ class ThemeManager extends EventEmitter<ThemeManagerEvents> {
 					this.emit('themeChanged');
 				});
 			} catch (err) {
-				// 様々な理由により startViewTransition は失敗することがある
-				// ref. https://github.com/misskey-dev/misskey/issues/16562
-
-				// FIXME: viewTransitonエラーはtry~catch貫通してそうな気配がする
 				console.error(err);
 
 				window.document.documentElement.classList.remove('_themeChanging_');

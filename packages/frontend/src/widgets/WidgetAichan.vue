@@ -40,7 +40,6 @@ const { widgetProps, configure } = useWidgetPropsManager(name,
 const live2d = useTemplateRef('live2d');
 
 const touched = () => {
-	//if (this.live2d) this.live2d.changeExpression('gurugurume');
 };
 
 const onMousemove = (ev: MouseEvent) => {

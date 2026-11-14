@@ -39,11 +39,9 @@ describe('Abuse report', () => {
 				strictEqual(reportInB != null, true);
 				return reportInB;
 			}, WAIT_FOR_FEDERATION);
-			// NOTE: reporter is not Alice, and is not moderator in A
 			strictEqual(reportInB.reporter.url, 'https://a.test/@system.actor');
 			strictEqual(reportInB.targetUserId, bob.id);
 
-			// NOTE: cannot forward multiple times
 			await rejects(
 				async () => await aModerator.client.request('admin/forward-abuse-user-report', { reportId: report.id }),
 				(err: any) => {

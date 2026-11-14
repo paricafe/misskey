@@ -72,8 +72,6 @@ function fetchAccount(token: string, id?: string, forceShowDialog?: boolean): Pr
 		})
 			.then(res => new Promise<Misskey.entities.MeDetailed | { error: Record<string, any> }>((done2, fail2) => {
 				if (res.status >= 500 && res.status < 600) {
-					// サーバーエラー(5xx)の場合をrejectとする
-					// （認証エラーなど4xxはresolve）
 					return fail2(res);
 				}
 				res.json().then(done2, fail2);
@@ -81,13 +79,10 @@ function fetchAccount(token: string, id?: string, forceShowDialog?: boolean): Pr
 			.then(async res => {
 				if ('error' in res) {
 					if (res.error.id === 'a8c724b3-6e9c-4b46-b1a8-bc3ed6258370') {
-						// SUSPENDED
 						if (forceShowDialog || $i && (token === $i.token || id === $i.id)) {
 							await showSuspendedDialog();
 						}
 					} else if (res.error.id === 'e5b3b9f0-2b8f-4b9f-9c1f-8c5c1b2e1b1a') {
-						// USER_IS_DELETED
-						// アカウントが削除されている
 						if (forceShowDialog || $i && (token === $i.token || id === $i.id)) {
 							await alert({
 								type: 'error',
@@ -96,8 +91,6 @@ function fetchAccount(token: string, id?: string, forceShowDialog?: boolean): Pr
 							});
 						}
 					} else if (res.error.id === 'b0a7f5f8-dc2f-4171-b91f-de88ad238e14') {
-						// AUTHENTICATION_FAILED
-						// トークンが無効化されていたりアカウントが削除されたりしている
 						if (forceShowDialog || $i && (token === $i.token || id === $i.id)) {
 							await alert({
 								type: 'error',
@@ -184,9 +177,7 @@ export async function login(token: AccountWithToken['token'], redirect?: string)
 	await addAccount(host, me, token);
 
 	if (redirect) {
-		// 他のタブは再読み込みするだけ
 		reloadChannel.postMessage(null);
-		// このページはredirectで指定された先に移動
 		window.location.href = redirect;
 		return;
 	}
@@ -251,7 +242,7 @@ export async function getAccountMenu(opts: {
 					}
 				},
 			};
-		} else { // プロファイルを復元した場合などはアカウントのトークンや詳細情報はstoreにキャッシュされていない
+		} else {
 			return {
 				type: 'button' as const,
 				text: username,
@@ -282,7 +273,6 @@ export async function getAccountMenu(opts: {
 
 	const menuItems: MenuItem[] = [];
 
-	// TODO: $iのホストも比較したいけど通常null
 	const accountItems = (await getAccounts().then(accounts => accounts.filter(x => x.id !== me.id))).map(a => createItem(a.host, a.id, a.username, a.user, a.token));
 
 	if (opts.withExtraOperation) {

@@ -27,8 +27,8 @@ describe('Emoji', () => {
 	describe('MkEmoji', () => {
 		test('Should render selector-less heart with color in native mode', async () => {
 			preferState.emojiStyle = 'native';
-			const mkEmoji = await renderEmoji('\u2764'); // monochrome heart
-			assert.ok(mkEmoji.queryByText('\u2764\uFE0F')); // colored heart
+			const mkEmoji = await renderEmoji('\u2764');
+			assert.ok(mkEmoji.queryByText('\u2764\uFE0F'));
 			assert.ok(!mkEmoji.queryByText('\u2764'));
 		});
 	});

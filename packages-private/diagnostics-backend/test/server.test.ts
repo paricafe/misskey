@@ -8,7 +8,6 @@ import type { ChildProcess } from 'node:child_process';
 import { describe, expect, test } from 'vitest';
 import { waitForMessage } from '../src/measure/server';
 
-/** waitForMessage が使うのは message/exit/error/disconnect の購読だけなので EventEmitter で足りる */
 function createFakeServer() {
 	return new EventEmitter() as unknown as ChildProcess;
 }
@@ -28,7 +27,6 @@ describe('waitForMessage', () => {
 		await expect(received).resolves.toBe('ping');
 	});
 
-	// 子が死んだあとメッセージは来ないので、タイムアウトまで待たずに理由を添えて失敗させる
 	test('rejects immediately when the server exits', async () => {
 		const server = createFakeServer();
 		const received = waitForMessage(server, isPing, 'ping', 60_000);
@@ -61,7 +59,6 @@ describe('waitForMessage', () => {
 		await expect(waitForMessage(server, isPing, 'ping', 1)).rejects.toThrow(/Timed out waiting for ping/);
 	});
 
-	// 待機が終わった後もリスナーが残っていると、ラウンドを重ねるごとに積み上がる
 	test('removes every listener once settled', async () => {
 		const server = createFakeServer();
 		const emitter = server as unknown as EventEmitter;

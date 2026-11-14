@@ -153,7 +153,6 @@ type Options<T extends AsUiComponent> = T extends AsUiButtons
 	: Omit<T, 'id' | 'type'>;
 
 export function patch(id: string, def: values.Value, call: (fn: values.VFn, args: values.Value[]) => Promise<values.Value>) {
-	// TODO
 }
 
 function getRootOptions(def: values.Value | undefined): Options<AsUiRoot> {
@@ -573,7 +572,6 @@ export function registerAsUiLib(components: Ref<AsUiComponent>[], done: (root: R
 		'Ui:patch': values.FN_NATIVE(([id, val], opts) => {
 			utils.assertString(id);
 			utils.assertArray(val);
-			// patch(id.value, val.value, opts.call); // TODO
 		}),
 
 		'Ui:get': values.FN_NATIVE(([id], opts) => {
@@ -586,7 +584,6 @@ export function registerAsUiLib(components: Ref<AsUiComponent>[], done: (root: R
 			}
 		}),
 
-		// Ui:root.update({ children: [...] }) の糖衣構文
 		'Ui:render': values.FN_NATIVE(([children], opts) => {
 			utils.assertArray(children);
 

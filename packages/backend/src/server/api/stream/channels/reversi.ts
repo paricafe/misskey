@@ -30,7 +30,6 @@ export class ReversiChannel extends Channel {
 
 	@bindThis
 	public dispose() {
-		// Unsubscribe events
 		this.subscriber.off(`reversiStream:${this.user!.id}`, this.send);
 	}
 }

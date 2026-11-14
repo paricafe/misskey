@@ -159,15 +159,13 @@ function execSearch(value: string) {
 
 			newResult.push({
 				id: item.id,
-				path: path ?? '/', // never gets `/`
+				path: path ?? '/',
 				label: item.label,
 				parentLabels: parentLabels.toReversed(),
 				icon,
 				isRoot: item.parentId == null,
 			});
 		};
-
-		// label, keywords, texts の順に優先して表示
 
 		const items = Array.from(searchIndexItemById.values());
 		const matchedIds = new Set<string>();
@@ -213,7 +211,6 @@ watch(rawSearchQuery, (value) => {
 	searchSelectedIndex.value = null;
 
 	if (value === '') {
-		// クリア時は即座にメニュー表示へ戻すため、保留中の検索も破棄する
 		execSearchThrottled.cancel({ upcomingOnly: true });
 		searchResult.value = [];
 		return;

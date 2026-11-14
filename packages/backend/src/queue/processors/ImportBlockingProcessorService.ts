@@ -90,7 +90,6 @@ export class ImportBlockingProcessorService {
 				throw new Error(`Unable to resolve user: @${username}@${host}`);
 			}
 
-			// skip myself
 			if (target.id === job.data.user.id) return;
 
 			this.logger.info(`Block ${target.id} ...`);

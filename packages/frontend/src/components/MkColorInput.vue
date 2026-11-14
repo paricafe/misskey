@@ -73,7 +73,6 @@ const onInput = () => {
 	&.focused {
 		> .inputCore {
 			border-color: var(--MI_THEME-accent) !important;
-			//box-shadow: 0 0 0 4px var(--MI_THEME-focus);
 		}
 	}
 

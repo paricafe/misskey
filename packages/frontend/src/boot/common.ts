@@ -44,43 +44,26 @@ export async function common(createVue: () => Promise<App<Element>>) {
 
 		window.addEventListener('error', event => {
 			console.error(event);
-			/*
-			alert({
-				type: 'error',
-				title: 'DEV: Unhandled error',
-				text: event.message
-			});
-			*/
 		});
 
 		window.addEventListener('unhandledrejection', event => {
 			console.error(event);
-			/*
-			alert({
-				type: 'error',
-				title: 'DEV: Unhandled promise rejection',
-				text: event.reason
-			});
-			*/
 		});
 	}
 
 	let isClientUpdated = false;
 
-	//#region クライアントが更新されたかチェック
 	const lastVersion = miLocalStorage.getItem('lastVersion');
 	if (lastVersion !== version) {
 		miLocalStorage.setItem('lastVersion', version);
 
-		try { // 変なバージョン文字列来るとcompareVersionsでエラーになるため
+		try {
 			if (lastVersion != null && compareVersions(version, lastVersion) === 1) {
 				isClientUpdated = true;
 			}
-		} catch (err) { /* empty */ }
+		} catch (err) { }
 	}
-	//#endregion
 
-	//#region Detect language & fetch translations
 	storeBootloaderErrors({ ...i18n.ts._bootErrors, reload: i18n.ts.reload });
 
 	if (import.meta.hot) {
@@ -90,32 +73,25 @@ export async function common(createVue: () => Promise<App<Element>>) {
 				await new Promise(resolve => {
 					window.setTimeout(resolve, 500);
 				});
-				// fetch with cache: 'no-store' to ensure the latest locale is fetched
 				await window.fetch(`/assets/locales/${lang}.${version}.json`, { cache: 'no-store' }).then(async res => res.status === 200 && await res.text());
 				window.location.reload();
 			}
 		});
 	}
-	//#endregion
 
-	// タッチデバイスでCSSの:hoverを機能させる
 	window.document.addEventListener('touchend', () => {}, { passive: true });
 
-	// URLに#pswpを含む場合は取り除く
 	if (window.location.hash === '#pswp') {
 		window.history.replaceState(null, '', window.location.href.replace('#pswp', ''));
 	}
 
-	// 一斉リロード
 	reloadChannel.addEventListener('message', path => {
 		if (path.data !== null) window.location.href = path.data;
 		else window.location.reload();
 	});
 
-	//#region Set lang attr
 	const html = window.document.documentElement;
 	html.setAttribute('lang', lang);
-	//#endregion
 
 	await store.ready;
 	await deckStore.ready;
@@ -126,7 +102,6 @@ export async function common(createVue: () => Promise<App<Element>>) {
 		miLocalStorage.setItem('v', instance.version);
 	});
 
-	//#region loginId
 	const params = new URLSearchParams(window.location.search);
 	const loginId = params.get('loginId');
 
@@ -142,9 +117,7 @@ export async function common(createVue: () => Promise<App<Element>>) {
 
 		window.history.replaceState({ misskey: 'loginId' }, '', target);
 	}
-	//#endregion
 
-	//#region Sync dark mode
 	if (prefer.s.syncDeviceDarkMode) {
 		store.set('darkMode', isDeviceDarkmode());
 	}
@@ -154,18 +127,12 @@ export async function common(createVue: () => Promise<App<Element>>) {
 			store.set('darkMode', mql.matches);
 		}
 	});
-	//#endregion
 
 	if (!isSafeMode) {
-		// TODO: instance.defaultLightTheme/instance.defaultDarkThemeが不正な形式だった場合のケア
 		if (prefer.s.lightTheme == null && instance.defaultLightTheme != null) prefer.commit('lightTheme', JSON.parse(instance.defaultLightTheme));
 		if (prefer.s.darkTheme == null && instance.defaultDarkTheme != null) prefer.commit('darkTheme', JSON.parse(instance.defaultDarkTheme));
 	}
 
-	// NOTE: この処理は必ずクライアント更新チェック処理より後に来ること(テーマ再構築のため)
-	// NOTE: この処理は必ずダークモード判定処理より後に来ること(初回のテーマ適用のため)
-	// NOTE: この処理は必ずサーバーテーマ適用処理より後に来ること(二重発火を防ぐため)
-	// see: https://github.com/misskey-dev/misskey/issues/16562
 	watch(store.r.darkMode, (darkMode) => {
 		const theme = (() => {
 			if (darkMode) {
@@ -214,7 +181,6 @@ export async function common(createVue: () => Promise<App<Element>>) {
 		applyTextAutospacePreference(v);
 	}, { immediate: true });
 
-	// Keep screen on
 	const onVisibilityChange = () => window.document.addEventListener('visibilitychange', () => {
 		if (window.document.visibilityState === 'visible') {
 			navigator.wakeLock.request('screen');
@@ -224,8 +190,6 @@ export async function common(createVue: () => Promise<App<Element>>) {
 		navigator.wakeLock.request('screen')
 			.then(onVisibilityChange)
 			.catch(() => {
-				// On WebKit-based browsers, user activation is required to send wake lock request
-				// https://webkit.org/blog/13862/the-user-activation-api/
 				window.document.addEventListener(
 					'click',
 					() => navigator.wakeLock.request('screen').then(onVisibilityChange),
@@ -238,7 +202,6 @@ export async function common(createVue: () => Promise<App<Element>>) {
 		window.document.documentElement.classList.add('forceSelectableAll');
 	}
 
-	//#region Fetch user
 	if ($i && $i.token) {
 		if (_DEV_) {
 			console.log('account cache found. refreshing...');
@@ -246,17 +209,13 @@ export async function common(createVue: () => Promise<App<Element>>) {
 
 		refreshCurrentAccount();
 	}
-	//#endregion
 
-	//#region Load default font
 	const def_arr = miLocalStorage.getItem('defaultFontFace')?.split('_');
 	const fontId = def_arr?.[0];
 	if (fontId) {
 		loadFontStyle(fontId);
 	}
-	//#endregion
 
-	// analytics
 	fetchInstanceMetaPromise.then(async () => {
 		await initAnalytics(instance);
 
@@ -279,8 +238,6 @@ export async function common(createVue: () => Promise<App<Element>>) {
 	directives(app);
 	components(app);
 
-	// https://github.com/misskey-dev/misskey/pull/8575#issuecomment-1114239210
-	// なぜか2回実行されることがあるため、mountするdivを1つに制限する
 	const rootEl = ((): HTMLElement => {
 		const MISSKEY_MOUNT_DIV_ID = 'misskey_app';
 
@@ -299,13 +256,11 @@ export async function common(createVue: () => Promise<App<Element>>) {
 
 	app.mount(rootEl);
 
-	// boot.jsのやつを解除
 	window.onerror = null;
 	window.onunhandledrejection = null;
 
 	removeSplash();
 
-	// Let the shell paint before optional network, instrumentation and plugin work.
 	const initializeExtras = () => {
 		void fetchCustomEmojisForBoot();
 		void initTelemetry(instance, app).catch(error => console.error('Failed to initialize telemetry:', error));
@@ -314,7 +269,6 @@ export async function common(createVue: () => Promise<App<Element>>) {
 	if (window.requestIdleCallback) window.requestIdleCallback(initializeExtras, { timeout: 1000 });
 	else window.setTimeout(initializeExtras, 0);
 
-	//#region Self-XSS 対策メッセージ
 	if (!_DEV_) {
 		console.log(
 			`%c${i18n.ts._selfXssPrevention.warning}`,
@@ -335,7 +289,6 @@ export async function common(createVue: () => Promise<App<Element>>) {
 		);
 		console.log(i18n.tsx._selfXssPrevention.description3({ link: 'https://misskey-hub.net/docs/for-users/resources/self-xss/' }));
 	}
-	//#endregion
 
 	return {
 		isClientUpdated,
@@ -350,7 +303,6 @@ function removeSplash() {
 		splash.style.opacity = '0';
 		splash.style.pointerEvents = 'none';
 
-		// transitionendイベントが発火しない場合があるため
 		window.setTimeout(() => {
 			splash.remove();
 		}, 1000);

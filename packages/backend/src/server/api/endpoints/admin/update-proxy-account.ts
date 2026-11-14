@@ -51,7 +51,7 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 
 			if (ps.description !== undefined) {
 				this.moderationLogService.log(me, 'updateProxyAccountDescription', {
-					before: null, //TODO
+					before: null,
 					after: ps.description,
 				});
 			}

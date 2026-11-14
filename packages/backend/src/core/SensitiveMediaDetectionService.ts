@@ -11,10 +11,6 @@ import { LoggerService } from '@/core/LoggerService.js';
 import type { MiMeta } from '@/models/_.js';
 import type Logger from '@/logger.js';
 
-/**
- * 正規化済み画像に対する nsfwjs 互換の予測値。
- * 推論自体は外部サービス (sensitive-detector) が行い、本体はその生の値を受け取って判定する。
- */
 export type Prediction = {
 	className: string;
 	probability: number;
@@ -28,7 +24,6 @@ type DetectImagesResponse =
 	| { success: true; result: { results: BatchItemResult[] } }
 	| { success: false; error: { code: string; message: string } };
 
-// #region type guards
 function isPrediction(v: unknown): v is Prediction {
 	if (typeof v !== 'object' || v === null) return false;
 	const obj = v as Record<string, unknown>;
@@ -63,9 +58,7 @@ function isDetectImagesResponse(v: unknown): v is DetectImagesResponse {
 	}
 	return false;
 }
-// #endregion
 
-// サイドカーの判定エンドポイント。baseUrl にパスプレフィックスがあっても連結できるよう先頭スラッシュは付けない。
 const DETECT_IMAGES_PATH = 'v1/detect-images';
 
 @Injectable()
@@ -82,28 +75,17 @@ export class SensitiveMediaDetectionService {
 		this.logger = this.loggerService.getLogger('sensitive-media-detection');
 	}
 
-	/**
-	 * 正規化済み画像 1 枚を外部サービスに送り、生の予測値を得る。
-	 * 接続先未設定・通信失敗・タイムアウト時は null（= 非センシティブ扱い）を返す。
-	 */
 	@bindThis
 	public async detectSensitive(source: Buffer): Promise<Prediction[] | null> {
 		return (await this.detectSensitiveMany([source]))[0] ?? null;
 	}
 
-	/**
-	 * 複数の正規化済み画像をまとめて外部サービスに送る。
-	 * maxImagesPerRequest 枚ごとにチャンク分割して順次送信し、送信順を保った結果配列を返す。
-	 * 接続先未設定・通信失敗・タイムアウト時は該当分を null（= 非センシティブ扱い）にしてフォールバックする
-	 * （API 呼び出し失敗時はセンシティブではない判定とする方針: misskey-dev/misskey#16804）。
-	 */
 	@bindThis
 	public async detectSensitiveMany(sources: Buffer[]): Promise<(Prediction[] | null)[]> {
 		if (sources.length === 0) return [];
 
 		const baseUrl = this.meta.sensitiveMediaDetectionApiUrl;
 		if (baseUrl == null || baseUrl.trim() === '') {
-			// 接続先が未設定なら検出不能。全件 null（非センシティブ扱い）を返す。
 			return sources.map(() => null);
 		}
 
@@ -137,8 +119,6 @@ export class SensitiveMediaDetectionService {
 				form.append(`image${i}`, new Blob([image], { type: 'image/png' }), `${i}.png`);
 			}
 
-			// Content-Type は FormData から boundary 付きで自動設定させるため、手動設定はしない。
-			// 手動指定すると boundary の欠落・不一致で multipart として読めなくなる。
 			const headers: Record<string, string> = {};
 			if (apiKey != null && apiKey !== '') {
 				headers['Authorization'] = `Bearer ${apiKey}`;

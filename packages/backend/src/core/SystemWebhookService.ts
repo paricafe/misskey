@@ -78,9 +78,6 @@ export class SystemWebhookService implements OnApplicationShutdown {
 		return this.activeSystemWebhooks;
 	}
 
-	/**
-	 * SystemWebhook の一覧を取得する.
-	 */
 	@bindThis
 	public fetchSystemWebhooks(params?: {
 		ids?: MiSystemWebhook['id'][];
@@ -103,9 +100,6 @@ export class SystemWebhookService implements OnApplicationShutdown {
 		return query.getMany();
 	}
 
-	/**
-	 * SystemWebhook を作成する.
-	 */
 	@bindThis
 	public async createSystemWebhook(
 		params: {
@@ -134,9 +128,6 @@ export class SystemWebhookService implements OnApplicationShutdown {
 		return webhook;
 	}
 
-	/**
-	 * SystemWebhook を更新する.
-	 */
 	@bindThis
 	public async updateSystemWebhook(
 		params: {
@@ -171,9 +162,6 @@ export class SystemWebhookService implements OnApplicationShutdown {
 		return afterEntity;
 	}
 
-	/**
-	 * SystemWebhook を削除する.
-	 */
 	@bindThis
 	public async deleteSystemWebhook(id: MiSystemWebhook['id'], updater: MiUser) {
 		const webhook = await this.systemWebhooksRepository.findOneByOrFail({ id });
@@ -187,10 +175,6 @@ export class SystemWebhookService implements OnApplicationShutdown {
 			});
 	}
 
-	/**
-	 * SystemWebhook をWebhook配送キューに追加する
-	 * @see QueueService.systemWebhookDeliver
-	 */
 	@bindThis
 	public async enqueueSystemWebhook<T extends SystemWebhookEventType>(
 		type: T,

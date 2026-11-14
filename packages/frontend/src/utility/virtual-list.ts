@@ -5,7 +5,6 @@
 
 export type VirtualListAnchor = { id: string; offset: number };
 
-/** Measured heights belong to item IDs, so pagination and edits can retain the scroll anchor. */
 export class VirtualListLayout {
 	private ids: readonly string[] = [];
 	private indices = new Map<string, number>();

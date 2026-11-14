@@ -27,7 +27,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 			>
 				<template #default="{ item }">
 					<button class="_button" :class="$style.emojisItem" @click="remove(item.emoji, $event)">
-						<!-- pointer-eventsをnoneにしておかないとiOSなどでドラッグしたときに画像の方に判定が持ってかれる -->
 						<MkCustomEmoji v-if="item.emoji[0] === ':'" style="pointer-events: none;" :name="item.emoji" :normal="true" :fallbackToImage="true"/>
 						<MkEmoji v-else style="pointer-events: none;" :emoji="item.emoji" :normal="true"/>
 					</button>
@@ -118,7 +117,6 @@ function copy() {
 }
 
 function paste() {
-	// TODO: validate
 	navigator.clipboard.readText().then(text => {
 		emojis.value = text.split(' ');
 	});

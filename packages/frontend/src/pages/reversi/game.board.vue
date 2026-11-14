@@ -306,7 +306,7 @@ if (!props.game.isEnded) {
 	}, TIMER_INTERVAL_SEC * 1000, {
 		immediate: false,
 		afterMounted: true,
-		keepRunningWhenHidden: true, // 対局の制限時間管理のため、バックグラウンドでも止めない
+		keepRunningWhenHidden: true,
 	});
 }
 
@@ -326,7 +326,7 @@ async function onStreamLog(log: Reversi.Serializer.Log & { id: string | null }) 
 					playbackRate: 1,
 				});
 
-				if (log.player !== engine.value.turn) { // = desyncが発生している
+				if (log.player !== engine.value.turn) {
 					const _game = await misskeyApi('reversi/show-game', {
 						gameId: props.game.id,
 					});

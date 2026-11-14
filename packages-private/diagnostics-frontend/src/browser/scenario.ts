@@ -9,9 +9,6 @@ import type { HeadlessChromeController } from './controller';
 
 export const scenarioDescription = 'fresh browser signup, first timeline note, after the note becomes visible';
 
-/**
- * 各ラウンドを同じ初期状態から始めるため、DBを消して管理者だけ作り直す。
- */
 export async function prepareInstance(baseUrl: string) {
 	await resetState(baseUrl);
 	await registerUser(baseUrl, 'admin', 'admin1234', true);
@@ -26,6 +23,5 @@ export async function runSignupAndPostScenario(chrome: HeadlessChromeController,
 	await closeUserSetupDialog(page);
 	await postNote(page, noteText, 10_000);
 
-	// 投稿直後の非同期処理が落ち着いてから計測したいので少し待つ
 	await sleep(1000);
 }

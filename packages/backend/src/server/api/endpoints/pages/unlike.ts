@@ -65,7 +65,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				throw new ApiError(meta.errors.notLiked);
 			}
 
-			// Delete like
 			await this.pageLikesRepository.delete(exist.id);
 
 			this.pagesRepository.decrement({ id: page.id }, 'likedCount', 1);

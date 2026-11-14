@@ -29,7 +29,6 @@ export class MiAd {
 	})
 	public place: string;
 
-	// 今は使われていないが将来的に活用される可能性はある
 	@Column('varchar', {
 		length: 32, nullable: false,
 	})

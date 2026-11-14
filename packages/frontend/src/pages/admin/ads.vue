@@ -110,7 +110,6 @@ type Ad = Misskey.entities.Ad & {
 
 const ads = ref<Ad[]>([]);
 
-// ISO形式はTZがUTCになってしまうので、TZ分ずらして時間を初期化
 const localTime = new Date();
 const localTimeDiff = localTime.getTimezoneOffset() * 60 * 1000;
 const daysOfWeek: string[] = [i18n.ts._weekday.sunday, i18n.ts._weekday.monday, i18n.ts._weekday.tuesday, i18n.ts._weekday.wednesday, i18n.ts._weekday.thursday, i18n.ts._weekday.friday, i18n.ts._weekday.saturday];
@@ -155,7 +154,6 @@ const filterItems = (v: typeof filterType.value) => {
 	refresh();
 };
 
-// 選択された曜日(index)のビットフラグを操作する
 function toggleDayOfWeek(ad: Misskey.entities.Ad, index: number) {
 	ad.dayOfWeek ^= 1 << index;
 }

@@ -12,7 +12,6 @@ const abortControllers = new WeakMap<HTMLElement, AbortController>();
 
 export const rippleDirective = {
 	mounted(el, binding) {
-		// 明示的に false であればバインドしない
 		if (binding.value === false) return;
 		if (!prefer.s.animation) return;
 

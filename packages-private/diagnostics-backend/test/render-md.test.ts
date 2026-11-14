@@ -36,10 +36,6 @@ function findMetricRow(markdown: string, metric: string) {
 	return row;
 }
 
-/**
- * 出力をゴールデンファイルで固定する。
- * 意図的に変更したときは `vitest -u` で更新し、__snapshots__ の差分もレビューすること。
- */
 test('renders the backend memory report', async () => {
 	const markdown = renderMemoryReportMarkdown(await loadFixture('base'), await loadFixture('head'), {
 		baseHeapSnapshotUrl: 'https://example.invalid/base',

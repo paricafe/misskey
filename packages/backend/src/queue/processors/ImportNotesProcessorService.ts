@@ -28,12 +28,10 @@ import { QueueLoggerService } from '../QueueLoggerService.js';
 import type * as Bull from 'bullmq';
 import type { DbNoteImportToDbJobData, DbNoteImportJobData, DbNoteWithParentImportToDbJobData } from '../types.js';
 
-// Archives come from any user who may import notes, so bound what one import can unpack and enqueue.
 const MAX_ZIP_ENTRIES = 100_000;
-const MAX_ZIP_ENTRY_SIZE = 256 * 1024 * 1024; // 256MB
-const MAX_ZIP_TOTAL_SIZE = 2 * 1024 * 1024 * 1024; // 2GB
+const MAX_ZIP_ENTRY_SIZE = 256 * 1024 * 1024;
+const MAX_ZIP_TOTAL_SIZE = 2 * 1024 * 1024 * 1024;
 const MAX_IMPORT_NOTES = 50_000;
-// Each reply job carries its whole subtree, so payload size grows with the square of the depth.
 const MAX_IMPORT_REPLY_DEPTH = 200;
 
 const FACEBOOK_POSTS_PATH = 'your_activity_across_facebook/posts/your_posts__check_ins__photos_and_videos_1.json';
@@ -152,9 +150,6 @@ export class ImportNotesProcessorService {
 		return notesTree;
 	}
 
-	/**
-	 * Extracts the entries accepted by `include` within the archive limits and returns every entry name.
-	 */
 	@bindThis
 	private async extractZip(zipPath: string, outputPath: string, include: (name: string) => boolean): Promise<string[]> {
 		const names: string[] = [];
@@ -168,11 +163,9 @@ export class ImportNotesProcessorService {
 				}
 				if (!include(entry.filename)) continue;
 
-				// ZipFile rejects absolute paths and `..`, so the entry name stays inside outputPath.
 				const destPath = join(outputPath, entry.filename);
 				await fsp.mkdir(dirname(destPath), { recursive: true });
 				await zip.extractToFile(entry, destPath, { maxBytes: Math.min(MAX_ZIP_ENTRY_SIZE, MAX_ZIP_TOTAL_SIZE - totalSize) });
-				// Count the bytes actually written, since the size in the header can be forged.
 				totalSize += (await fsp.stat(destPath)).size;
 			}
 		} finally {
@@ -181,9 +174,6 @@ export class ImportNotesProcessorService {
 		return names;
 	}
 
-	/**
-	 * Rejects imports whose note count or reply depth would make the queued jobs unreasonably large.
-	 */
 	@bindThis
 	private assertImportSize(roots: any[]): void {
 		let count = 0;
@@ -217,7 +207,6 @@ export class ImportNotesProcessorService {
 		try {
 			return JSON.parse(jsonStr);
 		} catch (error) {
-			//The format is not what we expected. Either this file was tampered with or twitters exports changed
 			this.logger.warn('Failed to import twitter notes due to malformed file');
 			throw error;
 		}
@@ -257,7 +246,7 @@ export class ImportNotesProcessorService {
 			try {
 				await fsp.writeFile(destPath, '', 'binary');
 				await this.downloadUrl(file.url, destPath);
-			} catch (e) { // TODO: 何度か再試行
+			} catch (e) {
 				if (e instanceof Error || typeof e === 'string') {
 					this.logger.error(e);
 				}
@@ -288,7 +277,7 @@ export class ImportNotesProcessorService {
 			try {
 				await fsp.writeFile(destPath, '', 'binary');
 				await this.downloadUrl(file.url, destPath);
-			} catch (e) { // TODO: 何度か再試行
+			} catch (e) {
 				if (e instanceof Error || typeof e === 'string') {
 					this.logger.error(e);
 				}
@@ -322,7 +311,7 @@ export class ImportNotesProcessorService {
 			try {
 				await fsp.writeFile(destPath, '', 'binary');
 				await this.downloadUrl(file.url, destPath);
-			} catch (e) { // TODO: 何度か再試行
+			} catch (e) {
 				if (e instanceof Error || typeof e === 'string') {
 					this.logger.error(e);
 				}
@@ -332,7 +321,6 @@ export class ImportNotesProcessorService {
 			const outputPath = path + '/unknown';
 			try {
 				this.logger.succ(`Unzipping to ${outputPath}`);
-				// The format is only known after listing the entries, so extract what any supported format needs.
 				const entryNames = await this.extractZip(destPath, outputPath, name =>
 					name === INSTAGRAM_POSTS_PATH || name.startsWith(INSTAGRAM_MEDIA_DIR) ||
 					name === 'actor.json' || name === 'outbox.json' || name.startsWith(MASTODON_MEDIA_DIR));
@@ -386,7 +374,7 @@ export class ImportNotesProcessorService {
 			try {
 				await fsp.writeFile(path, '', 'utf-8');
 				await this.downloadUrl(file.url, path);
-			} catch (e) { // TODO: 何度か再試行
+			} catch (e) {
 				if (e instanceof Error || typeof e === 'string') {
 					this.logger.error(e);
 				}
@@ -439,7 +427,7 @@ export class ImportNotesProcessorService {
 				if (!exists) {
 					try {
 						await this.downloadUrl(file.url, filePath);
-					} catch (e) { // TODO: 何度か再試行
+					} catch (e) {
 						this.logger.error(e instanceof Error ? e : new Error(e as string));
 					}
 					const driveFile = await this.driveService.addFile({
@@ -534,7 +522,6 @@ export class ImportNotesProcessorService {
 		const recipients = Array.isArray(audience) ? audience : [audience];
 		const copiedRecipients = Array.isArray(cc) ? cc : [cc];
 		const publicAddress = 'https://www.w3.org/ns/activitystreams#Public';
-		// Do not widen private exports whose audience cannot be represented locally.
 		const visibility = recipients.includes(publicAddress) ? 'public'
 			: copiedRecipients.includes(publicAddress) ? 'home'
 				: recipients.some((uri: unknown) => typeof uri === 'string' && uri.endsWith('/followers')) ? 'followers' : null;
@@ -588,7 +575,7 @@ export class ImportNotesProcessorService {
 				if (!exists) {
 					try {
 						await this.downloadUrl(file.url, filePath);
-					} catch (e) { // TODO: 何度か再試行
+					} catch (e) {
 						this.logger.error(e instanceof Error ? e : new Error(e as string));
 					}
 					const driveFile = await this.driveService.addFile({
@@ -712,7 +699,7 @@ export class ImportNotesProcessorService {
 						if (!exists) {
 							try {
 								await this.downloadService.downloadUrl(videos[0].url, filePath);
-							} catch (e) { // TODO: 何度か再試行
+							} catch (e) {
 								this.logger.error(e instanceof Error ? e : new Error(e as string));
 							}
 							const driveFile = await this.driveService.addFile({
@@ -737,7 +724,7 @@ export class ImportNotesProcessorService {
 						if (!exists) {
 							try {
 								await this.downloadService.downloadUrl(file.media_url_https, filePath);
-							} catch (e) { // TODO: 何度か再試行
+							} catch (e) {
 								this.logger.error(e instanceof Error ? e : new Error(e as string));
 							}
 

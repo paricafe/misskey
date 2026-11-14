@@ -32,9 +32,6 @@ export function setIframeId(id: string): void {
 	defaultIframeId = id;
 }
 
-/**
- * 親フレームにイベントを送信
- */
 export function postMessageToParentWindow<T extends PostMessageEventType = PostMessageEventType>(type: T, payload?: PostMessageEventPayload[T], iframeId: string | null = null): void {
 	let _iframeId = iframeId;
 	if (_iframeId == null) {

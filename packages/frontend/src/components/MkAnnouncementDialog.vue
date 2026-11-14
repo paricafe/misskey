@@ -92,7 +92,7 @@ onMounted(() => {
 		const rootElRect = rootEl.value.getBoundingClientRect();
 		if (
 			bottomElRect.top >= rootElRect.top &&
-			bottomElRect.top <= (rootElRect.bottom - 66) // 66 ≒ 75 * 0.9 (modalのアニメーション分)
+			bottomElRect.top <= (rootElRect.bottom - 66)
 		) {
 			hasReachedBottom.value = true;
 			return;

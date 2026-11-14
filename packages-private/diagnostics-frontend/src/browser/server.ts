@@ -15,10 +15,6 @@ function commandName(command: string) {
 	return command;
 }
 
-/**
- * 計測対象のリポジトリで Misskey テストサーバーを起動する。
- * POSIXでは detached にして、後で子孫プロセスごとまとめて落とせるようにする。
- */
 export function startServer(label: string, repoDir: string) {
 	process.stderr.write(`[${label}] Starting Misskey test server\n`);
 	const child = spawn(commandName('pnpm'), ['start:test'], {
@@ -44,7 +40,6 @@ export async function waitForServer(baseUrl: string, child: ChildProcess) {
 		if (child.exitCode != null) throw new Error(`Misskey server exited early with code ${child.exitCode}`);
 		if (child.signalCode != null) throw new Error(`Misskey server exited early with signal ${child.signalCode}`);
 		try {
-			// 応答が返らないままだとfetchが待ち続け、外側の120秒の上限を超えてしまう
 			const remainingMs = serverStartupTimeoutMs - (Date.now() - startedAt);
 			const response = await fetch(`${baseUrl}/`, {
 				redirect: 'manual',
@@ -52,7 +47,6 @@ export async function waitForServer(baseUrl: string, child: ChildProcess) {
 			});
 			if (response.status < 500) return;
 		} catch {
-			// 中断・接続拒否いずれもまだ起動中とみなしてリトライする
 		}
 		await sleep(1_000);
 	}
@@ -66,7 +60,6 @@ export async function stopServer(child: ChildProcess) {
 		spawnSync('taskkill', ['/pid', String(child.pid), '/t', '/f'], { stdio: 'ignore' });
 	} else if (child.pid != null) {
 		try {
-			// プロセスグループごと落とさないと pnpm 配下の node が残る
 			process.kill(-child.pid, 'SIGTERM');
 		} catch {
 			child.kill('SIGTERM');
@@ -80,7 +73,6 @@ export async function stopServer(child: ChildProcess) {
 		}
 
 		const forceKillTimer = setTimeout(() => {
-			// 猶予の間に終了していれば、PIDが再利用されて無関係のプロセスを撃つ恐れがある
 			if (!hasExited(child) && child.pid != null) {
 				try {
 					if (process.platform === 'win32') {

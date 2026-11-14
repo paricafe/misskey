@@ -108,9 +108,6 @@ export class SnowfallEffect {
 		max: 0.125,
 		easing: 0.0005,
 	};
-	/**
-	 * @throws {Error} - Thrown when it fails to get WebGL context for the canvas
-	 */
 	constructor(options: {
 		sakura?: boolean;
 	}) {
@@ -337,7 +334,6 @@ export class SnowfallEffect {
 			);
 
 			color.push(...this.color, 0.1 + Math.random() * this.opacity);
-			//size.push((this.size * Math.random() * this.size * vh * dpi) / 1000);
 			size.push((this.size * vh * dpi) / 1000);
 		}
 

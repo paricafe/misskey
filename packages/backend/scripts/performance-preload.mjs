@@ -3,8 +3,6 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-// Opt in with NODE_OPTIONS="--import=.../performance-preload.mjs". Cluster
-// children inherit the preload, so each process reports its own resource use.
 import cluster from 'node:cluster';
 import { monitorEventLoopDelay, performance, PerformanceObserver } from 'node:perf_hooks';
 
@@ -49,7 +47,6 @@ const timer = setInterval(() => {
 		pid: process.pid,
 		role: role(),
 		intervalMs: elapsedMs,
-		// 100% means one CPU core, independent of the machine's core count.
 		cpuPercent: ((cpu.user - previousCpu.user) + (cpu.system - previousCpu.system)) / (elapsedMs * 10),
 		memory: process.memoryUsage(),
 		eventLoopUtilization: performance.eventLoopUtilization(utilization, previousUtilization).utilization,

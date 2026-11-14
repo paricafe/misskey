@@ -21,18 +21,12 @@ describe('UserWebhookService', () => {
 	let app: TestingModule;
 	let service: UserWebhookService;
 
-	// --------------------------------------------------------------------------------------
-
 	let usersRepository: UsersRepository;
 	let userWebhooksRepository: WebhooksRepository;
 	let idService: IdService;
 	let queueService: Mocked<QueueService>;
 
-	// --------------------------------------------------------------------------------------
-
 	let root: MiUser;
-
-	// --------------------------------------------------------------------------------------
 
 	async function createUser(data: Partial<MiUser> = {}) {
 		return await usersRepository
@@ -56,8 +50,6 @@ describe('UserWebhookService', () => {
 			})
 			.then(x => userWebhooksRepository.findOneByOrFail(x.identifiers[0]));
 	}
-
-	// --------------------------------------------------------------------------------------
 
 	async function beforeAllImpl() {
 		app = await Test
@@ -99,8 +91,6 @@ describe('UserWebhookService', () => {
 		await usersRepository.createQueryBuilder().delete().execute();
 		await userWebhooksRepository.createQueryBuilder().delete().execute();
 	}
-
-	// --------------------------------------------------------------------------------------
 
 	describe('アプリを毎回作り直す必要のないグループ', () => {
 		beforeAll(beforeAllImpl);

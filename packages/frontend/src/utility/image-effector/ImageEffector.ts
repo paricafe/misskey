@@ -121,9 +121,6 @@ export class ImageEffector {
 		this.compositor.changeResolution(width, height);
 	}
 
-	/*
-	 * disposeCanvas = true だとloseContextを呼ぶため、コンストラクタで渡されたcanvasも再利用不可になるので注意
-	 */
 	public destroy(disposeCanvas = true) {
 		this.compositor.destroy(disposeCanvas);
 	}

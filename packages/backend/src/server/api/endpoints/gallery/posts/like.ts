@@ -71,7 +71,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				throw new ApiError(meta.errors.yourPost);
 			}
 
-			// if already liked
 			const exist = await this.galleryLikesRepository.exists({
 				where: {
 					postId: post.id,
@@ -83,14 +82,12 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				throw new ApiError(meta.errors.alreadyLiked);
 			}
 
-			// Create like
 			await this.galleryLikesRepository.insert({
 				id: this.idService.gen(),
 				postId: post.id,
 				userId: me.id,
 			});
 
-			// ランキング更新
 			if (Date.now() - this.idService.parse(post.id).date.getTime() < GALLERY_POSTS_RANKING_WINDOW) {
 				await this.featuredService.updateGalleryPostsRanking(post.id, 1);
 			}

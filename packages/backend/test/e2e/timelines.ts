@@ -5,9 +5,6 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-// How to run:
-// pnpm jest -- e2e/timelines.ts
-
 import * as assert from 'assert';
 import { describe, beforeAll, test, vi } from 'vitest';
 import { setTimeout } from 'node:timers/promises';
@@ -84,14 +81,6 @@ describe('Timelines', () => {
 		root = await signup({ username: 'root' });
 	}, 1000 * 60 * 2);
 
-	// afterEach(async () => {
-	// 	// テスト中に作ったノートをきれいにする。
-	// 	// ユーザも作っているが、時間差で動く通知系処理などがあり、このタイミングで消すとエラー落ちするので消さない（ノートさえ消えていれば支障はない）
-	// 	const db = await initTestDb(true);
-	// 	await db.query('DELETE FROM "note"');
-	// 	await db.query('DELETE FROM "channel"');
-	// });
-
 	describe.each([
 		{ enableFanoutTimeline: true },
 		{ enableFanoutTimeline: false },
@@ -165,7 +154,7 @@ describe('Timelines', () => {
 			});
 
 			test('withReplies: true でフォローしているユーザーの他人への返信が含まれる', async () => {
-				/* FIXME: https://github.com/misskey-dev/misskey/issues/12065 */ if (!enableFanoutTimeline) return;
+				  if (!enableFanoutTimeline) return;
 
 				const [alice, bob, carol] = await Promise.all([signup(), signup(), signup()]);
 
@@ -216,7 +205,7 @@ describe('Timelines', () => {
 			});
 
 			test('withReplies: true でフォローしているユーザーの行った別のフォローしているユーザーの visibility: followers な投稿への返信が含まれる', async () => {
-				/* FIXME: https://github.com/misskey-dev/misskey/issues/12065 */ if (!enableFanoutTimeline) return;
+				  if (!enableFanoutTimeline) return;
 
 				const [alice, bob, carol] = await Promise.all([signup(), signup(), signup()]);
 
@@ -237,7 +226,7 @@ describe('Timelines', () => {
 			});
 
 			test('withReplies: true でフォローしているユーザーの自分の visibility: followers な投稿への返信が含まれる', async () => {
-				/* FIXME: https://github.com/misskey-dev/misskey/issues/12065 */ if (!enableFanoutTimeline) return;
+				  if (!enableFanoutTimeline) return;
 
 				const [alice, bob] = await Promise.all([signup(), signup()]);
 
@@ -288,7 +277,7 @@ describe('Timelines', () => {
 			});
 
 			test('withReplies: false でフォローしているユーザーからの自分への返信が含まれる', async () => {
-				/* FIXME: https://github.com/misskey-dev/misskey/issues/12065 */ if (!enableFanoutTimeline) return;
+				  if (!enableFanoutTimeline) return;
 
 				const [alice, bob] = await Promise.all([signup(), signup()]);
 
@@ -305,7 +294,7 @@ describe('Timelines', () => {
 			});
 
 			test('自分の他人への返信が含まれる', async () => {
-				/* FIXME: https://github.com/misskey-dev/misskey/issues/12065 */ if (!enableFanoutTimeline) return;
+				  if (!enableFanoutTimeline) return;
 
 				const [alice, bob] = await Promise.all([signup(), signup()]);
 
@@ -611,7 +600,7 @@ describe('Timelines', () => {
 			});
 
 			test('フォローしていないユーザーからの visibility: specified なノートに返信したときの自身のノートが含まれる', async () => {
-				/* FIXME: https://github.com/misskey-dev/misskey/issues/12065 */ if (!enableFanoutTimeline) return;
+				  if (!enableFanoutTimeline) return;
 
 				const [alice, bob] = await Promise.all([signup(), signup()]);
 
@@ -626,20 +615,6 @@ describe('Timelines', () => {
 				}, waitForPushToTlOptions);
 			});
 
-			/* TODO
-			test('自身の visibility: specified なノートへのフォローしていないユーザーからの返信が含まれる', async () => {
-				const [alice, bob] = await Promise.all([signup(), signup()]);
-				const aliceNote = await post(alice, { text: 'hi', visibility: 'specified', visibleUserIds: [bob.id] });
-				const bobNote = await post(bob, { text: 'ok', visibility: 'specified', visibleUserIds: [alice.id], replyId: aliceNote.id });
-				await vi.waitFor(async () => {
-					const res = await api('notes/timeline', { limit: 100 }, alice);
-					assert.strictEqual(res.body.some(note => note.id === bobNote.id), true);
-					assert.strictEqual(res.body.find(note => note.id === bobNote.id).text, 'ok');
-				}, waitForPushToTlOptions);
-			});
-			*/
-
-			// ↑の挙動が理想だけど実装が面倒かも
 			test('自身の visibility: specified なノートへのフォローしていないユーザーからの返信が含まれない', async () => {
 				const [alice, bob] = await Promise.all([signup(), signup()]);
 
@@ -940,7 +915,6 @@ describe('Timelines', () => {
 
 				await vi.waitFor(async () => {
 					if (enableFanoutTimeline) {
-						// NOTE: notes/timeline だと DB へのフォールバックが効くので Redis を直接見て確かめる
 						assert.strictEqual(await redisForTimelines.exists(`list:homeTimeline:${bob.id}`), 1);
 
 						const bobHTL = await redisForTimelines.lrange(`list:homeTimeline:${bob.id}`, 0, -1);
@@ -964,7 +938,6 @@ describe('Timelines', () => {
 				await post(bob, { text: 'I\'m Bob.' });
 
 				await vi.waitFor(async () => {
-					// NOTE: notes/timeline だと DB へのフォールバックが効くので Redis を直接見て確かめる
 					assert.strictEqual(await redisForTimelines.exists(`list:homeTimeline:${bob.id}`), 0);
 				}, waitForPushToTlOptions);
 			});
@@ -1181,7 +1154,6 @@ describe('Timelines', () => {
 				assert.strictEqual(res.body.some(note => note.id === bobNote.id), false);
 			});
 
-			// 含まれても良いと思うけど実装が面倒なので含まれない
 			test('フォローしているユーザーの visibility: home なノートが含まれない', async () => {
 				const [alice, bob, carol] = await Promise.all([signup(), signup(), signup()]);
 
@@ -1280,7 +1252,7 @@ describe('Timelines', () => {
 			});
 
 			test('withReplies: false でフォローしているユーザーからの自分への返信が含まれる', async () => {
-				/* FIXME: https://github.com/misskey-dev/misskey/issues/12065 */ if (!enableFanoutTimeline) return;
+				  if (!enableFanoutTimeline) return;
 
 				const [alice, bob] = await Promise.all([signup(), signup()]);
 
@@ -1297,7 +1269,7 @@ describe('Timelines', () => {
 			});
 
 			test('withReplies: false でフォローしていないユーザーからの自分への返信が含まれる', async () => {
-				/* FIXME: https://github.com/misskey-dev/misskey/issues/12065 */ if (!enableFanoutTimeline) return;
+				  if (!enableFanoutTimeline) return;
 
 				const [alice, bob] = await Promise.all([signup(), signup()]);
 
@@ -1654,7 +1626,6 @@ describe('Timelines', () => {
 			});
 
 			test('withReplies: false でフォローしているユーザーからの自分への返信が含まれる', async () => {
-				/* FIXME: https://github.com/misskey-dev/misskey/issues/12065 */
 				if (!enableFanoutTimeline) return;
 
 				const [alice, bob] = await Promise.all([signup(), signup()]);
@@ -1689,7 +1660,6 @@ describe('Timelines', () => {
 			});
 
 			test('withReplies: true でフォローしているユーザーの行った別のフォローしているユーザーの visibility: followers な投稿への返信が含まれる', async () => {
-				/* FIXME: https://github.com/misskey-dev/misskey/issues/12065 */
 				if (!enableFanoutTimeline) return;
 
 				const [alice, bob, carol] = await Promise.all([signup(), signup(), signup()]);
@@ -1711,7 +1681,6 @@ describe('Timelines', () => {
 			});
 
 			test('withReplies: true でフォローしているユーザーの自分の visibility: followers な投稿への返信が含まれる', async () => {
-				/* FIXME: https://github.com/misskey-dev/misskey/issues/12065 */
 				if (!enableFanoutTimeline) return;
 
 				const [alice, bob] = await Promise.all([signup(), signup()]);
@@ -1787,7 +1756,6 @@ describe('Timelines', () => {
 			});
 
 			test('withReplies: false でフォローしていないユーザーからの自分への返信が含まれる', async () => {
-				/* FIXME: https://github.com/misskey-dev/misskey/issues/12065 */
 				if (!enableFanoutTimeline) return;
 
 				const [alice, bob] = await Promise.all([signup(), signup()]);
@@ -2106,11 +2074,6 @@ describe('Timelines', () => {
 			});
 
 			describe('凍結', () => {
-				/*
-				 * bob = 未フォローのローカルユーザー (凍結対象でない)
-				 * carol = 未フォローのローカルユーザー (凍結対象)
-				 * dave = フォローしているローカルユーザー (凍結対象)
-				 */
 				let alice: SignupResponse, bob: SignupResponse, carol: SignupResponse, dave: SignupResponse;
 				let aliceNote: Note, bobNote: Note, carolNote: Note, daveNote: Note;
 
@@ -2159,10 +2122,6 @@ describe('Timelines', () => {
 			});
 
 			describe('凍結 (リモート)', () => {
-				/*
-				 * carol = 未フォローのリモートユーザー (凍結対象)
-				 * elle = フォローしているリモートユーザー (凍結対象)
-				 */
 				let alice: SignupResponse, carol: SignupResponse, elle: SignupResponse;
 				let aliceNote: Note, carolNote: Note, elleNote: Note;
 
@@ -2810,7 +2769,7 @@ describe('Timelines', () => {
 			});
 
 			test('[withReplies: false] 他人への返信が含まれない', async () => {
-				/* FIXME: https://github.com/misskey-dev/misskey/issues/12065 */ if (!enableFanoutTimeline) return;
+				  if (!enableFanoutTimeline) return;
 
 				const [alice, bob, carol] = await Promise.all([signup(), signup(), signup()]);
 
@@ -3000,7 +2959,6 @@ describe('Timelines', () => {
 				assert.strictEqual(res.body.some(note => note.id === bobNote.id), false);
 			});
 
-			/** @see https://github.com/misskey-dev/misskey/issues/14000 */
 			test('FTT: sinceId にキャッシュより古いノートを指定しても、sinceId による絞り込みが正しく動作する', async () => {
 				const alice = await signup();
 				const noteSince = await post(alice, { text: 'Note where id will be `sinceId`.' });
@@ -3296,7 +3254,5 @@ describe('Timelines', () => {
 				assert.strictEqual(res.body.some((note: any) => note.id === bobRenote.id), false);
 			});
 		});
-		// TODO: リノートミュート済みユーザーのテスト
-		// TODO: ページネーションのテスト
 	});
 });

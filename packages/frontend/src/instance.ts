@@ -8,9 +8,6 @@ import * as Misskey from 'misskey-js';
 import { misskeyApi } from '@/utility/misskey-api.js';
 import { miLocalStorage } from '@/local-storage.js';
 
-// TODO: 他のタブと永続化されたstateを同期
-
-//#region loader
 const providedMetaEl = window.document.getElementById('misskey_meta');
 
 let cachedMeta = miLocalStorage.getItem('instance') ? JSON.parse(miLocalStorage.getItem('instance')!) : null;
@@ -23,9 +20,6 @@ if (providedAt > cachedAt) {
 	cachedMeta = providedMeta;
 	cachedAt = providedAt;
 }
-//#endregion
-
-// TODO: instanceをリアクティブにするかは再考の余地あり
 
 export const instance: Misskey.entities.MetaDetailed = reactive(cachedMeta ?? {});
 

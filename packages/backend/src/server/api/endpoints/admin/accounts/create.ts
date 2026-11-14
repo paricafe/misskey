@@ -84,19 +84,14 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 			const me = _me ? await this.usersRepository.findOneByOrFail({ id: _me.id }) : null;
 
 			if (this.serverSettings.rootUserId == null && me == null && token == null) {
-				// 初回セットアップの場合
 				if (this.config.setupPassword != null) {
-					// 初期パスワードが設定されている場合
 					if (ps.setupPassword !== this.config.setupPassword) {
-						// 初期パスワードが違う場合
 						throw new ApiError(meta.errors.wrongInitialPassword);
 					}
 				} else if (ps.setupPassword != null && ps.setupPassword.trim() !== '') {
-					// 初期パスワードが設定されていないのに初期パスワードが入力された場合
 					throw new ApiError(meta.errors.wrongInitialPassword);
 				}
 			} else if (token !== null || !(await this.roleService.isAdministrator(me))) {
-				// 初回セットアップではなく、管理者でない場合 or 外部トークンを使用している場合
 				throw new ApiError(meta.errors.accessDenied);
 			}
 

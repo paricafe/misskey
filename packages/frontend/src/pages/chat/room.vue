@@ -144,15 +144,12 @@ const timeline = makeDateSeparatedTimelineComputedRef(messages);
 
 const SCROLL_HEAD_THRESHOLD = 200;
 
-// column-reverseなので本来はスクロール位置の最下部への追従は不要なはずだが、おそらくブラウザのバグにより、最下部にスクロールした状態でも追従されない場合がある(スクロール位置が少数になることがあるのが関わっていそう)
-// そのため補助としてMutationObserverを使って追従を行う
 useMutationObserver(timelineEl, {
 	subtree: true,
 	childList: true,
 	attributes: false,
 }, () => {
 	const scrollContainer = getScrollContainer(timelineEl.value)!;
-	// column-reverseなのでscrollTopは負になる
 	if (-scrollContainer.scrollTop < SCROLL_HEAD_THRESHOLD) {
 		scrollContainer.scrollTo({
 			top: 0,
@@ -248,7 +245,6 @@ async function initialize() {
 			}
 		}
 
-		// ルーム情報は取れても、タイムラインの取得だけ失敗することがある（通信エラーなど）
 		if (mResult.status === 'rejected') {
 			fetchError.value = toFetchError(mResult.reason);
 			initializing.value = false;
@@ -315,7 +311,6 @@ function onMessage(message: Misskey.entities.ChatMessageLite) {
 
 	messages.value.unshift(normalizeMessage(message));
 
-	// TODO: DOM的にバックグラウンドになっていないかどうかも考慮する
 	if (message.fromUserId !== $i.id && !window.document.hidden && isActivated) {
 		connection.value?.send('read', {
 			id: message.id,
@@ -323,7 +318,6 @@ function onMessage(message: Misskey.entities.ChatMessageLite) {
 	}
 
 	if (message.fromUserId !== $i.id) {
-		//notifyNewMessage();
 	}
 }
 
@@ -337,7 +331,7 @@ function onDeleted(id: string) {
 function onReact(ctx: Parameters<Misskey.Channels['chatUser']['events']['react']>[0] | Parameters<Misskey.Channels['chatRoom']['events']['react']>[0]) {
 	const message = messages.value.find(m => m.id === ctx.messageId);
 	if (message) {
-		if (room.value == null) { // 1on1の時はuserは省略される
+		if (room.value == null) {
 			message.reactions.push({
 				reaction: ctx.reaction,
 				user: message.fromUserId === $i.id ? user.value! : $i,
@@ -371,7 +365,6 @@ function notifyNewMessage() {
 
 function onVisibilitychange() {
 	if (window.document.hidden) return;
-	// TODO
 }
 
 onMounted(() => {

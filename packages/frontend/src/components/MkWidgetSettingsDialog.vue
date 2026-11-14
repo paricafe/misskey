@@ -89,7 +89,6 @@ function cancel() {
 	dialog.value?.close();
 }
 
-//#region プレビューのリサイズ
 const resizerRootEl = useTemplateRef('resizerRootEl');
 const resizerEl = useTemplateRef('resizerEl');
 const widgetHeight = ref(0);
@@ -107,10 +106,10 @@ const ro2 = new ResizeObserver(() => {
 
 function calcScale() {
 	if (!resizerRootEl.value) return;
-	const previewWidth = resizerRootEl.value.clientWidth - 40; // 左右の余白 20pxずつ
-	const previewHeight = resizerRootEl.value.clientHeight - 40; // 上下の余白 20pxずつ
+	const previewWidth = resizerRootEl.value.clientWidth - 40;
+	const previewHeight = resizerRootEl.value.clientHeight - 40;
 	const widgetWidth = 280;
-	const scale = Math.min(previewWidth / widgetWidth, previewHeight / widgetHeight.value, 1); // 拡大はしないので1を上限に
+	const scale = Math.min(previewWidth / widgetWidth, previewHeight / widgetHeight.value, 1);
 	widgetScale.value = scale;
 }
 
@@ -128,7 +127,6 @@ onBeforeUnmount(() => {
 	ro1.disconnect();
 	ro2.disconnect();
 });
-//#endregion
 </script>
 
 <style module>

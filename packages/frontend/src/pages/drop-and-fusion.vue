@@ -101,7 +101,6 @@ const {
 		{ label: 'SQUARE', value: 'square' },
 		{ label: 'YEN', value: 'yen' },
 		{ label: 'SWEETS', value: 'sweets' },
-		//{ label: 'SPACE', value: 'space' },
 	],
 	initialValue: 'normal',
 });

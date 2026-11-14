@@ -6,10 +6,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 <template>
 <div>
 	<div :class="$style.contents">
-		<!--
-			デッキUIが設定されている場合はデッキUIに戻れるようにする (ただし?zenが明示された場合は表示しない)
-			See https://github.com/misskey-dev/misskey/issues/10905
-		-->
 		<button v-if="showDeckNav" class="_buttonPrimary" :class="$style.deckNav" @click="goToDeck">{{ i18n.ts.goToDeck }}</button>
 
 		<div style="flex: 1; min-height: 0;">

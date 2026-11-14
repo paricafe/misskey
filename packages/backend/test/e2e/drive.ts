@@ -20,7 +20,6 @@ describe('Drive', () => {
 	}, 1000 * 60 * 2);
 
 	test('ファイルURLからアップロードできる', async () => {
-		// utils.js uploadUrl の処理だがAPIレスポンスも見るためここで同様の処理を書いている
 
 		const marker = Math.random().toString();
 
@@ -47,7 +46,6 @@ describe('Drive', () => {
 	});
 
 	test('ローカルからアップロードできる', async () => {
-		// APIレスポンスを直接使用するので utils.js uploadFile が通過することで成功とする
 
 		const res = await uploadFile(alice, { path: '192.jpg', name: 'テスト画像' });
 

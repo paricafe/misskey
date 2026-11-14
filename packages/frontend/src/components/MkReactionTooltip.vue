@@ -37,7 +37,7 @@ const emit = defineEmits<{
 	display: block;
 	width: 60px;
 	max-height: 60px;
-	font-size: 60px; // unicodeな絵文字についてはwidthが効かないため
+	font-size: 60px;
 	margin: 0 auto;
 	object-fit: contain;
 }

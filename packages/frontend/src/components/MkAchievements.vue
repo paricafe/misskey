@@ -77,7 +77,6 @@ function _fetch_() {
 			const a = res.find(x => x.name === t);
 			if (a) achievements.value.push(a);
 		}
-		//achievements = res.sort((a, b) => b.unlockedAt - a.unlockedAt);
 	});
 }
 

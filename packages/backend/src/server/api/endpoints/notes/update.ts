@@ -167,7 +167,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				note.fileIds.length === finalFileIds.length &&
 				note.fileIds.every((fileId, index) => fileId === finalFileIds[index])
 			) {
-				// The same as old note, nothing to do
 				return {
 					updatedNote: await this.noteEntityService.pack(note, me),
 				};

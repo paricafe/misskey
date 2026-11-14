@@ -13,7 +13,6 @@ import type * as misskey from 'misskey-js';
 const waitForPushToTlOptions = { timeout: 3000, interval: 25 };
 
 describe('Block', () => {
-	// alice blocks bob
 	let alice: misskey.entities.SignupResponse;
 	let bob: misskey.entities.SignupResponse;
 	let carol: misskey.entities.SignupResponse;
@@ -67,10 +66,6 @@ describe('Block', () => {
 		assert.strictEqual(res.status, 400);
 		assert.strictEqual(castAsError(res.body).error.id, 'b390d7e1-8a5e-46ed-b625-06271cafd3d3');
 	});
-
-	// TODO: ユーザーリストに入れられないテスト
-
-	// TODO: ユーザーリストから除外されるテスト
 
 	test('タイムライン(LTL)にブロックされているユーザーの投稿が含まれない', async () => {
 		const aliceNote = await post(alice, { text: 'hi' });

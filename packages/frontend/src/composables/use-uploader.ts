@@ -38,7 +38,7 @@ const IMAGE_EDITING_SUPPORTED_TYPES = [
 	'image/webp',
 ];
 
-const VIDEO_COMPRESSION_SUPPORTED_TYPES = [ // TODO
+const VIDEO_COMPRESSION_SUPPORTED_TYPES = [
 	'video/mp4',
 	'video/quicktime',
 	'video/x-matroska',
@@ -96,13 +96,13 @@ function getCompressionSettings(level: 0 | 1 | 2 | 3) {
 		};
 	} else if (level === 2) {
 		return {
-			maxWidth: 2000 * 0.75, // =1500
-			maxHeight: 2000 * 0.75, // =1500
+			maxWidth: 2000 * 0.75,
+			maxHeight: 2000 * 0.75,
 		};
 	} else if (level === 3) {
 		return {
-			maxWidth: 2000 * 0.75 * 0.75, // =1125
-			maxHeight: 2000 * 0.75 * 0.75, // =1125
+			maxWidth: 2000 * 0.75 * 0.75,
+			maxHeight: 2000 * 0.75 * 0.75,
 		};
 	} else {
 		return null;
@@ -298,13 +298,9 @@ export function useUploader(options: {
 							triggerRef(items);
 						});
 					},
-				}, /*{
-					icon: 'ti ti-resize',
-					text: i18n.ts.resize,
-					action: async () => {
-						// TODO
-					},
-				},*/ {
+				},
+
+ {
 					icon: 'ti ti-sparkles',
 					text: i18n.ts._imageEffector.title,
 					action: async () => {
@@ -598,7 +594,7 @@ export function useUploader(options: {
 		});
 	}
 
-	async function upload() { // エラーハンドリングなどを考慮してシーケンシャルにやる
+	async function upload() {
 		items.value = items.value.map(item => ({
 			...item,
 			aborted: false,
@@ -607,7 +603,6 @@ export function useUploader(options: {
 		}));
 
 		for (const item of items.value.filter(item => item.uploaded == null)) {
-			// アップロード処理途中で値が変わる場合（途中で全キャンセルされたりなど）もあるので、Array filterではなくここでチェック
 			if (item.aborted) {
 				continue;
 			}
@@ -652,7 +647,6 @@ export function useUploader(options: {
 		item.preprocessing = true;
 		item.preprocessProgress = null;
 
-		// Each run owns its result until it is still current and ready to commit.
 		const processingItem = { ...item };
 		try {
 			if (IMAGE_PREPROCESS_NEEDED_TYPES.includes(processingItem.file.type)) {
@@ -773,8 +767,6 @@ export function useUploader(options: {
 					const result = await readAndCompressImage(preprocessedFile, config);
 					signal.throwIfAborted();
 					if (result.size < preprocessedFile.size || preprocessedFile.type === 'image/webp') {
-						// The compression may not always reduce the file size
-						// (and WebP is not browser safe yet)
 						preprocessedFile = result;
 						item.compressedSize = result.size;
 						item.suffix = '.' + mimeTypeMap[config.mimeType];
@@ -818,12 +810,9 @@ export function useUploader(options: {
 					input,
 					output,
 					video: {
-						//width: 320, // Height will be deduced automatically to retain aspect ratio
 						bitrate: item.compressionLevel === 1 ? mediabunny.QUALITY_VERY_HIGH : item.compressionLevel === 2 ? mediabunny.QUALITY_MEDIUM : mediabunny.QUALITY_VERY_LOW,
 					},
 					audio: {
-						// Explicitly keep audio (don't discard) and copy it if possible
-						// without re-encoding to avoid WebCodecs limitations on iOS Safari
 						discard: false,
 					},
 				});

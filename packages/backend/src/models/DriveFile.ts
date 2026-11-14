@@ -168,9 +168,6 @@ export class MiDriveFile {
 	})
 	public maybePorn: boolean;
 
-	/**
-	 * 外部の(信頼されていない)URLへの直リンクか否か
-	 */
 	@Index()
 	@Column('boolean', {
 		default: false,

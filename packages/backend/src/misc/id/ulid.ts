@@ -3,9 +3,6 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-// Crockford's Base32
-// https://github.com/ulid/spec#encoding
-
 const CHARS = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
 
 export const ulidRegExp = /^[0123456789ABCDEFGHJKMNPQRSTVWXYZ]{26}$/;

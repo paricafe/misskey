@@ -155,14 +155,6 @@ export class WebhookTestService {
 	) {
 	}
 
-	/**
-	 * UserWebhookのテスト送信を行う.
-	 * 送信されるペイロードはいずれもダミーの値で、実際にはデータベース上に存在しない.
-	 *
-	 * また、この関数経由で送信されるWebhookは以下の設定を無視する.
-	 * - Webhookそのものの有効・無効設定（active）
-	 * - 送信対象イベント（on）に関する設定
-	 */
 	@bindThis
 	public async testUserWebhook<T extends WebhookEventTypes>(
 		params: {
@@ -185,8 +177,6 @@ export class WebhookTestService {
 				...params.override,
 			};
 
-			// テスト目的なのでUserWebhookServiceの機能を経由せず直接キューに追加する（チェック処理などをスキップする意図）.
-			// また、Jobの試行回数も1回だけ.
 			this.queueService.userWebhookDeliver(merged, type, contents, { attempts: 1 });
 		};
 
@@ -246,7 +236,6 @@ export class WebhookTestService {
 				send('unfollow', { user: await this.toPackedUserDetailedNotMe(dummyUser3) });
 				break;
 			}
-			// まだ実装されていない (#9485)
 			case 'reaction':
 				return;
 			default: {
@@ -256,14 +245,6 @@ export class WebhookTestService {
 		}
 	}
 
-	/**
-	 * SystemWebhookのテスト送信を行う.
-	 * 送信されるペイロードはいずれもダミーの値で、実際にはデータベース上に存在しない.
-	 *
-	 * また、この関数経由で送信されるWebhookは以下の設定を無視する.
-	 * - Webhookそのものの有効・無効設定（isActive）
-	 * - 送信対象イベント（on）に関する設定
-	 */
 	@bindThis
 	public async testSystemWebhook<T extends SystemWebhookEventType>(
 		params: {
@@ -284,8 +265,6 @@ export class WebhookTestService {
 				...params.override,
 			};
 
-			// テスト目的なのでSystemWebhookServiceの機能を経由せず直接キューに追加する（チェック処理などをスキップする意図）.
-			// また、Jobの試行回数も1回だけ.
 			this.queueService.systemWebhookDeliver(merged, type, contents, { attempts: 1 });
 		};
 

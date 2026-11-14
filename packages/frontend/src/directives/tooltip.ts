@@ -3,9 +3,6 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-// TODO: useTooltip関数使うようにしたい
-// ただディレクティブ内でonUnmountedなどのcomposition api使えるのか不明
-
 import { defineAsyncComponent, ref } from 'vue';
 import type { Directive } from 'vue';
 import { isTouchUsing } from '@/utility/touch.js';

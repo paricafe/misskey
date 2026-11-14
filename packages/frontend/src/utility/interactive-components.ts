@@ -36,7 +36,6 @@ export function loadEmojiPicker() {
 	});
 }
 
-/** Finish before authenticated controls mount, keeping iOS focus within the user gesture. */
 export function preloadInteractiveComponents() {
 	return Promise.all([loadPostForm(), loadEmojiPicker()]);
 }

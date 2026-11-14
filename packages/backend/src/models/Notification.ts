@@ -11,7 +11,6 @@ import { MiRole } from './Role.js';
 import { MiDriveFile } from './DriveFile.js';
 import { MiNoteDraft } from './NoteDraft.js';
 
-// misskey-js の notificationTypes と同期すべし
 export type MiNotification = {
 	type: 'note';
 	id: string;
@@ -117,26 +116,12 @@ export type MiNotification = {
 	id: string;
 	createdAt: string;
 
-	/**
-	 * アプリ通知のbody
-	 */
 	customBody: string;
 
-	/**
-	 * アプリ通知のheader
-	 * (省略時はアプリ名で表示されることを期待)
-	 */
 	customHeader: string | null;
 
-	/**
-	 * アプリ通知のicon(URL)
-	 * (省略時はアプリアイコンで表示されることを期待)
-	 */
 	customIcon: string | null;
 
-	/**
-	 * アプリ通知のアプリ(のトークン)
-	 */
 	appAccessTokenId: MiAccessToken['id'] | null;
 } | {
 	type: 'test';

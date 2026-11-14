@@ -1,7 +1,6 @@
 #!/bin/bash
 mkdir certificates
 
-# rootCA
 openssl genrsa -des3 \
   -passout pass:rootCA \
   -out certificates/rootCA.key 4096
@@ -12,7 +11,6 @@ openssl req -x509 -new -nodes -batch \
   -passin pass:rootCA \
   -out certificates/rootCA.crt
 
-# domain
 function generate {
   openssl req -new -newkey rsa:2048 -sha256 -nodes \
     -keyout certificates/$1.key \

@@ -47,13 +47,10 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 		private idService: IdService,
 	) {
 		super(meta, paramDef, async (ps, me) => {
-			// Generate secret
 			const secret = secureRndstr(32);
 
-			// for backward compatibility
 			const permission = unique(ps.permission.map(v => v.replace(/^(.+)(\/|-)(read|write)$/, '$3:$1')));
 
-			// Create account
 			const app = await this.appsRepository.insertOne({
 				id: this.idService.gen(),
 				userId: me ? me.id : null,

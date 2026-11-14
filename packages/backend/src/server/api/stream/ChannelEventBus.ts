@@ -5,7 +5,6 @@
 
 import { EventEmitter } from 'node:events';
 
-/** Route a process-wide stream message only to connections listening to it. */
 export class ChannelEventBus {
 	private readonly subscribers = new Map<string | symbol, Set<EventEmitter>>();
 
@@ -32,7 +31,6 @@ export class ChannelEventBus {
 	public emit(channel: string, message: unknown): void {
 		const connections = this.subscribers.get(channel);
 		if (connections == null) return;
-		// Match EventEmitter semantics when a callback changes subscriptions.
 		for (const subscriber of [...connections]) subscriber.emit(channel, message);
 	}
 }

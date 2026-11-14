@@ -60,10 +60,8 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 		private globalEventService: GlobalEventService,
 	) {
 		super(meta, paramDef, async (ps, me) => {
-			// If the parent folder is specified
 			let parent = null;
 			if (ps.parentId) {
-				// Fetch parent folder
 				parent = await this.driveFoldersRepository.findOneBy({
 					id: ps.parentId,
 					userId: me.id,
@@ -74,7 +72,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				}
 			}
 
-			// Create folder
 			const folder = await this.driveFoldersRepository.insertOne({
 				id: this.idService.gen(),
 				name: ps.name,
@@ -84,7 +81,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 
 			const folderObj = await this.driveFolderEntityService.pack(folder);
 
-			// Publish folderCreated event
 			this.globalEventService.publishDriveStream(me.id, 'folderCreated', folderObj);
 
 			return folderObj;

@@ -262,7 +262,6 @@ export class EntityConverter {
 		};
 	}
 
-	/** A small, explicit HTML vocabulary. MFM arguments and user HTML never become markup. */
 	render(value: string, defaultHost: string | null = null): string {
 		if (value === '') return '';
 		let nodes: MfmNode[];
@@ -389,7 +388,6 @@ export class EntityConverter {
 			}
 		};
 		try { visit(parseMfm(text(note.text), { nestLimit: 12 })); } catch { return []; }
-		// When names could not be matched unambiguously, do not fabricate an account identifier.
 		if (ids.length !== mentions.length) return [];
 		return ids.map((mentionId, index) => {
 			const mention = mentions[index]!;

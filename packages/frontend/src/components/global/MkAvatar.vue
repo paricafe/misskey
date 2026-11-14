@@ -270,10 +270,10 @@ watch(() => props.user.avatarBlurhash, () => {
 					skew(-30deg)
 					rotate(-37.5deg)
 					translate(-2.82842712475%, /* -2 * sqrt(2) */
-										-38.5857864376%); /* 40 - 2 * sqrt(2) */
+										-38.5857864376%);
 
 				> .plot {
-					background-position: 20% 10%; /* ~= 37.5deg */
+					background-position: 20% 10%;
 
 					&:first-child {
 						background-position-x: 21%;
@@ -299,11 +299,11 @@ watch(() => props.user.avatarBlurhash, () => {
 					skew(30deg)
 					rotate(37.5deg)
 					translate(2.82842712475%, /* 2 * sqrt(2) */
-										-38.5857864376%); /* 40 - 2 * sqrt(2) */
+										-38.5857864376%);
 
 				> .plot {
 					position: absolute;
-					background-position: 80% 10%; /* ~= 37.5deg */
+					background-position: 80% 10%;
 
 					&:first-child {
 						background-position-x: 79%;

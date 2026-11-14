@@ -75,7 +75,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> {
 	) {
 		super(meta, paramDef, async (ps, me) => {
 			const additionalProperties: Partial<{ likedCount: number, isLiked: boolean }> = {};
-			// Fetch the list
 			const userList = await this.userListsRepository.findOneBy(!ps.forPublic && me !== null ? {
 				id: ps.listId,
 				userId: me.id,

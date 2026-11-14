@@ -113,7 +113,7 @@ describe('API', () => {
 
 		const res = await cli.request('drive/files/create', {
 			file: testFile,
-			name: null, // nullのパラメータは消える
+			name: null,
 		});
 
 		expect(res).toEqual({
@@ -276,7 +276,6 @@ describe('API', () => {
 		const fetchMock = vi
 			.spyOn(globalThis, 'fetch')
 			.mockImplementation(async () => {
-				// 本来返すべき値は`Role`型だが、テストなのでお茶を濁す
 				return new Response('{}', { status: 200 });
 			});
 

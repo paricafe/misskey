@@ -29,9 +29,6 @@ export class QueueStatsService implements OnApplicationShutdown {
 	) {
 	}
 
-	/**
-	 * Report queue stats regularly
-	 */
 	@bindThis
 	public start(): void {
 		const log = [] as any[];

@@ -13,7 +13,6 @@ import { DI } from '@/di-symbols.js';
 import { RoleService } from '@/core/RoleService.js';
 import { ApiError } from '@/server/api/error.js';
 
-// TODO: UserWebhook schemaの適用
 export const meta = {
 	tags: ['webhooks'],
 
@@ -69,8 +68,6 @@ export const paramDef = {
 	},
 	required: ['name', 'url', 'on'],
 } as const;
-
-// TODO: ロジックをサービスに切り出す
 
 @Injectable()
 export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-disable-line import/no-default-export

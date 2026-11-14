@@ -82,11 +82,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				query.andWhere(ps.poll ? 'note.hasPoll = TRUE' : 'note.hasPoll = FALSE');
 			}
 
-			// TODO
-			//if (bot != undefined) {
-			//	query.isBot = bot;
-			//}
-
 			const notes = await query.limit(ps.limit).getMany();
 
 			return await this.noteEntityService.packMany(notes);

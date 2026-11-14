@@ -42,17 +42,14 @@ const props = defineProps<{
 	iconOnly?: boolean;
 	active?: boolean;
 
-	// for type=button
 	name?: string;
 	value?: string;
 	disabled?: boolean;
 
-	// for type=a
 	href?: string;
 	target?: string;
 	rel?: string;
 
-	// for type=routerLink
 	to?: string;
 	linkBehavior?: MkABehavior;
 }>();
@@ -133,7 +130,7 @@ function onMousedown(evt: MouseEvent): void {
 <style lang="scss" module>
 .root {
 	position: relative;
-	z-index: 1; // 他コンポーネントのbox-shadowに隠されないようにするため
+	z-index: 1;
 	display: block;
 	min-width: 100px;
 	width: max-content;

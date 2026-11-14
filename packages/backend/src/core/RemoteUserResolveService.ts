@@ -77,7 +77,6 @@ export class RemoteUserResolveService {
 			if (this.utilityService.isUriLocal(self.href)) {
 				const local = this.apDbResolverService.parseUri(self.href);
 				if (local.local && local.type === 'users') {
-					// the LR points to local
 					return (await this.apDbResolverService
 						.getUserFromApId(self.href)
 						.then((u) => {
@@ -94,9 +93,7 @@ export class RemoteUserResolveService {
 			return await this.apPersonService.createPerson(self.href);
 		}
 
-		// ユーザー情報が古い場合は、WebFingerからやりなおして返す
 		if (user.lastFetchedAt == null || Date.now() - user.lastFetchedAt.getTime() > 1000 * 60 * 60 * 24) {
-			// 繋がらないインスタンスに何回も試行するのを防ぐ, 後続の同様処理の連続試行を防ぐ ため 試行前にも更新する
 			await this.usersRepository.update(user.id, {
 				lastFetchedAt: new Date(),
 			});
@@ -105,11 +102,9 @@ export class RemoteUserResolveService {
 			const self = await this.resolveSelf(acctLower);
 
 			if (user.uri !== self.href) {
-				// if uri mismatch, Fix (user@host <=> AP's Person id(RemoteUser.uri)) mapping.
 				this.logger.info(`uri missmatch: ${acctLower}`);
 				this.logger.info(`recovery missmatch uri for (username=${username}, host=${host}) from ${user.uri} to ${self.href}`);
 
-				// validate uri
 				const uri = new URL(self.href);
 				if (uri.hostname !== host) {
 					throw new Error('Invalid uri');

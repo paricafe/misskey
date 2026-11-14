@@ -5,7 +5,6 @@
 
 'use strict';
 
-// ブロックの中に入れないと、定義した変数がブラウザのグローバルスコープに登録されてしまい邪魔なので
 (async () => {
 	window.onerror = (e) => {
 		console.error(e);
@@ -22,7 +21,6 @@
 		return;
 	}
 
-	// パラメータに応じてsplashのスタイルを変更
 	const params = new URLSearchParams(location.search);
 	if (params.has('rounded') && params.get('rounded') === 'false') {
 		document.documentElement.classList.add('norounded');
@@ -31,7 +29,6 @@
 		document.documentElement.classList.add('noborder');
 	}
 
-	//#region Detect language & fetch translations
 	const supportedLangs = LANGS;
 	/** @type { string } */
 	let lang = localStorage.getItem('lang');
@@ -41,19 +38,15 @@
 		} else {
 			lang = supportedLangs.find(x => x.split('-')[0] === navigator.language);
 
-			// Fallback
 			if (lang == null) lang = 'en-US';
 		}
 	}
 
-	// for https://github.com/misskey-dev/misskey/issues/10202
 	if (lang == null || lang.toString == null || lang.toString() === 'null') {
 		console.error('invalid lang value detected!!!', typeof lang, lang);
 		lang = 'en-US';
 	}
-	//#endregion
 
-	//#region Script
 	async function importAppScript() {
 		await import(CLIENT_ENTRY ? `/embed_vite/${CLIENT_ENTRY.replace('scripts', lang)}` : '/embed_vite/src/boot.ts')
 			.catch(async e => {
@@ -62,7 +55,6 @@
 			});
 	}
 
-	// タイミングによっては、この時点でDOMの構築が済んでいる場合とそうでない場合とがある
 	if (document.readyState !== 'loading') {
 		importAppScript();
 	} else {
@@ -72,7 +64,6 @@
 	}
 
 	localStorage.setItem('lang', lang);
-	//#endregion
 
 	async function addStyle(styleText) {
 		let css = document.createElement('style');
@@ -81,7 +72,6 @@
 	}
 
 	async function renderError(code) {
-		// Cannot set property 'innerHTML' of null を回避
 		if (document.readyState === 'loading') {
 			await new Promise(resolve => window.addEventListener('DOMContentLoaded', resolve));
 		}
@@ -92,7 +82,6 @@
 			messages = JSON.parse(bootloaderLocales);
 		}
 		if (!messages) {
-			// older version of misskey does not store bootloaderLocales, stores locale as a whole
 			const legacyLocale = localStorage.getItem('locale');
 			if (legacyLocale) {
 				const parsed = JSON.parse(legacyLocale);

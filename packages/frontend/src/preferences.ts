@@ -14,7 +14,6 @@ import { TypedBroadcastChannel as BroadcastChannel } from '@/utility/typed-broad
 import { misskeyApi } from '@/utility/misskey-api.js';
 import { TAB_ID } from '@/tab-id.js';
 
-// クラウド同期用グループ名
 const syncGroup = 'default';
 
 const io: StorageProvider = {
@@ -32,8 +31,6 @@ const io: StorageProvider = {
 	},
 
 	cloudGet: async (ctx) => {
-		// TODO: この取得方法だとアカウントが変わると保存場所も変わってしまうので改修する
-		// 例えば複数アカウントある場合でも設定値を保存するための「プライマリアカウント」を設定できるようにするとか
 		try {
 			const cloudData = await misskeyApi('i/registry/get', {
 				scope: ['client', 'preferences', 'sync'],
@@ -45,7 +42,7 @@ const io: StorageProvider = {
 				value: target[1],
 			};
 		} catch (err: any) {
-			if (err.code === 'NO_SUCH_KEY') { // TODO: いちいちエラーキャッチするのは面倒なのでキーが無くてもエラーにならない maybe-get のようなエンドポイントをバックエンドに実装する
+			if (err.code === 'NO_SUCH_KEY') {
 				return null;
 			} else {
 				throw err;
@@ -61,7 +58,7 @@ const io: StorageProvider = {
 				key: syncGroup + ':' + ctx.key,
 			}) as [any, any][];
 		} catch (err: any) {
-			if (err.code === 'NO_SUCH_KEY') { // TODO: いちいちエラーキャッチするのは面倒なのでキーが無くてもエラーにならない maybe-get のようなエンドポイントをバックエンドに実装する
+			if (err.code === 'NO_SUCH_KEY') {
 				cloudData = [];
 			} else {
 				throw err;
@@ -84,7 +81,6 @@ const io: StorageProvider = {
 	},
 
 	cloudGetBulk: async (ctx) => {
-		// TODO: 値の取得を1つのリクエストで済ませたい(バックエンド側でAPIの新設が必要)
 		const fetchings = ctx.needs.map(need => io.cloudGet(need).then(res => [need.key, res] as const));
 		const cloudDatas = await Promise.all(fetchings);
 
@@ -101,7 +97,6 @@ const io: StorageProvider = {
 
 export const prefer = new PreferencesManager(io, $i);
 
-//#region タブ間同期
 let latestPreferencesUpdate: {
 	tabId: string;
 	timestamp: number;
@@ -140,12 +135,9 @@ preferencesChannel.addEventListener('message', (ev) => {
 		};
 	}
 });
-//#endregion
 
-//#region 定期クラウドバックアップ
 let latestBackupAt = 0;
 
-// documentが非表示の間は実行されない (同期されていない古い値がバックアップされるのを防ぐ意味もある)
 createVisibilityAwareInterval(() => {
 	if ($i == null) return;
 	if (!store.s.enablePreferencesAutoCloudBackup) return;
@@ -155,7 +147,6 @@ createVisibilityAwareInterval(() => {
 		latestBackupAt = Date.now();
 	});
 }, 1000 * 60 * 3);
-//#endregion
 
 if (_DEV_) {
 	(window as any).prefer = prefer;

@@ -40,7 +40,7 @@ const props = defineProps<{
 	callback?: string;
 	name?: string;
 	icon?: string;
-	permission?: string; // コンマ区切り
+	permission?: string;
 }>();
 
 const _permissions = computed(() => {

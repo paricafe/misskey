@@ -13,10 +13,6 @@ export type SummarizeOptions = {
 	heapSnapshotBreakdownTopN: number;
 };
 
-/**
- * 中央値に最も近いサンプルを1つ選ぶ。
- * largestRequests のように中央値を取れない項目は、代表サンプルの値をそのまま採用する。
- */
 export function selectRepresentativeSample(samples: BrowserMeasurementSample[], getValue: (sample: BrowserMeasurementSample) => number) {
 	const medianValue = finiteMedian(samples.map(getValue), 0);
 	let selected: { sample: BrowserMeasurementSample; distance: number } | null = null;

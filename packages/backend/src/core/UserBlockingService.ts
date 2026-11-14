@@ -90,7 +90,6 @@ export class UserBlockingService implements OnModuleInit {
 			this.cacheService.userBlockingCache.refresh(blocker.id),
 			this.cacheService.userBlockedCache.refresh(blockee.id),
 		]).finally(() => {
-			// The database change also needs to invalidate peers if refreshing Redis fails.
 			this.globalEventService.publishInternalEvent('blockingCreated', {
 				blockerId: blocker.id,
 				blockeeId: blockee.id,
@@ -134,13 +133,11 @@ export class UserBlockingService implements OnModuleInit {
 			});
 		}
 
-		// リモートにフォローリクエストをしていたらUndoFollow送信
 		if (this.userEntityService.isLocalUser(follower) && this.userEntityService.isRemoteUser(followee)) {
 			const content = this.apRendererService.addContext(this.apRendererService.renderUndo(this.apRendererService.renderFollow(follower, followee), follower));
 			this.queueService.deliver(follower, content, followee.inbox, false);
 		}
 
-		// リモートからフォローリクエストを受けていたらReject送信
 		if (this.userEntityService.isRemoteUser(follower) && this.userEntityService.isLocalUser(followee)) {
 			const content = this.apRendererService.addContext(this.apRendererService.renderReject(this.apRendererService.renderFollow(follower, followee, request.requestId!), followee));
 			this.queueService.deliver(followee, content, follower.inbox, false);
@@ -190,8 +187,6 @@ export class UserBlockingService implements OnModuleInit {
 			return;
 		}
 
-		// Since we already have the blocker and blockee, we do not need to fetch
-		// them in the query above and can just manually insert them here.
 		blocking.blocker = blocker;
 		blocking.blockee = blockee;
 
@@ -207,7 +202,6 @@ export class UserBlockingService implements OnModuleInit {
 			});
 		});
 
-		// deliver if remote bloking
 		if (this.userEntityService.isLocalUser(blocker) && this.userEntityService.isRemoteUser(blockee)) {
 			const content = this.apRendererService.addContext(this.apRendererService.renderUndo(this.apRendererService.renderBlock(blocking), blocker));
 			this.queueService.deliver(blocker, content, blockee.inbox, false);

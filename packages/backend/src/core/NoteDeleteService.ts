@@ -63,11 +63,6 @@ export class NoteDeleteService {
 		private remoteUserResolveService: RemoteUserResolveService,
 	) {}
 
-	/**
-	 * 投稿を削除します。
-	 * @param user 投稿者
-	 * @param note 投稿
-	 */
 	async delete(user: { id: MiUser['id']; uri: MiUser['uri']; host: MiUser['host']; isBot: MiUser['isBot']; }, note: MiNote, quiet = false, deleter?: MiUser) {
 		const deletedAt = new Date();
 
@@ -105,11 +100,9 @@ export class NoteDeleteService {
 				deletedAt: deletedAt,
 			});
 
-			//#region ローカルの投稿なら削除アクティビティを配送
 			if (this.userEntityService.isLocalUser(user) && !note.localOnly) {
 				let renote: MiNote | null = null;
 
-				// if deleted note is renote
 				if (isRenote(note) && !isQuote(note)) {
 					renote = await this.notesRepository.findOneBy({
 						id: note.renoteId,
@@ -122,7 +115,6 @@ export class NoteDeleteService {
 
 				this.deliverToConcerned(user, note, content);
 			}
-			//#endregion
 
 			this.notesChart.update(note, false);
 			if (this.meta.enableChartsForRemoteUser || (user.host == null)) {
@@ -169,7 +161,6 @@ export class NoteDeleteService {
 		childTargetIds: MiNote['id'][];
 	}> {
 		return this.db.transaction(async transactionalEntityManager => {
-			// Capture the last committed edit, including history, before deleting it.
 			const snapshot = await transactionalEntityManager.findOne(MiNote, {
 				where: { id: note.id, userId: user.id },
 				select: { id: true, text: true, cw: true, mentions: true, mentionedRemoteUsers: true, history: true },
@@ -233,7 +224,6 @@ export class NoteDeleteService {
 	private async getMentionedRemoteUsers(note: MiNote) {
 		const where = [] as any[];
 
-		// mention / reply / dm
 		const uris = (JSON.parse(note.mentionedRemoteUsers) as IMentionedRemoteUsers).map(x => x.uri);
 		if (uris.length > 0) {
 			where.push(
@@ -248,7 +238,6 @@ export class NoteDeleteService {
 		const mentionIds = [...new Set([...note.mentions, ...history.flatMap(revision => revision.mentions ?? []), ...resolved.map(user => user.id)])];
 		if (mentionIds.length > 0) where.push({ id: In(mentionIds), host: Not(IsNull()) });
 
-		// renote / quote
 		if (note.renoteUserId) {
 			where.push({
 				id: note.renoteUserId,

@@ -74,7 +74,6 @@ export const Default = {
 			],
 		},
 		chromatic: {
-			// `XActivity` is not compatible with Chromatic for now
 			disableSnapshot: true,
 		},
 	},

@@ -103,7 +103,6 @@ export class ReversiGameChannel extends Channel {
 
 	@bindThis
 	public dispose() {
-		// Unsubscribe events
 		this.subscriber.off(`reversiGameStream:${this.gameId}`, this.send);
 	}
 }

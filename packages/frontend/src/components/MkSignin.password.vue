@@ -13,9 +13,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 			</I18n>
 		</div>
 
-		<!-- password入力 -->
 		<form class="_gaps_s" @submit.prevent="onSubmit">
-			<!-- ブラウザ オートコンプリート用 -->
 			<input type="hidden" name="username" autocomplete="username" :value="user.username">
 
 			<MkInput v-model="password" :placeholder="i18n.ts.password" type="password" autocomplete="current-password webauthn" :withPasswordToggle="true" required autofocus data-testid="signin-password">

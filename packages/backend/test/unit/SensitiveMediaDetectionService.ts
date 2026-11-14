@@ -126,7 +126,6 @@ describe('SensitiveMediaDetectionService', () => {
 		]));
 		const svc = makeService({ sensitiveMediaDetectionMaxImagesPerRequest: 2 });
 		const res = await svc.detectSensitiveMany([buf('a'), buf('b'), buf('c'), buf('d'), buf('e')]);
-		// 5 枚を 2 枚ずつ → 3 リクエスト、結果は順序を保って 5 件。
 		expect(sendMock).toHaveBeenCalledTimes(3);
 		expect(res).toHaveLength(5);
 		expect(res.every(x => x != null)).toBe(true);

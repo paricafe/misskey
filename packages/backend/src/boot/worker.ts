@@ -17,9 +17,6 @@ import { shutdownApplications } from './application-lifecycle.js';
 const logger = new Logger('core', 'cyan');
 const bootLogger = logger.createSubLogger('boot', 'magenta');
 
-/**
- * Init worker process
- */
 export async function workerMain() {
 	let config: Config;
 	try {
@@ -56,7 +53,6 @@ export async function workerMain() {
 	}
 
 	if (cluster.isWorker) {
-		// Send a 'ready' message to parent process
 		process.send!('ready');
 	}
 }

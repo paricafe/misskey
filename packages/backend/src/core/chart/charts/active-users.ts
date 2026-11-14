@@ -20,9 +20,6 @@ const week = 1000 * 60 * 60 * 24 * 7;
 const month = 1000 * 60 * 60 * 24 * 30;
 const year = 1000 * 60 * 60 * 24 * 365;
 
-/**
- * アクティブユーザーに関するチャート
- */
 @Injectable()
 export default class ActiveUsersChart extends Chart<typeof schema> { // eslint-disable-line import/no-default-export
 	constructor(

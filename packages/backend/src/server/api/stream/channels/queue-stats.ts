@@ -24,8 +24,6 @@ export class QueueStatsChannel extends Channel {
 		request: ChannelRequest,
 	) {
 		super(request);
-		//this.onStats = this.onStats.bind(this);
-		//this.onMessage = this.onMessage.bind(this);
 	}
 
 	@bindThis

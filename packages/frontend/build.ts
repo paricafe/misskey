@@ -6,13 +6,9 @@ import locales from 'i18n';
 import { LocaleInliner } from '../frontend-builder/locale-inliner.js'
 import { createLogger } from '../frontend-builder/logger';
 
-// requires node 21 or later
 const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
 const outputDir = __dirname + '/../../built/_frontend_vite_';
 
-/**
- * @return {Promise<void>}
- */
 async function viteBuild() {
 	await execa('vite', ['build'], {
 		cwd: __dirname,

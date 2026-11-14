@@ -38,7 +38,6 @@ export class ClipChannel extends Channel {
 		if (clip == null) return false;
 		if (!clip.isPublic && (this.user == null || clip.userId !== this.user.id)) return false;
 
-		// Subscribe stream
 		this.subscriber.on(`clipStream:${this.clipId}`, this.onEvent);
 
 		return true;
@@ -53,7 +52,6 @@ export class ClipChannel extends Channel {
 
 	@bindThis
 	public dispose() {
-		// Unsubscribe events
 		this.subscriber.off(`clipStream:${this.clipId}`, this.onEvent);
 	}
 }

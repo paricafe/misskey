@@ -27,7 +27,6 @@ export async function extractDroppedItems(ev: DragEvent): Promise<DroppedItem[]>
 	if ('webkitGetAsEntry' in apiTestItem) {
 		return readDataTransferItems(dropItems);
 	} else {
-		// webkitGetAsEntryに対応していない場合はfilesから取得する（ディレクトリのサポートは出来ない）
 		const dropFiles = ev.dataTransfer.files;
 		if (dropFiles.length === 0) {
 			return [];
@@ -49,9 +48,6 @@ export async function extractDroppedItems(ev: DragEvent): Promise<DroppedItem[]>
 	}
 }
 
-/**
- * ドラッグ＆ドロップされたファイルのリストからディレクトリ構造とファイルへの参照（{@link File}）を取得する。
- */
 export async function readDataTransferItems(itemList: DataTransferItemList): Promise<DroppedItem[]> {
 	async function readEntry(entry: FileSystemEntry): Promise<DroppedItem> {
 		if (entry.isFile) {
@@ -89,7 +85,6 @@ export async function readDataTransferItems(itemList: DataTransferItemList): Pro
 		return await Promise.all(allEntries.map(readEntry));
 	}
 
-	// 扱いにくいので配列に変換
 	const items = Array.of<DataTransferItem>();
 	for (let i = 0; i < itemList.length; i++) {
 		items.push(itemList[i]);
@@ -103,9 +98,6 @@ export async function readDataTransferItems(itemList: DataTransferItemList): Pro
 	);
 }
 
-/**
- * {@link DroppedItem}のリストからディレクトリを再帰的に検索し、ファイルのリストを取得する。
- */
 export function flattenDroppedFiles(items: DroppedItem[]): DroppedFile[] {
 	const result = Array.of<DroppedFile>();
 	for (const item of items) {

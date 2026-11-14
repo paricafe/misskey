@@ -76,7 +76,6 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-	// 必要なら戻り値を増やす
 	(ev: 'done'): void,
 	(ev: 'closed'): void
 }>();

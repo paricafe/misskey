@@ -43,13 +43,11 @@ export class MetaEntityService {
 			.where('ads.expiresAt > :now', { now: new Date() })
 			.andWhere('ads.startsAt <= :now', { now: new Date() })
 			.andWhere(new Brackets(qb => {
-				// 曜日のビットフラグを確認する
 				qb.where('ads.dayOfWeek & :dayOfWeek > 0', { dayOfWeek: 1 << new Date().getDay() })
 					.orWhere('ads.dayOfWeek = 0');
 			}))
 			.getMany();
 
-		// クライアントの手間を減らすためあらかじめJSONに変換しておく
 		let defaultLightTheme = null;
 		let defaultDarkTheme = null;
 		if (instance.defaultLightTheme) {

@@ -26,7 +26,6 @@ const props = defineProps<{
 	}
 }>();
 
-// if no instance data is given, this is for the local instance
 const instance = props.instance ?? {
 	name: serverMetadata.name,
 	themeColor: (window.document.querySelector('meta[name="theme-color-orig"]') as HTMLMetaElement)?.content,
@@ -51,7 +50,7 @@ $height: 2ex;
 	border-radius: 4px 0 0 4px;
 	overflow: clip;
 	color: #fff;
-	text-shadow: /* .866 ≈ sin(60deg) */
+	text-shadow:
 		1px 0 1px #000,
 		.866px .5px 1px #000,
 		.5px .866px 1px #000,

@@ -30,18 +30,15 @@ export class Routes {
 			const grant = await getAuthorization(request, this.deps.store);
 			if (!optional && (!grant || grant.kind !== 'user')) throw new HttpError(401, 'A user access token is required');
 			if (grant && scope && !(scope === 'read:accounts' && allowsScope(grant.scopes, 'profile'))) assertScope(grant.scopes, scope);
-			// The native token may have been revoked; confirm it before answering.
 			const verified = grant?.nativeToken ? this.deps.native.call('ping', {}, grant.nativeToken, { ip: request.ip }) : undefined;
 			const run = () => handler({ request, reply, grant, userId: grant?.userId ?? '', query: request.query as Json, body: (request.body ?? {}) as Json, params: request.params as Json,
 				call: <T>(endpoint: string, body: Json = {}) => this.deps.native.call<T>(endpoint, body, grant?.nativeToken, { ip: request.ip, userAgent: request.headers['user-agent'] }),
 			});
 			if (verified == null) return run();
 			if (method !== 'GET') {
-				// Writes must not start before the token is confirmed.
 				await verified;
 				return run();
 			}
-			// Reads overlap with the check; nothing is returned until it succeeds.
 			const result = Promise.resolve().then(run);
 			result.catch(() => {});
 			await verified;
@@ -74,7 +71,6 @@ export class Routes {
 			this.prefetchAuthors(context, authors),
 		]);
 		const store = preloadedStatusStore(this.deps.store, entries, filters);
-		// Bound native state lookups while preserving the source timeline order.
 		const result: Array<Json | null> = Array(statuses.length).fill(null);
 		let next = 0;
 		let failed = false;
@@ -88,7 +84,6 @@ export class Routes {
 		return result.filter((status): status is Json => status !== null);
 	}
 	private async prefetchAuthors(context: RequestContext, ids: string[]): Promise<void> {
-		// Preserve the native single-user visibility checks for anonymous requests.
 		if (!context.grant?.nativeToken) return;
 		const users = await context.call<Json[]>('users/show', { userIds: ids });
 		let cache = this.readCache.get(context);
@@ -278,9 +273,6 @@ function validateQuoteApprovalPolicy(value: unknown, nativeVisibility: string): 
 	const policy = value.trim();
 	if (!policy) return;
 	if (!['public', 'followers', 'nobody'].includes(policy)) throw new HttpError(422, 'Invalid quote_approval_policy');
-	// Mastodon forces private/direct posts to nobody regardless of this input.
-	// Native visibility already prevents other users quoting those posts. Public
-	// notes have no native mechanism for enforcing a more restrictive policy.
 	if (policy !== 'public' && !['followers', 'specified'].includes(nativeVisibility)) throw new HttpError(422, 'Only public quote approval is supported for public or unlisted statuses');
 }
 
@@ -314,7 +306,6 @@ function prepareStatusInput(input: Json, defaults: Json = {}, editing = false): 
 	if (input.media_ids !== undefined) {
 		const ids = strings(input.media_ids);
 		if (ids.length > 16 || ids.some(id => !id) || new Set(ids).size !== ids.length) throw new HttpError(422, 'Invalid media_ids');
-		// Clients send an empty list for text-only posts; native creation rejects an empty fileIds.
 		if (ids.length || editing) native.fileIds = ids;
 	}
 	if (!editing) {
@@ -370,7 +361,6 @@ async function createStatus(routes: Routes, c: RequestContext): Promise<Json> {
 	const quoted = body.renoteId ? await quoteTarget(routes, c, body.renoteId) : undefined;
 	if (quoted) {
 		body.renoteId = quoted.id;
-		// Misskey needs content to distinguish a quote from a pure renote.
 		if (!body.text?.trim() && !body.cw && !body.fileIds?.length && !body.poll && !body.replyId) body.text = quoted.url;
 	}
 	if (body.visibility === 'specified') {
@@ -381,8 +371,6 @@ async function createStatus(routes: Routes, c: RequestContext): Promise<Json> {
 		body.visibleUserIds = [...new Set(ids)].filter(id => id !== c.userId);
 		if (!body.visibleUserIds.length) throw new HttpError(422, 'A direct status needs a recipient mention');
 	}
-	// Recipient lookups above yield. Recheck and claim in a short database
-	// transaction so concurrent requests cannot both submit the native write.
 	const claimedReplay = key ? await store.transaction(async () => {
 		const id = await existing();
 		if (id) return id;
@@ -415,7 +403,6 @@ async function replyDescendants(routes: Routes, context: RequestContext, rootId:
 			for (const note of rows) {
 				if (note.replyId !== parentId || seen.has(note.id)) continue;
 				seen.add(note.id);
-				// Hidden replies are skipped together with their subtrees.
 				if (!routes.deps.entities.status(note, { viewerId: context.userId || null, allowLocalOnly: true })) continue;
 				notes.push(note);
 				pending.push(note.id);

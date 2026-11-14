@@ -34,7 +34,6 @@ describe('remote avatar decorations', () => {
 	test('does not wait for the remote server on a cache miss', async () => {
 		const { cache, getDecorations, resolveFetch } = setup(undefined);
 
-		// The remote fetch is still pending, but packing continues without decorations.
 		await expect(getDecorations('remote.example')).resolves.toEqual([]);
 		expect(cache.fetch).toHaveBeenCalledWith('remote-user');
 		resolveFetch();

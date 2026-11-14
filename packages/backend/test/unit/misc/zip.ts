@@ -28,19 +28,16 @@ async function buildZip(entries: TestEntry[]): Promise<Uint8Array> {
 	return new Uint8Array(await blob.arrayBuffer());
 }
 
-/**
- * ローカルファイルヘッダとセントラルディレクトリに記録された uncompressed size を書き換える (1 エントリの ZIP 専用)
- */
 function forgeUncompressedSize(zip: Uint8Array, size: number): Uint8Array {
 	const forged = new Uint8Array(zip);
 	const view = new DataView(forged.buffer, forged.byteOffset, forged.byteLength);
 	let patched = 0;
 	for (let i = 0; i + 4 <= forged.byteLength; i++) {
 		const signature = view.getUint32(i, true);
-		if (signature === 0x04034b50) { // local file header
+		if (signature === 0x04034b50) {
 			view.setUint32(i + 22, size, true);
 			patched++;
-		} else if (signature === 0x02014b50) { // central directory file header
+		} else if (signature === 0x02014b50) {
 			view.setUint32(i + 24, size, true);
 			patched++;
 		}
@@ -154,13 +151,12 @@ describe('misc:zip', () => {
 	});
 
 	test('rejects archives containing duplicate entry names', async () => {
-		// ZipWriter は重複名を許さないので、'b.png' を 'a.png' に書き換えて重複させる
 		const zip = await buildZip([
 			{ name: 'a.png', data: 'first' },
 			{ name: 'b.png', data: 'second' },
 		]);
 		const text = new TextDecoder('latin1').decode(zip);
-		expect(text.split('b.png').length - 1).toBe(2); // local file header + central directory
+		expect(text.split('b.png').length - 1).toBe(2);
 		const forged = new Uint8Array(zip);
 		for (let i = text.indexOf('b.png'); i !== -1; i = text.indexOf('b.png', i + 1)) {
 			forged[i] = 'a'.charCodeAt(0);
@@ -196,7 +192,6 @@ describe('misc:zip', () => {
 
 		const zip = await ZipFile.open(zipPath);
 		try {
-			// 1. meta.json だけを取り出す
 			let seen = 0;
 			for await (const entry of zip.entries()) {
 				seen++;
@@ -207,7 +202,6 @@ describe('misc:zip', () => {
 			expect(seen).toBe(count + 1);
 			expect(await fs.promises.readFile(path.join(dir, 'meta.json'), 'utf-8')).toBe('{"metaVersion":2}');
 
-			// 2. 任意のエントリを取り出す
 			const wanted = new Set(['e0.png', 'e2500.png', `e${count - 1}.png`]);
 			for await (const entry of zip.entries()) {
 				if (!wanted.has(entry.filename)) continue;
@@ -246,8 +240,6 @@ describe('misc:zip', () => {
 			const entry = (await findEntry(zip, 'bomb.bin'))!;
 			expect(entry.uncompressedSize).toBe(10);
 
-			// zip.js が伸長中にヘッダのサイズとの不一致を検出して打ち切る (ERR_INVALID_UNCOMPRESSED_SIZE)。
-			// それをすり抜けた場合でも extractToFile 側の書き出しバイト数の検査で打ち切られる
 			const dest = path.join(dir, 'bomb.bin');
 			await expect(zip.extractToFile(entry, dest, { maxBytes: 64 * 1024 })).rejects.toThrow();
 			expect(fs.existsSync(dest)).toBe(false);
@@ -258,7 +250,6 @@ describe('misc:zip', () => {
 
 	describe('ZipArchive', () => {
 		test('writes entries that round-trip through ZipFile', async () => {
-			// 512KB (zip.js の既定チャンクサイズ) をまたぐデータも壊れずに書き出せること
 			const image = new Uint8Array(1024 * 1024 + 12345);
 			for (let i = 0; i < image.length; i++) image[i] = (i * 31) & 0xff;
 			const srcDir = path.join(dir, 'src');
@@ -280,7 +271,6 @@ describe('misc:zip', () => {
 			try {
 				expect(await listNames(zip)).toEqual(['empty.png', 'meta.json', 'ok.png']);
 				for await (const entry of zip.entries()) {
-					// サイズが既知なので zip64 拡張は使われない
 					expect(entry.zip64).toBe(false);
 					await zip.extractToFile(entry, path.join(outDir, entry.filename), { maxBytes: 8 * 1024 * 1024 });
 				}
@@ -315,7 +305,6 @@ describe('misc:zip', () => {
 			const srcPath = path.join(dir, 'ok.txt');
 			await fs.promises.writeFile(srcPath, 'ok');
 
-			// zip.js の ZipWriter は名前を検証しないので、ZipArchive 側で弾けていることを確かめる
 			const unsafeNames = [
 				'../../../etc/cron.d/pwn',
 				'sub/../../pwn',
@@ -332,7 +321,6 @@ describe('misc:zip', () => {
 				for (const name of unsafeNames) {
 					await expect(archive.addFile(name, srcPath), name).rejects.toThrow(ZipArchiveError);
 				}
-				// traversal にならない '..' を含む名前は通す
 				for (const name of ['a..b.png', '..hidden.png', 'sub/dir/ok.png']) {
 					await expect(archive.addFile(name, srcPath), name).resolves.toBeUndefined();
 				}

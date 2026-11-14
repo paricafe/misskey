@@ -11,7 +11,6 @@ import type { Json } from './types.js';
 interface Upload { blob: Blob; name: string; }
 interface MultipartInput { fields: Json; files: Map<string, Upload>; }
 
-/** Parse the entire upload before performing a native write, regardless of part ordering. */
 async function input(c: RequestContext, acceptedFiles: readonly string[]): Promise<MultipartInput> {
 	if (!c.request.isMultipart()) return { fields: c.body, files: new Map() };
 	const fields: Json = Object.create(null);
@@ -60,7 +59,6 @@ async function ownedFile(c: RequestContext): Promise<Json> {
 		if (error instanceof NativeError && ['ACCESS_DENIED', 'NO_SUCH_FILE'].includes(error.code)) throw new HttpError(404, 'Record not found');
 		throw error;
 	});
-	// Native moderators may read other users' files; this endpoint is strictly owner-only.
 	if ((file.userId ?? file.user?.id) !== c.userId) throw new HttpError(404, 'Record not found');
 	return file;
 }
@@ -136,8 +134,6 @@ async function updateProfile(routes: Routes, c: RequestContext): Promise<Json> {
 			body[target] = null;
 		}
 	}
-	// Validate all ordinary fields before the first upload. Uploaded files remain in
-	// the user's drive if a later profile validation fails, matching native behavior.
 	for (const field of ['avatar', 'header']) {
 		const file = files.get(field);
 		if (file) {
@@ -187,8 +183,6 @@ async function search(routes: Routes, c: RequestContext, version: number): Promi
 		result.accounts = users.map(user => routes.deps.entities.account(user));
 	})());
 	if ((!type || type === 'statuses') && c.grant?.kind === 'user') tasks.push((async () => {
-		// Native notes/search accepts an offset but does not apply it. Advance its
-		// opaque ID cursor explicitly so a client does not receive page one again.
 		const notes: Json[] = [];
 		let untilId = c.query.max_id ? string(c.query.max_id) : undefined;
 		let skipped = 0;
@@ -223,7 +217,6 @@ async function resolveOrEmpty(call: () => Promise<Json>): Promise<Json | undefin
 }
 
 async function history(routes: Routes, c: RequestContext): Promise<Json[]> {
-	// Native notes omit edit history unless it is requested explicitly.
 	const note = await c.call<Json>('notes/show', { noteId: String(c.params.id), withHistory: true });
 	await routes.status(note, c);
 	const revisions = [...array(note.history), { ...note, createdAt: note.updatedAt ?? note.createdAt }];

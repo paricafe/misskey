@@ -83,7 +83,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 
 			const passwd = secureRndstr(8);
 
-			// Generate hash of password
 			const hash = bcrypt.hashSync(passwd);
 
 			await this.userProfilesRepository.update({

@@ -11,7 +11,6 @@ export const chartLegend = (legend: InstanceType<typeof MkChartLegend> | null | 
 	afterUpdate(chart, args, options) {
 		if (legend == null) return;
 
-		// Reuse the built-in legendItems generator
 		const items = chart.options.plugins!.legend!.labels!.generateLabels!(chart);
 
 		legend.update(chart, items);

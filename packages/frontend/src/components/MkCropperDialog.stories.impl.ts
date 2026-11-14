@@ -43,7 +43,6 @@ export const Default = {
 	},
 	parameters: {
 		chromatic: {
-			// NOTE: ロードが終わるまで待つ
 			delay: 3000,
 		},
 		layout: 'centered',

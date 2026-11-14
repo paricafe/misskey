@@ -54,7 +54,7 @@ const rootEl = useTemplateRef('rootEl');
 
 const menuIndicated = computed(() => {
 	for (const def in navbarItemDef) {
-		if (def === 'notifications') continue; // 通知は下にボタンとして表示されてるから
+		if (def === 'notifications') continue;
 		if (navbarItemDef[def].indicated) return true;
 	}
 	return false;

@@ -53,8 +53,6 @@ function verify(expected: LocaleRecord, actual: LocaleRecord, lang: string, trac
 	}
 }
 
-// index.tsはtsのまま動かすことを想定していない（ビルド成果物を外部に公開する）.
-// よってビルド後のものを検証する
 const locales = await import('../built/index.js');
 const { 'ja-JP': original, ...verifiees } = locales as unknown as Record<string, LocaleRecord>;
 

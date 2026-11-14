@@ -94,16 +94,11 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 		private userEntityService: UserEntityService,
 	) {
 		super(meta, paramDef, async (ps, me) => {
-			// check parameter
 			if (!ps.moveToAccount) throw new ApiError(meta.errors.noSuchUser);
-			// abort if user is the root
 			if (this.serverSettings.rootUserId === me.id) throw new ApiError(meta.errors.rootForbidden);
-			// abort if user has already moved
 			if (me.movedToUri) throw new ApiError(meta.errors.alreadyMoved);
 
-			// parse user's input into the destination account
 			const { username, host } = Acct.parse(ps.moveToAccount);
-			// retrieve the destination account
 			let moveTo = await this.remoteUserResolveService.resolveUser(username, host).catch((e) => {
 				this.apiLoggerService.logger.warn(`failed to resolve remote user: ${e}`);
 				throw new ApiError(meta.errors.noSuchUser);
@@ -111,12 +106,9 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 			const destination = await this.getterService.getUser(moveTo.id) as MiLocalUser | MiRemoteUser;
 			const newUri = this.userEntityService.getUserUri(destination);
 
-			// update local db
 			await this.apPersonService.updatePerson(newUri);
-			// retrieve updated user
 			moveTo = await this.apPersonService.resolvePerson(newUri);
 
-			// make sure that the user has indicated the old account as an alias
 			const fromUrl = this.userEntityService.genLocalUserUri(me.id);
 			let allowed = false;
 			if (moveTo.alsoKnownAs) {
@@ -128,7 +120,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				}
 			}
 
-			// abort if unintended
 			if (!allowed || moveTo.movedToUri) throw new ApiError(meta.errors.destinationAccountForbids);
 
 			return await this.accountMoveService.moveFromLocal(me, moveTo);

@@ -49,8 +49,6 @@ const paginator = markRaw(new Paginator('clips/notes', {
 
 let connection: Misskey.IChannelConnection<Misskey.Channels['clip']> | null = null;
 
-// 同じクリップを大勢が購読していると、更新の度に全員が同時にreloadしリクエストがスパイクしうるため、
-// 受信直後ではなくランダムな遅延を挟んでからreloadし、着火タイミングを分散させる
 let reloadTimer: number | null = null;
 
 function scheduleReload() {

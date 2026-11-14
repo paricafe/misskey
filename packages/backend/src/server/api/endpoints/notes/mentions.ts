@@ -61,11 +61,10 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 
 			const query = this.queryService.makePaginationQuery(this.notesRepository.createQueryBuilder('note'), ps.sinceId, ps.untilId, ps.sinceDate, ps.untilDate)
 				.andWhere(new Brackets(qb => {
-					qb // このmeIdAsListパラメータはqueryServiceのgenerateVisibilityQueryでセットされる
+					qb
 						.where(':meIdAsList <@ note.mentions')
 						.orWhere(':meIdAsList <@ note.visibleUserIds');
 				}))
-				// Avoid scanning primary key index
 				.orderBy('CONCAT(note.id)', (ps.sinceDate || ps.sinceId) ? 'ASC' : 'DESC')
 				.innerJoinAndSelect('note.user', 'user')
 				.leftJoinAndSelect('note.reply', 'reply')

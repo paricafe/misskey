@@ -87,9 +87,7 @@ function onMouseout() {
 function onDragover(ev: DragEvent) {
 	if (!ev.dataTransfer) return;
 
-	// 自分自身がドラッグされている場合
 	if (isDragging.value) {
-		// 自分自身にはドロップさせない
 		ev.dataTransfer.dropEffect = 'none';
 		return;
 	}
@@ -130,13 +128,11 @@ function onDrop(ev: DragEvent) {
 
 	if (!ev.dataTransfer) return;
 
-	// ファイルだったら
 	if (ev.dataTransfer.files.length > 0) {
 		emit('upload', Array.from(ev.dataTransfer.files), props.folder);
 		return;
 	}
 
-	//#region ドライブのファイル
 	{
 		const droppedData = getDragData(ev, 'driveFiles');
 		if (droppedData != null) {
@@ -152,15 +148,12 @@ function onDrop(ev: DragEvent) {
 			});
 		}
 	}
-	//#endregion
 
-	//#region ドライブのフォルダ
 	{
 		const droppedData = getDragData(ev, 'driveFolders');
 		if (droppedData != null) {
 			const droppedFolder = droppedData[0];
 
-			// 移動先が自分自身ならreject
 			if (droppedFolder.id === props.folder.id) return;
 
 			misskeyApi('drive/folders/update', {
@@ -191,7 +184,6 @@ function onDrop(ev: DragEvent) {
 			});
 		}
 	}
-	//#endregion
 }
 
 function onDragstart(ev: DragEvent) {
@@ -201,8 +193,6 @@ function onDragstart(ev: DragEvent) {
 	setDragData(ev, 'driveFolders', [props.folder]);
 	isDragging.value = true;
 
-	// 親ブラウザに対して、ドラッグが開始されたフラグを立てる
-	// (=あなたの子供が、ドラッグを開始しましたよ)
 	emit('dragstart');
 }
 

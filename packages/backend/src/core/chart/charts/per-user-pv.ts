@@ -15,9 +15,6 @@ import { ChartLoggerService } from '../ChartLoggerService.js';
 import { name, schema } from './entities/per-user-pv.js';
 import type { KVs } from '../core.js';
 
-/**
- * ユーザーごとのプロフィール被閲覧数に関するチャート
- */
 @Injectable()
 export default class PerUserPvChart extends Chart<typeof schema> { // eslint-disable-line import/no-default-export
 	constructor(

@@ -52,9 +52,6 @@ export class UserWebhookService implements OnApplicationShutdown {
 		return this.activeWebhooks;
 	}
 
-	/**
-	 * UserWebhook の一覧を取得する.
-	 */
 	@bindThis
 	public fetchWebhooks(params?: {
 		ids?: MiWebhook['id'][];
@@ -77,10 +74,6 @@ export class UserWebhookService implements OnApplicationShutdown {
 		return query.getMany();
 	}
 
-	/**
-	 * UserWebhook をWebhook配送キューに追加する
-	 * @see QueueService.userWebhookDeliver
-	 */
 	@bindThis
 	public async enqueueUserWebhook<T extends WebhookEventTypes>(
 		userId: MiUser['id'],
@@ -107,10 +100,10 @@ export class UserWebhookService implements OnApplicationShutdown {
 		switch (type) {
 			case 'webhookCreated': {
 				if (body.active) {
-					this.activeWebhooks.push({ // TODO: このあたりのデシリアライズ処理は各modelファイル内に関数としてexportしたい
+					this.activeWebhooks.push({
 						...body,
 						latestSentAt: body.latestSentAt ? new Date(body.latestSentAt) : null,
-						user: null, // joinなカラムは通常取ってこないので
+						user: null,
 					});
 				}
 				break;
@@ -119,16 +112,16 @@ export class UserWebhookService implements OnApplicationShutdown {
 				if (body.active) {
 					const i = this.activeWebhooks.findIndex(a => a.id === body.id);
 					if (i > -1) {
-						this.activeWebhooks[i] = { // TODO: このあたりのデシリアライズ処理は各modelファイル内に関数としてexportしたい
+						this.activeWebhooks[i] = {
 							...body,
 							latestSentAt: body.latestSentAt ? new Date(body.latestSentAt) : null,
-							user: null, // joinなカラムは通常取ってこないので
+							user: null,
 						};
 					} else {
-						this.activeWebhooks.push({ // TODO: このあたりのデシリアライズ処理は各modelファイル内に関数としてexportしたい
+						this.activeWebhooks.push({
 							...body,
 							latestSentAt: body.latestSentAt ? new Date(body.latestSentAt) : null,
-							user: null, // joinなカラムは通常取ってこないので
+							user: null,
 						});
 					}
 				} else {

@@ -33,7 +33,6 @@ export class GlobalTimelineChannel extends Channel {
 		private noteStreamingHidingService: NoteStreamingHidingService,
 	) {
 		super(request);
-		//this.onNote = this.onNote.bind(this);
 	}
 
 	@bindThis
@@ -44,7 +43,6 @@ export class GlobalTimelineChannel extends Channel {
 		this.withRenotes = !!(params.withRenotes ?? true);
 		this.withFiles = !!(params.withFiles ?? false);
 
-		// Subscribe events
 		this.subscriber.on('notesStream', this.onNote);
 	}
 
@@ -72,7 +70,6 @@ export class GlobalTimelineChannel extends Channel {
 
 	@bindThis
 	public dispose() {
-		// Unsubscribe events
 		this.subscriber.off('notesStream', this.onNote);
 	}
 }

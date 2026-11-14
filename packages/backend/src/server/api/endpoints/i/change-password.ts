@@ -56,7 +56,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				throw new Error('incorrect password');
 			}
 
-			// Generate hash of password
 			const salt = await bcrypt.genSalt(8);
 			const hash = await bcrypt.hash(ps.newPassword, salt);
 

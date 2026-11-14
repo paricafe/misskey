@@ -240,9 +240,6 @@ export class WatermarkRenderer {
 		this.compositor.changeResolution(width, height);
 	}
 
-	/*
-	 * disposeCanvas = true だとloseContextを呼ぶため、コンストラクタで渡されたcanvasも再利用不可になるので注意
-	 */
 	public destroy(disposeCanvas = true): void {
 		this.compositor.destroy(disposeCanvas);
 	}
@@ -255,7 +252,7 @@ async function createTextureFromUrl(imageUrl: string | null) {
 		const img = new Image();
 		img.onload = () => resolve(img);
 		img.onerror = reject;
-		img.src = getProxiedImageUrl(imageUrl); // CORS対策
+		img.src = getProxiedImageUrl(imageUrl);
 	}).catch(() => null);
 
 	if (image == null) return null;
@@ -273,9 +270,6 @@ async function createTextureFromText(text: string | null, resolution = 2048) {
 	const margin = fontSize / 2;
 	ctx.shadowColor = '#000000';
 	ctx.shadowBlur = fontSize / 4;
-
-	//ctx.fillStyle = '#00ff00';
-	//ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
 	ctx.fillStyle = '#ffffff';
 	ctx.font = `bold ${fontSize}px sans-serif`;

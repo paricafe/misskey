@@ -108,7 +108,6 @@ async function setup(app: FastifyInstance, options: GatewayOptions, deps: Return
 	registerNotifications(routes);
 }
 
-/** Install protocol routes; only OAuth's two shared URLs need dispatch before native handlers. */
 export function installGateway(app: FastifyInstance, options: GatewayOptions): { close(): Promise<void> } {
 	const deps = dependencies(options);
 	app.addHook('onRoute', route => {
@@ -118,8 +117,6 @@ export function installGateway(app: FastifyInstance, options: GatewayOptions): {
 			return handlesOAuth(request) ? dispatchHandler(request, reply, deps) : original.call(this, request, reply);
 		};
 	});
-	// Native OAuth already parses JSON and URL-encoded forms. Normalize multipart token
-	// forms before that parser, keeping the native OAuth implementation independent.
 	app.addHook('preParsing', async (request, _reply, payload) => {
 		if (request.method !== 'POST' || new URL(request.url, 'http://localhost').pathname.replace(/\/$/u, '') !== '/oauth/token' || !request.headers['content-type']?.startsWith('multipart/form-data')) return payload;
 		const chunks: Buffer[] = []; let size = 0;

@@ -9,7 +9,6 @@ import { createConnection } from 'node:net';
 
 const socketError = (message: string, code: string) => Object.assign(new Error(message), { code });
 
-/** Only the primary may remove a stale socket, before it creates a listener. */
 export async function prepareUnixSocket(socketPath: string): Promise<void> {
 	if (cluster.isWorker) return;
 	const stat = await lstat(socketPath).catch((error: NodeJS.ErrnoException) => {

@@ -118,9 +118,7 @@ const rootEl = useTemplateRef('rootEl');
 const contentAreaEl = useTemplateRef('contentAreaEl');
 const inputAreaEl = useTemplateRef('inputAreaEl');
 
-/** 値が編集中かどうか */
 const editing = ref<boolean>(false);
-/** 編集中の値. {@link beginEditing}と{@link endEditing}内、および各inputタグやそのコールバックからの操作のみを想定する */
 const editingValue = ref<CellValue>(undefined);
 
 const cellWidth = computed(() => cell.value.column.width);
@@ -135,7 +133,6 @@ const needsContentCentering = computed(() => {
 });
 
 watch(() => [cell.value.value], () => {
-	// 中身がセットされた直後はサイズが分からないので、次のタイミングで更新する
 	nextTick(emitContentSizeChanged);
 }, { immediate: true });
 
@@ -236,7 +233,6 @@ async function beginEditing(target: HTMLElement) {
 				emit('operation:beginEdit', cell.value);
 
 				await nextTick(() => {
-					// inputの展開後にフォーカスを当てたい
 					if (inputAreaEl.value) {
 						(inputAreaEl.value.querySelector('*') as HTMLElement).focus();
 					}
@@ -244,7 +240,6 @@ async function beginEditing(target: HTMLElement) {
 				break;
 			}
 			case 'boolean': {
-				// とくに特殊なUIは設けず、トグルするだけ
 				emitValueChange(!cell.value.value);
 				break;
 			}
@@ -342,7 +337,6 @@ $cellHeight: 28px;
 	box-sizing: border-box;
 	height: 100%;
 
-	// selected適用時に中身がズレてしまうので、透明の線をあらかじめ引いておきたい
 	border: solid 0.5px transparent;
 
 	&.selected {

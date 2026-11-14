@@ -96,7 +96,7 @@ test('preserves native error codes and rate limit headers', async () => {
 test('does not retry a write when the connection closes after the server receives it', async t => {
 	let mutations = 0;
 	const baseUrl = await server(t, async (request, response) => {
-		for await (const _chunk of request) { /* Consume the complete write request. */ }
+		for await (const _chunk of request) {   }
 		mutations += 1;
 		response.destroy();
 	});

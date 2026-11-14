@@ -8,7 +8,6 @@ import type { Schema } from '@/misc/json-schema.js';
 import { refs } from '@/misc/json-schema.js';
 
 export function convertSchemaToOpenApiSchema(schema: Schema, type: 'param' | 'res', includeSelfRef: boolean): any {
-	// optional, nullable, refはスキーマ定義に含まれないので分離しておく
 	const { optional, nullable, ref, selfRef, ...res1 }: any = schema;
 	const res = deepClone(res1);
 
@@ -16,7 +15,6 @@ export function convertSchemaToOpenApiSchema(schema: Schema, type: 'param' | 're
 		if (type === 'res') {
 			const required = Object.entries(schema.properties).filter(([k, v]) => !v.optional).map(([k]) => k);
 			if (required.length > 0) {
-			// 空配列は許可されない
 				res.required = required;
 			}
 		}

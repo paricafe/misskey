@@ -87,9 +87,6 @@ async function renderChart() {
 			borderRadius: 4,
 			barPercentage: 0.9,
 			fill: true,
-		/* @see <https://github.com/misskey-dev/misskey/pull/10365#discussion_r1155511107>
-		} satisfies ChartData, extra);
-		 */
 		}, extra);
 	}
 
@@ -143,7 +140,6 @@ async function renderChart() {
 					},
 					ticks: {
 						display: true,
-						//mirror: true,
 					},
 				},
 			},
@@ -163,7 +159,7 @@ async function renderChart() {
 					},
 					external: externalTooltipHandler,
 				},
-				...({ // TSを黙らすため
+				...({
 					gradient,
 				}),
 			},

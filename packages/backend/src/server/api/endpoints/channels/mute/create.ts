@@ -60,13 +60,11 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 		private channelMutingService: ChannelMutingService,
 	) {
 		super(meta, paramDef, async (ps, me) => {
-			// Check if exists the channel
 			const targetChannel = await this.channelsRepository.findOneBy({ id: ps.channelId });
 			if (!targetChannel) {
 				throw new ApiError(meta.errors.noSuchChannel);
 			}
 
-			// Check if already muting
 			const exist = await this.channelMutingService.isMuted({
 				requestUserId: me.id,
 				targetChannelId: targetChannel.id,
@@ -75,7 +73,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				throw new ApiError(meta.errors.alreadyMuting);
 			}
 
-			// Check if expiresAt is past
 			if (ps.expiresAt && ps.expiresAt <= Date.now()) {
 				throw new ApiError(meta.errors.expiresAtIsPast);
 			}

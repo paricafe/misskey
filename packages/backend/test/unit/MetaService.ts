@@ -30,7 +30,6 @@ describe('MetaService', () => {
 
 		metaService = app.get<MetaService>(MetaService, { strict: false });
 
-		// Make it cached
 		await metaService.fetch();
 	});
 

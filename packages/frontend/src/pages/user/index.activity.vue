@@ -49,16 +49,8 @@ function showMenu(ev: PointerEvent) {
 		action: () => {
 			chartSrc.value = 'per-user-pv';
 		},
-	}, /*, {
-		text: i18n.ts.following,
-		action: () => {
-			chartSrc = 'per-user-following';
-		}
-	}, {
-		text: i18n.ts.followers,
-		action: () => {
-			chartSrc = 'per-user-followers';
-		}
-	}*/], ev.currentTarget ?? ev.target);
+	},
+
+], ev.currentTarget ?? ev.target);
 }
 </script>

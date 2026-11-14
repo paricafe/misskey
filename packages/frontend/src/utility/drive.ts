@@ -43,23 +43,6 @@ export function uploadFile(file: File | Blob, options: {
 	const filePromise = new Promise<Misskey.entities.DriveFile>((resolve, reject) => {
 		if ($i == null) return reject();
 
-		// こっち側で検出するMIME typeとサーバーで検出するMIME typeは異なる場合があるため、こっち側ではやらないことにする
-		// https://github.com/misskey-dev/misskey/issues/16091
-		//const allowedMimeTypes = $i.policies.uploadableFileTypes;
-		//const isAllowedMimeType = allowedMimeTypes.some(mimeType => {
-		//	if (mimeType === '*' || mimeType === '*/*') return true;
-		//	if (mimeType.endsWith('/*')) return file.type.startsWith(mimeType.slice(0, -1));
-		//	return file.type === mimeType;
-		//});
-		//if (!isAllowedMimeType) {
-		//	os.alert({
-		//		type: 'error',
-		//		title: i18n.ts.failedToUpload,
-		//		text: i18n.ts.cannotUploadBecauseUnallowedFileType,
-		//	});
-		//	return reject();
-		//}
-
 		if ((file.size > instance.maxFileSize) || (file.size > ($i.policies.maxFileSizeMb * 1024 * 1024))) {
 			os.alert({
 				type: 'error',
@@ -89,7 +72,6 @@ export function uploadFile(file: File | Blob, options: {
 		xhr.onload = ((ev: ProgressEvent<XMLHttpRequest>) => {
 			let response;
 			try {
-				// Proxies may return an HTML error page instead of an API response.
 				if (xhr.status !== 413 && ev.target?.response != null) {
 					response = JSON.parse(ev.target.response);
 				}
@@ -236,7 +218,6 @@ export function chooseFileFromUrl(): Promise<Misskey.entities.DriveFile> {
 
 			const marker = genId();
 
-			// TODO: no websocketモード対応
 			const connection = useStream().useChannel('main');
 			connection.on('urlUploadFinished', urlResponse => {
 				if (urlResponse.marker === marker) {

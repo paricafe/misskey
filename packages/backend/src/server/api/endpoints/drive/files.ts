@@ -79,8 +79,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				case '-size': query.orderBy('file.size', 'ASC'); break;
 			}
 
-			// IS NULL は等値条件扱いされず (userId, folderId, id) インデックスの並びが使われないため、
-			// folderId も ORDER BY に含めて PK スキャンを避ける
 			const idOrder = query.expressionMap.orderBys['file.id'];
 			if (!ps.folderId && typeof idOrder === 'string') {
 				query.orderBy('file.folderId', idOrder).addOrderBy('file.id', idOrder);

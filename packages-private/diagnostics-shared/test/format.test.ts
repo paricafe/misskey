@@ -18,7 +18,6 @@ import {
 } from '../src/format';
 
 describe('formatBytes', () => {
-	// 1024ではなく1000区切り。単位が2桁以上なら小数を落とす
 	test.each([
 		[0, '0\u00A0B'],
 		[999, '999\u00A0B'],
@@ -69,19 +68,16 @@ describe('escaping', () => {
 });
 
 describe('percent helpers', () => {
-	// before が0だと変化率そのものが定義できない
 	test('returns a placeholder when the baseline is zero or missing', () => {
 		expect(calcAndFormatDeltaPercent(0, 10)).toBe('-');
 		expect(calcAndFormatDeltaPercent(null, 10)).toBe('-');
 		expect(calcAndFormatDeltaPercent(10, null)).toBe('-');
 	});
 
-	// 0になったのは「消えた」という有効な結果なので、隠さず -100% として出す
 	test('formats a drop to zero as -100%', () => {
 		expect(calcAndFormatDeltaPercent(10, 0)).toBe('$\\color{green}{\\text{-100\\%}}$');
 	});
 
-	// Markdownのテーブルセル内ではLaTeXの \% がさらに食われるため二重にする
 	test('doubles the percent escape for markdown table cells', () => {
 		expect(calcAndFormatDeltaPercentInMdTable(100, 110)).toContain('\\\\%');
 		expect(calcAndFormatDeltaPercent(100, 110)).not.toContain('\\\\%');

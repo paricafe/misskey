@@ -117,7 +117,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 
 					<div :class="$style.footer">
 						<div>
-							<!-- レイアウト調整用のスペース -->
 						</div>
 
 						<div :class="$style.center">
@@ -172,11 +171,9 @@ type GridItem = {
 function setupGrid(rowClass: { changedRow: string }): GridSetting {
 	return {
 		row: {
-			// グリッドの行数をあらかじめ100行確保する
 			minimumDefinitionCount: 100,
 			styleRules: [
 				{
-					// チェックされたら背景色を変える
 					condition: ({ row }) => gridItems.value[row.index].checked,
 					applyStyle: { className: rowClass.changedRow },
 				},
@@ -472,7 +469,6 @@ onMounted(async () => {
 	left:0;
 	bottom:0;
 	z-index: 1;
-	// stickyで追従させる都合上、フッター自身でpaddingを持つ必要があるため、親要素で画一的に指定している分をネガティブマージンで相殺している
 	margin-top: calc(var(--MI-margin) * -1);
 	margin-bottom: calc(var(--MI-margin) * -1);
 	padding-top: var(--MI-margin);

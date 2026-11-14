@@ -33,33 +33,22 @@ const accessDenied = {
 	id: '56f35758-7dd5-468b-8439-5d6fb8ec9b8e',
 };
 
-/**
- * multipartのpartを一時ファイルへ書き出す。
- * クライアントの問題により書き出しできなかった場合はエラーを返し、サーバーの問題により書き出しできなかった場合は例外を投げる。
- *
- * ここで `stream.pipeline()` を使ってはいけない。EOFをpush済みだが 'end' はまだ発火していない状態のままdestroyされた
- * readableに対し、`stream.pipeline()` は発火しない 'end' を待ち続けるため
- */
 async function writeMultipartFileToTemp(file: Readable, path: string): Promise<Error | null> {
 	const dest = fs.createWriteStream(path);
 
-	// 片方が失敗するともう片方は完了しなくなるため、先に失敗した側だけを原因として記録する
 	let failed = false;
 	const reading = stream.finished(file, { writable: false }).then(() => null, (err: Error) => {
-		if (failed) return null; // 書き込み側の失敗に巻き込まれた
+		if (failed) return null;
 		failed = true;
 		return err;
 	});
 	const writing = stream.finished(dest, { readable: false }).then(() => null, (err: Error) => {
-		if (failed) return null; // 読み込み側の失敗に巻き込まれた
+		if (failed) return null;
 		failed = true;
-		file.destroy(); // partを待ち続けても意味がないので破棄
+		file.destroy();
 		return err;
 	});
 
-	// end: falseにして、書き込み側を終わらせるのはpartの決着を見届けてから自分で行う。
-	// pipe()任せの自動end()はpartが 'end' を発火しないままdestroyされると呼ばれず、
-	// 書き込み側が永久に完了しない (空のpartの直後にlimitへ達した場合など)
 	file.pipe(dest, { end: false });
 
 	const readError = await reading;
@@ -115,7 +104,6 @@ export class ApiCallService implements OnApplicationShutdown {
 			const unixEpochInSeconds = Date.now();
 			if (typeof(info) === 'object' && info && 'resetMs' in info && typeof(info.resetMs) === 'number') {
 				const cooldownInSeconds = Math.ceil((info.resetMs - unixEpochInSeconds) / 1000);
-				// もしかするとマイナスになる可能性がなくはないのでマイナスだったら0にしておく
 				reply.header('Retry-After', Math.max(cooldownInSeconds, 0).toString(10));
 			} else {
 				this.logger.warn(`rate limit information has unexpected type ${typeof(err.info?.reset)}`);
@@ -124,7 +112,6 @@ export class ApiCallService implements OnApplicationShutdown {
 			reply.header('WWW-Authenticate', `Bearer realm="Misskey", error="invalid_request", error_description="${err.message}"`);
 			statusCode = statusCode ?? 400;
 		} else if (err.kind === 'permission') {
-			// (ROLE_PERMISSION_DENIEDは関係ない)
 			if (err.code === 'PERMISSION_DENIED') {
 				reply.header('WWW-Authenticate', `Bearer realm="Misskey", error="insufficient_scope", error_description="${err.message}"`);
 			}
@@ -200,7 +187,6 @@ export class ApiCallService implements OnApplicationShutdown {
 			? request.query
 			: request.body;
 
-		// https://datatracker.ietf.org/doc/html/rfc6750.html#section-2.1 (case sensitive)
 		const token = request.headers.authorization?.startsWith('Bearer ')
 			? request.headers.authorization.slice(7)
 			: body?.['i'];
@@ -236,7 +222,6 @@ export class ApiCallService implements OnApplicationShutdown {
 		reply: FastifyReply,
 	): Promise<void> {
 		const multipartData = await request.file().catch(() => {
-			/* Fastify throws if the remote didn't send multipart data. Return 400 below. */
 		});
 		if (multipartData == null) {
 			reply.code(400);
@@ -248,8 +233,6 @@ export class ApiCallService implements OnApplicationShutdown {
 		try {
 			const multipartError = await writeMultipartFileToTemp(multipartData.file, path);
 
-			// multipartを読み切れなかった場合
-			// クライアント起因なので400
 			if (multipartError != null) {
 				this.logger.debug(`Failed to read the multipart request body: ${multipartError.message}`);
 				reply.code(400);
@@ -257,8 +240,6 @@ export class ApiCallService implements OnApplicationShutdown {
 				return;
 			}
 
-			// ファイルサイズが制限を超えていた場合
-			// truncated はストリームを読み切ってからでないと機能しないため、書き出しより後にある必要がある
 			if (multipartData.file.truncated) {
 				reply.code(413);
 				reply.send();
@@ -270,7 +251,6 @@ export class ApiCallService implements OnApplicationShutdown {
 				fields[k] = typeof v === 'object' && 'value' in v ? v.value : undefined;
 			}
 
-			// https://datatracker.ietf.org/doc/html/rfc6750.html#section-2.1 (case sensitive)
 			const token = request.headers.authorization?.startsWith('Bearer ')
 				? request.headers.authorization.slice(7)
 				: fields['i'];
@@ -319,7 +299,6 @@ export class ApiCallService implements OnApplicationShutdown {
 				},
 			});
 		} else {
-			// 文字列を返す場合は、JSON.stringify通さないとJSONと認識されない
 			reply.send(typeof x === 'string' ? JSON.stringify(x) : x);
 		}
 	}
@@ -383,11 +362,9 @@ export class ApiCallService implements OnApplicationShutdown {
 				(limit as any).key = ep.name;
 			}
 
-			// TODO: 毎リクエスト計算するのもあれだしキャッシュしたい
 			const factor = user ? (await this.roleService.getUserPolicies(user.id)).rateLimitFactor : 1;
 
 			if (limitActor != null && factor > 0) {
-				// Rate limit
 				const rateLimit = await this.rateLimiterService.limit(limit as IEndpointMeta['limit'] & { key: NonNullable<string> }, limitActor, factor);
 				if (rateLimit != null) {
 					throw new ApiError({
@@ -449,7 +426,6 @@ export class ApiCallService implements OnApplicationShutdown {
 			}
 		}
 
-		// 未ログイン時は既定ポリシーで判定
 		if (ep.meta.requiredRolePolicy != null && (user == null || this.meta.rootUserId !== user.id)) {
 			const myRoles = user != null ? await this.roleService.getUserRoles(user.id) : [];
 			const policies = await this.roleService.getUserPolicies(user?.id ?? null);
@@ -473,7 +449,6 @@ export class ApiCallService implements OnApplicationShutdown {
 			});
 		}
 
-		// Cast non JSON input
 		if ((ep.meta.requireFile || request.method === 'GET') && ep.params.properties) {
 			for (const k of Object.keys(ep.params.properties)) {
 				const param = ep.params.properties![k];
@@ -494,8 +469,6 @@ export class ApiCallService implements OnApplicationShutdown {
 			}
 		}
 
-		// The API span starts in handleRequest/handleMultipartRequest so it also covers
-		// authentication, rate limiting, and parameter validation.
 		return await ep.exec(data, user, token, file, request.ip, request.headers)
 			.catch((err: Error) => this.#onExecError(ep, data, err, user?.id));
 	}

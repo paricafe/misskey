@@ -69,13 +69,11 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 		private getterService: GetterService,
 	) {
 		super(meta, paramDef, async (ps, me) => {
-			// Lookup user
 			const user = await this.getterService.getUser(ps.userId).catch(err => {
 				if (err.id === '15348ddd-432d-49c2-8a5a-8069753becff') throw new ApiError(meta.errors.noSuchUser);
 				throw err;
 			});
 
-			// Fetch recent notes
 			const recentNotesQuery = this.notesRepository.createQueryBuilder('note')
 				.select(['note.id', 'note.replyId'])
 				.where('note.userId = :userId', { userId: user.id })
@@ -83,8 +81,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				.orderBy('note.id', 'DESC')
 				.limit(1000);
 
-			// 対象ユーザー自身がリクエストしている場合、generateVisibilityQuery の
-			// `note.userId = :meId` に必ず一致して常に真になるので、条件ごと省略する
 			const isSelf = me != null && me.id === user.id;
 			if (!isSelf) {
 				this.queryService.generateVisibilityQuery(recentNotesQuery, me);
@@ -92,12 +88,10 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 
 			const recentNotes = await recentNotesQuery.getMany();
 
-			// 投稿が少なかったら中断
 			if (recentNotes.length === 0) {
 				return [];
 			}
 
-			// TODO ミュートを考慮
 			const replyTargetNotesQuery = this.notesRepository.createQueryBuilder('note')
 				.select(['note.id', 'note.userId'])
 				.where('note.id IN (:...replyIds)', { replyIds: recentNotes.map(p => p.replyId) });
@@ -108,7 +102,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 
 			const repliedUsers: any = {};
 
-			// Extract replies from recent notes
 			for (const userId of replyTargetNotes.map(x => x.userId.toString())) {
 				if (repliedUsers[userId]) {
 					repliedUsers[userId]++;
@@ -117,16 +110,12 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				}
 			}
 
-			// Calc peak
 			const peak = maximum(Object.values(repliedUsers));
 
-			// Sort replies by frequency
 			const repliedUsersSorted = Object.keys(repliedUsers).sort((a, b) => repliedUsers[b] - repliedUsers[a]);
 
-			// Extract top replied users
 			const topRepliedUserIds = repliedUsersSorted.slice(0, ps.limit);
 
-			// Make replies object (includes weights)
 			const _userMap = await this.userEntityService.packMany(topRepliedUserIds, me, { schema: 'UserDetailed' })
 				.then(users => new Map(users.map(u => [u.id, u])));
 			const repliesObj = await Promise.all(topRepliedUserIds.map(async (userId) => ({

@@ -3,10 +3,6 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-/**
- * Languages Loader
- */
-
 import * as fs from 'node:fs';
 import { load as loadYaml } from 'js-yaml';
 import { languages, primaries } from './const.js';
@@ -20,9 +16,6 @@ type PrimaryLang = keyof typeof primaries;
 
 type Locales = Record<Language, ILocale>;
 
-/**
- * オブジェクトを再帰的にマージする
- */
 function merge<T extends ILocale>(...args: (T | ILocale | undefined)[]): T {
 	return args.reduce<ILocale>((a, c) => ({
 		...a,
@@ -36,16 +29,10 @@ function merge<T extends ILocale>(...args: (T | ILocale | undefined)[]): T {
 	}), {} as ILocale) as T;
 }
 
-/**
- * 何故か文字列にバックスペース文字が混入することがあり、YAMLが壊れるので取り除く
- */
 function clean (text: string) {
 	return text.replace(new RegExp(String.fromCodePoint(0x08), 'g'), '');
 }
 
-/**
- * 空文字列が入ることがあり、フォールバックが動作しなくなるのでプロパティごと消す
- */
 function removeEmpty<T extends ILocale>(obj: T): T {
 	for (const [k, v] of Object.entries(obj)) {
 		if (v === '') {
@@ -58,9 +45,6 @@ function removeEmpty<T extends ILocale>(obj: T): T {
 }
 
 function build(): Record<Language, Locale> {
-	// vitestの挙動を調整するため、一度ローカル変数化する必要がある
-	// https://github.com/vitest-dev/vitest/issues/3988#issuecomment-1686599577
-	// https://github.com/misskey-dev/misskey/pull/14057#issuecomment-2192833785
 	const metaUrl = import.meta.url;
 	const locales = languages.reduce<Locales>((a, lang) => {
 		const locale = (loadYaml(clean(fs.readFileSync(new URL(`./locales/${lang}.yml`, metaUrl), 'utf-8'))) ?? {}) as ILocale;
@@ -103,12 +87,6 @@ const locales = build() as {
 	[lang: string]: Locale;
 };
 
-/**
- * フロントエンド用の locale JSON を書き出す
- * Service Worker が HTTP 経由で取得するために必要
- * @param destDir 出力先ディレクトリ（例: built/_frontend_dist_/locales）
- * @param version バージョン文字列（ファイル名とJSON内に埋め込まれる）
- */
 async function writeFrontendLocalesJson(destDir: string, version: string): Promise<void> {
 	const { mkdir, writeFile } = await import('node:fs/promises');
 	const { resolve } = await import('node:path');

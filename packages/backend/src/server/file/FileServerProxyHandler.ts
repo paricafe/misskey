@@ -46,7 +46,6 @@ export class FileServerProxyHandler {
 			return;
 		}
 
-		// アバタークロップなど、どうしてもオリジンである必要がある場合
 		const mustOrigin = 'origin' in request.query;
 
 		if (this.config.externalMediaProxyEnabled && !mustOrigin) {
@@ -55,7 +54,6 @@ export class FileServerProxyHandler {
 
 		this.validateUserAgent(request);
 
-		// Create temp file
 		const file = await this.getStreamAndTypeFromUrl(url);
 		if (file.kind === 'not-found') {
 			reply.code(404);
@@ -91,14 +89,11 @@ export class FileServerProxyHandler {
 		}
 	}
 
-	/**
-	 * 外部メディアプロキシにリダイレクトする
-	 */
 	private async redirectToExternalProxy(
 		request: FastifyRequest<{ Params: { url: string }; Querystring: ProxyQuery }>,
 		reply: FastifyReply,
 	) {
-		reply.header('Cache-Control', 'public, max-age=259200'); // 3 days
+		reply.header('Cache-Control', 'public, max-age=259200');
 
 		const url = new URL(`${this.config.mediaProxy}/${request.params.url || ''}`);
 
@@ -109,9 +104,6 @@ export class FileServerProxyHandler {
 		return reply.redirect(url.toString(), 301);
 	}
 
-	/**
-	 * User-Agent を検証する
-	 */
 	private validateUserAgent(request: FastifyRequest): void {
 		if (!request.headers['user-agent']) {
 			throw new StatusError('User-Agent is required', 400, 'User-Agent is required');
@@ -121,9 +113,6 @@ export class FileServerProxyHandler {
 		}
 	}
 
-	/**
-	 * 画像を処理してストリーム可能な形式に変換する
-	 */
 	private async processImage(
 		file: AvailableFile,
 		request: FastifyRequest<{ Params: { url: string }; Querystring: ProxyQuery }>,
@@ -164,9 +153,6 @@ export class FileServerProxyHandler {
 		return this.createDefaultStream(file, request, reply);
 	}
 
-	/**
-	 * 絵文字またはアバター用の画像を処理する
-	 */
 	private async processEmojiOrAvatar(
 		file: AvailableFile,
 		query: Pick<ProxyQuery, 'emoji' | 'avatar' | 'static'>,
@@ -194,9 +180,6 @@ export class FileServerProxyHandler {
 		};
 	}
 
-	/**
-	 * バッジ用の画像を処理する
-	 */
 	private async processBadge(file: AvailableFile): Promise<IImageStreamable> {
 		const mask = (await sharpBmp(file.path, file.mime))
 			.resize(96, 96, {
@@ -206,7 +189,7 @@ export class FileServerProxyHandler {
 			})
 			.greyscale()
 			.normalise()
-			.linear(1.75, -(128 * 1.75) + 128) // 1.75x contrast
+			.linear(1.75, -(128 * 1.75) + 128)
 			.flatten({ background: '#000' })
 			.toColorspace('b-w');
 
@@ -229,9 +212,6 @@ export class FileServerProxyHandler {
 		};
 	}
 
-	/**
-	 * デフォルトのストリームを作成する（Range リクエスト対応）
-	 */
 	private createDefaultStream(
 		file: AvailableFile,
 		request: FastifyRequest,

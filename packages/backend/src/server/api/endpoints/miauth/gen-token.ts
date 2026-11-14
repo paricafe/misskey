@@ -54,12 +54,10 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 		private notificationService: NotificationService,
 	) {
 		super(meta, paramDef, async (ps, me) => {
-			// Generate access token
 			const accessToken = secureRndstr(32);
 
 			const now = new Date();
 
-			// Insert access token doc
 			await this.accessTokensRepository.insert({
 				id: this.idService.gen(now.getTime()),
 				lastUsedAt: now,
@@ -73,7 +71,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				permission: ps.permission,
 			});
 
-			// アクセストークンが生成されたことを通知
 			this.notificationService.createNotification(me.id, 'createToken', {});
 
 			return {

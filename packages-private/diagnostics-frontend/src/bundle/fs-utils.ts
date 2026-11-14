@@ -6,10 +6,6 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
-/**
- * Windows の `\` 区切りを `/` に揃える。manifest 側のキーが常に `/` 区切りのため、
- * 実ファイルパスと突き合わせる前に正規化する必要がある。
- */
 export function normalizePath(filePath: string) {
 	return filePath.split(path.sep).join('/');
 }

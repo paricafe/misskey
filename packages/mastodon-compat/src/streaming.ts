@@ -110,10 +110,8 @@ async function openNative(native: StreamingDependencies['native'], token: string
 	const socketPath = native.socketPath;
 	const socket = new WebSocket(native.socketUrl(token), {
 		handshakeTimeout: 10_000, maxPayload: MAX_BUFFERED_BYTES, followRedirects: false,
-		// ws resets socketPath internally; keep the HTTP URL intact and override only the transport.
 		...(socketPath ? { createConnection: () => createConnection({ path: socketPath }) } : {}),
 	});
-	// A transport error may contain its credential-bearing URL. It must never reach a client or a logger.
 	socket.on('error', () => undefined);
 	await new Promise<void>((resolve, reject) => {
 		const abort = () => { cleanup(); socket.terminate(); reject(new StreamError(503, 'The streaming connection was cancelled')); };
@@ -295,14 +293,12 @@ class StreamingSession {
 	private enqueue(action: () => Promise<void>): void {
 		if (this.ended) return;
 		if (++this.pendingEvents > MAX_PENDING_EVENTS) { this.close(1013, 'Too many pending streaming events'); return; }
-		// Each action confirms the grant itself immediately before it emits.
 		this.queue = this.queue.then(async () => {
 			await this.checkFilters();
 			if (!this.ended) await action();
 		}).catch(async error => {
 			if (error instanceof NativeError && [401, 403].includes(error.status)) this.close(1008, 'The native authorization is unavailable');
 			else if (error instanceof StreamError) await this.sendError(error);
-			// Hidden/deleted entities and malformed native frames are intentionally not emitted.
 		}).finally(() => { this.pendingEvents--; });
 	}
 
@@ -321,7 +317,6 @@ class StreamingSession {
 		}
 	}
 
-	/** Every filter write changes the revision, so the list is reloaded only after checkFilters sees a new one. */
 	private async filters(): Promise<Array<{ key: string; value: unknown }>> {
 		const revision = this.filterRevision;
 		if (!this.filterCache || this.filterCache.revision !== revision) {
@@ -343,7 +338,6 @@ class StreamingSession {
 		return grant != null && this.emit(grant, target, event, payload);
 	}
 
-	/** The caller must have confirmed the grant after its last asynchronous read. */
 	private emit(grant: UserGrant, target: Subscription, event: string, payload?: Json | string): boolean {
 		if (this.ended || this.desiredSubscriptions.get(target.key) !== target || this.subscriptions.get(target.key) !== target || this.client.readyState !== WebSocket.OPEN) return false;
 		const required = event === 'notification' ? 'read:notifications' : 'read:statuses';
@@ -539,7 +533,6 @@ class StreamingSession {
 		return conversation;
 	}
 
-	/** Grants are insert-only, so the session grant still holds the current scopes. */
 	private async hydratedStatus(status: Json, store: StatusStore): Promise<Json> {
 		const grant = this.grant;
 		const reads = new Map<string, Promise<Json>>();
@@ -552,7 +545,6 @@ class StreamingSession {
 	}
 }
 
-/** Owns only the compatibility upgrade path; native routes remain owned by the host. */
 export function attachStreaming(server: Server, deps: StreamingDependencies): { close(): Promise<void> } {
 	const wss = new WebSocketServer({ noServer: true, maxPayload: 64 * 1024, perMessageDeflate: false });
 	const sessions = new Set<StreamingSession>();

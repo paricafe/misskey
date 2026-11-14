@@ -27,7 +27,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 		>
 			<template #default="{ item, dragStart }">
 				<div :class="$style.item">
-					<!-- divが無いとエラーになる -->
 					<RolesEditorFormula
 						:modelValue="item"
 						:dragStartCallback="dragStart"

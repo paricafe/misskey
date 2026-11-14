@@ -11,13 +11,11 @@ import { api, channel, clip, galleryPost, page, play, post, signup, simpleGet, u
 import type { SimpleGetResponse } from '../utils.js';
 import type * as misskey from 'misskey-js';
 
-// Request Accept in lowercase
 const ONLY_AP = 'application/activity+json';
 const PREFER_AP = 'application/activity+json, */*';
 const PREFER_HTML = 'text/html, */*';
 const UNSPECIFIED = '*/*';
 
-// Response Content-Type in lowercase
 const AP = 'application/activity+json; charset=utf-8';
 const HTML = 'text/html; charset=utf-8';
 const JSON_UTF8 = 'application/json; charset=utf-8';
@@ -45,7 +43,6 @@ describe('Webリソース', () => {
 		const { path, accept, cookie, type } = param;
 		const res = await simpleGet(path, accept, cookie);
 		assert.strictEqual(res.status, 200);
-		// Header values are case-insensitive
 		assert.strictEqual(res.type?.toLowerCase(), (type ?? HTML).toLowerCase());
 		return res;
 	};
@@ -97,7 +94,7 @@ describe('Webリソース', () => {
 
 	describe.each([
 		{ path: '/', type: HTML },
-		{ path: '/docs/ja-JP/about', type: HTML }, // "指定されたURLに該当するページはありませんでした。"
+		{ path: '/docs/ja-JP/about', type: HTML },
 		{ path: '/api-doc', type: HTML },
 		{ path: '/api.json', type: JSON_UTF8 },
 		{ path: '/api-console', type: HTML },
@@ -118,9 +115,6 @@ describe('Webリソース', () => {
 	])('$path', (p) => {
 		test('がGETできる。', async () => await ok({ ...p }));
 
-		// 注意: Webページが200で取得できても、実際のHTMLが正しく表示できるとは限らない
-		//      例えば、 /@xxx/pages/yyy に存在しないIDを渡した場合、HTTPレスポンスではエラーを区別できない
-		//      こういったアサーションはフロントエンドE2EやAPI Endpointのテストで担保する。
 	});
 
 	describe.each([
@@ -164,7 +158,6 @@ describe('Webリソース', () => {
 			test('MFMを含まない。', async () => {
 				const content = await simpleGet(path(alice.username), '*/*', undefined, res => res.text());
 				const _body: unknown = content.body;
-				// JSONフィードのときは改めて文字列化する
 				const body: string = typeof (_body) === 'object' ? JSON.stringify(_body) : _body as string;
 
 				if (body.includes('**a**')) {
@@ -205,10 +198,6 @@ describe('Webリソース', () => {
 				assert.strictEqual(metaTag(res, 'misskey:user-username'), alice.username);
 				assert.strictEqual(metaTag(res, 'misskey:user-id'), alice.id);
 
-				// TODO ogタグの検証
-				// TODO profile.noCrawleの検証
-				// TODO twitter:creatorの検証
-				// TODO <link rel="me" ...>の検証
 			});
 			test('はHTMLとしてGETできる。(存在しないIDでも。)', async () => await ok({
 				path: path('xxxxxxxxxx'),
@@ -239,7 +228,6 @@ describe('Webリソース', () => {
 	});
 
 	describe.each([
-		// 実際のハンドルはフロントエンド(index.vue)で行われる
 		{ sub: 'home' },
 		{ sub: 'notes' },
 		{ sub: 'activity' },
@@ -271,9 +259,6 @@ describe('Webリソース', () => {
 			assert.strictEqual(metaTag(res, 'misskey:user-id'), alice.id);
 			assert.strictEqual(metaTag(res, 'misskey:page-id'), alicePage.id);
 
-			// TODO ogタグの検証
-			// TODO profile.noCrawleの検証
-			// TODO twitter:creatorの検証
 		});
 
 		test('はGETできる。(存在しないIDでも。)', async () => await ok({
@@ -325,7 +310,6 @@ describe('Webリソース', () => {
 			path: '/inbox',
 		}));
 
-		// test.todo('POSTできる？');
 	});
 
 	describe('/users/:id/inbox', () => {
@@ -335,7 +319,6 @@ describe('Webリソース', () => {
 			path: path(alice.id),
 		}));
 
-		// test.todo('POSTできる？');
 	});
 
 	describe('/users/:id/outbox', () => {
@@ -367,9 +350,6 @@ describe('Webリソース', () => {
 				assert.strictEqual(metaTag(res, 'misskey:user-id'), alice.id);
 				assert.strictEqual(metaTag(res, 'misskey:note-id'), alicesPost.id);
 
-				// TODO ogタグの検証
-				// TODO profile.noCrawleの検証
-				// TODO twitter:creatorの検証
 			});
 
 			test('はHTMLとしてGETできる。(存在しないIDでも。)', async () => await ok({
@@ -408,9 +388,6 @@ describe('Webリソース', () => {
 			assert.strictEqual(metaTag(res, 'misskey:user-id'), alice.id);
 			assert.strictEqual(metaTag(res, 'misskey:flash-id'), alicePlay.id);
 
-			// TODO ogタグの検証
-			// TODO profile.noCrawleの検証
-			// TODO twitter:creatorの検証
 		});
 
 		test('がGETできる。(存在しないIDでも。)', async () => await ok({
@@ -429,8 +406,6 @@ describe('Webリソース', () => {
 			assert.strictEqual(metaTag(res, 'misskey:user-id'), alice.id);
 			assert.strictEqual(metaTag(res, 'misskey:clip-id'), aliceClip.id);
 
-			// TODO ogタグの検証
-			// TODO profile.noCrawleの検証
 		});
 
 		test('がGETできる。(存在しないIDでも。)', async () => await ok({
@@ -448,9 +423,6 @@ describe('Webリソース', () => {
 			assert.strictEqual(metaTag(res, 'misskey:user-username'), alice.username);
 			assert.strictEqual(metaTag(res, 'misskey:user-id'), alice.id);
 
-			// FIXME: misskey:gallery-post-idみたいなmetaタグの設定がない
-			// TODO profile.noCrawleの検証
-			// TODO twitter:creatorの検証
 		});
 
 		test('がGETできる。(存在しないIDでも。)', async () => await ok({
@@ -466,8 +438,6 @@ describe('Webリソース', () => {
 				path: path(aliceChannel.id),
 			});
 
-			// FIXME: misskey関連のmetaタグの設定がない
-			// TODO ogタグの検証
 		});
 
 		test('がGETできる。(存在しないIDでも。)', async () => await ok({

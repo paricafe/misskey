@@ -272,8 +272,6 @@ function onDragstart(ev: DragEvent) {
 	ev.dataTransfer.effectAllowed = 'move';
 	setDragData(ev, 'deckColumn', props.column.id);
 
-	// Chromeのバグで、Dragstartハンドラ内ですぐにDOMを変更する(=リアクティブなプロパティを変更する)とDragが終了してしまう
-	// SEE: https://stackoverflow.com/questions/19639969/html5-dragend-event-firing-immediately
 	window.setTimeout(() => {
 		dragging.value = true;
 	}, 10);
@@ -286,9 +284,7 @@ function onDragend(ev: DragEvent) {
 function onDragover(ev: DragEvent) {
 	if (ev.dataTransfer == null) return;
 
-	// 自分自身がドラッグされている場合
 	if (dragging.value) {
-		// 自分自身にはドロップさせない
 		ev.dataTransfer.dropEffect = 'none';
 	} else {
 		const isDeckColumn = checkDragDataType(ev, ['deckColumn']);

@@ -119,34 +119,16 @@ class HttpsRequestServiceAgent extends https.Agent {
 
 @Injectable()
 export class HttpRequestService {
-	/**
-	 * Get http non-proxy agent (without local address filtering)
-	 */
 	private readonly httpNative: http.Agent;
 
-	/**
-	 * Get https non-proxy agent (without local address filtering)
-	 */
 	private readonly httpsNative: https.Agent;
 
-	/**
-	 * Get http non-proxy agent
-	 */
 	private readonly http: http.Agent;
 
-	/**
-	 * Get https non-proxy agent
-	 */
 	private readonly https: https.Agent;
 
-	/**
-	 * Get http proxy or non-proxy agent
-	 */
 	public readonly httpAgent: http.Agent;
 
-	/**
-	 * Get https proxy or non-proxy agent
-	 */
 	public readonly httpsAgent: https.Agent;
 
 	constructor(
@@ -154,9 +136,9 @@ export class HttpRequestService {
 		private config: Config,
 	) {
 		const cache = new CacheableLookup({
-			maxTtl: 3600,	// 1hours
-			errorTtl: 30,	// 30secs
-			lookup: false,	// nativeのdns.lookupにfallbackしない
+			maxTtl: 3600,
+			errorTtl: 30,
+			lookup: false,
 		});
 
 		const agentOption = {
@@ -201,12 +183,6 @@ export class HttpRequestService {
 			: this.https;
 	}
 
-	/**
-	 * Get agent by URL
-	 * @param url URL
-	 * @param bypassProxy Always bypass proxy
-	 * @param isLocalAddressAllowed
-	 */
 	@bindThis
 	public getAgentByUrl(url: URL, bypassProxy = false, isLocalAddressAllowed = false): http.Agent | https.Agent {
 		if (bypassProxy || (this.config.proxyBypassHosts ?? []).includes(url.hostname)) {
@@ -222,11 +198,6 @@ export class HttpRequestService {
 		}
 	}
 
-	/**
-	 * Get agent for http by URL
-	 * @param url URL
-	 * @param isLocalAddressAllowed
-	 */
 	@bindThis
 	public getAgentForHttp(url: URL, isLocalAddressAllowed = false): http.Agent {
 		if ((this.config.proxyBypassHosts ?? []).includes(url.hostname)) {
@@ -238,11 +209,6 @@ export class HttpRequestService {
 		}
 	}
 
-	/**
-	 * Get agent for https by URL
-	 * @param url URL
-	 * @param isLocalAddressAllowed
-	 */
 	@bindThis
 	public getAgentForHttps(url: URL, isLocalAddressAllowed = false): https.Agent {
 		if ((this.config.proxyBypassHosts ?? []).includes(url.hostname)) {
@@ -269,7 +235,7 @@ export class HttpRequestService {
 			validators: [validateContentTypeSetAsActivityPub],
 		});
 
-		const finalUrl = res.url; // redirects may have been involved
+		const finalUrl = res.url;
 		const activity = await res.json() as IObject;
 
 		assertActivityMatchesUrl(url, activity, finalUrl, allowSoftfail);

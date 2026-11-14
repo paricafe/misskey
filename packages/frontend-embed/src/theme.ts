@@ -3,8 +3,6 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-// TODO: (可能な部分を)sharedに抽出して frontend と共通化
-
 import lightTheme from '@@/themes/_light.json5';
 import darkTheme from '@@/themes/_dark.json5';
 import { compile } from '@@/js/theme.js';
@@ -29,7 +27,6 @@ export function applyTheme(theme: Theme) {
 
 	window.document.documentElement.dataset.colorScheme = colorScheme;
 
-	// Deep copy
 	const _theme = JSON.parse(JSON.stringify(theme));
 
 	if (_theme.base) {
@@ -49,6 +46,4 @@ export function applyTheme(theme: Theme) {
 	for (const [k, v] of Object.entries(props)) {
 		window.document.documentElement.style.setProperty(`--MI_THEME-${k}`, v.toString());
 	}
-
-	// iframeを正常に透過させるために、cssのcolor-schemeは `light dark;` 固定にしてある。style.scss参照
 }

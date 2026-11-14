@@ -15,8 +15,6 @@ import { validateContentTypeSetAsJsonLD } from './misc/validator.js';
 import type { JsonLdDocument } from 'jsonld';
 import type { JsonLd as JsonLdObject, RemoteDocument } from 'jsonld/jsonld-spec.js';
 
-// RsaSignature2017 implementation is based on https://github.com/transmute-industries/RsaSignature2017
-
 export class JsonLdError extends IdentifiableError {
 	constructor(id: string, message?: string) {
 		super(id, message);
@@ -125,8 +123,6 @@ export class JsonLd {
 	@bindThis
 	public async compact(data: any, context: any = CONTEXT): Promise<JsonLdDocument> {
 		const customLoader = this.getLoader();
-		// XXX: Importing jsonld dynamically since Jest frequently fails to import it statically
-		// https://github.com/misskey-dev/misskey/pull/9894#discussion_r1103753595
 		return (await import('jsonld')).default.compact(data, context, {
 			documentLoader: customLoader,
 		});
@@ -140,10 +136,6 @@ export class JsonLd {
 		});
 	}
 
-	/**
-	 * Prevent any further HTTP requests from being made for the sake of
-	 * validating JSON-LD signatures.
-	 */
 	@bindThis
 	public freeze(): void { this.frozen = true; }
 

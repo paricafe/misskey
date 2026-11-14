@@ -230,7 +230,6 @@ async function run() {
 	}, {
 		in: aiScriptReadline,
 		out: () => {
-			// nop
 		},
 		err: (err) => {
 			os.alert({
@@ -240,7 +239,6 @@ async function run() {
 			});
 		},
 		log: () => {
-			// nop
 		},
 	});
 

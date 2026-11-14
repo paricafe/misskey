@@ -216,7 +216,7 @@ watch(rootEl, (el) => {
 	if (el && scrollContainer == null) {
 		scrollContainer = getScrollContainer(el);
 		if (scrollContainer == null) return;
-		scrollContainer.addEventListener('scroll', onScrollContainerScroll, { passive: true }); // ほんとはscrollendにしたいけどiosが非対応
+		scrollContainer.addEventListener('scroll', onScrollContainerScroll, { passive: true });
 	}
 }, { immediate: true });
 
@@ -232,7 +232,7 @@ let isPausingUpdate = false;
 watch(visibility, () => {
 	if (visibility.value === 'hidden') {
 		isPausingUpdate = true;
-	} else { // 'visible'
+	} else {
 		isPausingUpdate = false;
 		if (isTop()) {
 			releaseQueue();
@@ -250,7 +250,6 @@ const POLLING_INTERVAL =
 	MIN_POLLING_INTERVAL;
 
 if (!store.s.realtimeMode) {
-	// TODO: 先頭のノートの作成日時が1日以上前であれば流速が遅いTLと見做してインターバルを通常より延ばす
 	useInterval(async () => {
 		paginator.fetchNewer({
 			toQueue: () => !isTop() || isPausingUpdate,
@@ -435,7 +434,6 @@ defineExpose({
 
 <style lang="scss" module>
 .root {
-	// The virtual list owns scroll compensation, including its pagination controls.
 	overflow-anchor: none;
 }
 
@@ -449,7 +447,7 @@ defineExpose({
 }
 
 .new {
-	--gapFill: 0.5px; // 上位ヘッダーの高さにフォントの関係などで少数が含まれると、レンダリングエンジンによっては隙間が表示されてしまうため、隙間を隠すために少しずらす
+	--gapFill: 0.5px;
 
 	position: sticky;
 	top: calc(var(--MI-stickyTop, 0px) - var(--gapFill));
@@ -459,7 +457,6 @@ defineExpose({
 	padding: calc(10px + var(--gapFill)) 0 10px 0;
 }
 
-/* 疑似progressive blur */
 .newBg1, .newBg2 {
 	position: absolute;
 	top: 0;

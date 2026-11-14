@@ -7,7 +7,6 @@ import { randomBytes } from 'node:crypto';
 import type { TestContext } from 'node:test';
 import { Pool } from 'pg';
 
-/** Apply the compatibility migration history in an isolated schema, never a production table. */
 export async function postgresFixture(t: TestContext): Promise<string> {
 	const configured = process.env.MASTODON_TEST_DATABASE_URL;
 	if (!configured) throw new Error('Set MASTODON_TEST_DATABASE_URL to an isolated test PostgreSQL database');

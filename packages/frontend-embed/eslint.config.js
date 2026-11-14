@@ -19,12 +19,10 @@ export default [
 				...Object.fromEntries(Object.entries(globals.node).map(([key]) => [key, 'off'])),
 				...globals.browser,
 
-				// Node.js
 				module: false,
 				require: false,
 				__dirname: false,
 
-				// Misskey
 				_DEV_: false,
 				_LANGS_: false,
 				_VERSION_: false,
@@ -45,19 +43,6 @@ export default [
 				allowSingleExtends: true,
 			}],
 			'import/consistent-type-specifier-style': ['error', 'prefer-top-level'],
-			// window ... グローバルスコープと衝突し、予期せぬ結果を招くため
-			// e ... error や event など、複数のキーワードの頭文字であり分かりにくいため
-			// close ... window.closeと衝突 or 紛らわしい
-			// open ... window.openと衝突 or 紛らわしい
-			// fetch ... window.fetchと衝突 or 紛らわしい
-			// location ... window.locationと衝突 or 紛らわしい
-			// document ... window.documentと衝突 or 紛らわしい
-			// history ... window.historyと衝突 or 紛らわしい
-			// scroll ... window.scrollと衝突 or 紛らわしい
-			// setTimeout ... window.setTimeoutと衝突 or 紛らわしい
-			// setInterval ... window.setIntervalと衝突 or 紛らわしい
-			// clearTimeout ... window.clearTimeoutと衝突 or 紛らわしい
-			// clearInterval ... window.clearIntervalと衝突 or 紛らわしい
 			'id-denylist': ['error', 'window', 'e', 'close', 'open', 'fetch', 'location', 'document', 'history', 'scroll', 'setTimeout', 'setInterval', 'clearTimeout', 'clearInterval'],
 			'no-restricted-globals': [
 				'error',

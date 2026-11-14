@@ -257,7 +257,6 @@ async function launchPlugin(id: Plugin['installId']): Promise<void> {
 	const plugin = prefer.s.plugins.find(x => x.installId === id);
 	if (!plugin) return;
 
-	// 後方互換性のため
 	if (plugin.src == null) return;
 
 	pluginLogs.value.set(plugin.installId, []);
@@ -297,7 +296,7 @@ async function launchPlugin(id: Plugin['installId']): Promise<void> {
 				message: `${err}`,
 				isError: true,
 			});
-			throw err; // install時のtry-catchに反応させる
+			throw err;
 		},
 	});
 
@@ -464,7 +463,6 @@ async function createPluginEnv(opts: { plugin: Plugin; storageKey: string }): Pr
 		'Plugin:config': values.OBJ(config),
 	};
 
-	// 後方互換性のため
 	env['Plugin:register_post_form_action'] = env['Plugin:register:post_form_action'];
 	env['Plugin:register_user_action'] = env['Plugin:register:user_action'];
 	env['Plugin:register_note_action'] = env['Plugin:register:note_action'];

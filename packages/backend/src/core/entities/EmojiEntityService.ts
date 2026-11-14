@@ -31,7 +31,6 @@ export class EmojiEntityService {
 			aliases: emoji.aliases,
 			name: emoji.name,
 			category: emoji.category,
-			// || emoji.originalUrl してるのは後方互換性のため（publicUrlはstringなので??はだめ）
 			url: emoji.publicUrl || emoji.originalUrl,
 			localOnly: emoji.localOnly ? true : undefined,
 			isSensitive: emoji.isSensitive ? true : undefined,
@@ -58,7 +57,6 @@ export class EmojiEntityService {
 			name: emoji.name,
 			category: emoji.category,
 			host: emoji.host,
-			// || emoji.originalUrl してるのは後方互換性のため（publicUrlはstringなので??はだめ）
 			url: emoji.publicUrl || emoji.originalUrl,
 			license: emoji.license,
 			isSensitive: emoji.isSensitive,
@@ -132,14 +130,12 @@ export class EmojiEntityService {
 			roles?: Map<MiRole['id'], MiRole>
 		},
 	): Promise<Packed<'EmojiDetailedAdmin'>[]> {
-		// IDのみの要素をピックアップし、DBからレコードを取り出して他の値を補完する
 		const emojiEntities = emojis.filter(x => typeof x === 'object') as MiEmoji[];
 		const emojiIdOnlyList = emojis.filter(x => typeof x === 'string') as string[];
 		if (emojiIdOnlyList.length > 0) {
 			emojiEntities.push(...await this.emojisRepository.findBy({ id: In(emojiIdOnlyList) }));
 		}
 
-		// 特定ロール専用の絵文字である場合、そのロール情報をあらかじめまとめて取得しておく（pack側で都度取得も出来るが負荷が高いので）
 		let hintRoles: Map<MiRole['id'], MiRole>;
 		if (hint?.roles) {
 			hintRoles = hint.roles;

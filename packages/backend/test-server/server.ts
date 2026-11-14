@@ -18,9 +18,6 @@ let app: INestApplicationContext;
 let serverService: ServerService;
 let controller: FastifyInstance | undefined;
 
-/**
- * テスト用のサーバインスタンスを起動する
- */
 export async function setup() {
 	await killTestServer();
 
@@ -34,17 +31,10 @@ export async function setup() {
 
 	await startControllerEndpoints();
 
-	// ジョブキューは必要な時にテストコード側で起動する
-	// ジョブキューが動くとテスト結果の確認に支障が出ることがあるので意図的に動かさないでいる
-
 	console.log('application initialized.');
 }
 
-/**
- * テスト用のサーバインスタンスを停止する
- */
 export async function teardown() {
-	// 停止処理中に/env-resetを受け付けてアプリが再生成されないよう、先に閉じる
 	await controller?.close();
 	controller = undefined;
 
@@ -53,25 +43,16 @@ export async function teardown() {
 	await killTestServer();
 }
 
-/**
- * 既に重複したポートで待ち受けしているサーバがある場合はkillする
- */
 async function killTestServer() {
-	//
 	try {
 		const pid = await portToPid(config.port);
 		if (pid) {
 			await fkill(pid, { force: true });
 		}
 	} catch {
-		// NOP;
 	}
 }
 
-/**
- * 別プロセスに切り離してしまったが故に出来なくなった環境変数の書き換え等を実現するためのエンドポイントを作る
- * @param port
- */
 async function startControllerEndpoints(port = config.port + 1000) {
 	const fastify = Fastify();
 	controller = fastify;

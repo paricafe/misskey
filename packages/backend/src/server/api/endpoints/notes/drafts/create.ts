@@ -170,7 +170,6 @@ export const paramDef = {
 		renoteId: { type: 'string', format: 'misskey:id', nullable: true },
 		channelId: { type: 'string', format: 'misskey:id', nullable: true },
 
-		// anyOf内にバリデーションを書いても最初の一つしかチェックされない
 		text: {
 			type: 'string',
 			minLength: 0,

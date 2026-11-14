@@ -106,7 +106,6 @@ export const api = async <E extends keyof misskey.Endpoints, P extends misskey.E
 	return {
 		status: res.status,
 		headers: res.headers,
-		// FIXME: removing this non-null assertion: requires better typing around empty response.
 		body: body!,
 	};
 };
@@ -123,11 +122,6 @@ export function randomString(chars = 'abcdefghijklmnopqrstuvwxyz0123456789', len
 	return randomString;
 }
 
-/**
- * @brief プロミスにタイムアウト追加
- * @param p 待ち対象プロミス
- * @param timeout 待機ミリ秒
- */
 function timeoutPromise<T>(p: Promise<T>, timeout: number): Promise<T> {
 	return Promise.race([
 		p,
@@ -153,7 +147,6 @@ export const post = async (user: UserToken, params: misskey.Endpoints['notes/cre
 
 	const res = await api('notes/create', q, user);
 
-	// FIXME: the return type should reflect this fact.
 	return (res.body ? res.body.createdNote : null)!;
 };
 
@@ -166,7 +159,6 @@ export const createAppToken = async (user: UserToken, permissions: (typeof missk
 	return (res.body as misskey.entities.MiauthGenTokenResponse).token;
 };
 
-// 非公開ノートをAPI越しに見たときのノート NoteEntityService.ts
 export const hiddenNote = (note: misskey.entities.Note): misskey.entities.Note => {
 	const temp: misskey.entities.Note = {
 		...note,
@@ -292,18 +284,11 @@ export const role = async (user: UserToken, role: Partial<misskey.entities.Role>
 };
 
 interface UploadOptions {
-	/** Optional, absolute path or relative from ./resources/ */
 	path?: string | URL;
-	/** The name to be used for the file upload */
 	name?: string;
-	/** A Blob can be provided instead of path */
 	blob?: Blob;
 }
 
-/**
- * Upload file
- * @param user User
- */
 export const uploadFile = async (user?: UserToken, { path, name, blob }: UploadOptions = {}): Promise<{
 	status: number,
 	headers: Headers,
@@ -466,15 +451,6 @@ export const waitFire = async <C extends keyof misskey.Channels>(user: UserToken
 	}
 };
 
-/**
- * @brief WebSocketストリームから特定条件の通知を拾うプロミスを生成
- * @param user ユーザー認証情報
- * @param channel チャンネル
- * @param cond 条件
- * @param extractor 取り出し処理
- * @param timeout ミリ秒タイムアウト
- * @returns 時間内に正常に処理できた場合に通知からextractorを通した値を得る
- */
 export function makeStreamCatcher<T>(
 	user: UserToken,
 	channel: keyof misskey.Channels,
@@ -522,7 +498,6 @@ export const simpleGet = async (path: string, accept = '*/*', cookie: any = unde
 		accept.startsWith('application/activity+json') ||
 		(accept.startsWith('application/ld+json') && accept.includes('https://www.w3.org/ns/activitystreams'))
 	)) {
-		// validateContentTypeSetAsActivityPubのテストを兼ねる
 		validateContentTypeSetAsActivityPub(res);
 	}
 
@@ -539,14 +514,6 @@ export const simpleGet = async (path: string, accept = '*/*', cookie: any = unde
 	};
 };
 
-/**
- * あるAPIエンドポイントのPaginationが複数の条件で一貫した挙動であることをテストします。
- * (sinceId, untilId, sinceDate, untilDate, offset, limit)
- * @param expected 期待値となるEntityの並び（例：Note[]）昇順降順が一致している必要がある
- * @param fetchEntities Entity[]を返却するテスト対象のAPIを呼び出す関数
- * @param offsetBy 何をキーとしてPaginationするか。
- * @param ordering 昇順・降順
- */
 export async function testPaginationConsistency<Entity extends { id: string, createdAt?: string }>(
 	expected: Entity[],
 	fetchEntities: (paginationParam: {
@@ -570,38 +537,7 @@ export async function testPaginationConsistency<Entity extends { id: string, cre
 	};
 
 	for (const limit of [1, 5, 10, 100, undefined]) {
-		/*
-		// 1. sinceId/DateとuntilId/Dateで両端を指定して取得した結果が期待通りになっていること
-		if (ordering === 'desc') {
-			const end = expected.at(-1)!;
-			let last = await fetchEntities(rangeToParam({ limit, since: end }));
-			const actual: Entity[] = [];
-			while (last.length !== 0) {
-				actual.push(...last);
-				last = await fetchEntities(rangeToParam({ limit, until: last.at(-1), since: end }));
-			}
-			actual.push(end);
-			assert.deepStrictEqual(
-				actual.map(({ id, createdAt }) => id + ':' + createdAt),
-				expected.map(({ id, createdAt }) => id + ':' + createdAt));
-		}
 
-		// 2. sinceId/Date指定+limitで取得してつなぎ合わせた結果が期待通りになっていること
-		if (ordering === 'asc') {
-			// 昇順にしたときの先頭(一番古いもの)をもってくる（expected[1]を基準に降順にして0番目）
-			let last = await fetchEntities({ limit: 1, untilId: expected[1].id });
-			const actual: Entity[] = [];
-			while (last.length !== 0) {
-				actual.push(...last);
-				last = await fetchEntities(rangeToParam({ limit, since: last.at(-1) }));
-			}
-			assert.deepStrictEqual(
-				actual.map(({ id, createdAt }) => id + ':' + createdAt),
-				expected.map(({ id, createdAt }) => id + ':' + createdAt));
-		}
-		*/
-
-		// 3. untilId指定+limitで取得してつなぎ合わせた結果が期待通りになっていること
 		if (ordering === 'desc') {
 			let last = await fetchEntities({ limit });
 			const actual: Entity[] = [];
@@ -614,7 +550,6 @@ export async function testPaginationConsistency<Entity extends { id: string, cre
 				expected.map(({ id, createdAt }) => id + ':' + createdAt));
 		}
 
-		// 4. offset指定+limitで取得してつなぎ合わせた結果が期待通りになっていること
 		if (offsetBy === 'offset') {
 			let last = await fetchEntities({ limit, offset: 0 });
 			let offset = limit ?? 10;
@@ -682,8 +617,6 @@ export async function sendEnvResetRequest() {
 	}
 }
 
-// 与えられた値を強制的にエラーとみなす。この関数は型安全性を破壊するため、異常系のアサーション以外で用いられるべきではない。
-// FIXME(misskey-js): misskey-jsがエラー情報を公開するようになったらこの関数を廃止する
 export function castAsError(obj: Record<string, unknown>): { error: ApiError } {
 	return obj as { error: ApiError };
 }

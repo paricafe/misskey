@@ -5,13 +5,9 @@
 
 import { test } from './fixtures.js';
 import {
-	// const
 	ADMIN_SETUP_PASSWORD, BASE_URL,
-	// locator helper
 	locateMkInput, locateMkSwitch, locateMkTextarea,
-	// utils
 	registerUser, resetState, visitHome, closeUserSetupDialog, postNote,
-	// page utils
 	waitApiResponse, signIn,
 } from './utils.js';
 import type { RegisteredUser } from './utils.js';
@@ -121,14 +117,12 @@ test.describe('After user signup', () => {
 
 		await page.getByTestId('signin-page-input').waitFor({ state: 'visible', timeout: 10000 });
 		await locateMkInput(page, 'signin-username').fill('alice');
-		// Enterキーで続行できるかどうかの確認も兼ねる
 		await page.keyboard.press('Enter');
 
 		await page.getByTestId('signin-page-password').waitFor({ state: 'visible', timeout: 10000 });
 		await locateMkInput(page, 'signin-password').fill('alice1234');
 
 		const signinResponse = waitApiResponse(page, '/api/signin-flow');
-		// Enterキーで続行できるかどうかの確認も兼ねる
 		await page.keyboard.press('Enter');
 		await signinResponse;
 	});
@@ -162,29 +156,22 @@ test.describe('After user signed in', () => {
 	});
 
 	test('successfully loads', async ({ page }) => {
-		// 表示に時間がかかるのでデフォルト秒数だとタイムアウトする
 		await page.getByTestId('user-setup-continue').waitFor({ state: 'visible', timeout: 30000 });
 	});
 
 	test('account setup wizard', async ({ page }) => {
-		// 表示に時間がかかるのでデフォルト秒数だとタイムアウトする
 		await page.getByTestId('user-setup-continue').click({ timeout: 30000 });
 
 		await locateMkInput(page, 'user-setup-user-name').fill('ありす');
 		await locateMkTextarea(page, 'user-setup-user-description').fill('ほげ');
-		// TODO: アイコン設定のテスト
 		await page.getByTestId('user-setup-continue').click();
 
-		// プライバシー設定
 		await page.getByTestId('user-setup-continue').click();
 
-		// フォロー設定
 		await page.getByTestId('user-setup-continue').click();
 
-		// プッシュ通知設定
 		await page.getByTestId('user-setup-continue').click();
 
-		// 完了
 		await page.getByTestId('user-setup-continue').click();
 	});
 });
@@ -211,7 +198,3 @@ test.describe('After user setup', () => {
 		await page.getByTestId('post-form-text').waitFor({ state: 'hidden' });
 	});
 });
-
-// TODO: 投稿フォームの公開範囲指定のテスト
-// TODO: 投稿フォームのファイル添付のテスト
-// TODO: 投稿フォームのハッシュタグ保持フィールドのテスト

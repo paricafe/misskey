@@ -10,7 +10,6 @@ import SearchByTagEndpoint from './search-by-tag.js';
 describe('notes/search-by-tag query groups', () => {
 	test('binds every AND and OR tag independently in the PostgreSQL query', async () => {
 		const query = new DataSource({ type: 'postgres' }).createQueryBuilder().select('note.*').from('note', 'note');
-		// The relations and visibility policies are independent of tag binding.
 		vi.spyOn(query, 'innerJoinAndSelect').mockReturnValue(query);
 		vi.spyOn(query, 'leftJoinAndSelect').mockReturnValue(query);
 		vi.spyOn(query, 'getMany').mockResolvedValue([]);

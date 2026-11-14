@@ -83,11 +83,9 @@ const REPEATABLE_SYSTEM_JOB_DEF = [{
 	pattern: '0 0 * * *',
 }, {
 	name: 'checkModeratorsActivity',
-	// 毎時30分に起動
 	pattern: '30 * * * *',
 }, {
 	name: 'cleanRemoteNotes',
-	// 毎日午前4時に起動(最も人の少ない時間帯)
 	pattern: '0 4 * * *',
 }];
 
@@ -129,18 +127,16 @@ export class QueueService implements OnModuleInit {
 			}, {
 				name: def.name,
 				opts: {
-					// 期限ではなくcountで設定したいが、ジョブごとではなくキュー全体でカウントされるため、高頻度で実行されるジョブによって低頻度で実行されるジョブのログが消えることになる
 					removeOnComplete: {
-						age: 3600 * 24 * 7, // keep up to 7 days
+						age: 3600 * 24 * 7,
 					},
 					removeOnFail: {
-						age: 3600 * 24 * 7, // keep up to 7 days
+						age: 3600 * 24 * 7,
 					},
 				},
 			});
 		}
 
-		// 古いバージョンで作成され現在使われなくなったrepeatableジョブをクリーンアップ
 		this.systemQueue.getJobSchedulers().then(schedulers => {
 			for (const scheduler of schedulers) {
 				if (!REPEATABLE_SYSTEM_JOB_DEF.some(def => def.name === scheduler.key)) {
@@ -151,8 +147,6 @@ export class QueueService implements OnModuleInit {
 	}
 
 	public async onModuleInit(): Promise<void> {
-		// Startup must not succeed without the recovery scheduler: PostgreSQL may
-		// already contain accepted schedules whose original Redis enqueue failed.
 		await this.systemQueue.upsertJobScheduler('recoverScheduledNotes', {
 			pattern: '* * * * *',
 			immediately: true,
@@ -193,23 +187,16 @@ export class QueueService implements OnModuleInit {
 				type: 'custom',
 			},
 			removeOnComplete: {
-				age: 3600 * 24 * 7, // keep up to 7 days
+				age: 3600 * 24 * 7,
 				count: 30,
 			},
 			removeOnFail: {
-				age: 3600 * 24 * 7, // keep up to 7 days
+				age: 3600 * 24 * 7,
 				count: 100,
 			},
 		});
 	}
 
-	/**
-	 * ApDeliverManager-DeliverManager.execute()からinboxesを突っ込んでaddBulkしたい
-	 * @param user `{ id: string; }` この関数ではThinUserに変換しないので前もって変換してください
-	 * @param content IActivity | null
-	 * @param inboxes `Map<string, boolean>` / key: to (inbox url), value: isSharedInbox (whether it is sharedInbox)
-	 * @returns void
-	 */
 	@bindThis
 	public async deliverMany(user: ThinUser, content: IActivity | null, inboxes: Map<string, boolean>) {
 		if (content == null) return null;
@@ -222,11 +209,11 @@ export class QueueService implements OnModuleInit {
 				type: 'custom',
 			},
 			removeOnComplete: {
-				age: 3600 * 24 * 7, // keep up to 7 days
+				age: 3600 * 24 * 7,
 				count: 30,
 			},
 			removeOnFail: {
-				age: 3600 * 24 * 7, // keep up to 7 days
+				age: 3600 * 24 * 7,
 				count: 100,
 			},
 		};
@@ -261,11 +248,11 @@ export class QueueService implements OnModuleInit {
 				type: 'custom',
 			},
 			removeOnComplete: {
-				age: 3600 * 24 * 7, // keep up to 7 days
+				age: 3600 * 24 * 7,
 				count: 30,
 			},
 			removeOnFail: {
-				age: 3600 * 24 * 7, // keep up to 7 days
+				age: 3600 * 24 * 7,
 				count: 100,
 			},
 		});
@@ -294,11 +281,11 @@ export class QueueService implements OnModuleInit {
 			jobId,
 			delay: Math.max(0, autoArchiveAt.getTime() - Date.now()),
 			removeOnComplete: {
-				age: 3600 * 24 * 7, // keep up to 7 days
+				age: 3600 * 24 * 7,
 				count: 30,
 			},
 			removeOnFail: {
-				age: 3600 * 24 * 7, // keep up to 7 days
+				age: 3600 * 24 * 7,
 				count: 100,
 			},
 		});
@@ -315,11 +302,11 @@ export class QueueService implements OnModuleInit {
 			user: { id: user.id },
 		}, {
 			removeOnComplete: {
-				age: 3600 * 24 * 7, // keep up to 7 days
+				age: 3600 * 24 * 7,
 				count: 30,
 			},
 			removeOnFail: {
-				age: 3600 * 24 * 7, // keep up to 7 days
+				age: 3600 * 24 * 7,
 				count: 100,
 			},
 		});
@@ -331,11 +318,11 @@ export class QueueService implements OnModuleInit {
 			user: { id: user.id },
 		}, {
 			removeOnComplete: {
-				age: 3600 * 24 * 7, // keep up to 7 days
+				age: 3600 * 24 * 7,
 				count: 30,
 			},
 			removeOnFail: {
-				age: 3600 * 24 * 7, // keep up to 7 days
+				age: 3600 * 24 * 7,
 				count: 100,
 			},
 		});
@@ -348,7 +335,7 @@ export class QueueService implements OnModuleInit {
 		}, {
 			removeOnComplete: true,
 			removeOnFail: {
-				age: 3600 * 24 * 7, // keep up to 7 days
+				age: 3600 * 24 * 7,
 				count: 100,
 			},
 		});
@@ -360,11 +347,11 @@ export class QueueService implements OnModuleInit {
 			user: { id: user.id },
 		}, {
 			removeOnComplete: {
-				age: 3600 * 24 * 7, // keep up to 7 days
+				age: 3600 * 24 * 7,
 				count: 30,
 			},
 			removeOnFail: {
-				age: 3600 * 24 * 7, // keep up to 7 days
+				age: 3600 * 24 * 7,
 				count: 100,
 			},
 		});
@@ -376,11 +363,11 @@ export class QueueService implements OnModuleInit {
 			user: { id: user.id },
 		}, {
 			removeOnComplete: {
-				age: 3600 * 24 * 7, // keep up to 7 days
+				age: 3600 * 24 * 7,
 				count: 30,
 			},
 			removeOnFail: {
-				age: 3600 * 24 * 7, // keep up to 7 days
+				age: 3600 * 24 * 7,
 				count: 100,
 			},
 		});
@@ -392,11 +379,11 @@ export class QueueService implements OnModuleInit {
 			user: { id: user.id },
 		}, {
 			removeOnComplete: {
-				age: 3600 * 24 * 7, // keep up to 7 days
+				age: 3600 * 24 * 7,
 				count: 30,
 			},
 			removeOnFail: {
-				age: 3600 * 24 * 7, // keep up to 7 days
+				age: 3600 * 24 * 7,
 				count: 100,
 			},
 		});
@@ -410,11 +397,11 @@ export class QueueService implements OnModuleInit {
 			excludeInactive,
 		}, {
 			removeOnComplete: {
-				age: 3600 * 24 * 7, // keep up to 7 days
+				age: 3600 * 24 * 7,
 				count: 30,
 			},
 			removeOnFail: {
-				age: 3600 * 24 * 7, // keep up to 7 days
+				age: 3600 * 24 * 7,
 				count: 100,
 			},
 		});
@@ -426,11 +413,11 @@ export class QueueService implements OnModuleInit {
 			user: { id: user.id },
 		}, {
 			removeOnComplete: {
-				age: 3600 * 24 * 7, // keep up to 7 days
+				age: 3600 * 24 * 7,
 				count: 30,
 			},
 			removeOnFail: {
-				age: 3600 * 24 * 7, // keep up to 7 days
+				age: 3600 * 24 * 7,
 				count: 100,
 			},
 		});
@@ -442,11 +429,11 @@ export class QueueService implements OnModuleInit {
 			user: { id: user.id },
 		}, {
 			removeOnComplete: {
-				age: 3600 * 24 * 7, // keep up to 7 days
+				age: 3600 * 24 * 7,
 				count: 30,
 			},
 			removeOnFail: {
-				age: 3600 * 24 * 7, // keep up to 7 days
+				age: 3600 * 24 * 7,
 				count: 100,
 			},
 		});
@@ -458,11 +445,11 @@ export class QueueService implements OnModuleInit {
 			user: { id: user.id },
 		}, {
 			removeOnComplete: {
-				age: 3600 * 24 * 7, // keep up to 7 days
+				age: 3600 * 24 * 7,
 				count: 30,
 			},
 			removeOnFail: {
-				age: 3600 * 24 * 7, // keep up to 7 days
+				age: 3600 * 24 * 7,
 				count: 100,
 			},
 		});
@@ -474,11 +461,11 @@ export class QueueService implements OnModuleInit {
 			user: { id: user.id },
 		}, {
 			removeOnComplete: {
-				age: 3600 * 24 * 7, // keep up to 7 days
+				age: 3600 * 24 * 7,
 				count: 30,
 			},
 			removeOnFail: {
-				age: 3600 * 24 * 7, // keep up to 7 days
+				age: 3600 * 24 * 7,
 				count: 100,
 			},
 		});
@@ -492,11 +479,11 @@ export class QueueService implements OnModuleInit {
 			withReplies,
 		}, {
 			removeOnComplete: {
-				age: 3600 * 24 * 7, // keep up to 7 days
+				age: 3600 * 24 * 7,
 				count: 30,
 			},
 			removeOnFail: {
-				age: 3600 * 24 * 7, // keep up to 7 days
+				age: 3600 * 24 * 7,
 				count: 100,
 			},
 		});
@@ -563,11 +550,11 @@ export class QueueService implements OnModuleInit {
 			fileId: fileId,
 		}, {
 			removeOnComplete: {
-				age: 3600 * 24 * 7, // keep up to 7 days
+				age: 3600 * 24 * 7,
 				count: 30,
 			},
 			removeOnFail: {
-				age: 3600 * 24 * 7, // keep up to 7 days
+				age: 3600 * 24 * 7,
 				count: 100,
 			},
 		});
@@ -580,11 +567,11 @@ export class QueueService implements OnModuleInit {
 			fileId: fileId,
 		}, {
 			removeOnComplete: {
-				age: 3600 * 24 * 7, // keep up to 7 days
+				age: 3600 * 24 * 7,
 				count: 30,
 			},
 			removeOnFail: {
-				age: 3600 * 24 * 7, // keep up to 7 days
+				age: 3600 * 24 * 7,
 				count: 100,
 			},
 		});
@@ -607,11 +594,11 @@ export class QueueService implements OnModuleInit {
 			data,
 			opts: {
 				removeOnComplete: {
-					age: 3600 * 24 * 7, // keep up to 7 days
+					age: 3600 * 24 * 7,
 					count: 30,
 				},
 				removeOnFail: {
-					age: 3600 * 24 * 7, // keep up to 7 days
+					age: 3600 * 24 * 7,
 					count: 100,
 				},
 			},
@@ -625,11 +612,11 @@ export class QueueService implements OnModuleInit {
 			fileId: fileId,
 		}, {
 			removeOnComplete: {
-				age: 3600 * 24 * 7, // keep up to 7 days
+				age: 3600 * 24 * 7,
 				count: 30,
 			},
 			removeOnFail: {
-				age: 3600 * 24 * 7, // keep up to 7 days
+				age: 3600 * 24 * 7,
 				count: 100,
 			},
 		});
@@ -642,11 +629,11 @@ export class QueueService implements OnModuleInit {
 			fileId: fileId,
 		}, {
 			removeOnComplete: {
-				age: 3600 * 24 * 7, // keep up to 7 days
+				age: 3600 * 24 * 7,
 				count: 30,
 			},
 			removeOnFail: {
-				age: 3600 * 24 * 7, // keep up to 7 days
+				age: 3600 * 24 * 7,
 				count: 100,
 			},
 		});
@@ -659,11 +646,11 @@ export class QueueService implements OnModuleInit {
 			antenna,
 		}, {
 			removeOnComplete: {
-				age: 3600 * 24 * 7, // keep up to 7 days
+				age: 3600 * 24 * 7,
 				count: 30,
 			},
 			removeOnFail: {
-				age: 3600 * 24 * 7, // keep up to 7 days
+				age: 3600 * 24 * 7,
 				count: 100,
 			},
 		});
@@ -676,11 +663,11 @@ export class QueueService implements OnModuleInit {
 			soft: opts.soft,
 		}, {
 			removeOnComplete: {
-				age: 3600 * 24 * 7, // keep up to 7 days
+				age: 3600 * 24 * 7,
 				count: 30,
 			},
 			removeOnFail: {
-				age: 3600 * 24 * 7, // keep up to 7 days
+				age: 3600 * 24 * 7,
 				count: 100,
 			},
 		});
@@ -733,11 +720,11 @@ export class QueueService implements OnModuleInit {
 			},
 			opts: {
 				removeOnComplete: {
-					age: 3600 * 24 * 7, // keep up to 7 days
+					age: 3600 * 24 * 7,
 					count: 30,
 				},
 				removeOnFail: {
-					age: 3600 * 24 * 7, // keep up to 7 days
+					age: 3600 * 24 * 7,
 					count: 100,
 				},
 				...opts,
@@ -751,11 +738,11 @@ export class QueueService implements OnModuleInit {
 			key: key,
 		}, {
 			removeOnComplete: {
-				age: 3600 * 24 * 7, // keep up to 7 days
+				age: 3600 * 24 * 7,
 				count: 30,
 			},
 			removeOnFail: {
-				age: 3600 * 24 * 7, // keep up to 7 days
+				age: 3600 * 24 * 7,
 				count: 100,
 			},
 		});
@@ -765,20 +752,16 @@ export class QueueService implements OnModuleInit {
 	public createCleanRemoteFilesJob() {
 		return this.objectStorageQueue.add('cleanRemoteFiles', {}, {
 			removeOnComplete: {
-				age: 3600 * 24 * 7, // keep up to 7 days
+				age: 3600 * 24 * 7,
 				count: 30,
 			},
 			removeOnFail: {
-				age: 3600 * 24 * 7, // keep up to 7 days
+				age: 3600 * 24 * 7,
 				count: 100,
 			},
 		});
 	}
 
-	/**
-	 * @see UserWebhookDeliverJobData
-	 * @see UserWebhookDeliverProcessorService
-	 */
 	@bindThis
 	public userWebhookDeliver<T extends WebhookEventTypes>(
 		webhook: MiWebhook,
@@ -803,20 +786,16 @@ export class QueueService implements OnModuleInit {
 				type: 'custom',
 			},
 			removeOnComplete: {
-				age: 3600 * 24 * 7, // keep up to 7 days
+				age: 3600 * 24 * 7,
 				count: 30,
 			},
 			removeOnFail: {
-				age: 3600 * 24 * 7, // keep up to 7 days
+				age: 3600 * 24 * 7,
 				count: 100,
 			},
 		});
 	}
 
-	/**
-	 * @see SystemWebhookDeliverJobData
-	 * @see SystemWebhookDeliverProcessorService
-	 */
 	@bindThis
 	public systemWebhookDeliver<T extends SystemWebhookEventType>(
 		webhook: MiSystemWebhook,
@@ -840,11 +819,11 @@ export class QueueService implements OnModuleInit {
 				type: 'custom',
 			},
 			removeOnComplete: {
-				age: 3600 * 24 * 7, // keep up to 7 days
+				age: 3600 * 24 * 7,
 				count: 30,
 			},
 			removeOnFail: {
-				age: 3600 * 24 * 7, // keep up to 7 days
+				age: 3600 * 24 * 7,
 				count: 100,
 			},
 		});
@@ -928,7 +907,6 @@ export class QueueService implements OnModuleInit {
 
 	@bindThis
 	private redactJobData<T>(queueType: typeof QUEUE_TYPES[number], data: T): T {
-		// Webhookのsecret
 		if (queueType === 'userWebhookDeliver' || queueType === 'systemWebhookDeliver') {
 			if (typeof data === 'object' && data != null && 'secret' in data) {
 				return { ...data, secret: '(redacted)' } as T;
@@ -988,7 +966,6 @@ export class QueueService implements OnModuleInit {
 		if (search) {
 			const jobs = (await queue.getJobs(jobTypes, 0, 1000)).map(job => this.packJobData(queueType, job));
 
-			// 秘匿値を検索対象に含めると部分一致で値を推測できてしまうため、redact 済みのデータに対して検索する
 			return jobs.filter(job => {
 				const jobString = JSON.stringify(job).toLowerCase();
 				return search.toLowerCase().split(' ').every(term => {

@@ -70,15 +70,12 @@ export class UserWebhookDeliverProcessorService {
 			});
 
 			if (res instanceof StatusError) {
-				// 4xx
 				if (!res.isRetryable) {
 					throw new Bull.UnrecoverableError(`${res.statusCode} ${res.statusMessage}`);
 				}
 
-				// 5xx etc.
 				throw new Error(`${res.statusCode} ${res.statusMessage}`);
 			} else {
-				// DNS error, socket error, timeout ...
 				throw res;
 			}
 		}

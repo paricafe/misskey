@@ -87,14 +87,12 @@ export class ServerService implements OnApplicationShutdown {
 		this.#fastify = fastify;
 		registerHttpAccessLog(fastify);
 
-		// HSTS
 		if (this.config.url.startsWith('https') && !this.config.disableHsts) {
 			const preload = this.config.hstsPreload;
 			const host = new URL(this.config.url).host;
 			fastify.addHook('onRequest', makeHstsHook(host, preload));
 		}
 
-		// for test
 		if (envOption.enableCrossOriginIsolation) {
 			fastify.addHook('onRequest', (request, reply, done) => {
 				reply.header('Cross-Origin-Opener-Policy', 'same-origin');
@@ -103,25 +101,17 @@ export class ServerService implements OnApplicationShutdown {
 			});
 		}
 
-		// Register raw-body parser for ActivityPub HTTP signature validation.
 		await fastify.register(fastifyRawBody, {
 			global: false,
 			encoding: null,
 			runFirst: true,
 		});
 
-		// Register non-serving static server so that the child services can use reply.sendFile.
-		// `root` here is just a placeholder and each call must use its own `rootPath`.
 		fastify.register(fastifyStatic, {
 			root: _dirname,
 			serve: false,
 		});
 
-		// if the requester looks like to be performing an ActivityPub object lookup, reject all external redirects
-		//
-		// this will break lookup that involve copying a URL from a third-party server, like trying to lookup http://charlie.example.com/@alice@alice.com
-		//
-		// this is not required by standard but protect us from peers that did not validate final URL.
 		if (!this.meta.allowExternalApRedirect) {
 			const maybeApLookupRegex = /application\/activity\+json|application\/ld\+json.+activitystreams/i;
 			fastify.addHook('onSend', (request, reply, _, done) => {
@@ -209,7 +199,6 @@ export class ServerService implements OnApplicationShutdown {
 			const host = pathChunks.pop();
 
 			const emoji = await this.emojisRepository.findOneBy({
-				// `@.` is the spec of ReactionService.decodeReaction
 				host: (host === undefined || host === '.') ? IsNull() : host,
 				name: name,
 			});
@@ -228,12 +217,10 @@ export class ServerService implements OnApplicationShutdown {
 			let url: URL;
 			if ('badge' in request.query) {
 				url = new URL(`${this.config.mediaProxy}/emoji.png`);
-				// || emoji.originalUrl してるのは後方互換性のため（publicUrlはstringなので??はだめ）
 				url.searchParams.set('url', emoji.publicUrl || emoji.originalUrl);
 				url.searchParams.set('badge', '1');
 			} else {
 				url = new URL(`${this.config.mediaProxy}/emoji.webp`);
-				// || emoji.originalUrl してるのは後方互換性のため（publicUrlはstringなので??はだめ）
 				url.searchParams.set('url', emoji.publicUrl || emoji.originalUrl);
 				url.searchParams.set('emoji', '1');
 				if ('static' in request.query) url.searchParams.set('static', '1');
@@ -295,7 +282,6 @@ export class ServerService implements OnApplicationShutdown {
 			if (cluster.isWorker) {
 				process.send!('listenFailed');
 			} else {
-				// disableClustering
 				process.exit(1);
 			}
 		};
@@ -318,9 +304,6 @@ export class ServerService implements OnApplicationShutdown {
 
 	@bindThis
 	public async dispose(): Promise<void> {
-		// Start closing HTTP immediately; its preClose hook shuts down the gateway.
-		// Keep dependencies alive until existing HTTP requests have actually drained.
-		// Boot bounds the entire sequence, including queues and dependency cleanup.
 		this.#disposePromise ??= Promise.all([
 			this.#fastify.close(),
 			this.streamingApiServerService.detach(),
@@ -328,9 +311,6 @@ export class ServerService implements OnApplicationShutdown {
 		await this.#disposePromise;
 	}
 
-	/**
-	 * Get the Fastify instance for testing.
-	 */
 	public get fastify(): FastifyInstance {
 		return this.#fastify;
 	}

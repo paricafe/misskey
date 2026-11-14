@@ -102,9 +102,6 @@ export class Resolver {
 		}
 
 		if (value.includes('#')) {
-			// URLs with fragment parts cannot be resolved correctly because
-			// the fragment part does not get transmitted over HTTP(S).
-			// Avoid strange behaviour by not trying to resolve these at all.
 			throw new IdentifiableError('b94fd5b1-0e3b-4678-9df2-dad4cd515ab2', `cannot resolve URL with fragment: ${value}`);
 		}
 
@@ -156,7 +153,6 @@ export class Resolver {
 				return this.notesRepository.findOneByOrFail({ id: parsed.id })
 					.then(async note => {
 						if (parsed.rest === 'activity') {
-							// this refers to the create activity and not the note itself
 							return this.apRendererService.addContext(this.apRendererService.renderCreate(await this.apRendererService.renderNote(note), note));
 						} else {
 							return this.apRendererService.renderNote(note);
@@ -166,7 +162,6 @@ export class Resolver {
 				return this.usersRepository.findOneByOrFail({ id: parsed.id })
 					.then(user => this.apRendererService.renderPerson(user as MiLocalUser));
 			case 'questions':
-				// Polls are indexed by the note they are attached to.
 				return Promise.all([
 					this.notesRepository.findOneByOrFail({ id: parsed.id }),
 					this.pollsRepository.findOneByOrFail({ noteId: parsed.id }),

@@ -80,13 +80,11 @@ export async function mainBoot() {
 		if (prefer.s.enableSeasonalScreenEffect) {
 			const month = new Date().getMonth() + 1;
 			if (prefer.s.hemisphere === 'S') {
-				// ▼南半球
 				if (month === 7 || month === 8) {
 					const SnowfallEffect = (await import('@/utility/snowfall-effect.js')).SnowfallEffect;
 					new SnowfallEffect({}).render();
 				}
 			} else {
-				// ▼北半球
 				if (month === 12 || month === 1) {
 					const SnowfallEffect = (await import('@/utility/snowfall-effect.js')).SnowfallEffect;
 					new SnowfallEffect({}).render();
@@ -99,7 +97,6 @@ export async function mainBoot() {
 			}
 		}
 	} catch (error) {
-		// console.error(error);
 		console.error('Failed to initialise the seasonal screen effect canvas context:', error);
 	}
 
@@ -238,7 +235,6 @@ export async function mainBoot() {
 				const now = Date.now();
 
 				if (window.document.visibilityState === 'visible') {
-					// タブを高速で切り替えたら取得処理が何度も走るのを防ぐ
 					if ((now - lastVisibilityChangedAt) < 1000 * 10) {
 						justPlainLuckyTimer = window.setTimeout(claimPlainLucky, 1000 * 10);
 					} else {
@@ -267,29 +263,6 @@ export async function mainBoot() {
 			}, 1000 * 60 * 60);
 		}
 
-		// 邪魔
-		//const lastUsed = miLocalStorage.getItem('lastUsed');
-		//if (lastUsed) {
-		//	const lastUsedDate = parseInt(lastUsed, 10);
-		//	// 二時間以上前なら
-		//	if (Date.now() - lastUsedDate > 1000 * 60 * 60 * 2) {
-		//		toast(i18n.tsx.welcomeBackWithName({
-		//			name: $i.name || $i.username,
-		//		}));
-		//	}
-		//}
-		//miLocalStorage.setItem('lastUsed', Date.now().toString());
-		/*
-		const latestDonationInfoShownAt = miLocalStorage.getItem('latestDonationInfoShownAt');
-		const neverShowDonationInfo = miLocalStorage.getItem('neverShowDonationInfo');
-		if (neverShowDonationInfo !== 'true' && (createdAt.getTime() < (Date.now() - (1000 * 60 * 60 * 24 * 3))) && !window.location.pathname.startsWith('/miauth')) {
-			if (latestDonationInfoShownAt == null || (new Date(latestDonationInfoShownAt).getTime() < (Date.now() - (1000 * 60 * 60 * 24 * 30)))) {
-				const { dispose } = popup(defineAsyncComponent(() => import('@/components/MkDonation.vue')), {}, {
-					closed: () => dispose(),
-				});
-			}
-		}
-        */
 		const modifiedVersionMustProminentlyOfferInAgplV3Section13Read = miLocalStorage.getItem('modifiedVersionMustProminentlyOfferInAgplV3Section13Read');
 		if (modifiedVersionMustProminentlyOfferInAgplV3Section13Read !== 'true' && instance.repositoryUrl !== 'https://github.com/misskey-dev/misskey') {
 			const { dispose } = popup(defineAsyncComponent(() => import('@/components/MkSourceCodeAvailablePopup.vue')), {}, {
@@ -335,7 +308,6 @@ export async function mainBoot() {
 
 			const main = markRaw(stream.useChannel('main', null, 'System'));
 
-			// 自分の情報が更新されたとき
 			main.on('meUpdated', i => {
 				updateCurrentAccount(i);
 			});
@@ -364,12 +336,10 @@ export async function mainBoot() {
 				updateCurrentAccount({ hasUnreadAnnouncement: false });
 			});
 
-			// 個人宛てお知らせが発行されたとき
 			main.on('announcementCreated', onAnnouncementCreated);
 		}
 	}
 
-	// shortcut
 	let safemodeRequestCount = 0;
 	let safemodeRequestTimer: number | null = null;
 	const keymap = {
@@ -397,7 +367,6 @@ export async function mainBoot() {
 		},
 		'g': {
 			callback: () => {
-				// mを5回押すとセーフモードに入る
 				safemodeRequestCount++;
 				if (safemodeRequestCount >= 5) {
 					miLocalStorage.setItem('isSafeMode', 'true');

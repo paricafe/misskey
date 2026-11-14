@@ -15,8 +15,6 @@ import { IdService } from '@/core/IdService.js';
 import { QueueLoggerService } from '../QueueLoggerService.js';
 import type * as Bull from 'bullmq';
 
-// 走査位置はジョブを跨いで引き継ぐ
-// Redisが飛んだ場合は先頭からやり直すだけで、データ不整合は起きない
 const CURSOR_REDIS_KEY = 'cleanRemoteNotes:cursor';
 const CURSOR_ORIGIN = '0';
 
@@ -64,9 +62,7 @@ export class CleanRemoteNotesProcessorService {
 		const getConfig = () => {
 			return {
 				enabled: this.meta.enableRemoteNotesCleaning,
-				maxDuration: this.meta.remoteNotesCleaningMaxProcessingDurationInMinutes * 60 * 1000, // Convert minutes to milliseconds
-				// The date limit for the newest note to be considered for deletion.
-				// All notes newer than this limit will always be retained.
+				maxDuration: this.meta.remoteNotesCleaningMaxProcessingDurationInMinutes * 60 * 1000,
 				newestLimit: this.idService.gen(Date.now() - (1000 * 60 * 60 * 24 * this.meta.remoteNotesCleaningExpiryDaysForEachNotes)),
 			};
 		};
@@ -90,16 +86,6 @@ export class CleanRemoteNotesProcessorService {
 
 		const startAt = Date.now();
 
-		//#region queries
-
-		// The condition for removing the notes.
-		// The note must be:
-		// - old enough (older than the newestLimit)
-		// - a remote note (userHost is not null).
-		// - not have clipped
-		// - not have pinned on the user profile
-		// - not has been favorite by any user
-		// - only delete notes from bots
 		const removalCriteria = [
 			'note."id" < :newestLimit',
 			'note."clippedCount" = 0',
@@ -134,7 +120,6 @@ export class CleanRemoteNotesProcessorService {
 			};
 		}
 
-		// start with a conservative limit and adjust it based on the query duration
 		const minimumLimit = 10;
 		let currentLimit = 100;
 
@@ -143,8 +128,6 @@ export class CleanRemoteNotesProcessorService {
 			job.log(`Resuming from the cursor left by a previous run: ${cursorLeft}`);
 		}
 
-		// 末尾まで到達したら保存済みカーソルを捨て、次回の実行を先頭から始める
-		// クリップ解除やお気に入り解除で後から削除可能になったノートを拾い直すために必要
 		const restartFromBeginningNextTime = async () => {
 			await this.redisClient.del(CURSOR_REDIS_KEY);
 			cursorLeft = CURSOR_ORIGIN;
@@ -152,7 +135,6 @@ export class CleanRemoteNotesProcessorService {
 
 		const candidateNotesCteName = 'candidate_notes';
 
-		// tree walk down all root notes, short-circuit when the first unremovable note is found
 		const candidateNotesQueryBase = this.notesRepository.createQueryBuilder('note')
 			.select('note."id"', 'id')
 			.addSelect('note."replyId"', 'replyId')
@@ -174,22 +156,6 @@ export class CleanRemoteNotesProcessorService {
 			.innerJoin(candidateNotesCteName, 'parent', 'parent."id" = note."replyId" OR parent."id" = note."renoteId"')
 			.where('parent."isRemovable" = TRUE');
 
-		// A note tree can be deleted if there are no unremovable rows with the same rootId.
-		//
-		// `candidate_notes` will have the following structure after recursive query (some columns omitted):
-		// After performing a LEFT JOIN with `candidate_notes` as `unremovable`,
-		// the note tree containing unremovable notes will be anti-joined.
-		// For removable rows, the `unremovable` columns will have `NULL` values.
-		// | id  | rootId | isRemovable |
-		// |-----|--------|-------------|
-		// | aaa | aaa    | TRUE        |
-		// | bbb | aaa    | FALSE       |
-		// | ccc | aaa    | FALSE       |
-		// | ddd | ddd    | TRUE        |
-		// | eee | ddd    | TRUE        |
-		// | fff | fff    | TRUE        |
-		// | ggg | ggg    | FALSE       |
-		//
 		const candidateNotesQuery = ({ limit }: { limit: number }) => this.db.createQueryBuilder()
 			.select(`"${candidateNotesCteName}"."id"`, 'id')
 			.addSelect('unremovable."id" IS NULL', 'isRemovable')
@@ -218,7 +184,6 @@ export class CleanRemoteNotesProcessorService {
 				this.logger.info('Remote notes cleaning is disabled, processing stopped...');
 				break;
 			}
-			//#region check time
 			const batchBeginAt = Date.now();
 
 			const elapsed = batchBeginAt - startAt;
@@ -239,7 +204,6 @@ export class CleanRemoteNotesProcessorService {
 				lowThroughputWarned = true;
 			}
 			job.updateProgress(progress);
-			//#endregion
 
 			const queryBegin = performance.now();
 			let noteIds = null;
@@ -250,16 +214,9 @@ export class CleanRemoteNotesProcessorService {
 				).getRawMany<{ id: MiNote['id'], isRemovable: boolean, isBase: boolean }>();
 			} catch (e) {
 				if (e instanceof QueryFailedError && e.driverError?.code === '57014') {
-					// Statement timeout (maybe suddenly hit a large note tree), if possible, reduce the limit and try again
-					// if not possible, skip the current batch of notes and find the next root note
 					if (currentLimit <= minimumLimit) {
 						job.log('Local note tree complexity is too high, finding next root note...');
 
-						// This query is only used to advance the cursor past the offending range;
-						// it intentionally omits the heavy NOT EXISTS subqueries in `removalCriteria`
-						// (user_note_pining / note_favorite / note_reaction) which would otherwise
-						// hit the same statement_timeout that triggered this fallback path (#17057).
-						// Strict removability is re-evaluated by the next iteration's CTE query.
 						const idWindow = await this.notesRepository.createQueryBuilder('note')
 							.select('id')
 							.where('note.id > :cursorLeft')
@@ -283,7 +240,6 @@ export class CleanRemoteNotesProcessorService {
 
 						cursorLeft = lastId;
 
-						// 毎バッチtimeoutし続ける場合、ここを保存しないと一晩ぶんの前進が失われる
 						await this.redisClient.set(CURSOR_REDIS_KEY, cursorLeft);
 						continue;
 					}
@@ -300,14 +256,11 @@ export class CleanRemoteNotesProcessorService {
 			}
 
 			const queryDuration = performance.now() - queryBegin;
-			// try to adjust such that each query takes about 1~5 seconds and reasonable NodeJS heap so the task stays responsive
-			// this should not oscillate..
 			if (queryDuration > 5000 || noteIds.length > 5000) {
 				currentLimit = Math.floor(currentLimit * 0.5);
 			} else if (queryDuration < 1000 && noteIds.length < 1000) {
 				currentLimit = Math.floor(currentLimit * 1.5);
 			}
-			// clamp to a sane range
 			currentLimit = Math.min(Math.max(currentLimit, minimumLimit), 5000);
 
 			const deletableNoteIds = noteIds.filter(result => result.isRemovable).map(result => result.id);
@@ -327,8 +280,6 @@ export class CleanRemoteNotesProcessorService {
 
 					stats.deletedCount += deletableNoteIds.length;
 				} catch (e) {
-					// check for integrity violation errors (class 23) that might have occurred between the check and the delete
-					// we can safely continue to the next batch
 					if (e instanceof QueryFailedError && e.driverError?.code?.startsWith('23')) {
 						transientErrors++;
 						job.log(`Error deleting notes: ${e} (transient race condition?)`);
@@ -339,13 +290,12 @@ export class CleanRemoteNotesProcessorService {
 			}
 
 			cursorLeft = noteIds.filter(result => result.isBase).reduce((max, { id }) => id > max ? id : max, cursorLeft);
-			// 途中でジョブが落ちても進捗を失わないよう、バッチごとに保存する
 			await this.redisClient.set(CURSOR_REDIS_KEY, cursorLeft);
 
 			job.log(`Deleted ${noteIds.length} notes; ${Date.now() - batchBeginAt}ms`);
 
 			if (process.env.NODE_ENV !== 'test') {
-				await setTimeout(Math.min(1000 * 5, queryDuration)); // Wait a moment to avoid overwhelming the db
+				await setTimeout(Math.min(1000 * 5, queryDuration));
 			}
 		};
 

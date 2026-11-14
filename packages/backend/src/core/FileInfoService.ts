@@ -60,9 +60,6 @@ export class FileInfoService {
 		this.logger = this.loggerService.getLogger('file-info');
 	}
 
-	/**
-	 * Get file information
-	 */
 	@bindThis
 	public async getFileInfo(path: string, opts: {
 		fileName?: string | null;
@@ -98,7 +95,6 @@ export class FileInfoService {
 			}
 		}
 
-		// image dimensions
 		let width: number | undefined;
 		let height: number | undefined;
 		let orientation: number | undefined;
@@ -120,7 +116,6 @@ export class FileInfoService {
 				return undefined;
 			});
 
-			// うまく判定できない画像は octet-stream にする
 			if (!imageSize) {
 				warnings.push('cannot detect image dimensions');
 				type = TYPE_OCTET_STREAM;
@@ -129,7 +124,6 @@ export class FileInfoService {
 				height = imageSize.height;
 				orientation = imageSize.orientation;
 
-				// 制限を超えている画像は octet-stream にする
 				if (imageSize.width > 16383 || imageSize.height > 16383) {
 					warnings.push('image dimensions exceeds limits');
 					type = TYPE_OCTET_STREAM;
@@ -211,30 +205,30 @@ export class FileInfoService {
 				const command = FFmpeg()
 					.input(source)
 					.inputOptions([
-						'-skip_frame', 'nokey', // 可能ならキーフレームのみを取得してほしいとする（そうなるとは限らない）
-						'-lowres', '3', // 元の画質でデコードする必要はないので 1/8 画質でデコードしてもよいとする（そうなるとは限らない）
+						'-skip_frame', 'nokey',
+						'-lowres', '3',
 					])
 					.noAudio()
 					.videoFilters([
 						{
-							filter: 'select', // フレームのフィルタリング
+							filter: 'select',
 							options: {
-								e: 'eq(pict_type,PICT_TYPE_I)', // I-Frame のみをフィルタする（VP9 とかはデコードしてみないとわからないっぽい）
+								e: 'eq(pict_type,PICT_TYPE_I)',
 							},
 						},
 						{
-							filter: 'blackframe', // 暗いフレームの検出
+							filter: 'blackframe',
 							options: {
-								amount: '0', // 暗さに関わらず全てのフレームで測定値を取る
+								amount: '0',
 							},
 						},
 						{
 							filter: 'metadata',
 							options: {
-								mode: 'select', // フレーム選択モード
-								key: 'lavfi.blackframe.pblack', // フレームにおける暗部の百分率（前のフィルタからのメタデータを参照する）
+								mode: 'select',
+								key: 'lavfi.blackframe.pblack',
 								value: '50',
-								function: 'less', // 50% 未満のフレームを選択する（50% 以上暗部があるフレームだと誤検知を招くかもしれないので）
+								function: 'less',
 							},
 						},
 						{
@@ -247,8 +241,7 @@ export class FileInfoService {
 					])
 					.format('image2')
 					.output(join(outDir, '%d.png'))
-					.outputOptions(['-vsync', '0']); // 可変フレームレートにすることで穴埋めをさせない
-				// 判定対象フレームを選定して正規化済みバッファとして集め、外部サービスへまとめて送る。
+					.outputOptions(['-vsync', '0']);
 				const frameBuffers: Buffer[] = [];
 				let frameIndex = 0;
 				let targetIndex = 0;
@@ -260,7 +253,7 @@ export class FileInfoService {
 							continue;
 						}
 						targetIndex = nextIndex;
-						nextIndex += index; // fibonacci sequence によってフレーム数制限を掛ける
+						nextIndex += index;
 						frameBuffers.push(await fs.promises.readFile(path));
 					} finally {
 						fs.promises.unlink(path);
@@ -268,9 +261,6 @@ export class FileInfoService {
 				}
 				const predictions = await this.sensitiveMediaDetectionService.detectSensitiveMany(frameBuffers);
 				const results = predictions.filter((x): x is Prediction[] => x != null).map(x => judgePrediction(x));
-				// 判定に成功したフレームが 0 件のとき（接続先未設定・通信失敗等）は、
-				// Math.ceil(0) との比較が 0 >= 0 で真になり全動画がセンシティブ扱いになってしまうため、
-				// 1 件以上判定できたときのみ集約する（失敗時は非センシティブ扱い: misskey-dev/misskey#16804）。
 				if (results.length > 0) {
 					sensitive = results.filter(x => x[0]).length >= Math.ceil(results.length * sensitiveThreshold);
 					porn = results.filter(x => x[1]).length >= Math.ceil(results.length * sensitiveThresholdForPorn);
@@ -279,16 +269,12 @@ export class FileInfoService {
 				disposeOutDir();
 			}
 		} else if (isMimeImage(mime, 'sharp-convertible-image-with-bmp')) {
-			/*
-			 * 判定サービス側のデコーダは限られた画像形式しか受け付けないため、sharp で PNG に変換する
-			 * せっかくなので内部処理で使われる最大サイズの299x299に事前にリサイズする
-			 */
 			const png = await (await sharpBmp(source, mime))
 				.resize(299, 299, {
 					withoutEnlargement: false,
 				})
 				.rotate()
-				.flatten({ background: { r: 119, g: 119, b: 119 } }) // 透過部分を18%グレーで塗りつぶす
+				.flatten({ background: { r: 119, g: 119, b: 119 } })
 				.png()
 				.toBuffer();
 			const result = await this.sensitiveMediaDetectionService.detectSensitive(png);
@@ -320,13 +306,13 @@ export class FileInfoService {
 				watcher.add(next);
 				await new Promise<void>((resolve, reject) => {
 					watcher.on('add', function onAdd(path) {
-						if (path === next) { // 次フレームの書き出しが始まっているなら、現在フレームの書き出しは終わっている
+						if (path === next) {
 							watcher.unwatch(current);
 							watcher.off('add', onAdd);
 							resolve();
 						}
 					});
-					command.once('end', resolve); // 全てのフレームを処理し終わったなら、最終フレームである現在フレームの書き出しは終わっている
+					command.once('end', resolve);
 					command.once('error', reject);
 				});
 				yield framePath;
@@ -345,7 +331,6 @@ export class FileInfoService {
 
 	@bindThis
 	public fixMime(mime: string): string {
-		// see https://github.com/misskey-dev/misskey/pull/10686
 		if (mime === 'audio/x-flac') {
 			return 'audio/flac';
 		}
@@ -356,13 +341,6 @@ export class FileInfoService {
 		return mime;
 	}
 
-	/**
-	 * ビデオファイルにビデオトラックがあるかどうかチェック
-	 * （ない場合：m4a, webmなど）
-	 *
-	 * @param path ファイルパス
-	 * @returns ビデオトラックがあるかどうか（エラー発生時は常に`true`を返す）
-	 */
 	@bindThis
 	private hasVideoTrackOnVideoFile(path: string): Promise<boolean> {
 		const sublogger = this.logger.createSubLogger('ffprobe');
@@ -384,15 +362,11 @@ export class FileInfoService {
 		});
 	}
 
-	/**
-	 * Detect MIME Type and extension
-	 */
 	@bindThis
 	public async detectType(path: string): Promise<{
 		mime: string;
 		ext: string | null;
 	}> {
-	// Check 0 byte
 		const fileSize = await this.getFileSize(path);
 		if (fileSize === 0) {
 			return TYPE_OCTET_STREAM;
@@ -401,7 +375,6 @@ export class FileInfoService {
 		const type = await fileType.fileTypeFromFile(path);
 
 		if (type) {
-		// XMLはSVGかもしれない
 			if (type.mime === 'application/xml' && await this.checkSvg(path)) {
 				return TYPE_SVG;
 			}
@@ -426,18 +399,13 @@ export class FileInfoService {
 			};
 		}
 
-		// 種類が不明でもSVGかもしれない
 		if (await this.checkSvg(path)) {
 			return TYPE_SVG;
 		}
 
-		// それでも種類が不明なら application/octet-stream にする
 		return TYPE_OCTET_STREAM;
 	}
 
-	/**
-	 * Check the file is SVG or not
-	 */
 	@bindThis
 	public async checkSvg(path: string): Promise<boolean> {
 		try {
@@ -450,17 +418,11 @@ export class FileInfoService {
 		}
 	}
 
-	/**
-	 * Get file size
-	 */
 	@bindThis
 	public async getFileSize(path: string): Promise<number> {
 		return (await fs.promises.stat(path)).size;
 	}
 
-	/**
-	 * Calculate MD5 hash
-	 */
 	@bindThis
 	private async calcHash(path: string): Promise<string> {
 		const hash = crypto.createHash('md5').setEncoding('hex');
@@ -468,9 +430,6 @@ export class FileInfoService {
 		return hash.read();
 	}
 
-	/**
-	 * Detect dimensions of image
-	 */
 	@bindThis
 	private async detectImageSize(path: string): Promise<{
 		width: number;
@@ -485,9 +444,6 @@ export class FileInfoService {
 		return imageSize;
 	}
 
-	/**
-	 * Calculate blurhash string of image
-	 */
 	@bindThis
 	private async getBlurhash(path: string, type: string): Promise<string> {
 		const sharp = await sharpBmp(path, type);

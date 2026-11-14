@@ -290,7 +290,7 @@ async function initRenderer() {
 onMounted(async () => {
 	const closeWaiting = os.waiting();
 
-	await nextTick(); // waitingがレンダリングされるまで待つ
+	await nextTick();
 
 	await sampleImage_3_2_loading;
 	await sampleImage_2_3_loading;

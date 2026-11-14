@@ -37,7 +37,6 @@ export type MfmBaseProps = {
 	parsedNodes?: mfm.MfmNode[] | null;
 };
 
-/** `supports` で有効にした場合のみ参照される props */
 type MfmOptionalProps = {
 	enableEmojiMenu?: boolean;
 	enableEmojiMenuReaction?: boolean;
@@ -49,10 +48,6 @@ export type MfmEvents = {
 };
 
 export type MfmRendererConfig = {
-	/**
-	 * 描画時に呼ばれる
-	 * 循環インポートを防ぐために、単純なkey-valueではなく関数を採用
-	 */
 	components: () => {
 		Url: Component;
 		Link: Component;
@@ -61,29 +56,19 @@ export type MfmRendererConfig = {
 		Time: Component;
 		Emoji: Component;
 		CustomEmoji: Component;
-		/** 省略時は `<code>` で描画する */
 		Code?: Component;
-		/** 省略時は `<code>` で描画する */
 		CodeInline?: Component;
-		/** 省略時は検索語をそのまま描画する */
 		Search?: Component;
-		/** 省略時は sparkle を無視して子要素のみ描画する */
 		Sparkle?: Component;
 	};
-	/** 描画のたびに呼ばれる (設定の変更をリアクティブに反映するため) 。省略時はすべて有効 */
 	getOptions?: () => {
 		advancedMfm: boolean;
 		animatedMfm: boolean;
-		/** Remounts Emoji when the Unicode emoji style changes. */
 		emojiStyle?: string;
 	};
-	/** Renders a remote author's custom emoji with the local emoji of the same name when one exists. */
 	hasLocalEmoji?: (name: string) => boolean;
-	/** 子コンポーネントが対応している追加の props */
 	supports?: {
-		/** Url / Link / Mention の `navigationBehavior` 、A の `behavior` */
 		navigationBehavior?: boolean;
-		/** Emoji / CustomEmoji の `menu` / `menuReaction` */
 		emojiMenu?: boolean;
 	};
 };
@@ -93,9 +78,6 @@ export function createMfmRenderer<P extends MfmBaseProps = MfmBaseProps>(config:
 	const supportsEmojiMenu = config.supports?.emojiMenu ?? false;
 
 	return function (_props: P, { emit }: { emit: SetupContext<MfmEvents>['emit'] }) {
-		// こうしたいところだけど functional component 内では provide は使えない
-		//provide('linkNavigationBehavior', props.linkNavigationBehavior);
-
 		const props = _props as P & MfmOptionalProps;
 		const { Url, Link, Mention, A, Time, Emoji, CustomEmoji, Code, CodeInline, Search, Sparkle } = config.components();
 
@@ -125,16 +107,8 @@ export function createMfmRenderer<P extends MfmBaseProps = MfmBaseProps>(config:
 		const hashtagProps = supportsNavigationBehavior ? { behavior: props.linkNavigationBehavior } : {};
 		const emojiMenuProps = supportsEmojiMenu ? { menu: props.enableEmojiMenu, menuReaction: props.enableEmojiMenuReaction } : {};
 
-		/**
-		 * Gen Vue Elements from MFM AST
-		 * @param ast MFM AST
-		 * @param scale How times large the text is
-		 * @param disableNyaize Whether nyaize is disabled or not
-		 * @param path Parent AST path, including nodes whose children are flattened
-		 */
 		const genEl = (ast: mfm.MfmNode[], scale: number, disableNyaize = false, path = ''): (VNode | string)[] => ast.map((token, index): VNode | string | (VNode | string)[] => {
 			const nodePath = `${path}/${index}`;
-			// Some children capture props during setup, so remount only when their identity changes.
 			const key = (...identity: unknown[]) => JSON.stringify([nodePath, token.type, ...identity]);
 			switch (token.type) {
 				case 'text': {
@@ -171,7 +145,6 @@ export function createMfmRenderer<P extends MfmBaseProps = MfmBaseProps>(config:
 				}
 
 				case 'fn': {
-					// TODO: CSSを文字列で組み立てていくと token.props.args.~~~ 経由でCSSインジェクションできるのでよしなにやる
 					let style: string | undefined;
 					switch (token.props.name) {
 						case 'tada': {
@@ -279,7 +252,6 @@ export function createMfmRenderer<P extends MfmBaseProps = MfmBaseProps>(config:
 							if (!useAnim || Sparkle == null) {
 								return genEl(token.children, scale, false, nodePath);
 							}
-							// スロット関数の中で genEl を呼ぶと Sparkle が再描画されるたびに子の VNode が作り直される
 							const sparkleChildren = genEl(token.children, scale, false, nodePath);
 							return h(Sparkle, {}, { default: () => sparkleChildren });
 						}
@@ -410,7 +382,6 @@ export function createMfmRenderer<P extends MfmBaseProps = MfmBaseProps>(config:
 				}
 
 				case 'link': {
-					// スロット関数の中で genEl を呼ぶと再描画されるたびに子の VNode が作り直される
 					const linkChildren = genEl(token.children, scale, true, nodePath);
 					return [h(Link, {
 						key: key(token.props.url),
@@ -500,7 +471,6 @@ export function createMfmRenderer<P extends MfmBaseProps = MfmBaseProps>(config:
 								normal: props.plain,
 								host: props.author.host,
 								useOriginalSize: scale >= 2.5,
-								// リモートの絵文字はリアクションできないので menuReaction は常に false
 								...(supportsEmojiMenu ? { menu: props.enableEmojiMenu, menuReaction: false } : {}),
 							})];
 						}
@@ -549,7 +519,6 @@ export function createMfmRenderer<P extends MfmBaseProps = MfmBaseProps>(config:
 		}).flat(Infinity) as (VNode | string)[];
 
 		return h('span', {
-			// https://codeday.me/jp/qa/20190424/690106.html
 			style: props.nowrap ? 'white-space: pre; word-wrap: normal; overflow: hidden; text-overflow: ellipsis;' : 'white-space: pre-wrap;',
 		}, genEl(rootAst, props.rootScale ?? 1));
 	};

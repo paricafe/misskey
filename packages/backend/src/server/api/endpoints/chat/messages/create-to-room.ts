@@ -92,7 +92,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				}
 			}
 
-			// テキストが無いかつ添付ファイルも無かったらエラー
 			if (ps.text == null && file == null) {
 				throw new ApiError(meta.errors.contentRequired);
 			}

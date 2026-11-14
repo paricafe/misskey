@@ -25,8 +25,8 @@ export class UserKeypairService implements OnApplicationShutdown {
 		private userKeypairsRepository: UserKeypairsRepository,
 	) {
 		this.cache = new RedisKVCache<MiUserKeypair>(this.redisClient, 'userKeypair:v2', {
-			lifetime: 1000 * 60 * 60 * 24, // 24h
-			memoryCacheLifetime: 1000 * 60 * 60, // 1h
+			lifetime: 1000 * 60 * 60 * 24,
+			memoryCacheLifetime: 1000 * 60 * 60,
 			fetcher: (key) => this.fetcher(key),
 			toRedisConverter: (value) => JSON.stringify(value),
 			fromRedisConverter: (value) => JSON.parse(value),
@@ -52,7 +52,6 @@ export class UserKeypairService implements OnApplicationShutdown {
 	public async fetcher(userId: MiUser['id']): Promise<MiUserKeypair> {
 		const keyPair = await this.userKeypairsRepository.findOneByOrFail({ userId });
 
-		// migrate PKCS#1 => PKCS#8. legacy misskey generated PKCS#1 but slacc only accepts PKCS#8
 		if (keyPair.privateKey.includes('-----BEGIN RSA PRIVATE KEY-----')) {
 			const pkcs8Key = nodeCrypto.createPrivateKey({ key: keyPair.privateKey, format: 'pem', type: 'pkcs1' }).export({ format: 'pem', type: 'pkcs8' });
 			keyPair.privateKey = pkcs8Key;

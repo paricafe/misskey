@@ -25,7 +25,6 @@ const emit = defineEmits<{
 }>();
 
 function close() {
-	// こいつの中では非表示動作は行わない
 	emit('close');
 }
 </script>

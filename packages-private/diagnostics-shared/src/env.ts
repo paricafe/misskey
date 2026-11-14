@@ -21,18 +21,12 @@ export function readBooleanEnv(name: string, defaultValue: boolean) {
 	throw new Error(`${name} must be one of: 1, 0, true, false`);
 }
 
-/**
- * 必須の環境変数を読む。未設定・空文字ならエラーにする。
- */
 export function readRequiredEnv(name: string) {
 	const rawValue = process.env[name]?.trim();
 	if (rawValue == null || rawValue === '') throw new Error(`${name} must be set`);
 	return rawValue;
 }
 
-/**
- * 任意の環境変数を読む。未設定・空文字なら null を返す。
- */
 export function readOptionalEnv(name: string) {
 	const rawValue = process.env[name]?.trim();
 	if (rawValue == null || rawValue === '') return null;

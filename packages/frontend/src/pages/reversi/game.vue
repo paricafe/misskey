@@ -83,7 +83,6 @@ async function fetchGame() {
 	}
 }
 
-// 通信を取りこぼした場合の救済
 useInterval(async () => {
 	if (game.value == null) return;
 	if (game.value.isStarted) return;

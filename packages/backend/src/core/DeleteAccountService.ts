@@ -57,9 +57,7 @@ export class DeleteAccountService {
 			});
 		}
 
-		// 物理削除する前にDelete activityを送信する
 		if (this.userEntityService.isLocalUser(user)) {
-			// 知り得る全SharedInboxにDelete配信
 			const content = this.apRendererService.addContext(this.apRendererService.renderDelete(this.userEntityService.genLocalUserUri(user.id), user));
 
 			const queue: string[] = [];
@@ -89,7 +87,6 @@ export class DeleteAccountService {
 				soft: false,
 			});
 		} else {
-			// リモートユーザーの削除は、完全にDBから物理削除してしまうと再度連合してきてアカウントが復活する可能性があるため、soft指定する
 			this.queueService.createDeleteAccountJob(user, {
 				soft: true,
 			});

@@ -9,13 +9,13 @@ export const name = 'drive';
 
 export const schema = {
 	'local.incCount': {},
-	'local.incSize': {}, // in kilobyte
+	'local.incSize': {},
 	'local.decCount': {},
-	'local.decSize': {}, // in kilobyte
+	'local.decSize': {},
 	'remote.incCount': {},
-	'remote.incSize': {}, // in kilobyte
+	'remote.incSize': {},
 	'remote.decCount': {},
-	'remote.decSize': {}, // in kilobyte
+	'remote.decSize': {},
 } as const;
 
 export const entity = Chart.schemaToEntity(name, schema);

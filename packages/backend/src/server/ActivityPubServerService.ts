@@ -78,7 +78,6 @@ export class ActivityPubServerService {
 		private queryService: QueryService,
 		private fanoutTimelineEndpointService: FanoutTimelineEndpointService,
 	) {
-		//this.createServer = this.createServer.bind(this);
 	}
 
 	@bindThis
@@ -91,10 +90,6 @@ export class ActivityPubServerService {
 		}
 	}
 
-	/**
-	 * Pack Create<Note> or Announce Activity
-	 * @param note Note
-	 */
 	@bindThis
 	private async packActivity(note: MiNote): Promise<any> {
 		if (isRenote(note) && !isQuote(note)) {
@@ -123,20 +118,17 @@ export class ActivityPubServerService {
 
 		if (signature.params.headers.indexOf('host') === -1
 			|| request.headers.host !== this.config.host) {
-			// Host not specified or not match.
 			reply.code(401);
 			return;
 		}
 
 		if (signature.params.headers.indexOf('digest') === -1) {
-			// Digest not found.
 			reply.code(401);
 			return;
 		} else {
 			const digest = request.headers.digest;
 
 			if (typeof digest !== 'string') {
-				// Huh?
 				reply.code(401);
 				return;
 			}
@@ -145,7 +137,6 @@ export class ActivityPubServerService {
 			const match = digest.match(re);
 
 			if (match == null) {
-				// Invalid digest
 				reply.code(401);
 				return;
 			}
@@ -154,13 +145,11 @@ export class ActivityPubServerService {
 			const digestValue = match[2];
 
 			if (algo !== 'SHA-256') {
-				// Unsupported digest algorithm
 				reply.code(401);
 				return;
 			}
 
 			if (request.rawBody == null) {
-				// Bad request
 				reply.code(400);
 				return;
 			}
@@ -168,7 +157,6 @@ export class ActivityPubServerService {
 			const hash = crypto.createHash('sha256').update(request.rawBody).digest('base64');
 
 			if (hash !== digestValue) {
-				// Invalid digest
 				reply.code(401);
 				return;
 			}
@@ -176,9 +164,6 @@ export class ActivityPubServerService {
 
 		const body = request.body;
 
-		// Reject structurally invalid activities (e.g. missing actor) here instead
-		// of letting them fail deep inside the inbox processor. An actor-less
-		// activity can never be authenticated, so there is no point enqueueing it.
 		if (typeof body !== 'object' || body == null || !('actor' in body) || body.actor == null) {
 			reply.code(400);
 			return;
@@ -219,7 +204,6 @@ export class ActivityPubServerService {
 			return;
 		}
 
-		//#region Check ff visibility
 		const profile = await this.userProfilesRepository.findOneByOrFail({ userId: user.id });
 
 		if (profile.followersVisibility === 'private') {
@@ -231,7 +215,6 @@ export class ActivityPubServerService {
 			reply.header('Cache-Control', 'public, max-age=30');
 			return;
 		}
-		//#endregion
 
 		const limit = 10;
 		const partOf = `${this.config.url}/users/${userId}/followers`;
@@ -241,19 +224,16 @@ export class ActivityPubServerService {
 				followeeId: user.id,
 			} as FindOptionsWhere<MiFollowing>;
 
-			// カーソルが指定されている場合
 			if (cursor) {
 				query.id = LessThan(cursor);
 			}
 
-			// Get followers
 			const followings = await this.followingsRepository.find({
 				where: query,
 				take: limit + 1,
 				order: { id: -1 },
 			});
 
-			// 「次のページ」があるかどうか
 			const inStock = followings.length === limit + 1;
 			if (inStock) followings.pop();
 
@@ -274,7 +254,6 @@ export class ActivityPubServerService {
 			this.setResponseType(request, reply);
 			return (this.apRendererService.addContext(rendered));
 		} else {
-			// index page
 			const rendered = this.apRendererService.renderOrderedCollection(
 				partOf,
 				user.followersCount,
@@ -316,7 +295,6 @@ export class ActivityPubServerService {
 			return;
 		}
 
-		//#region Check ff visibility
 		const profile = await this.userProfilesRepository.findOneByOrFail({ userId: user.id });
 
 		if (profile.followingVisibility === 'private') {
@@ -328,7 +306,6 @@ export class ActivityPubServerService {
 			reply.header('Cache-Control', 'public, max-age=30');
 			return;
 		}
-		//#endregion
 
 		const limit = 10;
 		const partOf = `${this.config.url}/users/${userId}/following`;
@@ -338,19 +315,16 @@ export class ActivityPubServerService {
 				followerId: user.id,
 			} as FindOptionsWhere<MiFollowing>;
 
-			// カーソルが指定されている場合
 			if (cursor) {
 				query.id = LessThan(cursor);
 			}
 
-			// Get followings
 			const followings = await this.followingsRepository.find({
 				where: query,
 				take: limit + 1,
 				order: { id: -1 },
 			});
 
-			// 「次のページ」があるかどうか
 			const inStock = followings.length === limit + 1;
 			if (inStock) followings.pop();
 
@@ -371,7 +345,6 @@ export class ActivityPubServerService {
 			this.setResponseType(request, reply);
 			return (this.apRendererService.addContext(rendered));
 		} else {
-			// index page
 			const rendered = this.apRendererService.renderOrderedCollection(
 				partOf,
 				user.followingCount,
@@ -478,7 +451,7 @@ export class ActivityPubServerService {
 				sinceId: sinceId ?? null,
 				untilId: untilId ?? null,
 				limit: limit,
-				allowPartial: false, // Possibly true? IDK it's OK for ordered collection.
+				allowPartial: false,
 				me: null,
 				redisTimelines: [
 					`userTimeline:${user.id}`,
@@ -530,7 +503,6 @@ export class ActivityPubServerService {
 			this.setResponseType(request, reply);
 			return (this.apRendererService.addContext(rendered));
 		} else {
-			// index page
 			const rendered = this.apRendererService.renderOrderedCollection(
 				partOf,
 				user.notesCount,
@@ -574,7 +546,6 @@ export class ActivityPubServerService {
 			return;
 		}
 
-		// リモートだったらリダイレクト
 		if (user.host != null) {
 			if (user.uri == null || this.utilityService.isSelfHost(user.host)) {
 				reply.code(500);
@@ -632,8 +603,6 @@ export class ActivityPubServerService {
 
 		fastify.register(fastifyAccepts);
 
-		// raw-body shares `request.raw` with the body parser, so a string parser here would switch that stream
-		// to string mode and break raw-body. Keep only the `parseAs: 'buffer'` parsers below. The rest get 415 error.
 		fastify.removeAllContentTypeParsers();
 		fastify.addContentTypeParser('application/activity+json', { parseAs: 'buffer' }, almostDefaultJsonParser);
 		fastify.addContentTypeParser('application/ld+json', { parseAs: 'buffer' }, almostDefaultJsonParser);
@@ -646,12 +615,9 @@ export class ActivityPubServerService {
 			done();
 		});
 
-		//#region Routing
-		// inbox (limit: 64kb)
 		fastify.post('/inbox', { config: { rawBody: true }, bodyLimit: 1024 * 64 }, async (request, reply) => await this.inbox(request, reply));
 		fastify.post('/users/:user/inbox', { config: { rawBody: true }, bodyLimit: 1024 * 64 }, async (request, reply) => await this.inbox(request, reply));
 
-		// note
 		fastify.get<{ Params: { note: string; } }>('/notes/:note', { constraints: { apOrHtml: 'ap' } }, async (request, reply) => {
 			vary(reply.raw, 'Accept');
 
@@ -671,7 +637,6 @@ export class ActivityPubServerService {
 				return;
 			}
 
-			// リモートだったらリダイレクト
 			if (note.userHost != null) {
 				if (note.uri == null || this.utilityService.isSelfHost(note.userHost)) {
 					reply.code(500);
@@ -686,7 +651,6 @@ export class ActivityPubServerService {
 			return this.apRendererService.addContext(await this.apRendererService.renderNote(note, false));
 		});
 
-		// note activity
 		fastify.get<{ Params: { note: string; } }>('/notes/:note/activity', async (request, reply) => {
 			vary(reply.raw, 'Accept');
 
@@ -712,28 +676,23 @@ export class ActivityPubServerService {
 			return (this.apRendererService.addContext(await this.packActivity(note)));
 		});
 
-		// outbox
 		fastify.get<{
 			Params: { user: string; };
 			Querystring: { since_id?: string; until_id?: string; page?: string; };
 		}>('/users/:user/outbox', async (request, reply) => await this.outbox(request, reply));
 
-		// followers
 		fastify.get<{
 			Params: { user: string; };
 			Querystring: { cursor?: string; page?: string; };
 		}>('/users/:user/followers', async (request, reply) => await this.followers(request, reply));
 
-		// following
 		fastify.get<{
 			Params: { user: string; };
 			Querystring: { cursor?: string; page?: string; };
 		}>('/users/:user/following', async (request, reply) => await this.following(request, reply));
 
-		// featured
 		fastify.get<{ Params: { user: string; }; }>('/users/:user/collections/featured', async (request, reply) => await this.featured(request, reply));
 
-		// publickey
 		fastify.get<{ Params: { user: string; } }>('/users/:user/publickey', async (request, reply) => {
 			if (this.meta.federation === 'none') {
 				reply.code(403);
@@ -791,7 +750,6 @@ export class ActivityPubServerService {
 			}
 
 			const acct = Acct.parse(request.params.acct);
-			// normalize acct host
 			if (this.utilityService.isSelfHost(acct.host)) acct.host = null;
 
 			const user = await this.usersRepository.findOneBy({
@@ -802,9 +760,7 @@ export class ActivityPubServerService {
 
 			return await this.userInfo(request, reply, user);
 		});
-		//#endregion
 
-		// emoji
 		fastify.get<{ Params: { emoji: string; } }>('/emojis/:emoji', async (request, reply) => {
 			if (this.meta.federation === 'none') {
 				reply.code(403);
@@ -826,7 +782,6 @@ export class ActivityPubServerService {
 			return (this.apRendererService.addContext(await this.apRendererService.renderEmoji(emoji)));
 		});
 
-		// like
 		fastify.get<{ Params: { like: string; } }>('/likes/:like', async (request, reply) => {
 			if (this.meta.federation === 'none') {
 				reply.code(403);
@@ -852,15 +807,11 @@ export class ActivityPubServerService {
 			return (this.apRendererService.addContext(await this.apRendererService.renderLike(reaction, note)));
 		});
 
-		// follow
 		fastify.get<{ Params: { follower: string; followee: string; } }>('/follows/:follower/:followee', async (request, reply) => {
 			if (this.meta.federation === 'none') {
 				reply.code(403);
 				return;
 			}
-
-			// This may be used before the follow is completed, so we do not
-			// check if the following exists.
 
 			const [follower, followee] = await Promise.all([
 				this.usersRepository.findOneBy({
@@ -883,15 +834,11 @@ export class ActivityPubServerService {
 			return (this.apRendererService.addContext(this.apRendererService.renderFollow(follower, followee)));
 		});
 
-		// follow
 		fastify.get<{ Params: { followRequestId: string; } }>('/follows/:followRequestId', async (request, reply) => {
 			if (this.meta.federation === 'none') {
 				reply.code(403);
 				return;
 			}
-
-			// This may be used before the follow is completed, so we do not
-			// check if the following exists and only check if the follow request exists.
 
 			const followRequest = await this.followRequestsRepository.findOneBy({
 				id: request.params.followRequestId,

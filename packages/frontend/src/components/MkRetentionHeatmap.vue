@@ -192,7 +192,6 @@ async function renderChart() {
 							}
 						},
 					},
-					//mode: 'index',
 					animation: {
 						duration: 0,
 					},

@@ -133,7 +133,6 @@ async function renderChart() {
 					},
 					ticks: {
 						display: true,
-						//mirror: true,
 					},
 				},
 			},
@@ -153,7 +152,7 @@ async function renderChart() {
 					},
 					external: externalTooltipHandler,
 				},
-				...({ // TSを黙らすため
+				...({
 					gradient,
 				}),
 			},

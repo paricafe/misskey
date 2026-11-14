@@ -63,7 +63,6 @@ for (const unix of [false, true]) {
 		let nativeSocketPath: string | undefined;
 		let transport: NativeTransport | undefined;
 		if (unix) {
-			// Keep macOS socket paths short and cover characters that cannot be safely embedded in ws+unix URLs.
 			directory = await mkdtemp('/tmp/mastodon-streaming-');
 			nativeSocketPath = join(directory, 'native:%socket.sock');
 			upstream.listen(nativeSocketPath);
@@ -79,7 +78,6 @@ for (const unix of [false, true]) {
 			});
 		} else upstream.listen(0, '127.0.0.1');
 		await once(upstream, 'listening');
-		// No upstream TCP listener exists in the Unix case; the HTTP URL still determines the handshake Host and path.
 		const nativeUrl = unix ? 'http://127.0.0.1:1' : `http://127.0.0.1:${(upstream.address() as AddressInfo).port}`;
 		if (unix) assert.equal(upstream.address(), nativeSocketPath);
 		const store = new CompatStore(':memory:');

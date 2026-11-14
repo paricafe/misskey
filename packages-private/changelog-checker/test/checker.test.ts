@@ -46,7 +46,6 @@ describe('checkNewRelease', () => {
 		expect(result.success).toBe(false);
 	});
 
-	// 先頭だけ比較していると、より古いリリースの書き換えを見逃す
 	test('追加分の直後は一致しているが、より古いリリースが書き換えられている', () => {
 		const base = [new Release('2024.12.1'), new Release('2024.12.0')];
 		const head = [new Release('2024.12.2'), new Release('2024.12.1'), new Release('2024.11.0')];
@@ -427,7 +426,6 @@ describe('checkNewTopic', () => {
 		expect(result.success).toBe(false);
 	});
 
-	// 件数が同じでも内容が変わっていれば履歴の書き換えなのでエラーにする
 	test('古いバージョンの項目が書き換えられたときはエラーになる', () => {
 		const base = [
 			new Release('2024.12.1', [
@@ -478,7 +476,6 @@ describe('checkNewTopic', () => {
 		expect(result.success).toBe(false);
 	});
 
-	// 最新リリースの書き換えは通常の編集なので許容する
 	test('最新バージョンの項目を書き換えたときはエラーにならない', () => {
 		const base = [
 			new Release('2024.12.1', [

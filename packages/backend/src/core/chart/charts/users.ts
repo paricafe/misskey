@@ -17,9 +17,6 @@ import { ChartLoggerService } from '../ChartLoggerService.js';
 import { name, schema } from './entities/users.js';
 import type { KVs } from '../core.js';
 
-/**
- * ユーザー数に関するチャート
- */
 @Injectable()
 export default class UsersChart extends Chart<typeof schema> { // eslint-disable-line import/no-default-export
 	constructor(

@@ -36,8 +36,6 @@ describe('AbuseReportNotificationService', () => {
 	let app: TestingModule;
 	let service: AbuseReportNotificationService;
 
-	// --------------------------------------------------------------------------------------
-
 	let usersRepository: UsersRepository;
 	let userProfilesRepository: UserProfilesRepository;
 	let systemWebhooksRepository: SystemWebhooksRepository;
@@ -47,15 +45,11 @@ describe('AbuseReportNotificationService', () => {
 	let emailService: Mocked<EmailService>;
 	let webhookService: Mocked<SystemWebhookService>;
 
-	// --------------------------------------------------------------------------------------
-
 	let root: MiUser;
 	let alice: MiUser;
 	let bob: MiUser;
 	let systemWebhook1: MiSystemWebhook;
 	let systemWebhook2: MiSystemWebhook;
-
-	// --------------------------------------------------------------------------------------
 
 	async function createUser(data: Partial<MiUser> = {}) {
 		const user = await usersRepository
@@ -95,8 +89,6 @@ describe('AbuseReportNotificationService', () => {
 			})
 			.then(x => abuseReportNotificationRecipientRepository.findOneByOrFail(x.identifiers[0]));
 	}
-
-	// --------------------------------------------------------------------------------------
 
 	beforeAll(async () => {
 		app = await Test
@@ -172,8 +164,6 @@ describe('AbuseReportNotificationService', () => {
 	afterAll(async () => {
 		await app.close();
 	});
-
-	// --------------------------------------------------------------------------------------
 
 	describe('createRecipient', () => {
 		test('作成成功1', async () => {
@@ -293,7 +283,6 @@ describe('AbuseReportNotificationService', () => {
 			const [recipient1, recipient2, recipient3, recipient4] = await create();
 
 			const recipients = await service.fetchRecipients({});
-			// aliceはモデレータではないので除外される
 			expect(recipients).toEqual([recipient2, recipient3, recipient4]);
 		});
 
@@ -384,8 +373,6 @@ describe('AbuseReportNotificationService', () => {
 
 			await service.notifySystemWebhook(reports, 'abuseReport');
 
-			// 実際に除外されるかはSystemWebhookService側で確認する.
-			// ここでは非アクティブな通報通知を除外設定できているかを確認する
 			expect(webhookService.enqueueSystemWebhook).toHaveBeenCalledTimes(1);
 			expect(webhookService.enqueueSystemWebhook.mock.calls[0][0]).toBe('abuseReport');
 			expect(webhookService.enqueueSystemWebhook.mock.calls[0][2]).toEqual({ excludes: [systemWebhook2.id] });

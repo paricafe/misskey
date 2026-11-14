@@ -25,7 +25,6 @@ export type LoginUser = SigninResponse & {
 	password: string;
 };
 
-/** used for avoiding overload and some endpoints */
 export type Request = <
 	E extends keyof Misskey.Endpoints,
 	P extends Misskey.Endpoints[E]['req'],
@@ -43,24 +42,16 @@ export async function sleep(ms = 250): Promise<void> {
 
 type WaitForOptions = NonNullable<Parameters<typeof vi.waitFor>[1]>;
 
-/** 連合の反映を待つ上限。`vi.waitFor()` を使わない待ち合わせ (ストリーミング) にも使う */
 export const FEDERATION_TIMEOUT = 10000;
 
-/**
- * 連合の反映は非同期なので、固定時間の `sleep()` だけで待つと CI の負荷次第で容易に flaky になる。
- * 「一定時間待つ」のではなく「条件が満たされるまで待つ」ために `vi.waitFor()` へ渡すオプション。
- * (`vi.waitFor()` の既定値は timeout 1000ms / interval 50ms で、連合の反映待ちには短すぎる)
- */
 export const WAIT_FOR_FEDERATION: WaitForOptions = { timeout: FEDERATION_TIMEOUT, interval: 250 };
 
-/** アカウント削除・凍結など、明らかに時間のかかる処理を待つ場合の {@link WAIT_FOR_FEDERATION} */
 export const WAIT_FOR_SLOW_FEDERATION: WaitForOptions = { timeout: 30000, interval: 500 };
 
 async function signin(
 	host: Host,
 	params: Misskey.entities.SigninFlowRequest,
 ): Promise<SigninResponse> {
-	// wait for a second to prevent hit rate limit
 	await sleep(1000);
 
 	return await (new Misskey.api.APIClient({ origin: `https://${host}` }).request as Request)('signin-flow', params)
@@ -90,7 +81,6 @@ async function createAdmin(host: Host): Promise<Misskey.entities.SignupResponse 
 	}).then(async res => {
 		await client.request('admin/roles/update-default-policies', {
 			policies: {
-				/** TODO: @see https://github.com/misskey-dev/misskey/issues/14169 */
 				rateLimitFactor: 0 as never,
 			},
 		}, res.token);
@@ -171,11 +161,6 @@ export async function createRole(
 	});
 }
 
-/**
- * フォローは Follow → Accept の往復で成立するので、`sleep()` で待つと
- * 「配送時点のフォロワー」に依存する配送 (Update / Note など) を取りこぼして flaky になる。
- * followee 側から見たフォロワー数が期待値になるまで待つ。
- */
 export async function waitForFollowers(followee: LoginUser, count: number, options: WaitForOptions = WAIT_FOR_FEDERATION): Promise<void> {
 	await vi.waitFor(async () => {
 		const followers = await followee.client.request('users/followers', { userId: followee.id });
@@ -183,7 +168,6 @@ export async function waitForFollowers(followee: LoginUser, count: number, optio
 	}, options);
 }
 
-/** {@link waitForFollowers} の follower 側版 (Accept が返ってきたことを確認する) */
 export async function waitForFollowing(follower: LoginUser, count: number, options: WaitForOptions = WAIT_FOR_FEDERATION): Promise<void> {
 	await vi.waitFor(async () => {
 		const following = await follower.client.request('users/following', { userId: follower.id });
@@ -191,10 +175,6 @@ export async function waitForFollowing(follower: LoginUser, count: number, optio
 	}, options);
 }
 
-/**
- * フォロー関係が両方のサーバーで反映されるまで待つ。
- * 特に理由が無ければこちらを使う。
- */
 export async function waitForFollowRelation(follower: LoginUser, followee: LoginUser, count: number, options: WaitForOptions = WAIT_FOR_FEDERATION): Promise<void> {
 	await Promise.all([
 		waitForFollowing(follower, count, options),
@@ -271,7 +251,6 @@ export function deepStrictEqualWithExcludedFields<T>(actual: T, expected: T, exc
 	deepStrictEqual(_actual, _expected);
 }
 
-/** 「発火しない」ことの確認に使う待ち時間 */
 const NOT_FIRED_TIMEOUT = 500;
 
 export async function isFired<C extends keyof Misskey.Channels, T extends keyof Misskey.Channels[C]['events']>(
@@ -286,7 +265,6 @@ export async function isFired<C extends keyof Misskey.Channels, T extends keyof 
 	timeout = NOT_FIRED_TIMEOUT,
 ): Promise<boolean> {
 	const stream = new Misskey.Stream(`wss://${host}`, { token: user.i }, { WebSocket });
-	// 先にイベントを受け取った場合でもタイマーが残り続けないよう、必ず解除する
 	let timer: ReturnType<typeof setTimeout> | undefined;
 	try {
 		const connection = stream.useChannel(channel, params);
@@ -321,7 +299,6 @@ export async function isNoteUpdatedEventFired(
 	timeout = NOT_FIRED_TIMEOUT,
 ): Promise<boolean> {
 	const stream = new Misskey.Stream(`wss://${host}`, { token: user.i }, { WebSocket });
-	// 先にイベントを受け取った場合でもタイマーが残り続けないよう、必ず解除する
 	let timer: ReturnType<typeof setTimeout> | undefined;
 	try {
 		stream.send('s', { id: noteId });
@@ -374,7 +351,6 @@ export async function assertNotificationReceived(
 	if (expect) {
 		await vi.waitFor(async () => strictEqual(await fetchEndpointFired(), true), WAIT_FOR_FEDERATION);
 	} else {
-		// 届かないことの確認は待っても意味がないので 1 回だけ確認する
 		strictEqual(await fetchEndpointFired(), false);
 	}
 }

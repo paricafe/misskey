@@ -15,7 +15,6 @@ import { bindThis } from '@/decorators.js';
 import { RedisKVCache } from '@/misc/cache.js';
 import { HttpRequestService } from '@/core/HttpRequestService.js';
 
-// Defined also packages/sw/types.ts#L13
 type PushNotificationsTypes = {
 	'notification': Packed<'Notification'>;
 	'unreadAntennaNote': {
@@ -26,7 +25,6 @@ type PushNotificationsTypes = {
 	newChatMessage: Packed<'ChatMessage'>;
 };
 
-// Reduce length because push message servers have character limits
 function truncateBody<T extends keyof PushNotificationsTypes>(type: T, body: PushNotificationsTypes[T]): PushNotificationsTypes[T] {
 	if (typeof body !== 'object') return body;
 
@@ -35,7 +33,6 @@ function truncateBody<T extends keyof PushNotificationsTypes>(type: T, body: Pus
 		...(('note' in body && body.note) ? {
 			note: {
 				...body.note,
-				// textをgetNoteSummaryしたものに置き換える
 				text: getNoteSummary(('type' in body && body.type === 'renote') ? body.note.renote as Packed<'Note'> : body.note),
 
 				cw: undefined,
@@ -67,8 +64,8 @@ export class PushNotificationService implements OnApplicationShutdown {
 		private httpRequestService: HttpRequestService,
 	) {
 		this.subscriptionsCache = new RedisKVCache<MiSwSubscription[]>(this.redisClient, 'userSwSubscriptions', {
-			lifetime: 1000 * 60 * 60 * 1, // 1h
-			memoryCacheLifetime: 1000 * 60 * 3, // 3m
+			lifetime: 1000 * 60 * 60 * 1,
+			memoryCacheLifetime: 1000 * 60 * 3,
 			fetcher: (key) => this.swSubscriptionsRepository.findBy({ userId: key }),
 			toRedisConverter: (value) => JSON.stringify(value),
 			fromRedisConverter: (value) => JSON.parse(value),
@@ -94,7 +91,6 @@ export class PushNotificationService implements OnApplicationShutdown {
 	public async pushNotification<T extends keyof PushNotificationsTypes>(userId: string, type: T, body: PushNotificationsTypes[T]) {
 		if (!this.meta.enableServiceWorker || this.meta.swPublicKey == null || this.meta.swPrivateKey == null) return;
 
-		// アプリケーションの連絡先と、サーバーサイドの鍵ペアの情報を登録
 		push.setVapidDetails(this.config.url,
 			this.meta.swPublicKey,
 			this.meta.swPrivateKey);
@@ -124,10 +120,6 @@ export class PushNotificationService implements OnApplicationShutdown {
 			}), {
 				agent: this.httpRequestService.getAgentForHttps(new URL(subscription.endpoint)),
 			}).catch((err: any) => {
-				//swLogger.info(err.statusCode);
-				//swLogger.info(err.headers);
-				//swLogger.info(err.body);
-
 				if (err.statusCode === 410 || err.statusCode === 404) {
 					this.swSubscriptionsRepository.delete({
 						userId: userId,

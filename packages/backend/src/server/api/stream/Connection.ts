@@ -46,11 +46,7 @@ import type { EventEmitter } from 'events';
 
 const MAX_CHANNELS_PER_CONNECTION = 32;
 const MAX_SUBSCRIBING_NOTES_PER_CONNECTION = 1536;
-const MAX_BUFFERED_AMOUNT_PER_CONNECTION = 1024 * 1024 * 8; // 8MiB
-
-/**
- * Main stream connection
- */
+const MAX_BUFFERED_AMOUNT_PER_CONNECTION = 1024 * 1024 * 8;
 
 @Injectable({ scope: Scope.TRANSIENT })
 export default class Connection {
@@ -139,9 +135,6 @@ export default class Connection {
 		});
 	}
 
-	/**
-	 * クライアントからメッセージ受信時
-	 */
 	@bindThis
 	private async onWsConnectionMessage(data: WebSocket.RawData) {
 		if (this.wsConnection.readyState !== WebSocket.WebSocket.OPEN) return;
@@ -159,14 +152,14 @@ export default class Connection {
 		switch (type) {
 			case 'readNotification': this.onReadNotification(body); break;
 			case 'subNote': this.onSubscribeNote(body); break;
-			case 's': this.onSubscribeNote(body); break; // alias
+			case 's': this.onSubscribeNote(body); break;
 			case 'sr': this.onSubscribeNote(body); break;
 			case 'unsubNote': this.onUnsubscribeNote(body); break;
-			case 'un': this.onUnsubscribeNote(body); break; // alias
+			case 'un': this.onUnsubscribeNote(body); break;
 			case 'connect': await this.onChannelConnectRequested(body); break;
 			case 'disconnect': this.onChannelDisconnectRequested(body); break;
 			case 'channel': this.onChannelMessageRequested(body); break;
-			case 'ch': this.onChannelMessageRequested(body); break; // alias
+			case 'ch': this.onChannelMessageRequested(body); break;
 		}
 	}
 
@@ -180,9 +173,6 @@ export default class Connection {
 		this.notificationService.readAllNotification(this.user!.id);
 	}
 
-	/**
-	 * 投稿購読要求時
-	 */
 	@bindThis
 	private onSubscribeNote(payload: JsonValue | undefined) {
 		if (!isJsonObject(payload)) return;
@@ -191,14 +181,12 @@ export default class Connection {
 		const current = this.subscribingNotes.get(payload.id) ?? 0;
 
 		if (current === 0 && this.subscribingNotes.size >= MAX_SUBSCRIBING_NOTES_PER_CONNECTION) {
-			// 新規購読 かつ 購読上限に達している場合は、最も古い購読を解除して新規購読を追加する
 			const oldestId = this.subscribingNotes.keys().next().value;
 			if (oldestId != null) {
 				this.subscriber.off(`noteStream:${oldestId}`, this.onNoteStreamMessage);
 				this.subscribingNotes.delete(oldestId);
 			}
 		} else {
-			// access 順を更新して LRU を保つ
 			this.subscribingNotes.delete(payload.id);
 		}
 
@@ -210,9 +198,6 @@ export default class Connection {
 		}
 	}
 
-	/**
-	 * 投稿購読解除要求時
-	 */
 	@bindThis
 	private onUnsubscribeNote(payload: JsonValue | undefined) {
 		if (!isJsonObject(payload)) return;
@@ -231,20 +216,16 @@ export default class Connection {
 
 	@bindThis
 	private async onNoteStreamMessage(data: GlobalEvents['note']['payload']) {
-		// 自分自身ではないかつ
 		if (data.body.userId !== this.user?.id) {
-			// 公開範囲が指名で自分が含まれてない
 			if (data.body.visibility === 'specified' && (this.user == null || !data.body.visibleUserIds.includes(this.user.id))) {
 				return;
 			}
 
-			// 公開範囲がフォロワーで自分がフォロワーでない
 			if (data.body.visibility === 'followers' && !Object.hasOwn(this.following, data.body.userId)) {
 				return;
 			}
 		}
 
-		// TODO: ugcVisibilityForVisitor が local の場合の扱いを NoteEntityService.shouldHideNote と揃える
 		if (this.user == null && this.meta.ugcVisibilityForVisitor === 'none') return;
 
 		this.sendMessageToWs('noteUpdated', {
@@ -254,9 +235,6 @@ export default class Connection {
 		});
 	}
 
-	/**
-	 * チャンネル接続要求時
-	 */
 	@bindThis
 	private async onChannelConnectRequested(payload: JsonValue | undefined) {
 		if (!isJsonObject(payload)) return;
@@ -268,9 +246,6 @@ export default class Connection {
 		await this.connectChannel(id, params, channel, pong ?? undefined);
 	}
 
-	/**
-	 * チャンネル切断要求時
-	 */
 	@bindThis
 	private onChannelDisconnectRequested(payload: JsonValue | undefined) {
 		if (!isJsonObject(payload)) return;
@@ -279,9 +254,6 @@ export default class Connection {
 		this.disconnectChannel(id);
 	}
 
-	/**
-	 * クライアントにメッセージ送信
-	 */
 	@bindThis
 	public sendMessageToWs(type: string, payload: JsonObject) {
 		const message = JSON.stringify({
@@ -289,7 +261,6 @@ export default class Connection {
 			body: payload,
 		});
 
-		// 受信が追いつかないクライアントのために送信バッファを溜め続けないよう、閾値を超えたら切断して再接続させる
 		if (this.wsConnection.bufferedAmount + Buffer.byteLength(message) > MAX_BUFFERED_AMOUNT_PER_CONNECTION) {
 			this.wsConnection.terminate();
 			return;
@@ -298,9 +269,6 @@ export default class Connection {
 		this.wsConnection.send(message);
 	}
 
-	/**
-	 * チャンネルに接続
-	 */
 	@bindThis
 	public async connectChannel(id: string, params: JsonObject | undefined, channel: string, pong = false) {
 		if (this.channels.has(id)) {
@@ -322,7 +290,6 @@ export default class Connection {
 			return;
 		}
 
-		// 共有可能チャンネルに接続しようとしていて、かつそのチャンネルに既に接続していたら無意味なので無視
 		if (channelConstructor.shouldShare) {
 			for (const c of this.channels.values()) {
 				if (c.chName === channel) {
@@ -342,7 +309,6 @@ export default class Connection {
 		this.channels.set(ch.id, ch);
 		const valid = await ch.init(params ?? {});
 		if (typeof valid === 'boolean' && !valid) {
-			// 初期化処理の結果、接続拒否されたので切断
 			this.disconnectChannel(id);
 			return;
 		}
@@ -382,10 +348,6 @@ export default class Connection {
 		}
 	}
 
-	/**
-	 * チャンネルから切断
-	 * @param id チャンネルコネクションID
-	 */
 	@bindThis
 	public disconnectChannel(id: string) {
 		const channel = this.channels.get(id);
@@ -396,10 +358,6 @@ export default class Connection {
 		}
 	}
 
-	/**
-	 * チャンネルへメッセージ送信要求時
-	 * @param data メッセージ
-	 */
 	@bindThis
 	private onChannelMessageRequested(data: JsonValue | undefined) {
 		if (!isJsonObject(data)) return;
@@ -413,9 +371,6 @@ export default class Connection {
 		}
 	}
 
-	/**
-	 * ストリームが切れたとき
-	 */
 	@bindThis
 	public dispose() {
 		if (this.fetchIntervalId) clearInterval(this.fetchIntervalId);

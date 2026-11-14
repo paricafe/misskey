@@ -40,7 +40,6 @@ export class ApiServerService {
 		private signinApiService: SigninApiService,
 		private signinWithPasskeyApiService: SigninWithPasskeyApiService,
 	) {
-		//this.createServer = this.createServer.bind(this);
 	}
 
 	@bindThis
@@ -56,7 +55,6 @@ export class ApiServerService {
 			},
 		});
 
-		// Prevent cache
 		fastify.addHook('onRequest', (request, reply, done) => {
 			reply.header('Cache-Control', 'private, max-age=0, must-revalidate');
 			done();
@@ -82,7 +80,6 @@ export class ApiServerService {
 						return;
 					}
 
-					// Await so that any error can automatically be translated to HTTP 500
 					await this.apiCallService.handleMultipartRequest(ep, request, reply);
 					return reply;
 				});
@@ -98,7 +95,6 @@ export class ApiServerService {
 						return;
 					}
 
-					// Await so that any error can automatically be translated to HTTP 500
 					await this.apiCallService.handleRequest(ep, request, reply);
 					return reply;
 				});
@@ -187,12 +183,8 @@ export class ApiServerService {
 			}
 		});
 
-		// Make sure any unknown path under /api returns HTTP 404 Not Found,
-		// because otherwise ClientServerService will return the base client HTML
-		// page with HTTP 200.
 		fastify.get('/*', (request, reply) => {
 			reply.code(404);
-			// Mock ApiCallService.send's error handling
 			reply.send({
 				error: {
 					message: 'Unknown API endpoint.',

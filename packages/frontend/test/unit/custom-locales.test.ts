@@ -45,8 +45,6 @@ function expectCompatibleLocale(locale: ILocale, source: ILocale, prefix: string
 const japanese = readLocale('ja-JP');
 const japaneseLeaves = new Map(leafEntries(japanese));
 
-// Keep this contract independent of Git refs and translated text. MFM is a
-// Pari-owned namespace, so new entries there must also receive all translations.
 const customPaths = [
 	'allowClickingNotifications',
 	'_role._options.canEditNote',

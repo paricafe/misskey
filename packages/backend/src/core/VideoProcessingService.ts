@@ -36,7 +36,7 @@ export class VideoProcessingService {
 					.on('error', rej)
 					.screenshot({
 						folder: dir,
-						filename: 'out.png',	// must have .png extension
+						filename: 'out.png',
 						count: 1,
 						timestamps: ['5%'],
 					});

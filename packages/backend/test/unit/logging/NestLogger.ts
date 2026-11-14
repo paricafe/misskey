@@ -19,7 +19,6 @@ vi.mock('@/logging/logging-runtime.js', () => ({
 
 import { NestLogger } from '@/NestLogger.js';
 
-/** 実行環境のstack形式に依存しないよう、NestJSのstack判定を満たす文字列を自前で与える。 */
 function createError(message: string): Error {
 	const error = new Error(message);
 	error.stack = `Error: ${message}\n    at createError (/app/packages/backend/test/unit/logging/NestLogger.ts:1:1)`;
@@ -59,8 +58,6 @@ describe('NestLogger', () => {
 		]);
 	});
 
-	// Nest 12のlifecycle hookは Logger.error(reason, reason?.stack) をcontext無しで呼ぶ。
-	// stackをcontextと取り違えると、本文の先頭にスタックトレース全文が出てしまう。
 	test('keeps the stack out of the context when Nest reports a rejection without context', () => {
 		NestJsLogger.overrideLogger(new NestLogger());
 		const error = createError('broken');
@@ -74,7 +71,6 @@ describe('NestLogger', () => {
 		});
 	});
 
-	// Nestのインスタンス版Loggerは、contextを持つとき引数を [message, undefined, context] へ展開する。
 	test('adopts the trailing string as context when Nest appends its own', () => {
 		NestJsLogger.overrideLogger(new NestLogger());
 		const error = createError('broken');
@@ -109,7 +105,6 @@ describe('NestLogger', () => {
 		expect(records()[0]).not.toHaveProperty('error');
 	});
 
-	// Nest 12のstructuredParams: messageより後のプレーンオブジェクトは構造化された付帯情報として扱われる。
 	test('forwards structured params as attributes', () => {
 		new NestLogger().log('mapped', { route: '/api' }, 'RouterExplorer');
 
@@ -137,8 +132,6 @@ describe('NestLogger', () => {
 		expect(records()[0].message).not.toContain('\n');
 	});
 
-	// ConsoleLogger.error()はprintMessages()の後にstackをprocess.stderrへ直接書くため、
-	// 抑止しないとMisskeyのログ整形を迂回したstackが二重に出る。
 	test('does not let ConsoleLogger write the stack straight to stderr', () => {
 		const write = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
 		const error = createError('broken');
@@ -146,7 +139,6 @@ describe('NestLogger', () => {
 		try {
 			new NestLogger().error(error, error.stack);
 
-			// mockRestore()はmockClear()を兼ねて呼び出し履歴も消すため、復元より先に検証する。
 			expect(write).not.toHaveBeenCalled();
 		} finally {
 			write.mockRestore();

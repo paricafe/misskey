@@ -31,7 +31,6 @@ export class MiAvatarDecoration {
 	})
 	public description: string;
 
-	// TODO: 定期ジョブで存在しなくなったロールIDを除去するようにする
 	@Column('varchar', {
 		array: true, length: 128, default: '{}',
 	})

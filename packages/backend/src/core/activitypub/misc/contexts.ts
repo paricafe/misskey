@@ -5,7 +5,6 @@
 
 import type { Context, JsonLd } from 'jsonld/jsonld-spec.js';
 
-/* eslint:disable:quotemark indent */
 const id_v1 = {
 	'@context': {
 		'id': '@id',
@@ -533,21 +532,17 @@ const context_iris = [
 
 const extension_context_definition = {
 	Key: 'sec:Key',
-	// as non-standards
 	manuallyApprovesFollowers: 'as:manuallyApprovesFollowers',
 	sensitive: 'as:sensitive',
 	Hashtag: 'as:Hashtag',
 	quoteUrl: 'as:quoteUrl',
-	// Mastodon
 	toot: 'http://joinmastodon.org/ns#',
 	Emoji: 'toot:Emoji',
 	featured: 'toot:featured',
 	discoverable: 'toot:discoverable',
-	// schema
 	schema: 'http://schema.org#',
 	PropertyValue: 'schema:PropertyValue',
 	value: 'schema:value',
-	// Misskey
 	misskey: 'https://misskey-hub.net/ns#',
 	'_misskey_content': 'misskey:_misskey_content',
 	'_misskey_quote': 'misskey:_misskey_quote',
@@ -564,7 +559,6 @@ const extension_context_definition = {
 		'@type': 'schema:text',
 	},
 	'isCat': 'misskey:isCat',
-	// vcard
 	vcard: 'http://www.w3.org/2006/vcard/ns#',
 } satisfies Context;
 

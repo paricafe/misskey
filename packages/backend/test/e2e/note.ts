@@ -267,7 +267,7 @@ describe('Note', () => {
 
 	test('文字数ぎりぎりで怒られない', async () => {
 		const post = {
-			text: '!'.repeat(MAX_NOTE_TEXT_LENGTH), // 3000文字
+			text: '!'.repeat(MAX_NOTE_TEXT_LENGTH),
 		};
 		const res = await api('notes/create', post, alice);
 		assert.strictEqual(res.status, 200);
@@ -275,7 +275,7 @@ describe('Note', () => {
 
 	test('文字数オーバーで怒られる', async () => {
 		const post = {
-			text: '!'.repeat(MAX_NOTE_TEXT_LENGTH + 1), // 3001文字
+			text: '!'.repeat(MAX_NOTE_TEXT_LENGTH + 1),
 		};
 		const res = await api('notes/create', post, alice);
 		assert.strictEqual(res.status, 400);
@@ -1159,7 +1159,6 @@ describe('Note', () => {
 			const aliceNote = await post(alice, { text: 'Hello' });
 			const res = await api('notes/translate', { noteId: aliceNote.id, targetLang: 'ja' }, alice);
 
-			// NOTE: デフォルトでは登録されていないので落ちる
 			assert.strictEqual(res.status, 400);
 			assert.strictEqual(castAsError(res.body).error.code, 'UNAVAILABLE');
 		});

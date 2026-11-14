@@ -8,7 +8,6 @@ type Job<V> = {
 	timer: NodeJS.Timeout;
 };
 
-// TODO: redis使えるようにする
 export class CollapsedQueue<K, V> {
 	private jobs: Map<K, Job<V>> = new Map();
 

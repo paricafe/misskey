@@ -90,9 +90,7 @@ const scannerInstance = shallowRef<QrScanner | null>(null);
 
 const tab = ref<'users' | 'notes' | 'all'>('users');
 
-// higher is recent
 const results = ref(new Set<string>());
-// lower is recent
 const uris = ref<string[]>([]);
 const sources = new Map<string, ApShowResponse | null>();
 const users = ref<(misskey.entities.UserDetailed)[]>([]);
@@ -156,12 +154,10 @@ async function processResult(result: QrScanner.ScanResult) {
 	}
 
 	if (uris.value[0] !== trimmed) {
-		// 並べ替え
 		uris.value = [trimmed, ...uris.value.slice(0, 29).filter(u => u !== trimmed)];
 	}
 
 	if (sources.has(trimmed)) return;
-	// Start fetching user info
 	sources.set(trimmed, null);
 
 	await misskeyApi('ap/show', { uri: trimmed })
@@ -247,8 +243,6 @@ async function toggleFlash(to = false) {
 	}
 }
 
-// hasFlashなどの後続の処理がカメラを再起動する可能性があるため、
-// start() が完了するまでの間に停止された場合は結果を破棄する必要がある
 let initializeId = 0;
 
 function startQr() {

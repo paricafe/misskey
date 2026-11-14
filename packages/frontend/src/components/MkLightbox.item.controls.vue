@@ -46,7 +46,6 @@ import hasAudio from '@/utility/media-has-audio.js';
 import MkMediaRange from '@/components/MkMediaRange.vue';
 
 const props = withDefaults(defineProps<{
-	/** 音量をメディア要素に適用しない（ビジュアライザー用） */
 	externalVolumeControl?: boolean;
 }>(), {
 	externalVolumeControl: false,
@@ -57,12 +56,10 @@ const volume = defineModel<number>('volume', { required: true });
 const mediaEl = inject(DI.mkLightboxItemMediaEl, shallowRef<HTMLVideoElement | HTMLAudioElement | null>(null));
 const isVideo = computed(() => mediaEl.value instanceof HTMLVideoElement);
 
-// Menu
 const menuShowing = ref(false);
 
 function showMenu(ev: PointerEvent) {
 	const menu: MenuItem[] = [
-		// TODO: 再生キューに追加
 		{
 			type: 'switch',
 			text: i18n.ts._mediaControls.loop,
@@ -113,11 +110,10 @@ function showMenu(ev: PointerEvent) {
 	});
 }
 
-// MediaControl: Common State
 const oncePlayed = ref(false);
 const isReady = ref(false);
-const isPlaying = ref(false); // ユーザーが再生中であることを期待する状態か
-const isActuallyPlaying = ref(false); // 実際に再生中か (バッファリング等で一時停止している場合は false)
+const isPlaying = ref(false);
+const isActuallyPlaying = ref(false);
 const elapsedTimeMs = ref(0);
 const durationMs = ref(0);
 const rangePercent = computed({
@@ -130,21 +126,19 @@ const rangePercent = computed({
 	},
 });
 const speed = ref(1);
-const loop = ref(false); // TODO: ドライブファイルのフラグに置き換える
+const loop = ref(false);
 const bufferedEnd = ref(0);
 const bufferedDataRatio = computed(() => {
 	if (durationMs.value === 0) return 0;
 	return bufferedEnd.value / (durationMs.value / 1000);
 });
 
-// state の更新はすべてメディア要素のイベント側に任せる
 function togglePlayPause() {
 	if (!isReady.value) return;
 
 	if (isPlaying.value) {
 		mediaEl.value?.pause();
 	} else {
-		// 自動再生のブロック等で reject しうるが、再生ボタンが出たままになるだけなので握りつぶす
 		mediaEl.value?.play().catch(err => {
 			if (_DEV_) console.warn('Failed to play media:', err);
 		});
@@ -152,7 +146,6 @@ function togglePlayPause() {
 }
 
 function togglePictureInPicture() {
-	// ブラウザ側で許可されていない場合等にrejectしうるが、表示が変わらないだけなので握りつぶす
 	if (window.document.pictureInPictureElement) {
 		window.document.exitPictureInPicture().catch(err => {
 			if (_DEV_) console.warn('Failed to exit picture-in-picture:', err);
@@ -175,9 +168,6 @@ function toggleMute() {
 let abortController: AbortController | null = null;
 let loopObserver: MutationObserver | null = null;
 
-// currentTime だけは進捗を通知するイベントが timeupdate しかなく、
-// これは 4Hz 程度でしか発火しないためシークバーがカクつく。
-// そのため再生中に限り requestAnimationFrame で補間する
 let elapsedTickFrameId: number | null = null;
 
 function syncElapsedTime() {
@@ -203,7 +193,6 @@ function stopElapsedTick() {
 
 function syncDuration() {
 	const duration = mediaEl.value?.duration;
-	// メタデータ読み込み前は NaN、ライブストリームでは Infinity になりうる
 	durationMs.value = duration != null && Number.isFinite(duration) ? duration * 1000 : 0;
 }
 
@@ -214,7 +203,6 @@ function syncBuffered() {
 		return;
 	}
 
-	// シークすると読み込み済みの範囲が複数に分かれるため、最も先まで到達している位置を採用する
 	let end = 0;
 	for (let i = 0; i < buffered.length; i++) {
 		if (buffered.end(i) > end) end = buffered.end(i);
@@ -296,8 +284,6 @@ function init() {
 		syncElapsedTime();
 	});
 
-	// ネイティブUIやブラウザのコンテキストメニューから変更されうるもの
-	// (externalVolumeControl時は要素の音量を100%に固定しているので、取り込むと表示が壊れる)
 	if (!props.externalVolumeControl) {
 		on('volumechange', () => {
 			const to = el.muted ? 0 : el.volume;
@@ -309,14 +295,11 @@ function init() {
 		if (speed.value !== el.playbackRate) speed.value = el.playbackRate;
 	});
 
-	// loop には変更イベントが無いが、属性の変化を監視すればネイティブUI経由の変更も拾える
 	loopObserver = new MutationObserver(() => {
 		if (loop.value !== el.loop) loop.value = el.loop;
 	});
 	loopObserver.observe(el, { attributes: true, attributeFilter: ['loop'] });
 
-	// 現在の要素の状態を state に取り込む
-	// (コントロール表示前に再生が始まっている場合等)
 	syncReady();
 	syncDuration();
 	syncBuffered();
@@ -333,10 +316,8 @@ function init() {
 		el.volume = volume.value;
 	}
 
-	// 音声トラックを持たない動画はGIFのように扱う
 	if (isVideo.value) {
 		hasAudio(el).then(had => {
-			// 判定を待っている間に teardown / 再 init されている可能性があるので、世代が変わっていたら何もしない
 			if (signal.aborted) return;
 			if (!had) {
 				el.loop = el.muted = true;
@@ -355,14 +336,12 @@ function teardown() {
 	loopObserver = null;
 	stopElapsedTick();
 	isReady.value = false;
-	// メディア要素を差し替えた場合、古い要素のイベントはもう届かないのでここで戻しておく
-	// (isPlaying / loop / speed 等は init() が新しい要素から取り込み直す)
 	isActuallyPlaying.value = false;
 	oncePlayed.value = false;
 }
 
 watch(volume, (to) => {
-	if (props.externalVolumeControl) return; // 適用は音量を受け取った側 (Web Audio経路) が行う
+	if (props.externalVolumeControl) return;
 	if (mediaEl.value == null) return;
 	mediaEl.value.volume = to;
 	mediaEl.value.muted = to === 0;

@@ -29,7 +29,6 @@ export const packedQueueCountSchema = {
 	},
 } as const;
 
-// Bull.Metrics
 export const packedQueueMetricsSchema = {
 	type: 'object',
 	properties: {

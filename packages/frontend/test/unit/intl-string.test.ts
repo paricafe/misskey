@@ -12,10 +12,8 @@ import {
 	compareStringIncludes,
 } from '@/utility/intl-string.js';
 
-// 共通のテストを実行するヘルパー関数
 const runCommonTests = (normalizeFn: (str: string) => string) => {
 	test('全角英数字が半角の小文字になる', () => {
-		// ローマ字にならないようにする
 		const input = 'Ｂ１２３';
 		const expected = 'b123';
 		assert.strictEqual(normalizeFn(input), expected);
@@ -26,7 +24,6 @@ const runCommonTests = (normalizeFn: (str: string) => string) => {
 		assert.strictEqual(normalizeFn(input), expected);
 	});
 	test('小文字に揃う', () => {
-		// ローマ字にならないようにする
 		const input = 'tSt';
 		const expected = 'tst';
 		assert.strictEqual(normalizeFn(input), expected);
@@ -54,13 +51,11 @@ describe('normalize string', () => {
 	});
 });
 
-// normalizeStringWithHiraganaのテスト
 describe('normalize string with hiragana', () => {
 	beforeEach(async () => {
 		await initIntlString(true);
 	});
 
-	// 共通テスト
 	describe('共通のnormalizeStringテスト', () => {
 		runCommonTests(normalizeStringWithHiragana);
 	});
@@ -71,7 +66,6 @@ describe('normalize string with hiragana', () => {
 		assert.strictEqual(normalizeStringWithHiragana(input), expected);
 	});
 
-	// normalizeStringWithHiragana特有のテスト
 	test('カタカナがひらがなに変換される・伸ばし棒はハイフンに変換される', () => {
 		const input = 'カタカナひーらがーな';
 		const expected = 'かたかなひ-らが-な';

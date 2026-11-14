@@ -47,7 +47,6 @@ const description = ref($i.description ?? '');
 
 watch(name, () => {
 	os.apiWithDialog('i/update', {
-		// 空文字列をnullにしたいので??は使うな
 
 		name: name.value || null,
 	}, undefined, {
@@ -60,7 +59,6 @@ watch(name, () => {
 
 watch(description, () => {
 	os.apiWithDialog('i/update', {
-		// 空文字列をnullにしたいので??は使うな
 
 		description: description.value || null,
 	});

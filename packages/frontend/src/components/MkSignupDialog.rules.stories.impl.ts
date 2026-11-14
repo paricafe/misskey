@@ -63,7 +63,6 @@ export const Empty = {
 				// @ts-expect-error tosUrl is for test
 				instance.tosUrl = context.args.tosUrl;
 				onBeforeUnmount(() => {
-					// FIXME: 呼び出されない
 					instance.serverRules = [];
 					instance.tosUrl = null;
 				});

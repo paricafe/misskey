@@ -12,9 +12,6 @@ import type { TIPS } from '@/tips.js';
 import { Pizzax } from '@/lib/pizzax.js';
 import { DEFAULT_DEVICE_KIND } from '@/utility/device-kind.js';
 
-/**
- * 「状態」を管理するストア(not「設定」)
- */
 export const store = markRaw(new Pizzax('base', {
 	accountSetupWizard: {
 		where: 'account',
@@ -22,7 +19,7 @@ export const store = markRaw(new Pizzax('base', {
 	},
 	tips: {
 		where: 'device',
-		default: {} as Partial<Record<typeof TIPS[number], boolean>>, // true = 既読
+		default: {} as Partial<Record<typeof TIPS[number], boolean>>,
 	},
 	memo: {
 		where: 'account',
@@ -83,7 +80,7 @@ export const store = markRaw(new Pizzax('base', {
 	},
 	menuDisplay: {
 		where: 'device',
-		default: 'sideFull' as 'sideFull' | 'sideIcon'/* | 'top' */,
+		default: 'sideFull' as 'sideFull' | 'sideIcon',
 	},
 	postFormWithHashtags: {
 		where: 'device',
@@ -99,15 +96,15 @@ export const store = markRaw(new Pizzax('base', {
 	},
 	pluginTokens: {
 		where: 'deviceAccount',
-		default: {} as Record<string, string>, // plugin id, token
+		default: {} as Record<string, string>,
 	},
 	accountTokens: {
 		where: 'device',
-		default: {} as Record<string, string>, // host/userId, token
+		default: {} as Record<string, string>,
 	},
 	accountInfos: {
 		where: 'device',
-		default: {} as Record<string, Misskey.entities.MeDetailed>, // host/userId, user
+		default: {} as Record<string, Misskey.entities.MeDetailed>,
 	},
 
 	enablePreferencesAutoCloudBackup: {
@@ -123,8 +120,6 @@ export const store = markRaw(new Pizzax('base', {
 		default: true,
 	},
 }));
-
-// TODO: 他のタブと永続化されたstateを同期
 
 const PREFIX = 'miux:' as const;
 

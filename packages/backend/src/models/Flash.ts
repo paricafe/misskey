@@ -59,10 +59,6 @@ export class MiFlash {
 	})
 	public likedCount: number;
 
-	/**
-	 * public ... 公開
-	 * private ... プロフィールには表示しない
-	 */
 	@Column('varchar', {
 		length: 512, default: 'public',
 	})

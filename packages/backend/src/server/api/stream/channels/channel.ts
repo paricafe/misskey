@@ -30,7 +30,6 @@ export class ChannelChannel extends Channel {
 		private noteStreamingHidingService: NoteStreamingHidingService,
 	) {
 		super(request);
-		//this.onNote = this.onNote.bind(this);
 	}
 
 	@bindThis
@@ -38,7 +37,6 @@ export class ChannelChannel extends Channel {
 		if (typeof params.channelId !== 'string') return;
 		this.channelId = params.channelId;
 
-		// Subscribe stream
 		this.subscriber.on('notesStream', this.onNote);
 	}
 
@@ -61,24 +59,14 @@ export class ChannelChannel extends Channel {
 		this.send('note', await this.noteEntityService.withMyRenoteReaction(note, this.user?.id ?? null));
 	}
 
-	/*
-	 * ミュートとブロックされてるを処理する
-	 */
 	protected override isNoteMutedOrBlocked(note: Packed<'Note'>): boolean {
-		// 流れてきたNoteがインスタンスミュートしたインスタンスが関わる
 		if (isInstanceMuted(note, this.userMutedInstances)) return true;
 
-		// 流れてきたNoteがミュートしているユーザーが関わる
 		if (isUserRelated(note, this.userIdsWhoMeMuting)) return true;
-		// 流れてきたNoteがブロックされているユーザーが関わる
 		if (isUserRelated(note, this.userIdsWhoBlockingMe)) return true;
 
-		// 流れてきたNoteがリノートをミュートしてるユーザが行ったもの
 		if (isRenotePacked(note) && !isQuotePacked(note) && this.userIdsWhoMeMutingRenotes.has(note.user.id)) return true;
 
-		// このソケットで見ているチャンネルがミュートされていたとしても、チャンネルを直接見ている以上は流すようにしたい
-		// ただし、他のミュートしているチャンネルは流さないようにもしたい
-		// ノート自体のチャンネルIDはonNoteでチェックしているので、ここではリノートのチャンネルIDをチェックする
 		if (
 			(note.renote) &&
 			(note.renote.channelId !== this.channelId) &&
@@ -92,7 +80,6 @@ export class ChannelChannel extends Channel {
 
 	@bindThis
 	public dispose() {
-		// Unsubscribe events
 		this.subscriber.off('notesStream', this.onNote);
 	}
 }

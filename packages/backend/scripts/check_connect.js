@@ -34,8 +34,6 @@ async function connectToRedis(redisOptions) {
 	}
 }
 
-// If not all of these are defined, the default one gets reused.
-// so we use a Set to only try connecting once to each **uniq** redis.
 const promises = Array
 	.from(new Set([
 		config.redis,

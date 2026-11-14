@@ -3,8 +3,6 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-// FirefoxのプライベートモードなどではindexedDBが使用不可能なので、
-// indexedDBが使えない環境ではlocalStorageを使う
 import {
 	get as iget,
 	set as iset,

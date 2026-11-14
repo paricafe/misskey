@@ -73,7 +73,6 @@ export class SigninWithPasskeyApiService {
 		}
 
 		const fail = async (userId: MiUser['id'], status?: number, failure?: { id: string }) => {
-			// Append signin history
 			await this.signinsRepository.insert({
 				id: this.idService.gen(),
 				userId: userId,
@@ -89,8 +88,6 @@ export class SigninWithPasskeyApiService {
 				this.logger.warn('Recieved signin with passkey request from localhost IP address for rate limiting in production environment. This is likely due to an improper trustProxy setting in the config file.');
 			}
 
-			// Not more than 1 API call per 250ms and not more than 100 attempts per 30min
-			// NOTE: 1 Sign-in require 2 API calls
 			const rateLimit = await this.rateLimiterService.limit({ key: 'signin-with-passkey', duration: 60 * 30 * 1000, max: 200, minInterval: 250 }, getIpHash(request.ip));
 			if (rateLimit != null) {
 				reply.code(429);
@@ -104,7 +101,6 @@ export class SigninWithPasskeyApiService {
 			}
 		}
 
-		// Initiate Passkey Auth challenge with context
 		if (!credential) {
 			const context = randomUUID();
 			this.logger.info(`Initiate Passkey challenge: context: ${context}`);
@@ -117,9 +113,7 @@ export class SigninWithPasskeyApiService {
 		}
 
 		const context = body.context;
-		// context is always generated server-side by randomUUID(), so reject anything that is not a UUID
 		if (!context || typeof context !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(context)) {
-			// If try Authentication without valid context
 			return error(400, {
 				id: '1658cc2e-4495-461f-aee4-d403cdf073c1',
 			});
@@ -144,7 +138,6 @@ export class SigninWithPasskeyApiService {
 			});
 		}
 
-		// Fetch user
 		const user = await this.usersRepository.findOneBy({
 			id: authorizedUserId,
 			host: IsNull(),
@@ -164,7 +157,6 @@ export class SigninWithPasskeyApiService {
 
 		const profile = await this.userProfilesRepository.findOneByOrFail({ userId: user.id });
 
-		// Authentication was successful, but passwordless login is not enabled
 		if (!profile.usePasswordLessLogin) {
 			return await fail(user.id, 403, {
 				id: '2d84773e-f7b7-4d0b-8f72-bb69b584c912',

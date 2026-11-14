@@ -40,13 +40,11 @@ const parentStickyBottom = inject(DI.currentStickyBottom, ref(0));
 provide(DI.currentStickyBottom, childStickyBottom);
 
 const calc = () => {
-	// コンポーネントが表示されてないけどKeepAliveで残ってる場合などは null になる
 	if (headerEl.value != null) {
 		childStickyTop.value = parentStickyTop.value + headerEl.value.offsetHeight;
 		headerHeight.value = headerEl.value.offsetHeight.toString();
 	}
 
-	// コンポーネントが表示されてないけどKeepAliveで残ってる場合などは null になる
 	if (footerEl.value != null) {
 		childStickyBottom.value = parentStickyBottom.value + footerEl.value.offsetHeight;
 		footerHeight.value = footerEl.value.offsetHeight.toString();

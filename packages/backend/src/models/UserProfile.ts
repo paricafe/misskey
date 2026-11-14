@@ -10,10 +10,8 @@ import { MiUser } from './User.js';
 import { MiPage } from './Page.js';
 import { MiUserList } from './UserList.js';
 
-// TODO: このテーブルで管理している情報すべてレジストリで管理するようにしても良いかも
-//       ただ、「emailVerified が true なユーザーを find する」のようなクエリは書けなくなるからウーン
 @Entity('user_profile')
-@Index('IDX_fcb770976ff8240af5799e3ffc', { synchronize: false }) // PGroonga index managed by migration.
+@Index('IDX_fcb770976ff8240af5799e3ffc', { synchronize: false })
 export class MiUserProfile {
 	@PrimaryColumn(id())
 	public userId: MiUser['id'];
@@ -30,7 +28,6 @@ export class MiUserProfile {
 	})
 	public location: string | null;
 
-	// Note: There's index named IDX_de22cd2b445eee31ae51cdbe99 for SUBSTR("birthday", 6, 5)
 	@Column('char', {
 		length: 10, nullable: true,
 		comment: 'The birthday (YYYY-MM-DD) of the User.',
@@ -43,13 +40,10 @@ export class MiUserProfile {
 	})
 	public description: string | null;
 
-	// フォローされた際のメッセージ
 	@Column('varchar', {
 		length: 256, nullable: true,
 	})
 	public followedMessage: string | null;
-
-	// TODO: 鍵アカウントの場合の、フォローリクエスト受信時のメッセージも設定できるようにする
 
 	@Column('jsonb', {
 		default: [],
@@ -155,14 +149,12 @@ export class MiUserProfile {
 	})
 	public moderationNote: string | null;
 
-	// TODO: そのうち消す
 	@Column('jsonb', {
 		default: {},
 		comment: 'The client-specific data of the User.',
 	})
 	public clientData: Record<string, any>;
 
-	// TODO: そのうち消す
 	@Column('jsonb', {
 		default: {},
 		comment: 'The room data of the User.',
@@ -285,14 +277,12 @@ export class MiUserProfile {
 		unlockedAt: number;
 	}[];
 
-	//#region Denormalized fields
 	@Index()
 	@Column('varchar', {
 		length: 128, nullable: true,
 		comment: '[Denormalized]',
 	})
 	public userHost: string | null;
-	//#endregion
 
 	constructor(data: Partial<MiUserProfile>) {
 		if (data == null) return;

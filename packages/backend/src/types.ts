@@ -3,28 +3,6 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-/**
- * note - 通知オンにしているユーザーが投稿した
- * follow - フォローされた
- * mention - 投稿で自分が言及された
- * reply - 投稿に返信された
- * renote - 投稿がRenoteされた
- * quote - 投稿が引用Renoteされた
- * reaction - 投稿にリアクションされた
- * pollEnded - 自分のアンケートもしくは自分が投票したアンケートが終了した
- * scheduledNotePosted - 予約したノートが投稿された
- * scheduledNotePostFailed - 予約したノートの投稿に失敗した
- * receiveFollowRequest - フォローリクエストされた
- * followRequestAccepted - 自分の送ったフォローリクエストが承認された
- * roleAssigned - ロールが付与された
- * chatRoomInvitationReceived - チャットルームに招待された
- * achievementEarned - 実績を獲得
- * exportCompleted - エクスポートが完了
- * login - ログイン
- * createToken - トークン作成
- * app - アプリ通知
- * test - テスト通知（サーバー側）
- */
 export const notificationTypes = [
 	'note',
 	'follow',
@@ -65,18 +43,8 @@ export const mutedNoteReasons = ['word', 'manual', 'spam', 'other'] as const;
 export const followingVisibilities = ['public', 'followers', 'private'] as const;
 export const followersVisibilities = ['public', 'followers', 'private'] as const;
 
-/**
- * ユーザーがエクスポートできるものの種類
- *
- * （主にエクスポート完了通知で使用するものであり、既存のDBの名称等と必ずしも一致しない）
- */
 export const userExportableEntities = ['antenna', 'blocking', 'clip', 'customEmoji', 'favorite', 'following', 'muting', 'note', 'userList'] as const;
 
-/**
- * ユーザーがインポートできるものの種類
- *
- * （主にインポート完了通知で使用するものであり、既存のDBの名称等と必ずしも一致しない）
- */
 export const userImportableEntities = ['antenna', 'blocking', 'customEmoji', 'following', 'muting', 'userList'] as const;
 
 export const moderationLogTypes = [

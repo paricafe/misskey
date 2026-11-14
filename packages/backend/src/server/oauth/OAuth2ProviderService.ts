@@ -37,15 +37,7 @@ import { HtmlTemplateService } from '@/server/web/HtmlTemplateService.js';
 import { OAuthPage } from '@/server/web/views/oauth.js';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 
-// TODO: Consider migrating to @node-oauth/oauth2-server once
-// https://github.com/node-oauth/node-oauth2-server/issues/180 is figured out.
-// Upstream the various validations and RFC9207 implementation in that case.
-
-// Follows https://indieauth.spec.indieweb.org/#client-identifier
-// This is also mostly similar to https://developers.google.com/identity/protocols/oauth2/web-server#uri-validation
-// although Google has stricter rule.
 function validateClientId(raw: string): URL {
-	// "Clients are identified by a [URL]."
 	const url = ((): URL => {
 		try {
 			return new URL(raw);
@@ -54,40 +46,24 @@ function validateClientId(raw: string): URL {
 		}
 	})();
 
-	// "Client identifier URLs MUST have either an https or http scheme"
-	// But then again:
-	// https://datatracker.ietf.org/doc/html/rfc6749.html#section-3.1.2.1
-	// 'The redirection endpoint SHOULD require the use of TLS as described
-	// in Section 1.6 when the requested response type is "code" or "token"'
 	const allowedProtocols = process.env.NODE_ENV === 'test' ? ['http:', 'https:'] : ['https:'];
 	if (!allowedProtocols.includes(url.protocol)) {
 		throw new InvalidRequestError('client_id must be a valid HTTPS URL');
 	}
 
-	// "MUST contain a path component (new URL() implicitly adds one)"
-
-	// "MUST NOT contain single-dot or double-dot path segments,"
 	const segments = url.pathname.split('/');
 	if (segments.includes('.') || segments.includes('..')) {
 		throw new InvalidRequestError('client_id must not contain dot path segments');
 	}
 
-	// ("MAY contain a query string component")
-
-	// "MUST NOT contain a fragment component"
 	if (url.hash) {
 		throw new InvalidRequestError('client_id must not contain a fragment component');
 	}
 
-	// "MUST NOT contain a username or password component"
 	if (url.username || url.password) {
 		throw new InvalidRequestError('client_id must not contain a username or a password');
 	}
 
-	// ("MAY contain a port")
-
-	// "host names MUST be domain names or a loopback interface and MUST NOT be
-	// IPv4 or IPv6 addresses except for IPv4 127.0.0.1 or IPv6 [::1]."
 	if (!url.hostname.match(/\.\w+$/) && !['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)) {
 		throw new InvalidRequestError('client_id must have a domain name as a host name');
 	}
@@ -175,12 +151,6 @@ async function discoverClientInformation(logger: Logger, httpRequestService: Htt
 		let name = id;
 		let logo: string | null = null;
 
-		// https://indieauth.spec.indieweb.org/#redirect-url
-		// "The client SHOULD publish one or more <link> tags or Link HTTP headers with a rel attribute
-		// of redirect_uri at the client_id URL.
-		// Authorization endpoints verifying that a redirect_uri is allowed for use by a client MUST
-		// look for an exact match of the given redirect_uri in the request against the list of
-		// redirect_uris discovered after resolving any relative URLs."
 		const linkHeader = res.headers.get('link');
 		if (linkHeader) {
 			redirectUris.push(...httpLinkHeader.parse(linkHeader).get('rel', 'redirect_uri').map(link => link.uri));
@@ -189,12 +159,6 @@ async function discoverClientInformation(logger: Logger, httpRequestService: Htt
 		const contentType = res.headers.get('content-type');
 		const mediaType = contentType ? contentType.split(';')[0].trim() : null;
 		if (mediaType === 'application/json') {
-			// Client discovery via JSON document (11 July 2024 spec)
-			// https://indieauth.spec.indieweb.org/#client-metadata
-			// "Clients SHOULD have a JSON [RFC7159] document at their client_id URL containing
-			// client metadata defined in [RFC7591], the minimum properties for an IndieAuth
-			// client defined below."
-
 			const json = await res.json() as {
 				client_id: string;
 				client_name?: string;
@@ -203,15 +167,10 @@ async function discoverClientInformation(logger: Logger, httpRequestService: Htt
 				redirect_uris?: string[];
 			};
 
-			// https://indieauth.spec.indieweb.org/#client-metadata-li-1
-			// "The authorization server MUST verify that the client_id in the document matches the
-			// client_id of the URL where the document was retrieved."
 			if (json.client_id !== id) {
 				throw new InvalidRequestError('client_id in the document does not match the client_id URL');
 			}
 
-			// https://indieauth.spec.indieweb.org/#client-metadata-li-1
-			// "The client_uri MUST be a prefix of the client_id."
 			if (!json.client_uri || !id.startsWith(json.client_uri)) {
 				throw new InvalidRequestError('client_uri is not a prefix of client_id');
 			}
@@ -221,7 +180,6 @@ async function discoverClientInformation(logger: Logger, httpRequestService: Htt
 			}
 
 			if (typeof json.logo_uri === 'string') {
-				// Since uri can be relative, resolve it against the document URL
 				logo = new URL(json.logo_uri, res.url).toString();
 			}
 
@@ -229,11 +187,6 @@ async function discoverClientInformation(logger: Logger, httpRequestService: Htt
 				redirectUris.push(...json.redirect_uris.filter((uri): uri is string => typeof uri === 'string'));
 			}
 		} else {
-			// Client discovery via HTML microformats (12 February 2022 spec)
-			// https://indieauth.spec.indieweb.org/20220212/#client-information-discovery
-			// "Authorization servers SHOULD support parsing the [h-app] Microformat from the client_id,
-			// and if there is an [h-app] with a url property matching the client_id URL,
-			// then it should use the name and icon and display them on the authorization prompt."
 			const text = await res.text();
 			const doc = htmlParser.parse(`<div>${text}</div>`);
 
@@ -362,10 +315,6 @@ function appendIssuer(payload: Record<string, string>, issuerUrl: string): Recor
 	return {
 		...payload,
 
-		// https://datatracker.ietf.org/doc/html/rfc9207#name-response-parameter-iss
-		// "In authorization responses to the client, including error responses,
-		// an authorization server supporting this specification MUST indicate its
-		// identity by including the iss parameter in the response."
 		iss: issuerUrl,
 	};
 }
@@ -440,10 +389,6 @@ export class OAuth2ProviderService implements OnApplicationShutdown {
 
 		const clientUrl = validateClientId(clientId);
 
-		// https://indieauth.spec.indieweb.org/#client-information-discovery
-		// "the server may want to resolve the domain name first and avoid fetching the document
-		// if the IP address is within the loopback range defined by [RFC5735]
-		// or any other implementation-specific internal IP address."
 		if (process.env.NODE_ENV !== 'test' || process.env.MISSKEY_TEST_CHECK_IP_RANGE === '1') {
 			const lookup = await dns.lookup(clientUrl.hostname);
 			if (ipaddr.parse(lookup.address).range() !== 'unicast') {
@@ -451,11 +396,8 @@ export class OAuth2ProviderService implements OnApplicationShutdown {
 			}
 		}
 
-		// Find client information from the remote.
 		const clientInfo = await discoverClientInformation(this.#logger, this.httpRequestService, clientUrl.href);
 
-		// Require the redirect URI to be included in an explicit list, per
-		// https://datatracker.ietf.org/doc/html/draft-ietf-oauth-security-topics#section-4.1.3
 		if (!redirectUriValue || !clientInfo.redirectUris.includes(redirectUriValue)) {
 			throw new InvalidRequestError('Invalid redirect_uri');
 		}
@@ -477,9 +419,6 @@ export class OAuth2ProviderService implements OnApplicationShutdown {
 			throw new InvalidScopeError('`scope` parameter has no known scope', seed.requestedScope.join(' '));
 		}
 
-		// Require PKCE parameters.
-		// Recommended by https://indieauth.spec.indieweb.org/#authorization-request, but also prevents downgrade attack:
-		// https://datatracker.ietf.org/doc/html/draft-ietf-oauth-security-topics#name-pkce-downgrade-attack
 		if (typeof seed.codeChallenge !== 'string') {
 			throw new InvalidRequestError('`code_challenge` parameter is required');
 		}
@@ -516,8 +455,6 @@ export class OAuth2ProviderService implements OnApplicationShutdown {
 		}
 	}
 
-	// https://datatracker.ietf.org/doc/html/rfc8414.html
-	// https://indieauth.spec.indieweb.org/#indieauth-server-metadata
 	public generateRFC8414() {
 		return {
 			issuer: this.config.url,
@@ -537,7 +474,6 @@ export class OAuth2ProviderService implements OnApplicationShutdown {
 		registerFormBodyParser(fastify);
 
 		fastify.addHook('onRequest', (request, reply, done) => {
-			// クリックジャッキング防止のためiFrameの中に入れられないようにする
 			reply.header('X-Frame-Options', 'DENY');
 			reply.header('Content-Security-Policy', "frame-ancestors 'none'");
 			done();
@@ -682,22 +618,16 @@ export class OAuth2ProviderService implements OnApplicationShutdown {
 					throw new InvalidGrantError('grant request is invalid');
 				}
 
-				// https://datatracker.ietf.org/doc/html/rfc6749.html#section-4.1.2
-				// "If an authorization code is used more than once, the authorization server
-				// MUST deny the request and SHOULD revoke (when possible) all tokens
-				// previously issued based on that authorization code."
 				if (granted.used) {
 					await this.#revokeGrantCode(granted, code);
 					throw new InvalidGrantError('grant request is invalid');
 				}
 				granted.used = true;
 
-				// https://datatracker.ietf.org/doc/html/rfc6749.html#section-4.1.3
 				if (clientId !== granted.clientId || redirectUriValue !== granted.redirectUri) {
 					throw new InvalidGrantError('grant request is invalid');
 				}
 
-				// https://datatracker.ietf.org/doc/html/rfc7636.html#section-4.6
 				if (!codeVerifier) {
 					throw new InvalidGrantError('grant request is invalid');
 				}
@@ -710,7 +640,6 @@ export class OAuth2ProviderService implements OnApplicationShutdown {
 				const accessToken = secureRndstr(128);
 				const now = new Date();
 
-				// NOTE: we don't have a setup for automatic token expiration
 				await this.accessTokensRepository.insert({
 					id: this.idService.gen(now.getTime()),
 					lastUsedAt: now,

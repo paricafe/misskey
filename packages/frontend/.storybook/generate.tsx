@@ -436,7 +436,6 @@ function toStories(component: string): Promise<string> {
 	);
 }
 
-// glob('src/{components,pages,ui,widgets}/**/*.vue')
 (async () => {
 	const components = [
 		globSync('src/components/global/Mk*.vue'),

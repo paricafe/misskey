@@ -19,7 +19,6 @@ export async function clearCache() {
 	miLocalStorage.removeItem('lastEmojisFetchedAt');
 	clearAppliedThemeCache();
 	await misskeyApiGet('clear-browser-cache', {}).catch(() => {
-		// ignore
 	});
 	await fetchInstance(true);
 	await fetchCustomEmojis(true);

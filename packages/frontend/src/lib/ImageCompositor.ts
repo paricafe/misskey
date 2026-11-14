@@ -32,8 +32,6 @@ export function defineImageCompositorFunction<PS extends ImageCompositorFunction
 	return fn;
 }
 
-// TODO: per layer cache
-
 export class ImageCompositor<FNS extends Record<string, ImageCompositorFunction<any>>> {
 	private gl: WebGL2RenderingContext;
 	private canvas: HTMLCanvasElement | null = null;
@@ -109,8 +107,6 @@ export class ImageCompositor<FNS extends Record<string, ImageCompositorFunction<
 			}
 		`);
 
-		// レジスタ番号はシェーダープログラムに属しているわけではなく、独立の存在なので、とりあえず nopProgram を使って設定する(その後は効果が持続する)
-		// ref. https://qiita.com/emadurandal/items/5966c8374f03d4de3266
 		const positionLocation = gl.getAttribLocation(this.nopProgram, 'position');
 		gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
 		gl.enableVertexAttribArray(positionLocation);
@@ -181,7 +177,6 @@ export class ImageCompositor<FNS extends Record<string, ImageCompositorFunction<
 	public render(layers: (ImageCompositorLayer<FNS>)[]) {
 		const gl = this.gl;
 
-		// 入力をそのまま出力
 		if (layers.length === 0) {
 			gl.activeTexture(gl.TEXTURE0);
 			gl.bindTexture(gl.TEXTURE_2D, this.baseTexture);
@@ -277,9 +272,6 @@ export class ImageCompositor<FNS extends Record<string, ImageCompositorFunction<
 		this.gl.viewport(0, 0, this.renderWidth, this.renderHeight);
 	}
 
-	/*
-	 * disposeCanvas = true だとloseContextを呼ぶため、コンストラクタで渡されたcanvasも再利用不可になるので注意
-	 */
 	public destroy(disposeCanvas = true) {
 		this.gl.deleteProgram(this.nopProgram);
 

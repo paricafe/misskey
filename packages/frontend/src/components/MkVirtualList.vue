@@ -68,7 +68,6 @@ const visibleItems = computed(() => {
 });
 const bottom = computed(() => layout.totalHeight - layout.offset((visibleItems.value.at(-1)?.index ?? -1) + 1));
 
-// Keep keyboard focus without retaining intervening rows.
 function onFocusOut(event: FocusEvent) {
 	if (event.relatedTarget instanceof Node && (event.currentTarget as HTMLElement).contains(event.relatedTarget)) return;
 	focusedId.value = null;
@@ -130,7 +129,6 @@ function animateElement(el: HTMLElement, keyframes: Keyframe[]) {
 watch(() => props.items, (items, previous = []) => {
 	const previousHead = previous[0]?.id;
 	const prependCount = previousHead == null ? 0 : items.findIndex(item => item.id === previousHead);
-	// Animate data inserted ahead of existing records, never rows mounted while scrolling or paging.
 	const positions = active && props.animate && prependCount > 0
 		? new Map([...elements].map(([id, el]) => [id, el.getBoundingClientRect().top]))
 		: null;

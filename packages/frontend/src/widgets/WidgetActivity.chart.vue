@@ -85,7 +85,6 @@ function onMousedown(ev: MouseEvent) {
 	const baseZoom = zoom.value;
 	const basePos = pos.value;
 
-	// 動かした時
 	dragListen(me => {
 		const x = getPositionX(me);
 		const y = getPositionY(me);

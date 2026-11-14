@@ -7,10 +7,6 @@ function isInRange(bytes: Uint8Array, i: number, lo = 0x80, hi = 0xBF): boolean 
 	return i < bytes.length && bytes[i] >= lo && bytes[i] <= hi;
 }
 
-/**
- * bytes[i] から始まる有効なUTF-8シーケンスのバイト長を返す。不正な場合は0
- * (decodeURIComponent と同じく、冗長表現・サロゲート・U+10FFFF超は不正とする)
- */
 function getUtf8SequenceLength(bytes: Uint8Array, i: number): number {
 	const b0 = bytes[i];
 	if (b0 <= 0x7F) return 1;
@@ -24,15 +20,10 @@ function getUtf8SequenceLength(bytes: Uint8Array, i: number): number {
 	return 0;
 }
 
-/**
- * パーセントデコードする。不正なエスケープはその部分だけ元の形のまま残し、有効なUTF-8として解釈できる部分はデコードする
- */
 export function safeDecodeURIComponent(str: string): string {
 	try {
 		return decodeURIComponent(str);
 	} catch {
-		// 不正なエスケープを含む場合
-		// UTF-8として有効な範囲を自前で判定し、有効な範囲だけをデコードする
 	}
 
 	return str.replace(/(?:%[0-9A-Fa-f]{2})+/g, (run) => {

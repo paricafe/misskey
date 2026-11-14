@@ -7,10 +7,10 @@ const requestIdleCallback: typeof globalThis.requestIdleCallback = globalThis.re
 	const start = performance.now();
 	const timeoutId = window.setTimeout(() => {
 		callback({
-			didTimeout: false, // polyfill でタイムアウト発火することはない
+			didTimeout: false,
 			timeRemaining() {
 				const diff = performance.now() - start;
-				return Math.max(0, 50 - diff); // <https://www.w3.org/TR/requestidlecallback/#idle-periods>
+				return Math.max(0, 50 - diff);
 			},
 		});
 	});

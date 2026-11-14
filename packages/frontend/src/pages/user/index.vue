@@ -47,7 +47,6 @@ const XFlashs = defineAsyncComponent(() => import('./flashs.vue'));
 const XGallery = defineAsyncComponent(() => import('./gallery.vue'));
 const XRaw = defineAsyncComponent(() => import('./raw.vue'));
 
-// contextは非ログイン状態の情報しかないためログイン時は利用できない
 const CTX_USER = !$i && assertServerContext(serverContext, 'user') ? serverContext.user : null;
 
 const props = withDefaults(defineProps<{
@@ -62,7 +61,6 @@ const tab = ref(props.page);
 const user = ref<null | Misskey.entities.UserDetailed>(CTX_USER);
 const error = ref<any>(null);
 
-// 初回読込時専用（使える場合はサーバーコンテキストから取得する）
 function fetchUser(): void {
 	const { username, host } = Misskey.acct.parse(props.acct);
 
@@ -86,7 +84,6 @@ watch(() => props.acct, fetchUser, {
 	immediate: true,
 });
 
-// 再読込時専用（強制fetch）
 async function refreshUser(): Promise<void> {
 	if (props.acct == null) return;
 

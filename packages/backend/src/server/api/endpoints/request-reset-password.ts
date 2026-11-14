@@ -64,19 +64,16 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				host: IsNull(),
 			});
 
-			// 合致するユーザーが登録されていなかったら無視
 			if (user == null) {
 				return;
 			}
 
 			const profile = await this.userProfilesRepository.findOneByOrFail({ userId: user.id });
 
-			// 合致するメアドが登録されていなかったら無視
 			if (profile.email !== ps.email) {
 				return;
 			}
 
-			// メアドが認証されていなかったら無視
 			if (!profile.emailVerified) {
 				return;
 			}

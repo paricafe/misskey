@@ -37,7 +37,7 @@ const text = computed(() => {
 <style lang="scss" module>
 .root {
 	box-shadow: 0 0 0 3px var(--MI_THEME-panel);
-	border-radius: 120%; // Blinkのバグか知らんけど、100%ぴったりにすると何故か若干楕円でレンダリングされる
+	border-radius: 120%;
 
 	&.status_online {
 		background: #58d4c9;

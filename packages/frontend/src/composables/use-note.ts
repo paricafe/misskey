@@ -113,7 +113,6 @@ export function checkBuiltinSoftMute(
 	return false;
 }
 
-/** MkNote, MkNoteDetailedの共通ロジック */
 export function useNote(
 	props: UseNoteProps,
 	els: UseNoteElements = {},
@@ -125,7 +124,6 @@ export function useNote(
 	const currentClip = options.currentClip ?? null;
 	const currentAntenna = options.currentAntenna ?? null;
 
-	// プラグインの割り込み処理
 	const providedCache = inject(DI.noteViewStateCache, null);
 	const viewStateCache = options.onChildrenChanged ? null : providedCache;
 	const savedState = viewStateCache?.get(props.note);
@@ -139,7 +137,6 @@ export function useNote(
 			try {
 				result = interruptor.handler(result!) as Misskey.entities.Note | null;
 
-				// nullになった場合（非表示）はこれ以上やることがないのでループを抜ける
 				if (result == null) {
 					break;
 				}
@@ -153,15 +150,12 @@ export function useNote(
 			rawNote = result;
 		}
 	}
-	// Edit events replace top-level fields of the shown note, so only that level is reactive.
 	if (Misskey.note.isPureRenote(rawNote) && rawNote.renote != null) rawNote.renote = shallowReactive(rawNote.renote);
 	else rawNote = shallowReactive(rawNote);
 
-	// 基本状態
 	const isRenote = Misskey.note.isPureRenote(rawNote);
 	const appearNote = getAppearNote(rawNote) ?? rawNote;
 
-	// キャプチャ（ストリーム購読）
 	const capture = savedState?.capture ?? useNoteCapture({
 		note: appearNote,
 		parentNote: rawNote,
@@ -172,7 +166,6 @@ export function useNote(
 	});
 	const { $note: $appearNote, subscribe: subscribeManuallyToNoteCapture } = capture;
 
-	// 各種フラグ状態
 	const showContent = ref(savedState?.showContent ?? false);
 	const isDeleted = ref(false);
 	const translating = savedState?.translating ?? ref(false);
@@ -180,12 +173,9 @@ export function useNote(
 	const pollResults = savedState?.pollResults ?? new Map<string, Ref<boolean>>();
 	provide(DI.notePollResults, pollResults);
 
-	// ミュート判定
-	// mutedはミュート解除の操作で書き換わるのでrefだが、hardMutedは解除できないのでリアクティブにしない
 	const muted = ref(savedState?.muted ?? ($i ? checkNoteWordMute(appearNote, $i, $i.mutedWords) || checkBuiltinSoftMute(appearNote, inTimeline && !tl_withSensitive.value) : false));
 	const hardMuted = props.withHardMute && $i ? checkNoteWordMute(appearNote, $i, $i.hardMutedWords) : false;
 
-	// 計算プロパティ (Computed)
 	const isMyRenote = $i != null && ($i.id === rawNote.userId);
 	const parsed = computed(() => appearNote.text ? mfm.parse(appearNote.text) : null);
 	const urls = computed(() => parsed.value ? extractUrlFromMfm(parsed.value).filter((url) => appearNote.renote?.url !== url && appearNote.renote?.uri !== url) : null);
@@ -196,12 +186,11 @@ export function useNote(
 	const canTranslate = computed(() => $i != null && $i.policies.canUseTranslator && instance.translatorAvailable);
 	const renoteCollapsed = ref(
 		savedState?.renoteCollapsed ?? (prefer.s.collapseEverything || (prefer.s.alwaysCollapseRenotes && isRenote) || (prefer.s.collapseRenotes && isRenote && (
-			($i && ($i.id === rawNote.userId || $i.id === appearNote.userId)) || // `||` must be `||`! See https://github.com/misskey-dev/misskey/issues/13131
+			($i && ($i.id === rawNote.userId || $i.id === appearNote.userId)) ||
 			($appearNote.myReaction != null)
 		))),
 	);
 
-	// Retain data and user choices; all component watchers and DOM are still unmounted.
 	if (viewStateCache) {
 		const save = () => viewStateCache.set(props.note, {
 			note: rawNote,
@@ -224,14 +213,12 @@ export function useNote(
 		url: `https://${host}/notes/${appearNote.id}`,
 	};
 
-	// グローバルイベントの監視
 	useGlobalEvent('noteDeleted', (noteId) => {
 		if (noteId === rawNote.id || noteId === appearNote.id) {
 			isDeleted.value = true;
 		}
 	});
 
-	// ツールチップのセットアップ (Mockでない場合のみ)
 	if (!props.mock) {
 		if (els.renoteButton != null) {
 			useTooltip(els.renoteButton, async (showing) => {
@@ -273,7 +260,6 @@ export function useNote(
 		}
 	}
 
-	// 共通アクション関数群
 	async function renote() {
 		if (props.mock) return;
 		const isLoggedIn = await pleaseLogin({ openOnRemote: pleaseLoginContext });
@@ -306,7 +292,6 @@ export function useNote(
 		if (!isLoggedIn) return;
 		showMovedDialog();
 
-		// direct emoji reaction (e.g. fallback like button with defaultLike)
 		if (typeof arg === 'string') {
 			const emoji = arg;
 			sound.playMisskeySfx('reaction');
@@ -519,13 +504,11 @@ export function useNote(
 		}
 	}
 
-	// フォーカス制御
 	function focus() { els.rootEl?.value?.focus(); }
 
 	function blur() { els.rootEl?.value?.blur(); }
 
 	return {
-		// 状態・データ
 		note: rawNote,
 		appearNote,
 		$appearNote,
@@ -540,7 +523,6 @@ export function useNote(
 		collapsed,
 		renoteCollapsed,
 
-		// 導出値
 		isMyRenote,
 		parsed,
 		urls,
@@ -549,7 +531,6 @@ export function useNote(
 		canRenote,
 		canTranslate,
 
-		// アクション関数
 		renote,
 		reply,
 		react,

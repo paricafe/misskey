@@ -62,18 +62,15 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 		private noteEntityService: NoteEntityService,
 	) {
 		super(meta, paramDef, async (ps, me) => {
-			// Get favoritee
 			const note = await this.getterService.getNote(ps.noteId).catch(err => {
 				if (err.id === '9725d0ce-ba28-4dde-95a7-2cbb2c15de24') throw new ApiError(meta.errors.noSuchNote);
 				throw err;
 			});
 
-			// check visibility
 			if (!await this.noteEntityService.isVisibleForMe(note, me.id)) {
 				throw new ApiError(meta.errors.noSuchNote);
 			}
 
-			// if already favorited
 			const exist = await this.noteFavoritesRepository.exists({
 				where: {
 					noteId: note.id,
@@ -85,7 +82,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				throw new ApiError(meta.errors.alreadyFavorited);
 			}
 
-			// Create favorite
 			await this.noteFavoritesRepository.insert({
 				id: this.idService.gen(),
 				noteId: note.id,

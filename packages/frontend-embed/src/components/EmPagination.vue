@@ -51,15 +51,8 @@ export type Paging<E extends keyof Misskey.Endpoints = keyof Misskey.Endpoints> 
 	limit: number;
 	params?: Misskey.Endpoints[E]['req'] | ComputedRef<Misskey.Endpoints[E]['req']>;
 
-	/**
-	 * 検索APIのような、ページング不可なエンドポイントを利用する場合
-	 * (そのようなAPIをこの関数で使うのは若干矛盾してるけど)
-	 */
 	noPaging?: boolean;
 
-	/**
-	 * items 配列の中身を逆順にする(新しい方が最後)
-	 */
 	reversed?: boolean;
 
 	offsetMode?: boolean;
@@ -102,28 +95,16 @@ const emit = defineEmits<{
 
 const rootEl = shallowRef<HTMLElement>();
 
-// 遡り中かどうか
 const backed = ref(false);
 
 const scrollRemove = ref<(() => void) | null>(null);
 
-/**
- * 表示するアイテムのソース
- * 最新が0番目
- */
 const items = ref<MisskeyEntityMap>(new Map());
 
-/**
- * タブが非アクティブなどの場合に更新を貯めておく
- * 最新が0番目
- */
 const queue = ref<MisskeyEntityMap>(new Map());
 
 const offset = ref(0);
 
-/**
- * 初期化中かどうか（trueならEmLoadingで全て隠す）
- */
 const fetching = ref(true);
 
 const moreFetching = ref(false);
@@ -142,8 +123,6 @@ let isPausingUpdate = false;
 let timerForSetPause: number | null = null;
 const BACKGROUND_PAUSE_WAIT_SEC = 10;
 
-// 先頭が表示されているかどうかを検出
-// https://qiita.com/mkataigi/items/0154aefd2223ce23398e
 const scrollObserver = ref<IntersectionObserver>();
 
 watch([() => props.pagination.reversed, scrollableElement], () => {
@@ -176,7 +155,6 @@ watch([backed, rootEl], () => {
 	}
 });
 
-// パラメータに何らかの変更があった際、再読込したい（チャンネル等のIDが変わったなど）
 watch(() => [props.pagination.endpoint, props.pagination.params], init, { deep: true });
 
 watch(queue, (a, b) => {
@@ -317,10 +295,6 @@ const fetchMoreAhead = async (): Promise<void> => {
 	});
 };
 
-/**
- * Appear（IntersectionObserver）によってfetchMoreが呼ばれる場合、
- * APPEAR_MINIMUM_INTERVALミリ秒以内に2回fetchMoreが呼ばれるのを防ぐ
- */
 const fetchMoreApperTimeoutFn = (): void => {
 	preventAppearFetchMore.value = false;
 	preventAppearFetchMoreTimer.value = null;
@@ -351,7 +325,7 @@ watch(visibility, () => {
 			timerForSetPause = null;
 		},
 		BACKGROUND_PAUSE_WAIT_SEC * 1000);
-	} else { // 'visible'
+	} else {
 		if (timerForSetPause) {
 			window.clearTimeout(timerForSetPause);
 			timerForSetPause = null;
@@ -364,11 +338,6 @@ watch(visibility, () => {
 	}
 });
 
-/**
- * 最新のものとして1つだけアイテムを追加する
- * ストリーミングから降ってきたアイテムはこれで追加する
- * @param item アイテム
- */
 const prepend = (item: MisskeyEntity): void => {
 	if (items.value.size === 0) {
 		items.value.set(item.id, item);
@@ -380,10 +349,6 @@ const prepend = (item: MisskeyEntity): void => {
 	else prependQueue(item);
 };
 
-/**
- * 新着アイテムをitemsの先頭に追加し、displayLimitを適用する
- * @param newItems 新しいアイテムの配列
- */
 function unshiftItems(newItems: MisskeyEntity[]) {
 	const length = newItems.length + items.value.size;
 	items.value = new Map([...arrayToEntries(newItems), ...items.value].slice(0, props.displayLimit));
@@ -391,10 +356,6 @@ function unshiftItems(newItems: MisskeyEntity[]) {
 	if (length >= props.displayLimit) more.value = true;
 }
 
-/**
- * 古いアイテムをitemsの末尾に追加し、displayLimitを適用する
- * @param oldItems 古いアイテムの配列
- */
 function concatItems(oldItems: MisskeyEntity[]) {
 	const length = oldItems.length + items.value.size;
 	items.value = new Map([...items.value, ...arrayToEntries(oldItems)].slice(0, props.displayLimit));
@@ -411,9 +372,6 @@ function prependQueue(newItem: MisskeyEntity) {
 	queue.value = new Map([[newItem.id, newItem], ...queue.value].slice(0, props.displayLimit) as [string, MisskeyEntity][]);
 }
 
-/*
- * アイテムを末尾に追加する（使うの？）
- */
 const appendItem = (item: MisskeyEntity): void => {
 	items.value.set(item.id, item);
 };
@@ -449,8 +407,6 @@ onBeforeMount(() => {
 			nextTick(() => {
 				window.setTimeout(toBottom, 800);
 
-				// scrollToBottomでmoreFetchingボタンが画面外まで出るまで
-				// more = trueを遅らせる
 				window.setTimeout(() => {
 					moreFetching.value = false;
 				}, 2000);

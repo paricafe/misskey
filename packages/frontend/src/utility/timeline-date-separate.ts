@@ -12,7 +12,6 @@ export function getDateText(dateInstance: Date) {
 	return `${month.toString()}/${date.toString()}`;
 }
 
-// TODO: いちいちDateインスタンス作成するのは無駄感あるから文字列のまま解析したい
 export function isSeparatorNeeded(
 	prev: string | null,
 	next: string | null,
@@ -27,7 +26,6 @@ export function isSeparatorNeeded(
 	);
 }
 
-// TODO: いちいちDateインスタンス作成するのは無駄感あるから文字列のまま解析したい
 export function getSeparatorInfo(
 	prev: string | null,
 	next: string | null,

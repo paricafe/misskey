@@ -152,7 +152,6 @@ const tooltipForDragShowing = ref(false);
 const tooltipForHoverShowing = ref(false);
 
 onBeforeUnmount(() => {
-	// 何らかの問題で表示されっぱなしでもコンポーネントを離れたら消えるように
 	tooltipForDragShowing.value = false;
 	tooltipForHoverShowing.value = false;
 });
@@ -180,7 +179,7 @@ function onMouseenter() {
 let lastClickTime: number | null = null;
 
 function onMousedown(ev: MouseEvent | TouchEvent) {
-	if (props.disabled) return; // Prevent interaction if disabled
+	if (props.disabled) return;
 
 	ev.preventDefault();
 
@@ -225,7 +224,6 @@ function onMousedown(ev: MouseEvent | TouchEvent) {
 		window.removeEventListener('mouseup', onMouseup);
 		window.removeEventListener('touchend', onMouseup);
 
-		// 値が変わってたら通知
 		if (beforeValue !== finalValue.value) {
 			emit('update:modelValue', finalValue.value);
 			emit('dragEnded', finalValue.value);
@@ -242,7 +240,7 @@ function onMousedown(ev: MouseEvent | TouchEvent) {
 		return;
 	} else {
 		const now = Date.now();
-		if (now - lastClickTime < 300) { // 300ms以内のクリックはダブルクリックとみなす
+		if (now - lastClickTime < 300) {
 			lastClickTime = null;
 			emit('thumbDoubleClicked');
 			return;

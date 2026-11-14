@@ -162,7 +162,6 @@ async function run() {
 	try {
 		await aiscript.exec(ast);
 	} catch (err: any) {
-		// in case AiScript Interpreter has some bug
 		processError('AiScript Internal Error', err);
 	}
 }

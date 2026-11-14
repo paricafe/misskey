@@ -80,8 +80,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				.leftJoinAndSelect('reaction.note', 'note');
 
 			if (ps.type) {
-				// ローカルリアクションはホスト名が . とされているが
-				// DB 上ではそうではないので、必要に応じて変換
 				const suffix = '@.:';
 				const type = ps.type.endsWith(suffix) ? ps.type.slice(0, ps.type.length - suffix.length) + ':' : ps.type;
 				query.andWhere('reaction.reaction = :type', { type });

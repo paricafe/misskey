@@ -1,12 +1,5 @@
 import type { Plugin } from 'rolldown';
 
-/**
- * bullmqをESMビルドからバンドルし、未使用のPostgreSQLバックエンドを取り除くプラグイン
- *
- * bullmqのpackage.jsonにはexportsが無いため、通常はmain（CJSビルド）が選ばれてtree-shakingが効かない。
- * また、ルートのindexが`export * from './postgres'`しているため、Redisしか使わない場合でも
- * PostgreSQLバックエンド（インライン化されたSQLを含む）がすべてバンドルされてしまう。
- */
 export function bullmqEsmPlugin(): Plugin {
 	const postgresEntryRegex = /[\\/]node_modules[\\/]bullmq[\\/]dist[\\/]esm[\\/]postgres[\\/]index\.js$/;
 	let postgresStubbed = false;

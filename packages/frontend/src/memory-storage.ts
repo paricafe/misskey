@@ -48,10 +48,4 @@ export function createMemoryStorage(): MemoryStorage {
 	return new MemoryStorageImpl();
 }
 
-/**
- * SessionStorageよりも更に短い期間でクリアされるストレージです
- * - ブラウザの再読み込みやタブの閉じると内容が揮発します
- * - このストレージは他のタブと共有されません
- * - アカウント切り替えやログアウトを行うと内容が揮発します
- */
 export const defaultMemoryStorage: MemoryStorage = createMemoryStorage();

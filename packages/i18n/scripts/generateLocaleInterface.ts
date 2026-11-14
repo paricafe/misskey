@@ -141,12 +141,10 @@ export async function generateLocaleInterface(localesDir: string): Promise<void>
 	const autogenDir = `${__dirname}/../src/autogen`;
 	fs.mkdirSync(autogenDir, { recursive: true });
 
-	// 一瞬ファイルが存在しなくなって途切れる→不安定になるらしいので、リネームで対処
 	fs.writeFileSync(`${autogenDir}/_locale.ts`, printed, 'utf-8');
 	fs.renameSync(`${autogenDir}/_locale.ts`, `${autogenDir}/locale.ts`);
 }
 
-// スクリプトとして直接実行された場合
 const isMain = import.meta.url === `file://${process.argv[1]}`;
 if (isMain) {
 	await generateLocaleInterface(resolve(__dirname, '../../../locales'));

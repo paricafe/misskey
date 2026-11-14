@@ -14,7 +14,6 @@ export const meta = {
 	requireCredential: true,
 	requireAdmin: true,
 
-	// 実態はmetaの更新であるため
 	kind: 'write:admin:meta',
 
 	errors: {

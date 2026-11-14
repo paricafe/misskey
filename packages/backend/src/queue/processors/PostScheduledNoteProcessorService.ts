@@ -74,8 +74,6 @@ export class PostScheduledNoteProcessorService {
 			noteId = note.id;
 		} catch (error) {
 			if (error instanceof ScheduledNoteNotReadyError) return;
-			// Infrastructure failures must remain retryable. Invalid content is kept
-			// as an ordinary draft so the recovery scanner cannot retry it forever.
 			if (!(error instanceof IdentifiableError)) throw error;
 			const result = await this.noteDraftsRepository.update({
 				id: draft.id,
@@ -90,8 +88,6 @@ export class PostScheduledNoteProcessorService {
 			return;
 		}
 
-		// Note insertion and draft deletion have committed together. A notification
-		// failure cannot turn a successfully published note into a failed draft.
 		await this.notificationService.createNotification(draft.userId, 'scheduledNotePosted', { noteId });
 	}
 }

@@ -13,7 +13,6 @@ import type * as misskey from 'misskey-js';
 const waitForPushToTlOptions = { timeout: 3000, interval: 25 };
 
 describe('Mute', () => {
-	// alice mutes carol
 	let alice: misskey.entities.SignupResponse;
 	let bob: misskey.entities.SignupResponse;
 	let carol: misskey.entities.SignupResponse;
@@ -23,7 +22,6 @@ describe('Mute', () => {
 		bob = await signup({ username: 'bob' });
 		carol = await signup({ username: 'carol' });
 
-		// Mute: alice ==> carol
 		await api('mute/create', {
 			userId: carol.id,
 		}, alice);
@@ -36,7 +34,6 @@ describe('Mute', () => {
 
 		assert.strictEqual(res.status, 204);
 
-		// 単体でも走らせられるように副作用消す
 		await api('mute/delete', {
 			userId: bob.id,
 		}, alice);
@@ -55,7 +52,6 @@ describe('Mute', () => {
 	});
 
 	test('ミュートしているユーザーからメンションされても、ストリームに unreadNotification イベントが流れてこない', async () => {
-		// 状態リセット
 		await api('notifications/mark-all-as-read', {}, alice);
 
 		const fired = await waitFire(alice, 'main', () => post(carol, { text: '@alice hi' }), msg => msg.type === 'unreadNotification');

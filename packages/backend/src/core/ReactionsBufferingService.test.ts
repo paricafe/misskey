@@ -21,8 +21,6 @@ function deferred() {
 	return { promise, resolve };
 }
 
-// Models atomic Redis operations and response loss. The production Lua itself is
-// covered by integration tests, not by this protocol test double.
 class BufferedRedis {
 	public ackFailure: 'before' | 'after' | undefined;
 	public constructor(public readonly store = new Map<string, RedisValue>(), private readonly prefix = '') {}
@@ -98,8 +96,6 @@ class BufferedRedis {
 	}
 }
 
-// Transactions hold a shared lock and commit the count, pair cache, and marker
-// together. Failures can happen before the write or after a successful commit.
 class NoteDatabase {
 	public failUpdate = false;
 	public loseCommitResponse = false;
@@ -311,8 +307,6 @@ describe('ReactionsBufferingService recovery protocol', () => {
 		expect(db.note.reactions).toEqual({ '😀': users.length });
 		expect(db.note.reactionAndUserPairCache).toHaveLength(PER_NOTE_REACTION_USER_PAIR_CACHE_MAX);
 
-		// Delete cached users first, so their removals are evicted by later uncached
-		// users. An incomplete change set must not preserve their old cached pairs.
 		const cachedUsers = db.note.reactionAndUserPairCache.map(pair => pair.split('/')[0]);
 		const removalOrder = [...cachedUsers, ...users.filter(user => !cachedUsers.includes(user))];
 		for (const user of removalOrder) await service.delete('note', user, '😀');

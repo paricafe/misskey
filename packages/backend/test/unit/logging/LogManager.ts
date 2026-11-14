@@ -8,7 +8,6 @@ import type { LogBackend } from '@/logging/LogBackend.js';
 import type { AccessLogRecord, AccessLogRecordInput, LogRecordInput, LogTraceContext } from '@/logging/types.js';
 import { LogManager } from '@/logging/LogManager.js';
 
-/** テストで使う最小構成のログ入力を作成します。 */
 function createInput(level: LogRecordInput['level'] = 'info'): LogRecordInput {
 	return {
 		level,
@@ -20,7 +19,6 @@ function createInput(level: LogRecordInput['level'] = 'info'): LogRecordInput {
 	};
 }
 
-/** 実行環境を固定したLogManagerと、出力確認用の関数を作成します。 */
 function createManager(options: {
 	quiet?: boolean;
 	verbose?: boolean;

@@ -62,8 +62,6 @@ async function startApplication(mode: ApplicationMode) {
 		return {
 			app,
 			drain: async () => {
-				// Both consumers must finish before their shared database/Redis close,
-				// even if one consumer reports a drain failure.
 				const results = await Promise.allSettled([serverService?.dispose(), queueService?.stop()]);
 				const errors = results.flatMap(result => result.status === 'rejected' ? [result.reason] : []);
 				if (errors.length > 0) throw new AggregateError(errors, 'Application drain failed');
@@ -82,7 +80,6 @@ export function jobQueue() {
 	return startApplication('queue');
 }
 
-/** Share CoreModule, caches and connection pools in a single-process deployment. */
 export function serverAndQueue() {
 	return startApplication('combined');
 }

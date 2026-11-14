@@ -21,7 +21,6 @@ type UserLike = {
 const acCache = new Map<string, AhoCorasick>();
 
 export async function checkWordMute(note: NoteLike, me: UserLike | null | undefined, mutedWords: Array<string | string[]>): Promise<boolean> {
-	// 自分自身
 	if (me && (note.userId === me.id)) return false;
 
 	if (mutedWords.length > 0) {
@@ -48,16 +47,13 @@ export async function checkWordMute(note: NoteLike, me: UserLike | null | undefi
 			if (Array.isArray(filter)) {
 				return filter.every(keyword => text.includes(keyword));
 			} else {
-				// represents RegExp
 				const regexp = filter.match(/^\/(.+)\/(.*)$/);
 
-				// This should never happen due to input sanitisation.
 				if (!regexp) return false;
 
 				try {
 					return new RE2(regexp[1], regexp[2]).test(text);
 				} catch (_) {
-					// This should never happen due to input sanitisation.
 					return false;
 				}
 			}

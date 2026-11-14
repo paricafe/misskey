@@ -22,8 +22,6 @@ export class ClipService {
 	public static TooManyClipNotesError = class extends Error {};
 	public static TooManyClipsError = class extends Error {};
 
-	// クリップに同名多数のユーザーがカラム等で購読している場合、更新の度に全員へreload指示が飛びリクエストがスパイクしうるため、
-	// 短時間の連続更新はまとめて1回(先頭 + 最終更新からの静穏化後の末尾)だけ配信する
 	private static readonly UPDATED_THROTTLE_MS = 3000;
 	private readonly pendingUpdated = new Map<MiClip['id'], { timer: NodeJS.Timeout; trailing: boolean }>();
 
@@ -47,14 +45,12 @@ export class ClipService {
 	private publishUpdated(clipId: MiClip['id']): void {
 		const pending = this.pendingUpdated.get(clipId);
 		if (pending == null) {
-			// バースト先頭は即時配信し、静穏化ウィンドウを開始する
 			this.globalEventService.publishClipStream(clipId, 'updated');
 			this.pendingUpdated.set(clipId, {
 				trailing: false,
 				timer: setTimeout(() => this.flushUpdated(clipId), ClipService.UPDATED_THROTTLE_MS),
 			});
 		} else {
-			// ウィンドウ内の追加更新は末尾でまとめて1回だけ配信する
 			pending.trailing = true;
 			clearTimeout(pending.timer);
 			pending.timer = setTimeout(() => this.flushUpdated(clipId), ClipService.UPDATED_THROTTLE_MS);

@@ -123,14 +123,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 									>
 										<i class="ti ti-calendar-x"></i> {{ i18n.ts._drafts.cancelSchedule }}
 									</MkButton>
-									<!-- TODO
-									<MkButton
-										small
-										@click="reSchedule(draft)"
-									>
-										<i class="ti ti-calendar-time"></i> {{ i18n.ts._drafts.reSchedule }}
-									</MkButton>
-									-->
 								</template>
 								<MkButton
 									v-else

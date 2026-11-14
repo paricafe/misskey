@@ -9,9 +9,6 @@ import type { Plugin } from 'vite';
 
 const localesDir = path.resolve(__dirname, '../../../locales')
 
-/**
- * 外部ファイルを監視し、必要に応じてwebSocketでメッセージを送るViteプラグイン
- */
 export default function pluginWatchLocales(): Plugin {
 	return {
 		name: 'watch-locales',
@@ -19,7 +16,6 @@ export default function pluginWatchLocales(): Plugin {
 		configureServer(server) {
 			const localeYmlPaths = Object.keys(locales).map(locale => path.join(localesDir, `${locale}.yml`));
 
-			// watcherにパスを追加
 			server.watcher.add(localeYmlPaths);
 
 			server.watcher.on('change', (filePath) => {

@@ -5,27 +5,18 @@
 
 import seedrandom from 'seedrandom';
 
-/**
- * AIで生成した無作為なファーストネーム
- */
 export const firstNameDict = [
 	'Ethan', 'Olivia', 'Jackson', 'Emma', 'Liam', 'Ava', 'Aiden', 'Sophia', 'Mason', 'Isabella',
 	'Noah', 'Mia', 'Lucas', 'Harper', 'Caleb', 'Abigail', 'Samuel', 'Emily', 'Logan',
 	'Madison', 'Benjamin', 'Chloe', 'Elijah', 'Grace', 'Alexander', 'Scarlett', 'William', 'Zoey', 'James', 'Lily',
 ]
 
-/**
- * AIで生成した無作為なラストネーム
- */
 export const lastNameDict = [
 	'Anderson', 'Johnson', 'Thompson', 'Davis', 'Rodriguez', 'Smith', 'Patel', 'Williams', 'Lee', 'Brown',
 	'Garcia', 'Jackson', 'Martinez', 'Taylor', 'Harris', 'Nguyen', 'Miller', 'Jones', 'Wilson',
 	'White', 'Thomas', 'Garcia', 'Martinez', 'Robinson', 'Turner', 'Lewis', 'Hall', 'King', 'Baker', 'Cooper',
 ]
 
-/**
- * AIで生成した無作為な国名
- */
 export const countryDict = [
 	'Japan', 'Canada', 'Brazil', 'Australia', 'Italy', 'SouthAfrica', 'Mexico', 'Sweden', 'Russia', 'India',
 	'Germany', 'Argentina', 'South Korea', 'France', 'Nigeria', 'Turkey', 'Spain', 'Egypt', 'Thailand',
@@ -35,7 +26,6 @@ export const countryDict = [
 export function text(length: number = 10, seed?: string): string {
 	let result = "";
 
-	// シード値を使う場合、同じ数値が羅列されるが、ランダム文字列という意味では満たせていると思うのでこのまま使っておく
 	const rand = seed ? seedrandom(seed)() : Math.random();
 	while (result.length < length) {
 		result += rand.toString(36).substring(2);

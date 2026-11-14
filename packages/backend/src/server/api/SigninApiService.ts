@@ -95,7 +95,6 @@ export class SigninApiService {
 			return { error };
 		}
 
-		// not more than 1 attempt per second and not more than 10 attempts per hour
 		if (this.config.enableIpRateLimit) {
 			if (process.env.NODE_ENV === 'production' && (request.ip === '::1' || request.ip === '127.0.0.1')) {
 				this.logger.warn('Recieved signin request from localhost IP address for rate limiting in production environment. This is likely due to an improper trustProxy setting in the config file.');
@@ -123,7 +122,6 @@ export class SigninApiService {
 			return;
 		}
 
-		// Fetch user
 		const user = await this.usersRepository.findOneBy({
 			usernameLower: username.toLowerCase(),
 			host: IsNull(),
@@ -163,11 +161,9 @@ export class SigninApiService {
 			return;
 		}
 
-		// Compare password
 		const same = await bcrypt.compare(password, profile.password!);
 
 		const fail = async (status?: number, failure?: { id: string; }) => {
-			// Append signin history
 			await this.signinsRepository.insert({
 				id: this.idService.gen(),
 				userId: user.id,
@@ -179,7 +175,6 @@ export class SigninApiService {
 			return error(status ?? 500, failure ?? { id: '4e30e80c-e338-45a0-8c8f-44455efa3b76' });
 		};
 
-		// Check approval only after authentication so the pending state is not disclosed to others.
 		const signin = async () => {
 			if (!user.approved) {
 				if (this.meta.approvalRequiredForSignup) {
@@ -299,6 +294,5 @@ export class SigninApiService {
 				} satisfies Misskey.entities.SigninFlowResponse;
 			}
 		}
-		// never get here
 	}
 }

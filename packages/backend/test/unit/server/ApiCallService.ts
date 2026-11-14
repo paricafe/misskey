@@ -12,7 +12,6 @@ import { PrettyConsoleBackend } from '@/logging/PrettyConsoleBackend.js';
 import type { LogBackend } from '@/logging/LogBackend.js';
 import type { LogRecord } from '@/logging/types.js';
 
-/** API失敗ログを確認するための最小Fastify応答を作成します。 */
 function createReply() {
 	return {
 		code: vi.fn(),
@@ -21,7 +20,6 @@ function createReply() {
 	};
 }
 
-/** APIサービスの依存関係を最小限の仮実装へ差し替えます。 */
 function createService() {
 	const authenticateService = {
 		authenticate: vi.fn().mockResolvedValue([null, null]),

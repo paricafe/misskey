@@ -35,7 +35,6 @@ export class HybridTimelineChannel extends Channel {
 		private noteStreamingHidingService: NoteStreamingHidingService,
 	) {
 		super(request);
-		//this.onNote = this.onNote.bind(this);
 	}
 
 	@bindThis
@@ -47,7 +46,6 @@ export class HybridTimelineChannel extends Channel {
 		this.withReplies = !!(params.withReplies ?? false);
 		this.withFiles = !!(params.withFiles ?? false);
 
-		// Subscribe events
 		this.subscriber.on('notesStream', this.onNote);
 	}
 
@@ -58,10 +56,6 @@ export class HybridTimelineChannel extends Channel {
 		if (this.withFiles && (note.fileIds == null || note.fileIds.length === 0)) return;
 
 		if (!note.channelId) {
-			// 以下の条件に該当するノートのみ後続処理に通す（ので、以下のif文は該当しないノートをすべて弾くようにする）
-			// - 自分自身の投稿
-			// - その投稿のユーザーをフォローしている
-			// - 全体公開のローカルの投稿
 			if (!(
 				isMe ||
 				Object.hasOwn(this.following, note.userId) ||
@@ -70,8 +64,6 @@ export class HybridTimelineChannel extends Channel {
 				return;
 			}
 		} else {
-			// 以下の条件に該当するノートのみ後続処理に通す（ので、以下のif文は該当しないノートをすべて弾くようにする）
-			// - フォローしているチャンネルの投稿
 			if (!this.followingChannels.has(note.channelId)) {
 				return;
 			}
@@ -83,20 +75,16 @@ export class HybridTimelineChannel extends Channel {
 		if (note.reply) {
 			const reply = note.reply;
 			if ((this.following[note.userId]?.withReplies ?? false) || this.withReplies) {
-				// 自分のフォローしていないユーザーの visibility: followers な投稿への返信は弾く
 				if (reply.visibility === 'followers' && !Object.hasOwn(this.following, reply.userId) && reply.userId !== this.user!.id) return;
 			} else {
-				// 「チャンネル接続主への返信」でもなければ、「チャンネル接続主が行った返信」でもなければ、「投稿者の投稿者自身への返信」でもない場合
 				if (reply.userId !== this.user!.id && !isMe && reply.userId !== note.userId) return;
 			}
 		}
 
-		// 純粋なリノート（引用リノートでないリノート）の場合
 		if (isRenotePacked(note) && !isQuotePacked(note) && note.renote) {
 			if (!this.withRenotes) return;
 			if (note.renote.reply) {
 				const reply = note.renote.reply;
-				// 自分のフォローしていないユーザーの visibility: followers な投稿への返信のリノートは弾く
 				if (reply.visibility === 'followers' && !Object.hasOwn(this.following, reply.userId) && reply.userId !== this.user!.id) return;
 			}
 		}
@@ -111,7 +99,6 @@ export class HybridTimelineChannel extends Channel {
 
 	@bindThis
 	public dispose(): void {
-		// Unsubscribe events
 		this.subscriber.off('notesStream', this.onNote);
 	}
 }

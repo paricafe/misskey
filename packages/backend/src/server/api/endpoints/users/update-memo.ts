@@ -49,13 +49,11 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 		private idService: IdService,
 	) {
 		super(meta, paramDef, async (ps, me) => {
-			// Get target
 			const target = await this.getterService.getUser(ps.userId).catch(err => {
 				if (err.id === '15348ddd-432d-49c2-8a5a-8069753becff') throw new ApiError(meta.errors.noSuchUser);
 				throw err;
 			});
 
-			// 引数がnullか空文字であれば、パーソナルメモを削除する
 			if (ps.memo === '' || ps.memo == null) {
 				await this.userMemosRepository.delete({
 					userId: me.id,
@@ -64,7 +62,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				return;
 			}
 
-			// 以前に作成されたパーソナルメモがあるかどうか確認
 			const previousMemo = await this.userMemosRepository.findOneBy({
 				userId: me.id,
 				targetUserId: target.id,

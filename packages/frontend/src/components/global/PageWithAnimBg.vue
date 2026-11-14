@@ -23,7 +23,6 @@ import MkAnimBg from '@/components/MkAnimBg.vue';
 	width: 100%;
 	height: 100%;
 
-	// _pageScrollable はパフォーマンス上の理由で背景色が設定されているため
 	background: transparent !important;
 }
 </style>

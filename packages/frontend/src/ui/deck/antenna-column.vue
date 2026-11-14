@@ -124,13 +124,4 @@ const menu: MenuItem[] = [
 	},
 ];
 
-/*
-function focus() {
-	timeline.focus();
-}
-
-defineExpose({
-	focus,
-});
-*/
 </script>

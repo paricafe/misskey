@@ -65,20 +65,13 @@ export class ApQuestionService {
 		return { choices, votes, multiple, expiresAt };
 	}
 
-	/**
-	 * Update votes of Question
-	 * @param uri URI of AP Question object
-	 * @returns true if updated
-	 */
 	@bindThis
 	public async updateQuestion(value: string | IObject, actor?: MiRemoteUser, resolver?: Resolver): Promise<boolean> {
 		const uri = typeof value === 'string' ? value : value.id;
 		if (uri == null) throw new Error('uri is null');
 
-		// URIがこのサーバーを指しているならスキップ
 		if (this.utilityService.isUriLocal(uri)) throw new Error('uri points local');
 
-		//#region このサーバーに既に登録されているか
 		const note = await this.notesRepository.findOneBy({ uri });
 		if (note == null) throw new Error('Question is not registered');
 
@@ -87,9 +80,7 @@ export class ApQuestionService {
 
 		const user = await this.usersRepository.findOneBy({ id: poll.userId });
 		if (user == null) throw new Error('Question is not registered');
-		//#endregion
 
-		// resolve new Question object
 		// eslint-disable-next-line no-param-reassign
 		if (resolver == null) resolver = await this.apResolverService.createResolver();
 		const question = await resolver.resolve(value);

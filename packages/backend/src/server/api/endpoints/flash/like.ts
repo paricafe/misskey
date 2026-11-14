@@ -69,7 +69,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				throw new ApiError(meta.errors.yourFlash);
 			}
 
-			// if already liked
 			const exist = await this.flashLikesRepository.exists({
 				where: {
 					flashId: flash.id,
@@ -81,7 +80,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				throw new ApiError(meta.errors.alreadyLiked);
 			}
 
-			// Create like
 			await this.flashLikesRepository.insert({
 				id: this.idService.gen(),
 				flashId: flash.id,

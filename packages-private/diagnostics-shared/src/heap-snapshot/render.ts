@@ -12,7 +12,6 @@ import {
 	type HeapSnapshotReport,
 } from './categories';
 
-/** これ未満のバイト差分には色を付けない (0.1 MB) */
 const byteColorThreshold = 100_000;
 
 function categoryValue(report: HeapSnapshotReport, category: HeapSnapshotCategory) {
@@ -21,12 +20,9 @@ function categoryValue(report: HeapSnapshotReport, category: HeapSnapshotCategor
 
 function swatch(category: HeapSnapshotCategory) {
 	// eslint-disable-next-line no-irregular-whitespace
-	return `$\\color{${heapSnapshotCategory[category].color}}{\\rule{8pt}{8pt}}$\u00A0**${heapSnapshotCategory[category].label.replaceAll(' ', '\u00A0')}**`; // nbspにすること
+	return `$\\color{${heapSnapshotCategory[category].color}}{\\rule{8pt}{8pt}}$\u00A0**${heapSnapshotCategory[category].label.replaceAll(' ', '\u00A0')}**`;
 }
 
-/**
- * base / head のheap snapshotをカテゴリ別に比較するMarkdownテーブルを描画する。
- */
 export function renderHeapSnapshotTable(base: HeapSnapshotReport, head: HeapSnapshotReport) {
 	return renderMetricComparisonTable(
 		base.samples,
@@ -57,10 +53,6 @@ function formatSankeyPercentValue(value: number) {
 	return rounded.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
 }
 
-/**
- * heap snapshotの構成比をmermaidのsankey図として描画する。
- * 全体に占める割合が小さいカテゴリ・内訳は `Other` にまとめる。
- */
 export function renderHeapSnapshotSankey(report: HeapSnapshotReport, title: string) {
 	const total = categoryValue(report, 'total');
 	// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition

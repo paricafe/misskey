@@ -99,12 +99,10 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				}
 			}
 
-			// テキストが無いかつ添付ファイルも無かったらエラー
 			if (ps.text == null && file == null) {
 				throw new ApiError(meta.errors.contentRequired);
 			}
 
-			// Myself
 			if (ps.toUserId === me.id) {
 				throw new ApiError(meta.errors.recipientIsYourself);
 			}

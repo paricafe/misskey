@@ -114,7 +114,6 @@ const props = defineProps<{
 	params?: EmbedParams;
 }>();
 
-//#region Modalの制御
 const dialogEl = useTemplateRef('dialogEl');
 
 function cancel() {
@@ -127,11 +126,7 @@ function close() {
 }
 
 const phase = ref<'input' | 'result'>('input');
-//#endregion
 
-//#region 埋め込みURL生成・カスタマイズ
-
-// 本URL生成用params
 const paramsForUrl = computed<EmbedParams>(() => ({
 	header: header.value,
 	maxHeight: typeof maxHeight.value === 'number' ? Math.max(0, maxHeight.value) : undefined,
@@ -140,14 +135,13 @@ const paramsForUrl = computed<EmbedParams>(() => ({
 	border: border.value,
 }));
 
-// プレビュー用params（手動で更新を掛けるのでref）
 const paramsForPreview = ref<EmbedParams>(props.params ?? {});
 
 const embedPreviewUrl = computed(() => {
 	const paramClass = new URLSearchParams(normalizeEmbedParams(paramsForPreview.value));
 	if (paramClass.has('maxHeight')) {
 		const maxHeight = parseInt(paramClass.get('maxHeight')!);
-		paramClass.set('maxHeight', maxHeight === 0 ? '500' : Math.min(maxHeight, 700).toString()); // プレビューであまりにも縮小されると見づらいため、700pxまでに制限
+		paramClass.set('maxHeight', maxHeight === 0 ? '500' : Math.min(maxHeight, 700).toString());
 	}
 	return `${url}/embed/${props.entity}/${props.id}${paramClass.toString() ? '?' + paramClass.toString() : ''}`;
 });
@@ -184,7 +178,6 @@ function applyToPreview() {
 
 	nextTick(() => {
 		if (currentPreviewUrl === embedPreviewUrl.value) {
-			// URLが変わらなくてもリロード
 			iframeEl.value?.contentWindow?.window.location.reload();
 		}
 	});
@@ -200,9 +193,7 @@ function generate() {
 function doCopy() {
 	copyToClipboard(result.value);
 }
-//#endregion
 
-//#region プレビューのリサイズ
 const resizerRootEl = useTemplateRef('resizerRootEl');
 const iframeLoading = ref(true);
 const iframeEl = useTemplateRef('iframeEl');
@@ -233,7 +224,7 @@ function windowEventHandler(event: MessageEvent) {
 		iframeEl.value!.contentWindow?.postMessage({
 			type: 'misskey:embedParent:registerIframeId',
 			payload: {
-				iframeId: 'embedCodeGen', // 同じタイミングで複数のembed iframeがある際の区別用なのでここではなんでもいい
+				iframeId: 'embedCodeGen',
 			},
 		});
 	}
@@ -241,17 +232,17 @@ function windowEventHandler(event: MessageEvent) {
 		iframeHeight.value = event.data.payload.height;
 		nextTick(() => {
 			calcScale();
-			iframeLoading.value = false; // 初回の高さ変更まで待つ
+			iframeLoading.value = false;
 		});
 	}
 }
 
 function calcScale() {
 	if (!resizerRootEl.value) return;
-	const previewWidth = resizerRootEl.value.clientWidth - 40; // 左右の余白 20pxずつ
-	const previewHeight = resizerRootEl.value.clientHeight - 40; // 上下の余白 20pxずつ
+	const previewWidth = resizerRootEl.value.clientWidth - 40;
+	const previewHeight = resizerRootEl.value.clientHeight - 40;
 	const iframeWidth = 500;
-	const scale = Math.min(previewWidth / iframeWidth, previewHeight / iframeHeight.value, 1); // 拡大はしないので1を上限に
+	const scale = Math.min(previewWidth / iframeWidth, previewHeight / iframeHeight.value, 1);
 	iframeScale.value = scale;
 }
 
@@ -265,7 +256,6 @@ function reset() {
 	window.removeEventListener('message', windowEventHandler);
 	resizeObserver.disconnect();
 
-	// プレビューのリセット
 	iframeHeight.value = 0;
 	iframeScale.value = 1;
 	iframeLoading.value = true;
@@ -280,7 +270,6 @@ onDeactivated(() => {
 onUnmounted(() => {
 	reset();
 });
-//#endregion
 </script>
 
 <style module>

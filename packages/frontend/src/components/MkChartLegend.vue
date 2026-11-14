@@ -30,7 +30,6 @@ function update(_chart: Chart, _items: LegendItem[]) {
 function onClick(item: LegendItem) {
 	if (chart.value == null) return;
 	if (type.value === 'pie' || type.value === 'doughnut') {
-		// Pie and doughnut charts only have a single dataset and visibility is per item
 		if (item.index != null) chart.value.toggleDataVisibility(item.index);
 	} else {
 		if (item.datasetIndex != null) chart.value.setDatasetVisibility(item.datasetIndex, !chart.value.isDatasetVisible(item.datasetIndex));

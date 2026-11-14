@@ -10,9 +10,6 @@ import { type FlashLikesRepository, MiUser, type FlashsRepository } from '@/mode
 import { QueryService } from '@/core/QueryService.js';
 import { sqlLikeEscape } from '@/misc/sql-like-escape.js';
 
-/**
- * MisskeyPlay関係のService
- */
 @Injectable()
 export class FlashService {
 	constructor(
@@ -26,9 +23,6 @@ export class FlashService {
 	) {
 	}
 
-	/**
-	 * 人気のあるPlay一覧を取得する.
-	 */
 	public async featured(opts?: { offset?: number, limit: number }) {
 		const builder = this.flashRepository.createQueryBuilder('flash')
 			.andWhere('flash.likedCount > 0')

@@ -31,9 +31,6 @@ describe('User', () => {
 				const resolved = await resolveRemoteUser('a.test', aliceInA.id, aliceWatcherInB);
 				const aliceInB = await aliceWatcherInB.client.request('users/show', { userId: resolved.id });
 
-				// console.log(`a.test: ${JSON.stringify(aliceInA, null, '\t')}`);
-				// console.log(`b.test: ${JSON.stringify(aliceInB, null, '\t')}`);
-
 				deepStrictEqualWithExcludedFields(aliceInA, aliceInB, [
 					'id',
 					'host',
@@ -65,7 +62,6 @@ describe('User', () => {
 					resolveRemoteUser('a.test', alice.id, bob),
 				]);
 
-				// NOTE: follow each other
 				await Promise.all([
 					alice.client.request('following/create', { userId: bobInA.id }),
 					bob.client.request('following/create', { userId: aliceInB.id }),
@@ -86,7 +82,6 @@ describe('User', () => {
 				}
 			});
 
-			/** FIXME: not working */
 			test.skip('Setting private for followersVisibility is federated', async () => {
 				await Promise.all([
 					alice.client.request('i/update', { followersVisibility: 'private' }),
@@ -142,8 +137,6 @@ describe('User', () => {
 
 			test('Becoming a cat is sent to their followers', async () => {
 				await bob.client.request('following/create', { userId: aliceInB.id });
-				// Update は「配送時点のフォロワー」にしか配送されないので、
-				// フォローが a.test 側に反映されてから i/update する
 				await waitForFollowRelation(bob, alice, 1);
 
 				await alice.client.request('i/update', { isCat: true });
@@ -395,10 +388,10 @@ describe('User', () => {
 
 			test('Bob follows Alice, and Alice deleted themself', async () => {
 				await bob.client.request('following/create', { userId: aliceInB.id });
-				await waitForFollowRelation(bob, alice, 1); // followed by Bob
+				await waitForFollowRelation(bob, alice, 1);
 
 				await alice.client.request('i/delete-account', { password: alice.password });
-				await waitForFollowing(bob, 0, WAIT_FOR_SLOW_FEDERATION); // no following relation
+				await waitForFollowing(bob, 0, WAIT_FOR_SLOW_FEDERATION);
 
 				await rejects(
 					async () => await bob.client.request('following/create', { userId: aliceInB.id }),
@@ -428,19 +421,14 @@ describe('User', () => {
 
 			test('Bob follows Alice, then Alice gets deleted in B server', async () => {
 				await bob.client.request('following/create', { userId: aliceInB.id });
-				await waitForFollowRelation(bob, alice, 1); // followed by Bob
+				await waitForFollowRelation(bob, alice, 1);
 
 				await bAdmin.client.request('admin/delete-account', { userId: aliceInB.id });
 				await sleep();
 
-				/**
-				 * FIXME: remote account is not deleted!
-				 *        @see https://github.com/misskey-dev/misskey/issues/14728
-				 */
 				const deletedAlice = await bob.client.request('users/show', { userId: aliceInB.id });
 				assert(deletedAlice.id, aliceInB.id);
 
-				// TODO: why still following relation?
 				const following = await bob.client.request('users/following', { userId: bob.id });
 				strictEqual(following.length, 1);
 				await rejects(
@@ -457,10 +445,10 @@ describe('User', () => {
 				await sleep();
 
 				const following = await alice.client.request('users/following', { userId: alice.id });
-				strictEqual(following.length, 0); // Not following Bob because B server doesn't return Accept
+				strictEqual(following.length, 0);
 
 				const followers = await bob.client.request('users/followers', { userId: bob.id });
-				strictEqual(followers.length, 0); // Alice's Follow is not processed
+				strictEqual(followers.length, 0);
 			});
 		});
 	});
@@ -484,10 +472,10 @@ describe('User', () => {
 
 			test('Bob follows Alice, and Alice gets suspended, there is no following relation, and Bob fails to follow again', async () => {
 				await bob.client.request('following/create', { userId: aliceInB.id });
-				await waitForFollowRelation(bob, alice, 1); // followed by Bob
+				await waitForFollowRelation(bob, alice, 1);
 
 				await aAdmin.client.request('admin/suspend-user', { userId: alice.id });
-				await waitForFollowing(bob, 0, WAIT_FOR_SLOW_FEDERATION); // no following relation
+				await waitForFollowing(bob, 0, WAIT_FOR_SLOW_FEDERATION);
 
 				await rejects(
 					async () => await bob.client.request('following/create', { userId: aliceInB.id }),
@@ -503,13 +491,8 @@ describe('User', () => {
 				await sleep();
 
 				const followers = await alice.client.request('users/followers', { userId: alice.id });
-				strictEqual(followers.length, 1); // FIXME: followers are not deleted??
+				strictEqual(followers.length, 1);
 
-				/**
-				 * FIXME: still rejected!
-				 *        seems to can't process Undo Delete activity because it is not implemented
-				 *        related @see https://github.com/misskey-dev/misskey/issues/13273
-				 */
 				await rejects(
 					async () => await bob.client.request('following/create', { userId: aliceInB.id }),
 					(err: any) => {
@@ -518,7 +501,6 @@ describe('User', () => {
 					},
 				);
 
-				// FIXME: resolving also fails
 				await rejects(
 					async () => await resolveRemoteUser('a.test', alice.id, bob),
 					(err: any) => {
@@ -528,28 +510,23 @@ describe('User', () => {
 				);
 			});
 
-			/**
-			 * instead of simple unsuspension, let's tell existence by following from Alice
-			 */
 			test('Alice can follow Bob', async () => {
 				await alice.client.request('following/create', { userId: bobInA.id });
-				await waitForFollowers(bob, 1); // followed by Alice
+				await waitForFollowers(bob, 1);
 
 				const bobFollowers = await bob.client.request('users/followers', { userId: bob.id });
 				assert(bobFollowers[0].follower != null);
 				const renewedaliceInB = bobFollowers[0].follower;
 				assert(aliceInB.username === renewedaliceInB.username);
 				assert(aliceInB.host === renewedaliceInB.host);
-				assert(aliceInB.id !== renewedaliceInB.id); // TODO: Same username and host, but their ids are different! Is it OK?
+				assert(aliceInB.id !== renewedaliceInB.id);
 
 				const following = await bob.client.request('users/following', { userId: bob.id });
-				strictEqual(following.length, 0); // following are deleted
+				strictEqual(following.length, 0);
 
-				// Bob tries to follow Alice
 				await bob.client.request('following/create', { userId: renewedaliceInB.id });
 				await waitForFollowers(alice, 1);
 
-				// FIXME: but resolving still fails ...
 				await rejects(
 					async () => await resolveRemoteUser('a.test', alice.id, bob),
 					(err: any) => {

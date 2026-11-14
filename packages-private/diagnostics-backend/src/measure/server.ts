@@ -61,8 +61,6 @@ export function waitForMessage<T>(serverProcess: ChildProcess, predicate: (messa
 			resolve(message);
 		};
 
-		// 子が死んだ場合、待ち続けてもメッセージは来ない。
-		// タイムアウトまで待って誤解を招くエラーを出すより、理由を添えて即座に失敗させる
 		const onExit = (code: number | null, signal: string | null) => {
 			cleanup();
 			reject(new Error(`Server exited (code=${code}, signal=${signal}) while waiting for ${description}`));
@@ -85,11 +83,6 @@ export function waitForMessage<T>(serverProcess: ChildProcess, predicate: (messa
 	});
 }
 
-/**
- * ビルド済みバックエンドを子プロセスとして起動する。
- * execArgv は親から引き継がず `--expose-gc` のみを渡す: 親は tsx 経由で動くため、
- * 引き継ぐと計測対象プロセスにTSローダーが載ってしまいメモリ量が歪む。
- */
 export function forkBackendServer(backendDir: string) {
 	return fork(join(backendDir, 'built/entry.js'), [], {
 		cwd: backendDir,
@@ -115,7 +108,6 @@ export function waitForServerReady(serverProcess: ChildProcess, timeout: number)
 }
 
 export async function triggerGc(serverProcess: ChildProcess, timeout: number) {
-	// 送信前にlistenerを張らないと、応答を取りこぼす可能性がある
 	const ok = waitForMessage(serverProcess, isGcMessage, 'GC completion', timeout);
 
 	serverProcess.send('gc');
@@ -139,7 +131,6 @@ export async function getRuntimeMemoryUsage(serverProcess: ChildProcess, timeout
 	const message = await response;
 	const memoryUsage = message.value;
 
-	// /proc 由来の値と単位を揃える
 	return {
 		HeapTotal: bytesToKiB(memoryUsage.heapTotal),
 		HeapUsed: bytesToKiB(memoryUsage.heapUsed),
@@ -148,9 +139,6 @@ export async function getRuntimeMemoryUsage(serverProcess: ChildProcess, timeout
 	};
 }
 
-/**
- * heap snapshotの書き出しを依頼し、実際に書かれたパスを返す。
- */
 export async function requestHeapSnapshot(serverProcess: ChildProcess, snapshotPath: string, timeout: number) {
 	const response = waitForMessage(
 		serverProcess,
@@ -172,19 +160,13 @@ export async function requestHeapSnapshot(serverProcess: ChildProcess, snapshotP
 	return typeof message.path === 'string' ? message.path : snapshotPath;
 }
 
-/**
- * SIGTERMで終了を促し、一定時間で落ちなければSIGKILLする。
- */
 export async function shutdownBackendServer(serverProcess: ChildProcess) {
-	// 既に終了しているなら 'exit' はもう発火しないので、待つと無駄に10秒止まる
 	if (serverProcess.exitCode != null || serverProcess.signalCode != null) return;
 
 	await new Promise<void>(resolve => {
 		let forceTimer: NodeJS.Timeout | undefined;
 		const termTimer = globalThis.setTimeout(() => {
 			serverProcess.kill('SIGKILL');
-			// SIGKILLは無視できないので通常はここで 'exit' が来る。
-			// D状態などで落ちない場合に計測全体を止めないよう、待ち時間には上限を設ける
 			forceTimer = globalThis.setTimeout(resolve, 5000);
 		}, 10000);
 

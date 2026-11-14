@@ -147,7 +147,6 @@ const muteWords = { type: 'array', items: { oneOf: [
 	{ type: 'string' },
 ] } } as const;
 
-/** 上限は30日程度にしておく */
 const FOLLOW_APPROVAL_MAX_SECONDS = 30 * 24 * 60 * 60;
 
 export const paramDef = {
@@ -472,13 +471,11 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 					});
 				}
 
-				// Parse user's input into the old account
 				const newAlsoKnownAs = new Set<string>();
 				for (const line of ps.alsoKnownAs) {
 					if (!line) throw new ApiError(meta.errors.noSuchUser);
 					const { username, host } = Acct.parse(line);
 
-					// Retrieve the old account
 					const knownAs = await this.remoteUserResolveService.resolveUser(username, host).catch((e) => {
 						this.apiLoggerService.logger.warn(`failed to resolve dstination user: ${e}`);
 						throw new ApiError(meta.errors.noSuchUser);
@@ -493,8 +490,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 
 				updates.alsoKnownAs = newAlsoKnownAs.size > 0 ? Array.from(newAlsoKnownAs) : null;
 			}
-
-			//#region emojis/tags
 
 			let emojis = [] as string[];
 			let tags = [] as string[];
@@ -540,9 +535,7 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 			updates.emojis = emojis;
 			updates.tags = tags;
 
-			// ハッシュタグ更新
 			this.hashtagService.updateUsertags(user, tags);
-			//#endregion
 
 			if (Object.keys(updates).length > 0) {
 				await this.usersRepository.update(user.id, updates);
@@ -563,15 +556,12 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 
 			this.cacheService.userProfileCache.set(user.id, updatedProfile);
 
-			// Publish meUpdated event
 			this.globalEventService.publishMainStream(user.id, 'meUpdated', iObj);
 
-			// 鍵垢を解除したとき、期間による承認条件も考慮してフォローリクエストを承認
 			if (user.isLocked && ps.isLocked === false) {
 				await this.userFollowingService.acceptAllFollowRequests(user);
 			}
 
-			// フォロワーにUpdateを配信
 			this.accountUpdateService.publishToFollowers(user.id);
 
 			const urls = updatedProfile.fields.filter(x => x.value.startsWith('https://'));
@@ -609,7 +599,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 					.execute();
 			}
 		} catch (_) {
-			// なにもしない
 		}
 	}
 }

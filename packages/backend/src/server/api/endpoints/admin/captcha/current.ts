@@ -13,7 +13,6 @@ export const meta = {
 	requireCredential: true,
 	requireAdmin: true,
 
-	// 実態はmetaの取得であるため
 	kind: 'read:admin:meta',
 
 	res: {

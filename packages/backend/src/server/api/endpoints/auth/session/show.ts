@@ -62,7 +62,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 		private authSessionEntityService: AuthSessionEntityService,
 	) {
 		super(meta, paramDef, async (ps, me) => {
-			// Lookup session
 			const session = await this.authSessionsRepository.findOneBy({
 				token: ps.token,
 			});

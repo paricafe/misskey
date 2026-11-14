@@ -38,7 +38,6 @@ import { $i } from '@/i.js';
 import MkReactionEffect from '@/components/MkReactionEffect.vue';
 import { i18n } from '@/i18n.js';
 import * as sound from '@/utility/sound.js';
-// import { checkReactionPermissions } from '@/utility/check-reaction-permissions.js';
 import { customEmojisMap } from '@/custom-emojis.js';
 import { prefer } from '@/preferences.js';
 import { DI } from '@/di.js';
@@ -71,8 +70,6 @@ const isLocalCustomEmoji = computed(() => isLocalCustomEmojiReaction(props.react
 const canToggle = computed(() => {
 	const emoji = isLocalCustomEmoji.value ? customEmojisMap.get(emojiName.value) : getUnicodeEmojiOrNull(props.reaction);
 
-	// TODO
-	//return $i != null && emoji != null && checkReactionPermissions($i, props.note, emoji);
 	return $i != null && emoji != null;
 });
 
@@ -158,10 +155,6 @@ async function toggleReaction() {
 				emoji: emoji,
 			});
 		});
-		// TODO: 上位コンポーネントでやる
-		//if (props.note.text && props.note.text.length > 100 && (Date.now() - new Date(props.note.createdAt).getTime() < 1000 * 3)) {
-		//	claimAchievement('reactWithoutRead');
-		//}
 	}
 }
 

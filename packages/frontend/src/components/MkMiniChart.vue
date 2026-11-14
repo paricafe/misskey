@@ -70,7 +70,6 @@ function draw(): void {
 
 watch(() => props.src, draw, { immediate: true });
 
-// Vueが何故かWatchを発動させない場合があるので
 useInterval(draw, 1000, {
 	immediate: false,
 	afterMounted: true,

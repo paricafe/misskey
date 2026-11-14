@@ -89,13 +89,11 @@ class NotificationManager {
 
 	@bindThis
 	public push(notifiee: MiLocalUser['id'], reason: NotificationType) {
-		// 自分自身へは通知しない
 		if (this.notifier.id === notifiee) return;
 
 		const exist = this.queue.get(notifiee);
 
 		if (exist) {
-			// 「メンションされているかつ返信されている」場合は、メンションとしての通知ではなく返信としての通知にする
 			if (reason !== 'mention') {
 				exist.reason = reason;
 			}
@@ -126,17 +124,6 @@ class NotificationManager {
 				break;
 
 			case 'followers': {
-			// TODO: フォロワー限定ノートにフォロワーではない人がメンションされた場合通知されるのが正しい挙動なのか確認（一部に挙動の不一致がありそう）。現状は通知されるためフィルタしない
-			// 	const targetUserIds = this.queue.map(x => x.target);
-			// 	const followers = await this.followingsRepository.find({
-			// 		where: {
-			// 			followeeId: this.note.userId,
-			// 			followerId: In(targetUserIds),
-			// 			isFollowerHibernated: false,
-			// 		},
-			// 		select: ['followerId'],
-			// 	});
-			// 	visibleUserIds = new Set(followers.map(f => f.followerId));
 				visibleUserIds = null;
 				break;
 			}
@@ -175,7 +162,6 @@ type MinimumUser = {
 };
 
 type Option = {
-	// Internal only: consume this draft in the same transaction that inserts the note.
 	scheduledDraft?: { id: string; revision: number };
 	createdAt?: Date | null;
 	name?: string | null;
@@ -334,7 +320,6 @@ export class NoteCreateService implements OnApplicationShutdown {
 
 		let renote: MiNote | null = null;
 		if (data.renoteId != null) {
-			// Fetch renote to note
 			renote = await this.notesRepository.findOne({
 				where: { id: data.renoteId },
 				relations: {
@@ -350,7 +335,6 @@ export class NoteCreateService implements OnApplicationShutdown {
 				throw new IdentifiableError('bde24c37-121f-4e7d-980d-cec52f599f02', 'Cannot renote pure renote');
 			}
 
-			// Check blocking
 			if (renote.userId !== user.id) {
 				const blockExist = await this.blockingsRepository.exists({
 					where: {
@@ -364,22 +348,16 @@ export class NoteCreateService implements OnApplicationShutdown {
 			}
 
 			if (renote.visibility === 'followers' && renote.userId !== user.id) {
-				// 他人のfollowers noteはreject
 				throw new IdentifiableError('90b9d6f0-893a-4fef-b0f1-e9a33989f71a', 'Renote target visibility');
 			} else if (renote.visibility === 'specified') {
-				// specified / direct noteはreject
 				throw new IdentifiableError('48d7a997-da5c-4716-b3c3-92db3f37bf7d', 'Renote target visibility');
 			}
 
 			if (renote.channelId && renote.channelId !== data.channelId) {
-				// チャンネルのノートに対しリノート要求がきたとき、チャンネル外へのリノート可否をチェック
-				// リノートのユースケースのうち、チャンネル内→チャンネル外は少数だと考えられるため、JOINはせず必要な時に都度取得する
 				const renoteChannel = await this.channelsRepository.findOneBy({ id: renote.channelId });
 				if (renoteChannel == null) {
-					// リノートしたいノートが書き込まれているチャンネルが無い
 					throw new IdentifiableError('b060f9a6-8909-4080-9e0b-94d9fa6f6a77', 'No such channel');
 				} else if (!renoteChannel.allowRenoteToExternal) {
-					// リノート作成のリクエストだが、対象チャンネルがリノート禁止だった場合
 					throw new IdentifiableError('7e435f4a-780d-4cfc-a15a-42519bd6fb67', 'Channel does not allow renote to external');
 				}
 			}
@@ -387,7 +365,6 @@ export class NoteCreateService implements OnApplicationShutdown {
 
 		let reply: MiNote | null = null;
 		if (data.replyId != null) {
-			// Fetch reply
 			reply = await this.notesRepository.findOne({
 				where: { id: data.replyId },
 				relations: { user: true },
@@ -403,7 +380,6 @@ export class NoteCreateService implements OnApplicationShutdown {
 				throw new IdentifiableError('ced780a1-2012-4caf-bc7e-a95a291294cb', 'Cannot reply to specified note with different visibility');
 			}
 
-			// Check blocking
 			if (reply.userId !== user.id) {
 				const blockExist = await this.blockingsRepository.exists({
 					where: {
@@ -462,8 +438,6 @@ export class NoteCreateService implements OnApplicationShutdown {
 		isBot: MiUser['isBot'];
 		isCat: MiUser['isCat'];
 	}, data: Option, silent = false): Promise<MiNote> {
-		// チャンネル外にリプライしたら対象のスコープに合わせる
-		// (クライアントサイドでやっても良い処理だと思うけどとりあえずサーバーサイドで)
 		if (data.reply && data.channel && data.reply.channelId !== data.channel.id) {
 			if (data.reply.channelId) {
 				data.channel = await this.channelsRepository.findOneBy({ id: data.reply.channelId });
@@ -472,8 +446,6 @@ export class NoteCreateService implements OnApplicationShutdown {
 			}
 		}
 
-		// チャンネル内にリプライしたら対象のスコープに合わせる
-		// (クライアントサイドでやっても良い処理だと思うけどとりあえずサーバーサイドで)
 		if (data.reply && (data.channel == null) && data.reply.channelId) {
 			data.channel = await this.channelsRepository.findOneBy({ id: data.reply.channelId });
 		}
@@ -514,37 +486,30 @@ export class NoteCreateService implements OnApplicationShutdown {
 		if (data.renote) {
 			switch (data.renote.visibility) {
 				case 'public':
-					// public noteは無条件にrenote可能
 					break;
 				case 'home':
-					// home noteはhome以下にrenote可能
 					if (data.visibility === 'public') {
 						data.visibility = 'home';
 					}
 					break;
 				case 'followers':
-					// 他人のfollowers noteはreject
 					if (data.renote.userId !== user.id) {
 						throw new Error('Renote target is not public or home');
 					}
 
-					// followers noteはfollowers以下にrenote可能
 					if (data.visibility === 'public' || data.visibility === 'home') {
 						data.visibility = 'followers';
 					}
 					break;
 				case 'specified':
-					// specified / direct noteはreject
 					throw new Error('Renote target is not public or home');
 			}
 
-			// ローカルのみをRenoteしたらローカルのみにする
 			if (data.renote.localOnly && data.channel == null) {
 				data.localOnly = true;
 			}
 		}
 
-		// Check blocking
 		if (this.isRenote(data) && !this.isQuote(data)) {
 			if (data.renote.userHost === null) {
 				if (data.renote.userId !== user.id) {
@@ -559,29 +524,24 @@ export class NoteCreateService implements OnApplicationShutdown {
 		if (data.reply) {
 			switch (data.reply.visibility) {
 				case 'public':
-					// public noteは無条件にreply可能
 					break;
 				case 'home':
-					// home noteはhome以下にreply可能
 					if (data.visibility === 'public') {
 						data.visibility = 'home';
 					}
 					break;
 				case 'followers':
-					// followers noteはfollowers以下にreply可能
 					if (data.visibility === 'public' || data.visibility === 'home') {
 						data.visibility = 'followers';
 					}
 					break;
 				case 'specified':
-					// specified / direct noteはspecifiedのみreply可能
 					if (data.visibility !== 'specified') {
 						data.visibility = 'specified';
 					}
 					break;
 			}
 
-			// ローカルのみにリプライしたらローカルのみにする
 			if (data.reply.localOnly && data.channel == null) {
 				data.localOnly = true;
 			}
@@ -603,7 +563,6 @@ export class NoteCreateService implements OnApplicationShutdown {
 		let emojis = data.apEmojis;
 		let mentionedUsers = data.apMentions;
 
-		// Parse MFM if needed
 		if (!tags || !emojis || !mentionedUsers) {
 			const tokens = (data.text ? mfm.parse(data.text)! : []);
 			const cwTokens = data.cw ? mfm.parse(data.cw)! : [];
@@ -620,7 +579,6 @@ export class NoteCreateService implements OnApplicationShutdown {
 			mentionedUsers = data.apMentions ?? (await this.extractMentionedUsers(user, combinedTokens));
 		}
 
-		// if the host is media-silenced, custom emojis are not allowed
 		if (this.utilityService.isMediaSilencedHost(this.meta.mediaSilencedHosts, user.host)) emojis = [];
 
 		tags = tags.filter(tag => Array.from(tag).length <= 128).splice(0, 32);
@@ -653,7 +611,7 @@ export class NoteCreateService implements OnApplicationShutdown {
 		setImmediate('post created', { signal: this.#shutdownController.signal }).then(
 			() => this.postNoteCreated(note, user, data, silent, tags!, mentionedUsers!)
 				.catch(error => this.logPostCreatedError(note, 'postNoteCreated', error)),
-			() => { /* aborted, ignore this */ },
+			() => { },
 		);
 
 		return note;
@@ -701,7 +659,6 @@ export class NoteCreateService implements OnApplicationShutdown {
 
 			attachedFileTypes: data.files ? data.files.map(file => file.type) : [],
 
-			// 以下非正規化データ
 			replyUserId: data.reply ? data.reply.userId : null,
 			replyUserHost: data.reply ? data.reply.userHost : null,
 			renoteUserId: data.renote ? data.renote.userId : null,
@@ -713,7 +670,6 @@ export class NoteCreateService implements OnApplicationShutdown {
 		if (data.uri != null) insert.uri = data.uri;
 		if (data.url != null) insert.url = data.url;
 
-		// Append mentions data
 		if (mentionedUsers.length > 0) {
 			insert.mentions = mentionedUsers.map(u => u.id);
 			const profiles = await this.userProfilesRepository.findBy({ userId: In(insert.mentions) });
@@ -729,10 +685,8 @@ export class NoteCreateService implements OnApplicationShutdown {
 			}));
 		}
 
-		// 投稿を作成
 		try {
 			if (insert.hasPoll || data.scheduledDraft) {
-				// Start transaction
 				await this.db.transaction(async transactionalEntityManager => {
 					if (data.scheduledDraft) {
 						const draft = await transactionalEntityManager.findOne(MiNoteDraft, {
@@ -777,7 +731,6 @@ export class NoteCreateService implements OnApplicationShutdown {
 			};
 		} catch (e) {
 			if (e instanceof ScheduledNoteNotReadyError) throw e;
-			// duplicate key error
 			if (isDuplicateKeyValueError(e)) {
 				const err = new Error('Duplicated note');
 				err.name = 'duplicated';
@@ -797,7 +750,6 @@ export class NoteCreateService implements OnApplicationShutdown {
 		host: MiUser['host'];
 		isBot: MiUser['isBot'];
 	}, data: Option, silent: boolean, tags: string[], mentionedUsers: MinimumUser[]) {
-		// Start federation first: the counters and notifications below must not prevent it.
 		if (!silent && !data.localOnly && this.userEntityService.isLocalUser(user)) {
 			trackPromise(this.deliverNote(note, user, data, mentionedUsers)
 				.catch(error => this.logPostCreatedError(note, 'deliver', error)));
@@ -808,7 +760,6 @@ export class NoteCreateService implements OnApplicationShutdown {
 			this.perUserNotesChart.update(user, note, true);
 		}
 
-		// Register host
 		if (this.meta.enableStatsForFederatedInstances) {
 			if (this.userEntityService.isRemoteUser(user)) {
 				this.federatedInstanceService.fetchOrRegister(user.host).then(async i => {
@@ -820,12 +771,10 @@ export class NoteCreateService implements OnApplicationShutdown {
 			}
 		}
 
-		// ハッシュタグ更新
 		if (data.visibility === 'public' || data.visibility === 'home') {
 			this.hashtagService.updateHashtags(user, tags);
 		}
 
-		// Increment notes count (user)
 		this.incNotesCountOfUser(user);
 
 		this.pushToTl(note, user);
@@ -858,9 +807,7 @@ export class NoteCreateService implements OnApplicationShutdown {
 			});
 		}
 
-		// Silent creation (imports and fetched notes) must not notify followers.
 		if (data.reply == null && !silent) {
-			// TODO: キャッシュ
 			this.followingsRepository.findBy({
 				followeeId: user.id,
 				notify: 'normal',
@@ -868,7 +815,6 @@ export class NoteCreateService implements OnApplicationShutdown {
 				if (note.visibility !== 'specified') {
 					const isPureRenote = this.isRenote(data) && !this.isQuote(data) ? true : false;
 					for (const following of followings) {
-						// TODO: ワードミュート考慮
 						let isRenoteMuted = false;
 						if (isPureRenote) {
 							const userIdsWhoMeMutingRenotes = await this.cacheService.renoteMutingsCache.fetch(following.followerId);
@@ -891,11 +837,11 @@ export class NoteCreateService implements OnApplicationShutdown {
 			}, {
 				delay,
 				removeOnComplete: {
-					age: 3600 * 24 * 7, // keep up to 7 days
+					age: 3600 * 24 * 7,
 					count: 30,
 				},
 				removeOnFail: {
-					age: 3600 * 24 * 7, // keep up to 7 days
+					age: 3600 * 24 * 7,
 					count: 100,
 				},
 			});
@@ -904,7 +850,6 @@ export class NoteCreateService implements OnApplicationShutdown {
 		if (!silent) {
 			if (this.userEntityService.isLocalUser(user)) this.activeUsersChart.write(user);
 
-			// Pack the note
 			const noteObj = await this.noteEntityService.pack(note, null, { skipHide: true, withReactionAndUserPairCache: true });
 
 			this.globalEventService.publishNotesStream(noteObj);
@@ -923,11 +868,8 @@ export class NoteCreateService implements OnApplicationShutdown {
 
 			await this.createMentionedEvents(mentionedUsers, note, nm);
 
-			// If has in reply to note
 			if (data.reply) {
-				// 通知
 				if (data.reply.userHost === null) {
-					// Without the muting state, skipping is safer than notifying a muting user.
 					const muted = await this.isMutedByRecipient(data.reply.userId, data.reply.threadId ?? data.reply.id, note)
 						.catch(error => {
 							this.logPostCreatedError(note, 'replyNotification', error);
@@ -942,13 +884,10 @@ export class NoteCreateService implements OnApplicationShutdown {
 				}
 			}
 
-			// If it is renote
 			if (this.isRenote(data)) {
 				const type = this.isQuote(data) ? 'quote' : 'renote';
 
-				// Notify
 				if (data.renote.userHost === null) {
-					// null means the muting state is unknown; then skip everything that reaches the recipient.
 					const muted = await this.isMutedByRecipient(data.renote.userId, data.renote.threadId ?? data.renote.id, note)
 						.catch(error => {
 							this.logPostCreatedError(note, 'renoteNotification', error);
@@ -959,7 +898,6 @@ export class NoteCreateService implements OnApplicationShutdown {
 						nm.push(data.renote.userId, type);
 					}
 
-					// Publish event
 					if (muted !== null && user.id !== data.renote.userId) {
 						this.globalEventService.publishMainStream(data.renote.userId, 'renote', noteObj);
 						this.webhookService.enqueueUserWebhook(data.renote.userId, 'renote', { note: noteObj });
@@ -980,15 +918,12 @@ export class NoteCreateService implements OnApplicationShutdown {
 				userId: user.id,
 				channelId: data.channel.id,
 			}).then(count => {
-				// この処理が行われるのはノート作成後なので、ノートが一つしかなかったら最初の投稿だと判断できる
-				// TODO: とはいえノートを削除して何回も投稿すればその分だけインクリメントされる雑さもあるのでどうにかしたい
 				if (count === 1) {
 					this.channelsRepository.increment({ id: data.channel!.id }, 'usersCount', 1);
 				}
 			});
 		}
 
-		// Register to search database
 		this.index(note);
 	}
 
@@ -1001,7 +936,6 @@ export class NoteCreateService implements OnApplicationShutdown {
 	private isQuote(note: Option & { renote: MiNote }): note is Option & { renote: MiNote } & (
 		{ text: string } | { cw: string } | { reply: MiNote } | { poll: IPoll } | { files: MiDriveFile[] }
 	) {
-		// NOTE: SYNC WITH misc/is-quote.ts
 		return note.text != null ||
 			note.reply != null ||
 			note.cw != null ||
@@ -1019,7 +953,6 @@ export class NoteCreateService implements OnApplicationShutdown {
 			.execute();
 		if (result.affected !== 1) return false;
 
-		// 30%の確率、3日以内に投稿されたノートの場合ハイライト用ランキング更新
 		if (Math.random() < 0.3 && (Date.now() - this.idService.parse(renote.id).date.getTime()) < 1000 * 60 * 60 * 24 * 3) {
 			if (renote.channelId != null) {
 				if (renote.replyId == null) {
@@ -1045,29 +978,24 @@ export class NoteCreateService implements OnApplicationShutdown {
 		const noteActivity = await this.renderNoteOrRenoteActivity(data, note);
 		const dm = this.apDeliverManagerService.createDeliverManager(user, noteActivity);
 
-		// メンションされたリモートユーザーに配送
 		for (const u of mentionedUsers.filter(u => this.userEntityService.isRemoteUser(u))) {
 			dm.addDirectRecipe(u as MiRemoteUser);
 		}
 
-		// 投稿がリプライかつ投稿者がローカルユーザーかつリプライ先の投稿の投稿者がリモートユーザーなら配送
 		if (data.reply && data.reply.userHost !== null) {
 			const u = await this.usersRepository.findOneBy({ id: data.reply.userId });
 			if (u && this.userEntityService.isRemoteUser(u)) dm.addDirectRecipe(u);
 		}
 
-		// 投稿がRenoteかつ投稿者がローカルユーザーかつRenote元の投稿の投稿者がリモートユーザーなら配送
 		if (data.renote && data.renote.userHost !== null) {
 			const u = await this.usersRepository.findOneBy({ id: data.renote.userId });
 			if (u && this.userEntityService.isRemoteUser(u)) dm.addDirectRecipe(u);
 		}
 
-		// フォロワーに配送
 		if (['public', 'home', 'followers'].includes(note.visibility)) {
 			dm.addFollowersRecipe();
 		}
 
-		// A relay failure must not stop delivery to followers and direct recipients.
 		if (['public'].includes(note.visibility)) {
 			this.relayService.deliverToRelays(user, noteActivity)
 				.catch(error => this.logPostCreatedError(note, 'relay', error));
@@ -1076,7 +1004,6 @@ export class NoteCreateService implements OnApplicationShutdown {
 		await dm.execute();
 	}
 
-	/** Whether the recipient muted the thread, or a user the note relates to. */
 	@bindThis
 	private async isMutedByRecipient(recipientId: MiUser['id'], threadId: MiNote['id'], note: MiNote): Promise<boolean> {
 		const [isThreadMuted, userIdsWhoMeMuting] = await Promise.all([
@@ -1104,7 +1031,6 @@ export class NoteCreateService implements OnApplicationShutdown {
 	@bindThis
 	private async createMentionedEvents(mentionedUsers: MinimumUser[], note: MiNote, nm: NotificationManager) {
 		for (const u of mentionedUsers.filter(u => this.userEntityService.isLocalUser(u))) {
-			// One recipient's failure must not stop the mention events of the others.
 			try {
 				if (await this.isMutedByRecipient(u.id, note.threadId ?? note.id, note)) {
 					continue;
@@ -1117,7 +1043,6 @@ export class NoteCreateService implements OnApplicationShutdown {
 				this.globalEventService.publishMainStream(u.id, 'mention', detailPackedNote);
 				this.webhookService.enqueueUserWebhook(u.id, 'mention', { note: detailPackedNote });
 
-				// Create notification
 				nm.push(u.id, 'mention');
 			} catch (error) {
 				this.logPostCreatedError(note, 'mentionNotification', error);
@@ -1175,7 +1100,6 @@ export class NoteCreateService implements OnApplicationShutdown {
 			this.remoteUserResolveService.resolveUser(m.username, m.host ?? user.host).catch(() => null),
 		))).filter(x => x != null);
 
-		// Drop duplicate users
 		mentionedUsers = mentionedUsers.filter((u, i, self) =>
 			i === self.findIndex(u2 => u.id === u2.id),
 		);
@@ -1208,7 +1132,6 @@ export class NoteCreateService implements OnApplicationShutdown {
 				}
 			}
 		} else {
-			// TODO: キャッシュ？
 			// eslint-disable-next-line prefer-const
 			let [followings, userListMemberships] = await Promise.all([
 				this.followingsRepository.find({
@@ -1235,16 +1158,12 @@ export class NoteCreateService implements OnApplicationShutdown {
 			]);
 
 			if (note.visibility === 'followers') {
-				// TODO: 重そうだから何とかしたい Set 使う？
 				userListMemberships = userListMemberships.filter(x => x.userListUserId === user.id || followings.some(f => f.followerId === x.userListUserId));
 			}
 
-			// TODO: あまりにも数が多いと redisPipeline.exec に失敗する(理由は不明)ため、3万件程度を目安に分割して実行するようにする
 			for (const following of followings) {
-				// 基本的にvisibleUserIdsには自身のidが含まれている前提であること
 				if (note.visibility === 'specified' && !note.visibleUserIds.some(v => v === following.followerId)) continue;
 
-				// 「自分自身への返信 or そのフォロワーへの返信」のどちらでもない場合
 				if (isReply(note, following.followerId)) {
 					if (!following.withReplies) continue;
 				}
@@ -1256,14 +1175,12 @@ export class NoteCreateService implements OnApplicationShutdown {
 			}
 
 			for (const userListMembership of userListMemberships) {
-				// ダイレクトのとき、そのリストが対象外のユーザーの場合
 				if (
 					note.visibility === 'specified' &&
 					note.userId !== userListMembership.userListUserId &&
 					!note.visibleUserIds.some(v => v === userListMembership.userListUserId)
 				) continue;
 
-				// 「自分自身への返信 or そのリストの作成者への返信」のどちらでもない場合
 				if (isReply(note, userListMembership.userListUserId)) {
 					if (!userListMembership.withReplies) continue;
 				}
@@ -1274,7 +1191,6 @@ export class NoteCreateService implements OnApplicationShutdown {
 				}
 			}
 
-			// 自分自身のHTL
 			if (note.userHost == null) {
 				if (note.visibility !== 'specified' || !note.visibleUserIds.some(v => v === user.id)) {
 					this.fanoutTimelineService.push(`homeTimeline:${user.id}`, note.id, this.meta.perUserHomeTimelineCacheMax, r);
@@ -1284,7 +1200,6 @@ export class NoteCreateService implements OnApplicationShutdown {
 				}
 			}
 
-			// 自分自身以外への返信
 			if (isReply(note)) {
 				this.fanoutTimelineService.push(`userTimelineWithReplies:${user.id}`, note.id, note.userHost == null ? this.meta.perLocalUserUserTimelineCacheMax : this.meta.perRemoteUserUserTimelineCacheMax, r);
 
@@ -1330,7 +1245,6 @@ export class NoteCreateService implements OnApplicationShutdown {
 			return array;
 		};
 
-		// ランダムに最大1000件サンプリング
 		const samples = shuffle(followings).slice(0, Math.min(followings.length, 1000));
 
 		const hibernatedUsers = await this.usersRepository.find({

@@ -47,7 +47,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 		super(meta, paramDef, async (ps, user, token) => {
 			const isSecure = user != null && token == null;
 
-			// Lookup app
 			const ap = await this.appsRepository.findOneBy({ id: ps.appId });
 
 			if (ap == null) {

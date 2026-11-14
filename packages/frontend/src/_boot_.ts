@@ -11,7 +11,6 @@ const boot = subBootPaths.some(path => window.location.pathname === path || wind
 	? import('@/boot/sub-boot.js').then(module => module.subBoot)
 	: import('@/boot/main-boot.js').then(module => module.mainBoot);
 
-// Fetch boot modules alongside the icon stylesheet rather than adding another network waterfall.
 const icons = import.meta.env.DEV
 	? import('@tabler/icons-webfont/dist/tabler-icons.scss')
 	: import('icons-subsetter/built/tabler-icons-frontend.css');

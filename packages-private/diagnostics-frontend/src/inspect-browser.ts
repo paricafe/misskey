@@ -22,7 +22,6 @@ const baseUrl = process.env.FRONTEND_BROWSER_METRICS_URL ?? 'http://127.0.0.1:61
 const sampleCount = readIntegerEnv('FRONTEND_BROWSER_METRICS_SAMPLE_COUNT', 5, 1);
 const heapSnapshotBreakdownTopN = readIntegerEnv('FRONTEND_BROWSER_HEAP_SNAPSHOT_BREAKDOWN_TOP_N', defaultHeapSnapshotBreakdownTopN, 1);
 
-// 成果物 (artifact) としてアップロードされるファイルの出力先。CIではworkspace直下を指す
 const heapSnapshotOutputDir = resolve(readOptionalEnv('FRONTEND_BROWSER_HEAP_SNAPSHOT_OUTPUT_DIR') ?? process.cwd());
 const heapSnapshotWorkDirs = {
 	base: join(heapSnapshotOutputDir, 'frontend-browser-base-heap-snapshots'),
@@ -37,10 +36,6 @@ function heapSnapshotPath(label: Label, round: number) {
 	return join(heapSnapshotWorkDirs[label], `round-${round}.heapsnapshot`);
 }
 
-/**
- * ブラウザを毎ラウンド立ち上げ直して1サンプル分を計測する。
- * ブラウザを使い回すとキャッシュや前ラウンドのGC残渣が乗るため、必ず作り直す。
- */
 async function measureSample(label: Label, round: number, heapSnapshotSavePath: string): Promise<BrowserMeasurementSample> {
 	await prepareInstance(baseUrl);
 
@@ -71,9 +66,6 @@ async function measureSample(label: Label, round: number, heapSnapshotSavePath: 
 	});
 }
 
-/**
- * 中央値に最も近いラウンドのスナップショットだけを成果物として残し、残りは捨てる。
- */
 async function saveRepresentativeHeapSnapshot(label: Label, report: BrowserMetricsReport) {
 	const representative = selectRepresentativeSample(report.samples, sample => sample.heapSnapshot.categories.total);
 	await copyFile(heapSnapshotPath(label, representative.round), heapSnapshotOutputPaths[label]);
@@ -117,7 +109,6 @@ async function main() {
 		await rm(heapSnapshotOutputPaths[label], { force: true });
 	}
 
-	// base / head は同じポートでサーバーを立てるため、並行させず順番に計測する
 	await genReport('base', resolve(baseDirArg), resolve(baseOutputArg));
 	await genReport('head', resolve(headDirArg), resolve(headOutputArg));
 }

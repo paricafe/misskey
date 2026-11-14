@@ -36,15 +36,13 @@ const props = defineProps<{
 	mediaList: Misskey.entities.DriveFile[];
 	raw?: boolean;
 
-	/** 埋め込みページ用 親要素の正規URL */
 	originalEntityUrl: string;
 }>();
 
 const count = computed(() => props.mediaList.filter(media => previewable(media)).length);
 
 const previewable = (file: Misskey.entities.DriveFile): boolean => {
-	if (file.type === 'image/svg+xml') return true; // svgのwebpublic/thumbnailはpngなのでtrue
-	// FILE_TYPE_BROWSERSAFEに適合しないものはブラウザで表示するのに不適切
+	if (file.type === 'image/svg+xml') return true;
 	return (file.type.startsWith('video') || file.type.startsWith('image')) && FILE_TYPE_BROWSERSAFE.includes(file.type);
 };
 </script>
@@ -66,7 +64,6 @@ const previewable = (file: Misskey.entities.DriveFile): boolean => {
 	&.n1 {
 		grid-template-rows: 1fr;
 
-		// default but fallback (expand)
 		min-height: 64px;
 		max-height: clamp(
 			64px,
@@ -77,19 +74,19 @@ const previewable = (file: Misskey.entities.DriveFile): boolean => {
 		&.n116_9 {
 			min-height: initial;
 			max-height: initial;
-			aspect-ratio: 16 / 9; // fallback
+			aspect-ratio: 16 / 9;
 		}
 
 		&.n11_1{
 			min-height: initial;
 			max-height: initial;
-			aspect-ratio: 1 / 1; // fallback
+			aspect-ratio: 1 / 1;
 		}
 
 		&.n12_3 {
 			min-height: initial;
 			max-height: initial;
-			aspect-ratio: 2 / 3; // fallback
+			aspect-ratio: 2 / 3;
 		}
 	}
 
@@ -130,7 +127,7 @@ const previewable = (file: Misskey.entities.DriveFile): boolean => {
 }
 
 .media {
-	overflow: hidden; // clipにするとバグる
+	overflow: hidden;
 	border-radius: 8px;
 	position: relative;
 

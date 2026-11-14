@@ -6,7 +6,6 @@
 import { test as base, expect } from '@playwright/test';
 import { IGNORABLE_ERROR_MESSAGES, isIgnorableErrorMessage } from './ignorable-errors.js';
 
-/** 通常のtestの代わりにこちらを使用する */
 export const test = base.extend<{ _installIgnorableErrorHandlers: void }>({
 	_installIgnorableErrorHandlers: [async ({ page }, use) => {
 		await page.addInitScript((messages) => {
@@ -33,7 +32,6 @@ export const test = base.extend<{ _installIgnorableErrorHandlers: void }>({
 			window.isPlaywright = true;
 		}, [...IGNORABLE_ERROR_MESSAGES]);
 
-		// Playwright側で収集されるページエラーも同じ基準で握りつぶす。
 		page.on('pageerror', (error) => {
 			if (isIgnorableErrorMessage(error.message)) {
 				return;

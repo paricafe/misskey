@@ -94,7 +94,6 @@ function getTabStyle(t: Tab): Record<string, string> {
 }
 
 function onTabMousedown(selectedTab: Tab, ev: MouseEvent): void {
-	// ユーザビリティの観点からmousedown時にはonClickは呼ばない
 	if (selectedTab.key) {
 		tab.value = selectedTab.key;
 	}
@@ -119,8 +118,6 @@ function renderTab() {
 
 	const tabEl = tab.value ? tabRefs[tab.value] : undefined;
 	if (tabEl && tabHighlightEl.value && tabHighlightEl.value.parentElement) {
-		// offsetWidth や offsetLeft は少数を丸めてしまうため getBoundingClientRect を使う必要がある
-		// https://developer.mozilla.org/ja/docs/Web/API/HTMLElement/offsetWidth#%E5%80%A4
 		const parentRect = tabHighlightEl.value.parentElement.getBoundingClientRect();
 		const rect = tabEl.getBoundingClientRect();
 		tabHighlightEl.value.style.width = rect.width + 'px';
@@ -136,7 +133,7 @@ async function enter(el: Element) {
 	const elementWidth = el.getBoundingClientRect().width;
 	el.style.width = '0';
 	el.style.paddingLeft = '0';
-	el.offsetWidth; // reflow
+	el.offsetWidth;
 	el.style.width = `${elementWidth}px`;
 	el.style.paddingLeft = '';
 	nextTick(() => {
@@ -148,7 +145,6 @@ async function enter(el: Element) {
 
 function afterEnter(el: Element) {
 	if (!(el instanceof HTMLElement)) return;
-	// element.style.width = '';
 }
 
 async function leave(el: Element) {
@@ -156,7 +152,7 @@ async function leave(el: Element) {
 	const elementWidth = el.getBoundingClientRect().width;
 	el.style.width = `${elementWidth}px`;
 	el.style.paddingLeft = '';
-	el.offsetWidth; // reflow
+	el.offsetWidth;
 	el.style.width = '0';
 	el.style.paddingLeft = '0';
 }

@@ -38,10 +38,6 @@ function getMaxAbsoluteSlopes<T extends Record<string, number>>(readings: { elap
 	return result;
 }
 
-/**
- * メモリ使用量が落ち着くまで繰り返し読み取る。
- * 起動直後は遅延初期化でじわじわ増え続けるため、直近 `windowSize` 件の傾きが十分小さくなるまで待つ。
- */
 export async function measureMemoryUntilStable<T extends Record<string, number>>(
 	readMemoryUsage: () => Promise<T>,
 	timer: MemoryStabilityTimer = defaultTimer,

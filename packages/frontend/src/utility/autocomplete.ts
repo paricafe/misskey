@@ -36,26 +36,17 @@ export class Autocomplete {
 	private onlyType: SuggestionType[];
 
 	private get text(): string {
-		// Use raw .value to get the latest value
-		// (Because v-model does not update while composition)
 		return this.textarea.value;
 	}
 
 	private set text(text: string) {
-		// Use ref value to notify other watchers
-		// (Because .value setter never fires input/change events)
 		this.textRef.value = text;
 	}
 
-	/**
-	 * 対象のテキストエリアを与えてインスタンスを初期化します。
-	 */
 	constructor(textarea: HTMLInputElement | HTMLTextAreaElement, textRef: Ref<string | number | null>, onlyType?: SuggestionType[]) {
-		//#region BIND
 		this.onInput = this.onInput.bind(this);
 		this.complete = this.complete.bind(this);
 		this.close = this.close.bind(this);
-		//#endregion
 
 		this.suggestion = null;
 		this.textarea = textarea;
@@ -66,29 +57,19 @@ export class Autocomplete {
 		this.attach();
 	}
 
-	/**
-	 * このインスタンスにあるテキストエリアの入力のキャプチャを開始します。
-	 */
 	public attach() {
 		this.textarea.addEventListener('input', this.onInput);
 	}
 
-	/**
-	 * このインスタンスにあるテキストエリアの入力のキャプチャを解除します。
-	 */
 	public detach() {
 		this.textarea.removeEventListener('input', this.onInput);
 		this.close();
 	}
 
-	/**
-	 * テキスト入力時
-	 */
 	private onInput() {
 		const caretPos = Number(this.textarea.selectionStart);
 		const text = this.text.substring(0, caretPos).split('\n').pop()!;
 
-		// メンションに含められる文字のみで構成された、最も末尾にある文字列を抽出
 		const mentionCandidate = text.split(/[^a-zA-Z0-9_@.\-]+/).pop()!;
 
 		const mentionIndex = mentionCandidate.lastIndexOf('@');
@@ -115,21 +96,15 @@ export class Autocomplete {
 		const isMfmParam = mfmParamIndex !== -1 && afterLastMfmParam?.includes('.') && !afterLastMfmParam.includes(' ');
 		const isMfmTag = mfmTagIndex !== -1 && !isMfmParam;
 		const isEmoji = emojiIndex !== -1 && text.split(/:[a-z0-9_+\-]+:/).pop()!.includes(':');
-		// :ok:などを🆗にするたいおぷ
 		const isEmojiCompleteToUnicode = !isEmoji && emojiIndex === text.length - 1;
 
 		let opened = false;
 
 		if (maybeMention && this.onlyType.includes('user')) {
-			// ユーザのサジェスト中に@を入力すると、その位置から新たにユーザ名を取りなおそうとしてしまう
-			// この動きはリモートユーザのサジェストを阻害するので、@を検知したらその位置よりも前の@を探し、
-			// ホスト名を含むリモートのユーザ名を全て拾えるようにする
 			const mentionIndexAlt = mentionCandidate.lastIndexOf('@', mentionIndex - 1);
 
-			// @が連続している場合、1つ目を無視する
 			const mentionIndexLeft = (mentionIndexAlt !== -1 && mentionIndexAlt !== mentionIndex - 1) ? mentionIndexAlt : mentionIndex;
 
-			// メンションを構成する条件を満たしているか確認する
 			const isMention = mentionIndexLeft === 0 || '_@.-'.includes(mentionCandidate[mentionIndexLeft - 1]);
 
 			if (isMention) {
@@ -192,9 +167,6 @@ export class Autocomplete {
 		}
 	}
 
-	/**
-	 * サジェストを提示します。
-	 */
 	private async open<T extends keyof CompleteInfo>(type: T, q: CompleteInfo[T]['query']) {
 		if (type !== this.currentType) {
 			this.close();
@@ -203,14 +175,12 @@ export class Autocomplete {
 		this.opening = true;
 		this.currentType = type;
 
-		//#region サジェストを表示すべき位置を計算
 		const caretPosition = getCaretCoordinates(this.textarea, this.textarea.selectionStart ?? 0);
 
 		const rect = this.textarea.getBoundingClientRect();
 
 		const x = rect.left + caretPosition.left - this.textarea.scrollLeft;
 		const y = rect.top + caretPosition.top - this.textarea.scrollTop;
-		//#endregion
 
 		if (this.suggestion) {
 			this.suggestion.x.value = x;
@@ -248,9 +218,6 @@ export class Autocomplete {
 		}
 	}
 
-	/**
-	 * サジェストを閉じます。
-	 */
 	private close() {
 		if (this.suggestion == null) return;
 
@@ -260,9 +227,6 @@ export class Autocomplete {
 		this.textarea.focus();
 	}
 
-	/**
-	 * オートコンプリートする
-	 */
 	private complete<T extends keyof CompleteInfo>(props: CompleteProps<T>) {
 		this.close();
 
@@ -277,10 +241,8 @@ export class Autocomplete {
 
 			const acct = props.value.host === null ? props.value.username : `${props.value.username}@${toASCII(props.value.host)}`;
 
-			// 挿入
 			this.text = `${trimmedBefore}@${acct} ${after}`;
 
-			// キャレットを戻す
 			nextTick(() => {
 				this.textarea.focus();
 				const pos = trimmedBefore.length + (acct.length + 2);
@@ -293,10 +255,8 @@ export class Autocomplete {
 			const trimmedBefore = before.substring(0, before.lastIndexOf('#'));
 			const after = source.substring(caret ?? 0);
 
-			// 挿入
 			this.text = `${trimmedBefore}#${props.value} ${after}`;
 
-			// キャレットを戻す
 			nextTick(() => {
 				this.textarea.focus();
 				const pos = trimmedBefore.length + (props.value.length + 2);
@@ -342,10 +302,8 @@ export class Autocomplete {
 			const trimmedBefore = before.substring(0, before.lastIndexOf(':', before.length - 2));
 			const after = source.substring(caret);
 
-			// 挿入
 			this.text = trimmedBefore + props.value + after;
 
-			// キャレットを戻す
 			nextTick(() => {
 				this.textarea.focus();
 				const pos = trimmedBefore.length + props.value.length;
@@ -358,10 +316,8 @@ export class Autocomplete {
 			const trimmedBefore = before.substring(0, before.lastIndexOf('$'));
 			const after = source.substring(caret ?? 0);
 
-			// 挿入
 			this.text = `${trimmedBefore}$[${props.value} ]${after}`;
 
-			// キャレットを戻す
 			nextTick(() => {
 				this.textarea.focus();
 				const pos = trimmedBefore.length + (props.value.length + 3);
@@ -374,10 +330,8 @@ export class Autocomplete {
 			const trimmedBefore = before.substring(0, before.lastIndexOf('.'));
 			const after = source.substring(caret ?? 0);
 
-			// 挿入
 			this.text = `${trimmedBefore}.${props.value}${after}`;
 
-			// キャレットを戻す
 			nextTick(() => {
 				this.textarea.focus();
 				const pos = trimmedBefore.length + (props.value.length + 1);

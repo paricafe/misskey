@@ -188,7 +188,7 @@ async function done() {
 
 		const created = await os.apiWithDialog('admin/emoji/add', {
 			...params,
-			fileId: params.fileId, // TSを黙らすため
+			fileId: params.fileId,
 		});
 
 		emit('done', {

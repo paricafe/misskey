@@ -55,7 +55,7 @@ export const paramDef = {
 		limit: { type: 'integer', minimum: 1, maximum: 100, default: 10 },
 		sinceId: { type: 'string', format: 'misskey:id' },
 		untilId: { type: 'string', format: 'misskey:id' },
-		allowPartial: { type: 'boolean', default: false }, // true is recommended but for compatibility false by default
+		allowPartial: { type: 'boolean', default: false },
 		sinceDate: { type: 'integer' },
 		untilDate: { type: 'integer' },
 	},
@@ -180,9 +180,9 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 		if (!ps.withReplies) {
 			query.andWhere(new Brackets(qb => {
 				qb
-					.where('note.replyId IS NULL') // 返信ではない
+					.where('note.replyId IS NULL')
 					.orWhere(new Brackets(qb => {
-						qb // 返信だけど投稿者自身への返信
+						qb
 							.where('note.replyId IS NOT NULL')
 							.andWhere('note.replyUserId = note.userId');
 					}));

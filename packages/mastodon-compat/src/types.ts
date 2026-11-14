@@ -3,7 +3,6 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-/** JSON at the public HTTP boundary. Domain code must validate fields before use. */
 export type Json = Record<string, any>;
 
 export type NativeRequestContext = {
@@ -26,13 +25,11 @@ export type NativeTransportResponse = {
 	headers?: Record<string, string>;
 };
 
-/** An HTTP exchange; adapters can implement it without importing a web framework here. */
 export type NativeTransport = (request: NativeTransportRequest) => Promise<NativeTransportResponse>;
 
 export type NativeClientOptions = {
 	baseUrl: string;
 	publicUrl: string;
-	/** Unix socket for native streaming; HTTP requests use the configured transport. */
 	socketPath?: string;
 	transport?: NativeTransport;
 };

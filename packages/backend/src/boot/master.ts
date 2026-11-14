@@ -28,10 +28,8 @@ const bootLogger = logger.createSubLogger('boot', 'magenta');
 
 const themeColor = chalk.hex('#f7c3de');
 
-/** 起動時の案内を、選択されたログ形式に合わせて出力します。 */
 function greet(props: { version: string; format: LogFormat }) {
 	if (!envOption.quiet && props.format === 'json') {
-		// JSONモードでは生のコンソール出力を避け、各案内を1件ずつ構造化ログにします。
 		bootLogger.info('Welcome to Misskey!');
 		bootLogger.info(`Misskey v${props.version}`, null, true);
 		bootLogger.info('Misskey is an open-source decentralized microblogging platform.');
@@ -40,14 +38,12 @@ function greet(props: { version: string; format: LogFormat }) {
 	}
 
 	if (!envOption.quiet) {
-		//#region Misskey logo
 		const v = `v${props.version}`;
 		console.log(themeColor('  _____ _         _           '));
 		console.log(themeColor(' |     |_|___ ___| |_ ___ _ _ '));
 		console.log(themeColor(' | | | | |_ -|_ -| \'_| -_| | |'));
 		console.log(themeColor(' |_|_|_|_|___|___|_,_|___|_  |'));
 		console.log(' ' + chalk.gray(v) + themeColor('                        |___|\n'.substring(v.length)));
-		//#endregion
 
 		console.log(' Misskey is an open-source decentralized microblogging platform.');
 		console.log(chalk.rgb(255, 136, 0)(' If you like Misskey, please consider donating to support dev. https://misskey-hub.net/docs/donate/'));
@@ -60,13 +56,9 @@ function greet(props: { version: string; format: LogFormat }) {
 	bootLogger.info(`Misskey v${props.version}`, null, true);
 }
 
-/**
- * Init master process
- */
 export async function masterMain() {
 	let config!: Config;
 
-	// initialize app
 	try {
 		config = loadConfigBoot();
 		logger.info(`Start main process... pid: ${process.pid}`);
@@ -75,7 +67,6 @@ export async function masterMain() {
 		showEnvironment();
 		await showMachineInfo(bootLogger);
 		showNodejsVersion();
-		//await connectDb();
 		if (config.pidFile) fs.writeFileSync(config.pidFile, process.pid.toString());
 	} catch (e) {
 		bootLogger.error('Fatal error occurred during initialization: ' + e, null, true);
@@ -108,14 +99,8 @@ export async function masterMain() {
 	);
 
 	if (!envOption.disableClustering) {
-		// clusterモジュール有効時
-
 		if (envOption.onlyServer) {
 			if (config.socket) await prepareUnixSocket(config.socket);
-			// onlyServer かつ enableCluster な場合、メインプロセスはforkのみに制限する(listenしない)。
-			// ワーカープロセス側でlistenすると、メインプロセスでポートへの着信を受け入れてワーカープロセスへの分配を行う動作をする。
-			// そのため、メインプロセスでも直接listenするとポートの競合が発生して起動に失敗してしまう。
-			// see: https://nodejs.org/api/cluster.html#cluster
 		} else if (envOption.onlyQueue) {
 			await jobQueue();
 		} else {
@@ -124,8 +109,6 @@ export async function masterMain() {
 
 		await spawnWorkers(config.clusterLimit);
 	} else {
-		// clusterモジュール無効時
-
 		if (envOption.onlyServer) {
 			await server();
 		} else if (envOption.onlyQueue) {
@@ -159,7 +142,6 @@ function showNodejsVersion(): void {
 	nodejsLogger.info(`Version ${process.version} detected.`);
 }
 
-/** 設定を読み込み、成功時に後続のログ出力形式を適用します。 */
 function loadConfigBoot(): Config {
 	const configLogger = bootLogger.createSubLogger('config');
 	let config;
@@ -180,24 +162,6 @@ function loadConfigBoot(): Config {
 
 	return config;
 }
-
-/*
-async function connectDb(): Promise<void> {
-	const dbLogger = bootLogger.createSubLogger('db');
-
-	// Try to connect to DB
-	try {
-		dbLogger.info('Connecting...');
-		await initDb();
-		const v = await db.query('SHOW server_version').then(x => x[0].server_version);
-		dbLogger.succ(`Connected: v${v}`);
-	} catch (err) {
-		dbLogger.error('Cannot connect', null, true);
-		dbLogger.error(err);
-		process.exit(1);
-	}
-}
-*/
 
 async function spawnWorkers(limit = 1) {
 	if (isShutdownInProgress()) return;

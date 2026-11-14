@@ -40,7 +40,7 @@ export class HashtagService {
 		private meta: MiMeta,
 
 		@Inject(DI.redis)
-		private redisClient: Redis.Redis, // TODO: 専用のRedisサーバーを設定できるようにする
+		private redisClient: Redis.Redis,
 
 		@Inject(DI.hashtagsRepository)
 		private hashtagsRepository: HashtagsRepository,
@@ -74,7 +74,6 @@ export class HashtagService {
 	public async updateHashtag(user: { id: MiUser['id']; host: MiUser['host']; }, tag: string, isUserAttached = false, inc = true) {
 		tag = normalizeTag(tag);
 
-		// TODO: サンプリング
 		this.updateHashtagsRanking(tag, user.id);
 
 		const column: UpdatingHashtagColumn = isUserAttached ? {
@@ -172,7 +171,6 @@ export class HashtagService {
 		if (hiddenTags.includes(hashtag)) return;
 		if (this.utilityService.isKeyWordIncluded(hashtag, this.meta.sensitiveWords)) return;
 
-		// YYYYMMDDHHmm (10分間隔)
 		const now = new Date();
 		now.setMinutes(Math.floor(now.getMinutes() / 10) * 10, 0, 0);
 		const window = `${now.getUTCFullYear()}${(now.getUTCMonth() + 1).toString().padStart(2, '0')}${now.getUTCDate().toString().padStart(2, '0')}${now.getUTCHours().toString().padStart(2, '0')}${now.getUTCMinutes().toString().padStart(2, '0')}`;
@@ -184,19 +182,16 @@ export class HashtagService {
 
 		const redisPipeline = this.redisClient.pipeline();
 
-		// チャート用
 		redisPipeline.pfadd(`hashtagUsers:${hashtag}:${window}`, userId);
 		redisPipeline.expire(`hashtagUsers:${hashtag}:${window}`,
-			60 * 60 * 24 * 3, // 3日間
-			'NX', // "NX -- Set expiry only when the key has no expiry" = 有効期限がないときだけ設定
+			60 * 60 * 24 * 3,
+			'NX',
 		);
 
-		// ユニークカウント用
-		// TODO: Bloom Filter を使うようにしても良さそう
 		redisPipeline.sadd(`hashtagUsers:${hashtag}`, userId);
 		redisPipeline.expire(`hashtagUsers:${hashtag}`,
-			60 * 60, // 1時間
-			'NX', // "NX -- Set expiry only when the key has no expiry" = 有効期限がないときだけ設定
+			60 * 60,
+			'NX',
 		);
 
 		redisPipeline.exec();
@@ -241,7 +236,6 @@ export class HashtagService {
 
 		if (result == null) return {};
 
-		// key is hashtag
 		const charts = {} as Record<string, number[]>;
 		for (const hashtag of hashtags) {
 			charts[hashtag] = [];

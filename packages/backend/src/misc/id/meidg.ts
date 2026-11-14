@@ -7,9 +7,6 @@ import { parseBigInt16 } from '@/misc/bigint.js';
 
 const CHARS = '0123456789abcdef';
 
-//  4bit Fixed hex value 'g'
-// 44bit UNIX Time ms in Hex
-// 48bit Random value in Hex
 export const meidgRegExp = /^g[0-9a-f]{23}$/;
 
 function getTime(time: number) {

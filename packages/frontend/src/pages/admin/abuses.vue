@@ -27,17 +27,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 				</MkSelect>
 			</div>
 
-			<!-- TODO
-			<div class="inputs" style="display: flex; padding-top: 1.2em;">
-				<MkInput v-model="searchUsername" style="margin: 0; flex: 1;" type="text" :spellcheck="false">
-					<span>{{ i18n.ts.username }}</span>
-				</MkInput>
-				<MkInput v-model="searchHost" style="margin: 0; flex: 1;" type="text" :spellcheck="false" :disabled="paginator.computedParams.value.origin === 'local'">
-					<span>{{ i18n.ts.host }}</span>
-				</MkInput>
-			</div>
-			-->
-
 			<MkPagination v-slot="{items}" :paginator="paginator">
 				<div class="_gaps">
 					<XAbuseReport v-for="report in items" :key="report.id" :report="report" @resolved="resolved"/>

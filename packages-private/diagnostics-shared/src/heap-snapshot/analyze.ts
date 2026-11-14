@@ -11,9 +11,6 @@ import {
 	type HeapSnapshotData,
 } from './categories';
 
-/**
- * `.heapsnapshot` のJSONを、フィールドオフセットを解決した状態で扱うためのビュー。
- */
 type HeapSnapshotView = {
 	nodes: number[];
 	edges: number[];
@@ -77,10 +74,6 @@ function parseHeapSnapshot(snapshot: any): HeapSnapshotView {
 	};
 }
 
-/**
- * ノードごとのedge開始位置と、各ノードが何本のedgeから参照されているかを求める。
- * JS配列のelementsストアが専有されているか判定するために使う。
- */
 function indexEdges(view: HeapSnapshotView) {
 	const edgeStartIndexes = new Map<number, number>();
 	const retainerCounts = new Map<number, number>();
@@ -129,10 +122,6 @@ export function analyzeHeapSnapshot(snapshot: any, options: { breakdownTopN?: nu
 		if (counted) nodeCounts[category]++;
 	}
 
-	/**
-	 * 配列オブジェクト自身のself_sizeには要素ストアが含まれないため、
-	 * その配列だけが参照しているelementsノードの分を JS arrays に加算する。
-	 */
 	function addJsArrayElementSize(nodeIndex: number) {
 		const beginEdgeIndex = edgeStartIndexes.get(nodeIndex) ?? 0;
 		const edgeCount = nodes[nodeIndex + view.edgeCountOffset] ?? 0;
@@ -177,7 +166,6 @@ export function analyzeHeapSnapshot(snapshot: any, options: { breakdownTopN?: nu
 
 	categories.total += view.extraNativeBytes;
 
-	// 上のループで JS arrays に計上したelementsノードが確定してから、残りを Other JS objects に振り分ける
 	for (let nodeIndex = 0; nodeIndex < nodes.length; nodeIndex += nodeFieldCount) {
 		if (jsArrayElementNodeIndexes.has(nodeIndex)) continue;
 

@@ -55,6 +55,5 @@ describe('Note thread mute', () => {
 		assert.strictEqual(res.body.some(notification => 'note' in notification && notification.note.id === carolReply.id), false);
 		assert.strictEqual(res.body.some(notification => 'note' in notification && notification.note.id === carolReplyWithoutMention.id), false);
 
-		// NOTE: bobの投稿はスレッドミュート前に行われたため通知に含まれていてもよい
 	});
 });

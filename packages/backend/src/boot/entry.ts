@@ -3,10 +3,6 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-/**
- * Misskey Entry Point!
- */
-
 import cluster from 'node:cluster';
 import { EventEmitter } from 'node:events';
 import { writeHeapSnapshot } from 'node:v8';
@@ -30,25 +26,18 @@ const ev = new Xev();
 
 installProcessErrorHandlers({ logger, quiet: envOption.quiet });
 
-//#region Events
-
-// Listen new workers
 cluster.on('fork', worker => {
 	clusterLogger.debug(`Process forked: [${worker.id}]`);
 });
 
-// Listen online workers
 cluster.on('online', worker => {
 	clusterLogger.debug(`Process is now online: [${worker.id}]`);
 });
 
-// Dying away...
 process.on('exit', code => {
 	if (isShutdownInProgress()) return;
 	logger.info(`The process is going to exit with code ${code}`);
 });
-
-//#endregion
 
 if (!envOption.disableClustering) {
 	if (cluster.isPrimary) {
@@ -62,7 +51,6 @@ if (!envOption.disableClustering) {
 		throw new Error('Unknown process type');
 	}
 } else {
-	// 非clusterの場合はMasterのみが起動するため、Workerの処理は行わない(cluster.isWorker === trueの状態でこのブロックに来ることはない)
 	const { masterMain } = await import('./master.js');
 	await masterMain();
 	ev.mount();
@@ -107,8 +95,6 @@ process.on('message', msg => {
 
 readyRef.value = !isShutdownInProgress();
 
-// ユニットテスト時にMisskeyが子プロセスで起動された時のため
-// それ以外のときは process.send は使えないので弾く
 if (process.send) {
 	process.send('ok');
 }

@@ -145,7 +145,6 @@ describe('MfmService', () => {
 		});
 
 		test('quote (real mastodon toot)', () => {
-			// mastodon quotes their toot https://mstdn.virtecam.net/@YTJVDCM/117512986116956890
 			assert.deepStrictEqual(mfmService.fromHtml('<p class="quote-inline">RE: <a href="https://mstdn.virtecam.net/@YTJVDCM/117512985585506708" target="_blank" rel="nofollow noopener" translate="no"><span class="invisible">https://</span><span class="ellipsis">mstdn.virtecam.net/@YTJVDCM/11</span><span class="invisible">7512985585506708</span></a></p><p>ここに引用先を挿入</p>', { hasQuote: true }), 'ここに引用先を挿入');
 		});
 	});

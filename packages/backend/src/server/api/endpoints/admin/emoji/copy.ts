@@ -54,8 +54,6 @@ export const paramDef = {
 	required: ['emojiId'],
 } as const;
 
-// TODO: ロジックをサービスに切り出す
-
 @Injectable()
 export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-disable-line import/no-default-export
 	constructor(
@@ -74,14 +72,11 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 			let driveFile: MiDriveFile;
 
 			try {
-				// Create file
 				driveFile = await this.driveService.uploadFromUrl({ url: emoji.originalUrl, user: null, force: true });
 			} catch (_) {
-				// TODO: need to return Drive Error
 				throw new ApiError();
 			}
 
-			// Duplication Check
 			const isDuplicate = await this.customEmojiService.checkDuplicate(emoji.name);
 			if (isDuplicate) throw new ApiError(meta.errors.duplicateName);
 

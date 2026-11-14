@@ -5,10 +5,6 @@
 
 import CRC32 from 'crc-32';
 
-/**
- * true ... 黒
- * false ... 白
- */
 export type Color = boolean;
 const BLACK = true;
 const WHITE = false;
@@ -25,9 +21,6 @@ export type Undo = {
 	color: Color;
 	pos: number;
 
-	/**
-	 * 反転した石の位置の配列
-	 */
 	effects: number[];
 
 	turn: Color | null;
@@ -47,11 +40,8 @@ export class Game {
 	private logs: Undo[] = [];
 
 	constructor(map: string[], opts: Options) {
-		//#region binds
 		this.putStone = this.putStone.bind(this);
-		//#endregion
 
-		//#region Options
 		this.opts = opts;
 
 		/* eslint-disable @typescript-eslint/no-unnecessary-condition */
@@ -60,9 +50,6 @@ export class Game {
 		if (this.opts.loopedBoard == null) this.opts.loopedBoard = false;
 		/* eslint-enable */
 
-		//#endregion
-
-		//#region Parse map data
 		this.mapWidth = map[0].length;
 		this.mapHeight = map.length;
 		const mapData = map.join('');
@@ -70,9 +57,7 @@ export class Game {
 		this.board = mapData.split('').map(d => d === '-' ? null : d === 'b' ? BLACK : d === 'w' ? WHITE : undefined);
 
 		this.map = mapData.split('').map(d => d === '-' || d === 'b' || d === 'w' ? 'empty' : 'null');
-		//#endregion
 
-		// ゲームが始まった時点で片方の色の石しかないか、始まった時点で勝敗が決定するようなマップの場合がある
 		if (!this.canPutSomewhere(BLACK)) this.turn = this.canPutSomewhere(WHITE) ? WHITE : null;
 	}
 
@@ -103,10 +88,8 @@ export class Game {
 
 		this.board[pos] = color;
 
-		// 反転させられる石を取得
 		const effects = this.effects(color, pos);
 
-		// 反転させる
 		for (const pos of effects) {
 			this.board[pos] = color;
 		}
@@ -124,7 +107,6 @@ export class Game {
 	}
 
 	private calcTurn() {
-		// ターン計算
 		this.turn =
 			this.canPutSomewhere(!this.prevColor) ? !this.prevColor :
 			this.canPutSomewhere(this.prevColor!) ? this.prevColor : //eslint-disable-line @typescript-eslint/no-non-null-assertion
@@ -159,52 +141,45 @@ export class Game {
 
 	public canPut(color: Color, pos: number): boolean {
 		return (
-			this.board[pos] !== null ? false : // 既に石が置いてある場所には打てない
-			this.opts.canPutEverywhere ? this.mapDataGet(pos) === 'empty' : // 挟んでなくても置けるモード
-			this.effects(color, pos).length !== 0); // 相手の石を1つでも反転させられるか
+			this.board[pos] !== null ? false :
+			this.opts.canPutEverywhere ? this.mapDataGet(pos) === 'empty' :
+			this.effects(color, pos).length !== 0);
 	}
 
-	/**
-	 * 指定のマスに石を置いた時の、反転させられる石を取得します
-	 * @param color 自分の色
-	 * @param initPos 位置
-	 */
 	public effects(color: Color, initPos: number): number[] {
 		const enemyColor = !color;
 
 		const diffVectors: [number, number][] = [
-			[0, -1], // 上
-			[+1, -1], // 右上
-			[+1, 0], // 右
-			[+1, +1], // 右下
-			[0, +1], // 下
-			[-1, +1], // 左下
-			[-1, 0], // 左
-			[-1, -1], // 左上
+			[0, -1],
+			[+1, -1],
+			[+1, 0],
+			[+1, +1],
+			[0, +1],
+			[-1, +1],
+			[-1, 0],
+			[-1, -1],
 		];
 
 		const effectsInLine = ([dx, dy]: [number, number]): number[] => {
 			const nextPos = (x: number, y: number): [number, number] => [x + dx, y + dy];
 
-			const found: number[] = []; // 挟めるかもしれない相手の石を入れておく配列
+			const found: number[] = [];
 			let [x, y] = this.posToXy(initPos);
 			while (true) { // eslint-disable-line @typescript-eslint/no-unnecessary-condition
 				[x, y] = nextPos(x, y);
 
-				// 座標が指し示す位置がボード外に出たとき
 				if (this.opts.loopedBoard && this.xyToPos(
 					(x = ((x % this.mapWidth) + this.mapWidth) % this.mapWidth),
 					(y = ((y % this.mapHeight) + this.mapHeight) % this.mapHeight)) === initPos) {
-					// 盤面の境界でループし、自分が石を置く位置に戻ってきたとき、挟めるようにしている (ref: Test4のマップ)
 					return found;
-				} else if (x === -1 || y === -1 || x === this.mapWidth || y === this.mapHeight) return []; // 挟めないことが確定 (盤面外に到達)
+				} else if (x === -1 || y === -1 || x === this.mapWidth || y === this.mapHeight) return [];
 
 				const pos = this.xyToPos(x, y);
-				if (this.mapDataGet(pos) === 'null') return []; // 挟めないことが確定 (配置不可能なマスに到達)
+				if (this.mapDataGet(pos) === 'null') return [];
 				const stone = this.board[pos];
-				if (stone === null) return []; // 挟めないことが確定 (石が置かれていないマスに到達)
-				if (stone === enemyColor) found.push(pos); // 挟めるかもしれない (相手の石を発見)
-				if (stone === color) return found; // 挟めることが確定 (対となる自分の石を発見)
+				if (stone === null) return [];
+				if (stone === enemyColor) found.push(pos);
+				if (stone === color) return found;
 			}
 		};
 

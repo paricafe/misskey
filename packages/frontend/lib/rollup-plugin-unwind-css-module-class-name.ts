@@ -187,7 +187,6 @@ function isClassProperty(node: ESTree.Node | null): node is Extract<ESTree.Node,
 export function unwindCssModuleClassName(ast: ESTree.Node, magicString: RolldownMagicString): void {
 	walk(ast, {
 		enter(node: ESTree.Node, parent: ESTree.Node | null): void {
-			//#region
 			if (parent?.type !== 'Program') return;
 			if (ast.type !== 'Program') return;
 			if (node.type !== 'VariableDeclaration') return;
@@ -209,28 +208,10 @@ export function unwindCssModuleClassName(ast: ESTree.Node, magicString: Rolldown
 			}) as ESTree.ArrayExpression | undefined;
 			const __cssModulesIndex = node.declarations[0].init.arguments[1].elements.indexOf(cssModulesEntry ?? null);
 			if (cssModulesEntry === undefined || __cssModulesIndex < 0) return;
-			/* This region assumeed that the entered node looks like the following code.
-			 *
-			 * ```ts
-			 * const SomeComponent = _export_sfc(_sfc_main, [["foo", bar], ["__cssModules", cssModules]]);
-			 * ```
-			 */
-			//#endregion
-			//#region
 			const cssModuleForest = cssModulesEntry.elements[1];
 			if (cssModuleForest?.type !== 'Identifier' && cssModuleForest?.type !== 'ObjectExpression') return;
 			const moduleForest = resolveModuleForest(ast, cssModuleForest);
 			if (moduleForest === null) return;
-			/* This region collected a VariableDeclaration node in the module that looks like the following code.
-			 *
-			 * ```ts
-			 * const cssModules = {
-			 *   "$style": style0,
-			 * };
-			 * ```
-			 */
-			//#endregion
-			//#region
 			const options = resolveComponentOptions(ast, componentNode);
 			if (options === null) return;
 			const render = findRenderArrow(options);
@@ -238,35 +219,7 @@ export function unwindCssModuleClassName(ast: ESTree.Node, magicString: Rolldown
 			if (render.params.length !== 2) return;
 			const ctx = render.params[0];
 			if (ctx.type !== 'Identifier') return;
-			/* This region assumed that `sfcMain` looks like the following code.
-			 *
-			 * ```ts
-			 * const _sfc_main = defineComponent({
-			 *   setup(_props) {
-			 *     ...
-			 *     return (_ctx, _cache) => {
-			 *       ...
-			 *     };
-			 *   },
-			 * });
-			 * ```
-			 */
-			//#endregion
 			for (const [key, moduleTree] of moduleForest) {
-				//#region
-				/* This region collected VariableDeclaration nodes in the module that looks like the following code.
-				 *
-				 * ```ts
-				 * const foo = "bar";
-				 * const baz = "qux";
-				 * const style0 = {
-				 *   foo: foo,
-				 *   baz: baz,
-				 * };
-				 * ```
-				 */
-				//#endregion
-				//#region
 				walk(render.body, {
 					enter(childNode: ESTree.Node) {
 						if (!isCssModuleReference(childNode, ctx.name, key)) return;
@@ -284,39 +237,6 @@ export function unwindCssModuleClassName(ast: ESTree.Node, magicString: Rolldown
 						});
 					},
 				});
-				/* This region inlined the reference identifier of the class name in the render function into the actual literal, as in the following code.
-				 *
-				 * ```ts
-				 * const _sfc_main = defineComponent({
-				 *   setup(_props) {
-				 *     ...
-				 *     return (_ctx, _cache) => {
-				 *       ...
-				 *       return openBlock(), createElementBlock("div", {
-				 *         class: normalizeClass(_ctx.$style.foo),
-				 *       }, null);
-				 *     };
-				 *   },
-				 * });
-				 * ```
-				 *
-				 * ↓
-				 *
-				 * ```ts
-				 * const _sfc_main = defineComponent({
-				 *   setup(_props) {
-				 *     ...
-				 *     return (_ctx, _cache) => {
-				 *       ...
-				 *       return openBlock(), createElementBlock("div", {
-				 *         class: normalizeClass("bar"),
-				 *       }, null);
-				 *     };
-				 *   },
-				 * });
-				 */
-				//#endregion
-				//#region
 				walk(render.body, {
 					enter(childNode: ESTree.Node) {
 						if (!isCssModuleReference(childNode, ctx.name, key)) return;
@@ -326,40 +246,6 @@ export function unwindCssModuleClassName(ast: ESTree.Node, magicString: Rolldown
 						magicString.overwrite(childNode.start, childNode.end, 'undefined');
 					},
 				});
-				/* This region replaced the reference identifier of missing class names in the render function with `undefined`, as in the following code.
-				 *
-				 * ```ts
-				 * const _sfc_main = defineComponent({
-				 *   setup(_props) {
-				 *     ...
-				 *     return (_ctx, _cache) => {
-				 *       ...
-				 *       return openBlock(), createElementBlock('div', {
-				 *         class: normalizeClass(_ctx.$style.hoge),
-				 *       }, null);
-				 *     };
-				 *   },
-				 * });
-				 * ```
-				 *
-				 * ↓
-				 *
-				 * ```ts
-				 * const _sfc_main = defineComponent({
-				 *   setup(_props) {
-				 *     ...
-				 *     return (_ctx, _cache) => {
-				 *       ...
-				 *       return openBlock(), createElementBlock('div', {
-				 *         class: normalizeClass(undefined),
-				 *       }, null);
-				 *     };
-				 *   },
-				 * });
-				 * ```
-				 */
-				//#endregion
-				//#region
 				walk(render.body, {
 					enter(childNode: ESTree.Node, childParent: ESTree.Node | null) {
 						if (childNode.type !== 'CallExpression') return;
@@ -371,39 +257,6 @@ export function unwindCssModuleClassName(ast: ESTree.Node, magicString: Rolldown
 						magicString.overwrite(childNode.start, childNode.end, JSON.stringify(normalized));
 					},
 				});
-				/* This region compiled the `normalizeClass` call into a pseudo-AOT compilation, as in the following code.
-				 *
-				 * ```ts
-				 * const _sfc_main = defineComponent({
-				 *   setup(_props) {
-				 *     ...
-				 *     return (_ctx, _cache) => {
-				 *       ...
-				 *       return openBlock(), createElementBlock("div", {
-				 *         class: normalizeClass("bar"),
-				 *       }, null);
-				 *     };
-				 *   },
-				 * });
-				 * ```
-				 *
-				 * ↓
-				 *
-				 * ```ts
-				 * const _sfc_main = defineComponent({
-				 *   setup(_props) {
-				 *     ...
-				 *     return (_ctx, _cache) => {
-				 *       ...
-				 *       return openBlock(), createElementBlock("div", {
-				 *         class: "bar",
-				 *       }, null);
-				 *     };
-				 *   },
-				 * });
-				 * ```
-				 */
-				//#endregion
 			}
 			const hasRemainingCssModuleReference = Array.from(moduleForest.keys()).some((key) => {
 				let found = false;
@@ -417,7 +270,6 @@ export function unwindCssModuleClassName(ast: ESTree.Node, magicString: Rolldown
 				return found;
 			});
 			if (hasRemainingCssModuleReference) return;
-			//#region
 			if (node.declarations[0].init.arguments[1].elements.length === 1) {
 				if (componentNode.type === 'Identifier') {
 					walk(ast, {
@@ -433,64 +285,12 @@ export function unwindCssModuleClassName(ast: ESTree.Node, magicString: Rolldown
 					const removeEnd = node.declarations[0].init.arguments[1].end - 1;
 					magicString.remove(removeStart, removeEnd);
 				}
-				/* NOTE: The above logic is valid as long as the following two conditions are met.
-				 *
-				 * - the uniqueness of `ident` is kept throughout the module
-				 * - `_export_sfc` is noop when the second argument is an empty array
-				 *
-				 * Otherwise, the below logic should be used instead.
-
-				this.replace({
-					type: 'VariableDeclaration',
-					declarations: [{
-						type: 'VariableDeclarator',
-						id: {
-							type: 'Identifier',
-							name: node.declarations[0].id.name,
-						},
-						init: {
-							type: 'Identifier',
-							name: ident,
-						},
-					}],
-					kind: 'const',
-				});
-				 */
 			} else {
 				const nextElement = node.declarations[0].init.arguments[1].elements[__cssModulesIndex + 1];
 				const removeStart = node.declarations[0].init.arguments[1].elements[__cssModulesIndex]!.start;
 				const removeEnd = nextElement ? nextElement.start : node.declarations[0].init.arguments[1].end - 1;
 				magicString.remove(removeStart, removeEnd);
 			}
-			/* This region removed the `__cssModules` reference from the second argument of `_export_sfc`, as in the following code.
-			 *
-			 * ```ts
-			 * const SomeComponent = _export_sfc(_sfc_main, [["foo", bar], ["__cssModules", cssModules]]);
-			 * ```
-			 *
-			 * ↓
-			 *
-			 * ```ts
-			 * const SomeComponent = _export_sfc(_sfc_main, [["foo", bar]]);
-			 * ```
-			 *
-			 * When the declaration becomes noop, it is removed as follows.
-			 *
-			 * ```ts
-			 * const _sfc_main = defineComponent({
-			 *   ...
-			 * });
-			 * const SomeComponent = _export_sfc(_sfc_main, []);
-			 * ```
-			 *
-			 * ↓
-			 *
-			 * ```ts
-			 * const SomeComponent = defineComponent({
-			 *   ...
-			 * });
-			 */
-			//#endregion
 		},
 	});
 }

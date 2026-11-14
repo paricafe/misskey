@@ -74,7 +74,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				usePasswordLessLogin: false,
 			});
 
-			// Publish meUpdated event
 			this.globalEventService.publishMainStream(me.id, 'meUpdated', await this.userEntityService.pack(me.id, me, {
 				schema: 'MeDetailed',
 				includeSecrets: true,

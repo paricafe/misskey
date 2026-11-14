@@ -58,7 +58,6 @@ export class ExportClipsProcessorService {
 			return;
 		}
 
-		// Create temp file
 		const [path, cleanup] = await createTemp();
 
 		this.logger.info(`Temp file is ${path}`);
@@ -119,7 +118,6 @@ export class ExportClipsProcessorService {
 			cursor = clips.at(-1)?.id ?? null;
 
 			for (const clip of clips) {
-				// Stringify but remove the last `]}`
 				const content = JSON.stringify(this.serializeClip(clip)).slice(0, -2);
 				const isFirst = exportedClipsCount === 0;
 				await writer.write(isFirst ? content : ',\n' + content);

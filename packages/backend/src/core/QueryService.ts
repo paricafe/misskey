@@ -77,18 +77,6 @@ export class QueryService {
 		return q;
 	}
 
-	/**
-	 * ミュートやブロックのようにすべてのタイムラインで共通に使用するフィルターを定義します。
-	 *
-	 * 特別な事情がない限り、各タイムラインはこの関数を呼び出してフィルターを適用してください。
-	 *
-	 * Notes for future maintainers:
-	 * 1) この関数で生成するクエリと同等の処理が FanoutTimelineEndpointService にあります。
-	 *    この関数を変更した場合、FanoutTimelineEndpointService の方も変更する必要があります。
-	 * 2) 以下のエンドポイントでは特別な事情があるため queryService のそれぞれの関数を呼び出しています。
-	 *    この関数を変更した場合、以下のエンドポイントの方も変更する必要があることがあります。
-	 *    - packages/backend/src/server/api/endpoints/clips/notes.ts
-	 */
 	@bindThis
 	public generateBaseNoteFilteringQuery(
 		query: SelectQueryBuilder<any>,
@@ -120,7 +108,6 @@ export class QueryService {
 		}
 	}
 
-	// ここでいうBlockedは被Blockedの意
 	@bindThis
 	public generateBlockedUserQueryForNotes(
 		q: SelectQueryBuilder<any>,
@@ -135,9 +122,6 @@ export class QueryService {
 			.select('blocking.blockerId')
 			.where('blocking.blockeeId = :blockeeId', { blockeeId: me.id });
 
-		// 投稿の作者にブロックされていない かつ
-		// 投稿の返信先の作者にブロックされていない かつ
-		// 投稿の引用元の作者にブロックされていない
 		q
 			.andWhere(new Brackets(qb => {
 				qb
@@ -215,9 +199,6 @@ export class QueryService {
 			.select('user_profile.mutedInstances')
 			.where('user_profile.userId = :muterId', { muterId: me.id });
 
-		// 投稿の作者をミュートしていない かつ
-		// 投稿の返信先の作者をミュートしていない かつ
-		// 投稿の引用元の作者をミュートしていない
 		q
 			.andWhere(new Brackets(qb => {
 				qb
@@ -234,7 +215,6 @@ export class QueryService {
 					.where(`${noteColumn}.renoteUserId IS NULL`)
 					.orWhere(`${noteColumn}.renoteUserId NOT IN (${ mutingQuery.getQuery() })`);
 			}))
-			// mute instances
 			.andWhere(new Brackets(qb => {
 				qb
 					.andWhere(`${noteColumn}.userHost IS NULL`)
@@ -268,9 +248,7 @@ export class QueryService {
 
 	@bindThis
 	public generateVisibilityQuery(q: SelectQueryBuilder<any>, me?: { id: MiUser['id'] } | null): void {
-		// This code must always be synchronized with the checks in NoteEntityService.isVisibleForMe and Stream abstract class Channel.isNoteVisibleForMe.
 		if (me == null) {
-			// TODO: ugcVisibilityForVisitor が local の場合の扱い (付随するリモートのノートを隠して表示するか) を検討する
 			if (this.meta.ugcVisibilityForVisitor === 'none') q.andWhere('1=0');
 
 			q.andWhere(new Brackets(qb => {
@@ -285,26 +263,20 @@ export class QueryService {
 
 			q.andWhere(new Brackets(qb => {
 				qb
-				// 公開投稿である
 					.where(new Brackets(qb => {
 						qb
 							.where('note.visibility = \'public\'')
 							.orWhere('note.visibility = \'home\'');
 					}))
-				// または 自分自身
 					.orWhere('note.userId = :meId')
-				// または 自分宛て
 					.orWhere(':meIdAsList <@ note.visibleUserIds')
 					.orWhere(':meIdAsList <@ note.mentions')
 					.orWhere(new Brackets(qb => {
 						qb
-						// または フォロワー宛ての投稿であり、
 							.where('note.visibility = \'followers\'')
 							.andWhere(new Brackets(qb => {
 								qb
-								// 自分がフォロワーである
 									.where(`note.userId IN (${ followingQuery.getQuery() })`)
-								// または 自分の投稿へのリプライ
 									.orWhere('note.replyUserId = :meId');
 							}));
 					}));
@@ -346,9 +318,9 @@ export class QueryService {
 
 		if (excludeAuthor) {
 			const instanceSuspension = (user: string) => new Brackets(qb => qb
-				.where(`note.${user}Id IS NULL`) // no corresponding user
+				.where(`note.${user}Id IS NULL`)
 				.orWhere(`note.userId = note.${user}Id`)
-				.orWhere(`note.${user}Host IS NULL`) // local
+				.orWhere(`note.${user}Host IS NULL`)
 				.orWhere(nonBlockedHostQuery(`note.${user}Host`)));
 
 			q
@@ -356,8 +328,8 @@ export class QueryService {
 				.andWhere(instanceSuspension('renoteUser'));
 		} else {
 			const instanceSuspension = (user: string) => new Brackets(qb => qb
-				.where(`note.${user}Id IS NULL`) // no corresponding user
-				.orWhere(`note.${user}Host IS NULL`) // local
+				.where(`note.${user}Id IS NULL`)
+				.orWhere(`note.${user}Host IS NULL`)
 				.orWhere(nonBlockedHostQuery(`note.${user}Host`)));
 
 			q
@@ -367,12 +339,11 @@ export class QueryService {
 		}
 	}
 
-	// Requirements: user replyUser renoteUser must be joined
 	@bindThis
 	public generateSuspendedUserQueryForNote(q: SelectQueryBuilder<any>, excludeAuthor?: boolean): void {
 		if (excludeAuthor) {
 			const brakets = (user: string) => new Brackets(qb => qb
-				.where(`${user}.id IS NULL`) // そもそもreplyやrenoteではない、もしくはleftjoinなどでuserが存在しなかった場合を考慮
+				.where(`${user}.id IS NULL`)
 				.orWhere(`user.id = ${user}.id`)
 				.orWhere(`${user}.isSuspended = FALSE`));
 			q
@@ -380,7 +351,7 @@ export class QueryService {
 				.andWhere(brakets('renoteUser'));
 		} else {
 			const brakets = (user: string) => new Brackets(qb => qb
-				.where(`${user}.id IS NULL`) // そもそもreplyやrenoteではない、もしくはleftjoinなどでuserが存在しなかった場合を考慮
+				.where(`${user}.id IS NULL`)
 				.orWhere(`${user}.isSuspended = FALSE`));
 			q
 				.andWhere('user.isSuspended = FALSE')
@@ -389,12 +360,6 @@ export class QueryService {
 		}
 	}
 
-	/**
-	 * フォロー関係 (following テーブルの行) を、一覧の持ち主の公開範囲設定に従って閲覧者に開示してよいものだけに絞り込む。
-	 * - `followers`: フォロイーのフォロワー一覧として扱い、フォロイーの followersVisibility で判定する (users/followers と同一基準)
-	 * - `following`: フォロワーのフォロー一覧として扱い、フォロワーの followingVisibility で判定する (users/following と同一基準)
-	 * モデレーターによる例外は呼び出し元で扱う。
-	 */
 	@bindThis
 	public generateFollowingRelationVisibilityQuery(q: SelectQueryBuilder<any>, list: 'followers' | 'following', me?: { id: MiUser['id'] } | null): void {
 		const alias = q.alias;
@@ -414,11 +379,8 @@ export class QueryService {
 
 		q.andWhere(new Brackets(qb => {
 			qb
-				// 公開されている
 				.where(`${visibilityColumn} = 'public'`)
-				// または 自分自身の一覧
 				.orWhere(`${ownerColumn} = :meId`)
-				// または フォロワー限定で、自分が持ち主をフォローしている
 				.orWhere(new Brackets(qb => {
 					qb
 						.where(`${visibilityColumn} = 'followers'`)

@@ -13,7 +13,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 			<div :class="$style.totpDescription">{{ i18n.ts['2fa'] }}</div>
 		</div>
 
-		<!-- totp入力 -->
 		<form class="_gaps_s" @submit.prevent="emit('totpSubmitted', token)">
 			<MkInput v-model="token" type="text" :pattern="isBackupCode ? '^[A-Z0-9]{32}$' :'^[0-9]{6}$'" autocomplete="one-time-code" required autofocus :spellcheck="false" :inputmode="isBackupCode ? undefined : 'numeric'">
 				<template #label>{{ i18n.ts.token }} ({{ i18n.ts['2fa'] }})</template>

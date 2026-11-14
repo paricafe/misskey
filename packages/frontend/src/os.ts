@@ -3,8 +3,6 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-// TODO: なんでもかんでもos.tsに突っ込むのやめたいのでよしなに分割する
-
 import { markRaw, ref, defineAsyncComponent, nextTick } from 'vue';
 import * as Misskey from 'misskey-js';
 import type { Component, MaybeRef } from 'vue';
@@ -129,7 +127,6 @@ export function promiseDialog<T extends Promise<any>>(
 		}
 	});
 
-	// NOTE: dynamic importすると挙動がおかしくなる(showingの変更が伝播しない)
 	const { dispose } = popup(MkWaitingDialog, {
 		success: success,
 		showing: showing,
@@ -160,31 +157,25 @@ export function claimZIndex(priority: keyof typeof zIndexes = 'low'): number {
 	return zIndexes[priority];
 }
 
-// props に ref を許可するようにする
 type PropsWithRefs<P> = { [K in keyof P]: MaybeRef<P[K]> };
 type ComponentProps<T extends Component> = PropsWithRefs<CP<T>>;
 
-// 関数の引数が any[] (もっとも広義なもの) かどうかを判定し、any[] の場合は排除 (never) するヘルパー
 type FilterSpecificFunc<T> = T extends (...args: any[]) => void
 	? (any[] extends Parameters<T> ? never : T)
 	: T;
 
-// オブジェクトの各プロパティに対して再帰的、あるいは単純に適用する型関数
 type CleanFunctions<T> = {
 	[K in keyof T]: T[K] extends (...args: any[]) => any
 		? FilterSpecificFunc<T[K]>
 		: T[K];
 };
 
-// emitの関数群をオブジェクト型に変換する（InstanceType<Component>['$emit']はFunctionalComponent = ジェネリックコンポーネントでは使用できない）
 type ComponentEmitsObject<C extends Component, IE = OverloadToUnion<ComponentEmit<C>>> = CleanFunctions<{
 	[K in IE extends (evName: infer U, ...args: any[]) => any ? U & PropertyKey : never]: IE extends (evName: K, ...args: infer A) => infer R
 		? (...args: A) => R
 		: (...args: any[]) => void;
 }>;
 
-// NOTE: ジェネリック型つきのコンポーネントでは、emitsの型推論がうまく働かない（型変数を取り出すことはできないため）
-// NOTE: emitsがOverloadToUnionで対応しているオーバーロードの数を超える場合は、OverloadToUnionの個数を増やせばOK
 export function popup<T extends Component>(
 	component: T,
 	props: ComponentProps<T>,
@@ -222,7 +213,7 @@ export async function popupAsyncWithDialog<T extends Component>(
 
 	const timer = window.setTimeout(() => {
 		closeWaiting = waiting();
-	}, 100); // コンポーネントがキャッシュされている場合にもwaitingが表示されて画面がちらつくのを防止するためにラグを追加
+	}, 100);
 
 	try {
 		component = await componentFetching;
@@ -327,7 +318,6 @@ export function actions<const T extends ActionsAction[]>(props: {
 	});
 }
 
-// default が指定されていたら result は null になり得ないことを保証する overload function
 export function inputText(props: {
 	type?: 'text' | 'email' | 'password' | 'url';
 	title?: string;
@@ -338,7 +328,6 @@ export function inputText(props: {
 	minLength?: number;
 	maxLength?: number;
 }): Promise<MkDialogReturnType<string>>;
-// min lengthが指定されてたら result は null になり得ないことを保証する overload function
 export function inputText(props: {
 	type?: 'text' | 'email' | 'password' | 'url';
 	title?: string;
@@ -390,7 +379,6 @@ export function inputText(props: {
 	});
 }
 
-// default が指定されていたら result は null になり得ないことを保証する overload function
 export function inputNumber(props: {
 	title?: string;
 	text?: string;
@@ -526,7 +514,6 @@ export function waiting(options: { text?: string } = {}) {
 		}
 	}
 
-	// NOTE: dynamic importすると挙動がおかしくなる(showingの変更が伝播しない)
 	const { dispose } = popup(MkWaitingDialog, {
 		success: isSuccess,
 		showing: showing,
@@ -668,7 +655,6 @@ export function contextMenu(items: MenuItem[], ev: PointerEvent): Promise<void> 
 				resolve();
 				dispose();
 
-				// MkModalを通していないのでここでフォーカスを戻す処理を行う
 				if (returnFocusTo != null) {
 					focusParent(returnFocusTo, true, false);
 					returnFocusTo = null;
@@ -694,11 +680,6 @@ export async function post(props: PostFormProps = {}): Promise<void> {
 
 	showMovedDialog();
 	return new Promise(resolve => {
-		// NOTE: MkPostFormDialogをdynamic importするとiOSでテキストエリアに自動フォーカスできない
-		// NOTE: ただ、dynamic importしない場合、MkPostFormDialogインスタンスが使いまわされ、
-		//       Vueが渡されたコンポーネントに内部的に__propsというプロパティを生やす影響で、
-		//       複数のpost formを開いたときに場合によってはエラーになる
-		//       もちろん複数のpost formを開けること自体Misskeyサイドのバグなのだが
 		const { dispose } = popup(MkPostFormDialog, props, {
 			closed: () => {
 				resolve();
@@ -707,20 +688,6 @@ export async function post(props: PostFormProps = {}): Promise<void> {
 		});
 	});
 }
-
-/*
-export function checkExistence(fileData: ArrayBuffer): Promise<any> {
-	return new Promise((resolve, reject) => {
-		const data = new FormData();
-		data.append('md5', getMD5(fileData));
-
-		api('drive/files/find-by-hash', {
-			md5: getMD5(fileData)
-		}).then(resp => {
-			resolve(resp.length > 0 ? resp[0] : null);
-		});
-	});
-}*/
 
 export function chooseFileFromPc(
 	options: {
@@ -736,12 +703,9 @@ export function chooseFileFromPc(
 
 			res(Array.from(input.files));
 
-			// 一応廃棄
 			(window as any).__misskey_input_ref__ = null;
 		};
 
-		// https://qiita.com/fukasawah/items/b9dc732d95d99551013d
-		// iOS Safari で正常に動かす為のおまじない
 		(window as any).__misskey_input_ref__ = input;
 
 		input.click();

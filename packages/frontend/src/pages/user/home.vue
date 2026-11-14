@@ -8,9 +8,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 	<div class="_spacer" :style="{ '--MI_SPACER-w': narrow ? '800px' : '1100px' }">
 		<div ref="rootEl" class="ftskorzw" :class="{ wide: !narrow }" style="container-type: inline-size;">
 			<div class="main _gaps">
-				<!-- TODO -->
-				<!-- <div class="punished" v-if="user.isSuspended"><i class="ti ti-alert-triangle" style="margin-right: 8px;"></i> {{ i18n.ts.userSuspended }}</div> -->
-				<!-- <div class="punished" v-if="user.isSilenced"><i class="ti ti-alert-triangle" style="margin-right: 8px;"></i> {{ i18n.ts.userSilenced }}</div> -->
 
 				<div class="profile _gaps">
 					<MkAccountMoved v-if="user.movedTo" :movedTo="user.movedTo"/>
@@ -210,9 +207,7 @@ const XTimeline = defineAsyncComponent(() => import('./index.timeline.vue'));
 
 const props = withDefaults(defineProps<{
 	user: Misskey.entities.UserDetailed;
-	/** Refetches the user in place. Supplied by the parent page. */
 	refreshUser?: () => Promise<void>;
-	/** Test only; MkNotesTimeline currently causes problems in vitest */
 	disableNotes?: boolean;
 }>(), {
 	refreshUser: undefined,
@@ -238,7 +233,6 @@ const editModerationNote = ref(false);
 const isModerationNoteDirty = ref(false);
 
 watch(moderationNote, async (newValue) => {
-	// 再取得した値を同期しただけの場合は保存しない
 	if (newValue === (user.value.moderationNote ?? '')) return;
 	await misskeyApi('admin/update-user-note', { userId: user.value.id, text: newValue });
 	user.value = { ...user.value, moderationNote: newValue };
@@ -289,13 +283,11 @@ async function updateMemo() {
 
 watch(() => props.user, () => {
 	user.value = props.user;
-	// 編集中は上書きしない (入力中の内容を消してしまう)
 	if (!isModerationNoteDirty.value) moderationNote.value = props.user.moderationNote ?? '';
 	if (isEditingMemo.value) return;
 	memoDraft.value = props.user.memo;
 });
 
-// ここでは失敗は握りつぶす（Pull to Refreshがもどらなくなるので）
 async function reload() {
 	await Promise.allSettled([
 		props.refreshUser?.(),

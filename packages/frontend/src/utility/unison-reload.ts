@@ -7,7 +7,6 @@ import { TypedBroadcastChannel as BroadcastChannel } from '@/utility/typed-broad
 
 export const reloadChannel = new BroadcastChannel<string | null>('reload');
 
-// BroadcastChannelを用いて、クライアントが一斉にreloadするようにします。
 export function unisonReload(path?: string) {
 	if (path !== undefined) {
 		reloadChannel.postMessage(path);

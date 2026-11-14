@@ -46,7 +46,7 @@ export class DeliverProcessorService {
 		private queueLoggerService: QueueLoggerService,
 	) {
 		this.logger = this.queueLoggerService.logger.createSubLogger('deliver');
-		this.suspendedHostsCache = new MemorySingleCache<MiInstance[]>(1000 * 60 * 60); // 1h
+		this.suspendedHostsCache = new MemorySingleCache<MiInstance[]>(1000 * 60 * 60);
 	}
 
 	@bindThis
@@ -57,7 +57,6 @@ export class DeliverProcessorService {
 			return 'skip (blocked)';
 		}
 
-		// isSuspendedなら中断
 		let suspendedHosts = this.suspendedHostsCache.get();
 		if (suspendedHosts == null) {
 			suspendedHosts = await this.instancesRepository.find({
@@ -75,7 +74,6 @@ export class DeliverProcessorService {
 			? this.federatedInstanceService.fetchOrRegister(host)
 			: this.federatedInstanceService.fetch(host));
 
-		// suspend server by software
 		if (i != null && this.utilityService.isDeliverSuspendedSoftware(i)) {
 			return 'skip (software suspended)';
 		}
@@ -86,7 +84,6 @@ export class DeliverProcessorService {
 			this.apRequestChart.deliverSucc();
 			this.federationChart.deliverd(host, true);
 
-			// Update instance stats
 			process.nextTick(async () => {
 				if (i == null) return;
 
@@ -111,7 +108,6 @@ export class DeliverProcessorService {
 			this.apRequestChart.deliverFail();
 			this.federationChart.deliverd(host, false);
 
-			// Update instance stats
 			this.federatedInstanceService.fetchOrRegister(host).then(i => {
 				if (!i.isNotResponding) {
 					this.federatedInstanceService.update(i.id, {
@@ -119,15 +115,12 @@ export class DeliverProcessorService {
 						notRespondingSince: new Date(),
 					});
 				} else if (i.notRespondingSince) {
-					// 1週間以上不通ならサスペンド
 					if (i.suspensionState === 'none' && i.notRespondingSince.getTime() <= Date.now() - 1000 * 60 * 60 * 24 * 7) {
 						this.federatedInstanceService.update(i.id, {
 							suspensionState: 'autoSuspendedForNotResponding',
 						});
 					}
 				} else {
-					// isNotRespondingがtrueでnotRespondingSinceがnullの場合はnotRespondingSinceをセット
-					// notRespondingSinceは新たな機能なので、それ以前のデータにはnotRespondingSinceがない場合がある
 					this.federatedInstanceService.update(i.id, {
 						notRespondingSince: new Date(),
 					});
@@ -139,9 +132,7 @@ export class DeliverProcessorService {
 			});
 
 			if (res instanceof StatusError) {
-				// 4xx
 				if (!res.isRetryable) {
-					// 相手が閉鎖していることを明示しているため、配送停止する
 					if (job.data.isSharedInbox && res.statusCode === 410) {
 						this.federatedInstanceService.fetchOrRegister(host).then(i => {
 							this.federatedInstanceService.update(i.id, {
@@ -153,10 +144,8 @@ export class DeliverProcessorService {
 					throw new Bull.UnrecoverableError(`${res.statusCode} ${res.statusMessage}`);
 				}
 
-				// 5xx etc.
 				throw new Error(`${res.statusCode} ${res.statusMessage}`);
 			} else {
-				// DNS error, socket error, timeout ...
 				throw res;
 			}
 		}

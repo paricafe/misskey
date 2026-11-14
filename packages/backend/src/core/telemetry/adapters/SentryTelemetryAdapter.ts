@@ -8,7 +8,6 @@ import type * as SentryNode from '@sentry/node';
 import type { NodeOptions } from '@sentry/node';
 import type { SentryBackendConfig, TelemetryAdapter, TelemetryCaptureMessageOptions } from './TelemetryAdapter.js';
 
-// Sentryのtransportが詰まってもプロセス終了を妨げないようにする。
 const DEFAULT_SHUTDOWN_TIMEOUT = 5000;
 
 type SentryIntegrationsOption = NonNullable<NodeOptions['integrations']>;
@@ -18,29 +17,17 @@ type SentryIntegration = Parameters<SentryIntegrationFactory>[0][number];
 type SentryNodeOptions = NodeOptions;
 type SentryDataCollection = NonNullable<NodeOptions['dataCollection']>;
 
-/** 中継元のアドレスや利用者を特定できるHTTPヘッダー名の断片 */
 const PEER_IDENTIFYING_HEADER_SNIPPETS = ['forwarded', '-ip', 'remote-', 'via', '-user'];
 
-/**
- * Misskeyが既定で適用する収集範囲
- *
- * Sentry v11 は `dataCollection` 未指定だと全て収集するため、利用者の情報が意図せず送信されないよう既定を絞る
- * 緩める場合は設定ファイルの `dataCollection` で明示する
- */
 export const DEFAULT_SENTRY_DATA_COLLECTION: SentryDataCollection = {
-	// IPやユーザーIDの自動付与はしない。調査に必要な識別子はTelemetryService側で明示的に渡す
 	userInfo: false,
-	// backendは認証にCookieを使わないため、収集しても調査の役に立たない
 	cookies: false,
-	// GETのAPI呼び出しはアクセストークンを`i`クエリパラメータでも受け取るため落とす
 	urlQueryParams: false,
 	httpHeaders: {
 		request: { deny: PEER_IDENTIFYING_HEADER_SNIPPETS },
 		response: { deny: PEER_IDENTIFYING_HEADER_SNIPPETS },
 	},
-	// リクエスト・レスポンス本文はノートやチャットの内容を含む
 	httpBodies: [],
-	// クエリのバインド値や書き込みペイロードは利用者の投稿内容を含む
 	databaseQueryData: false,
 	genAI: { inputs: false, outputs: false },
 };
@@ -79,14 +66,10 @@ export function buildSentryNodeOptions(
 	}
 
 	return {
-		// Do not send Sentry trace headers to remote ActivityPub/Webhook/etc. hosts by default.
-		// Admins can opt in for trusted internal services via sentryForBackend.options.
 		tracePropagationTargets: [],
 
-		// Performance Monitoring
-		tracesSampleRate: 1.0, //  Capture 100% of the transactions
+		tracesSampleRate: 1.0,
 
-		// Profile every sampled trace (session-based profiling; relative to tracesSampleRate)
 		profileSessionSampleRate: 1.0,
 		profileLifecycle: 'trace',
 
@@ -128,7 +111,6 @@ export class SentryTelemetryAdapter implements TelemetryAdapter {
 		});
 	}
 
-	/** activeなSpanの識別子を、Logging基盤で扱える形式へ変換します。 */
 	public getActiveTraceContext(): LogTraceContext | undefined {
 		const activeSpan = this.Sentry.getActiveSpan();
 		if (activeSpan == null) return undefined;
@@ -142,7 +124,6 @@ export class SentryTelemetryAdapter implements TelemetryAdapter {
 	}
 
 	public async shutdown(): Promise<void> {
-		// timeout未指定だとtransportのflushが詰まった際にプロセス終了を妨げるため、上限時間を設ける。
 		await this.Sentry.close(DEFAULT_SHUTDOWN_TIMEOUT);
 	}
 }

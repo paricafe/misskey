@@ -68,17 +68,11 @@ export class AccountMoveService {
 	) {
 	}
 
-	/**
-	 * Move a local account to a new account.
-	 *
-	 * After delivering Move activity, its local followers unfollow the old account and then follow the new one.
-	 */
 	@bindThis
 	public async moveFromLocal(src: MiLocalUser, dst: MiLocalUser | MiRemoteUser): Promise<unknown> {
 		const _srcUri = this.userEntityService.getUserUri(src);
 		const dstUri = this.userEntityService.getUserUri(dst);
 
-		// add movedToUri to indicate that the user has moved
 		const update = {} as Partial<MiLocalUser>;
 		update.alsoKnownAs = src.alsoKnownAs?.includes(dstUri) ? src.alsoKnownAs : src.alsoKnownAs?.concat([dstUri]) ?? [dstUri];
 		update.movedToUri = dstUri;
@@ -86,7 +80,6 @@ export class AccountMoveService {
 		await this.usersRepository.update(src.id, update);
 		Object.assign(src, update);
 
-		// Update cache
 		this.globalEventService.publishInternalEvent('localUserUpdated', src);
 
 		const srcPerson = await this.apRendererService.renderPerson(src);
@@ -94,15 +87,12 @@ export class AccountMoveService {
 		await this.apDeliverManagerService.deliverToFollowers(src, updateAct);
 		this.relayService.deliverToRelays(src, updateAct);
 
-		// Deliver Move activity to the followers of the old account
 		const moveAct = this.apRendererService.addContext(this.apRendererService.renderMove(src, dst));
 		await this.apDeliverManagerService.deliverToFollowers(src, moveAct);
 
-		// Publish meUpdated event
 		const iObj = await this.userEntityService.pack(src.id, src, { schema: 'MeDetailed', includeSecrets: true });
 		this.globalEventService.publishMainStream(src.id, 'meUpdated', iObj);
 
-		// Unfollow after 24 hours
 		const followings = await this.followingsRepository.findBy({
 			followerId: src.id,
 		});
@@ -118,7 +108,6 @@ export class AccountMoveService {
 
 	@bindThis
 	public async postMoveProcess(src: MiUser, dst: MiUser): Promise<void> {
-		// Copy blockings and mutings, and update lists
 		try {
 			await Promise.all([
 				this.copyBlocking(src, dst),
@@ -128,14 +117,12 @@ export class AccountMoveService {
 				this.antennaService.onMoveAccount(src, dst),
 			]);
 		} catch {
-			/* skip if any error happens */
 		}
 
-		// follow the new account
 		const proxy = await this.systemAccountService.fetch('proxy');
 		const followings = await this.followingsRepository.findBy({
 			followeeId: src.id,
-			followerHost: IsNull(), // follower is local
+			followerHost: IsNull(),
 			followerId: Not(proxy.id),
 		});
 		const followJobs = followings.map(following => ({
@@ -143,51 +130,41 @@ export class AccountMoveService {
 			to: { id: dst.id },
 		})) as RelationshipJobData[];
 
-		// Decrease following count instead of unfollowing.
 		try {
 			await this.adjustFollowingCounts(followJobs.map(job => job.from.id), src);
 		} catch {
-			/* skip if any error happens */
 		}
 
-		// Should be queued because this can cause a number of follow per one move.
 		this.queueService.createFollowJob(followJobs);
 	}
 
 	@bindThis
 	public async copyBlocking(src: ThinUser, dst: ThinUser): Promise<void> {
-		// Followers shouldn't overlap with blockers, but the destination account, different from the blockee (i.e., old account), may have followed the local user before moving.
-		// So block the destination account here.
 		const srcBlockings = await this.blockingsRepository.findBy({ blockeeId: src.id });
 		const dstBlockings = await this.blockingsRepository.findBy({ blockeeId: dst.id });
 		const blockerIds = dstBlockings.map(blocking => blocking.blockerId);
-		// reblock the destination account
 		const blockJobs: RelationshipJobData[] = [];
 		for (const blocking of srcBlockings) {
-			if (blockerIds.includes(blocking.blockerId)) continue; // skip if already blocked
+			if (blockerIds.includes(blocking.blockerId)) continue;
 			blockJobs.push({ from: { id: blocking.blockerId }, to: { id: dst.id } });
 		}
-		// no need to unblock the old account because it may be still functional
 		this.queueService.createBlockJob(blockJobs);
 	}
 
 	@bindThis
 	public async copyMutings(src: ThinUser, dst: ThinUser): Promise<void> {
-		// Insert new mutings with the same values except mutee
 		const oldMutings = await this.mutingsRepository.findBy([
 			{ muteeId: src.id, expiresAt: IsNull() },
 			{ muteeId: src.id, expiresAt: MoreThan(new Date()) },
 		]);
 		if (oldMutings.length === 0) return;
 
-		// Check if the destination account is already indefinitely muted by the muter
 		const existingMutingsMuterUserIds = await this.mutingsRepository.findBy(
 			{ muteeId: dst.id, expiresAt: IsNull() },
 		).then(mutings => mutings.map(muting => muting.muterId));
 
 		const newMutings: Map<string, { muterId: string; muteeId: string; expiresAt: Date | null; }> = new Map();
 
-		// 重複しないようにIDを生成
 		const genId = (): string => {
 			let id: string;
 			do {
@@ -196,7 +173,7 @@ export class AccountMoveService {
 			return id;
 		};
 		for (const muting of oldMutings) {
-			if (existingMutingsMuterUserIds.includes(muting.muterId)) continue; // skip if already muted indefinitely
+			if (existingMutingsMuterUserIds.includes(muting.muterId)) continue;
 			newMutings.set(genId(), {
 				...muting,
 				muteeId: dst.id,
@@ -209,8 +186,6 @@ export class AccountMoveService {
 
 	@bindThis
 	public async copyRoles(src: ThinUser, dst: ThinUser): Promise<void> {
-		// Insert new roles with the same values except userId
-		// role service may have cache for roles so retrieve roles from service
 		const [oldRoleAssignments, roles] = await Promise.all([
 			this.roleService.getUserAssigns(src.id),
 			this.roleService.getRoles(),
@@ -218,10 +193,9 @@ export class AccountMoveService {
 
 		if (oldRoleAssignments.length === 0) return;
 
-		// No promise all since the only async operation is writing to the database
 		for (const oldRoleAssignment of oldRoleAssignments) {
 			const role = roles.find(x => x.id === oldRoleAssignment.roleId);
-			if (role == null) continue; // Very unlikely however removing role may cause this case
+			if (role == null) continue;
 			if (!role.preserveAssignmentOnMoveAccount) continue;
 
 			try {
@@ -233,18 +207,8 @@ export class AccountMoveService {
 		}
 	}
 
-	/**
-	 * Update lists while moving accounts.
-	 *   - No removal of the old account from the lists
-	 *   - Users number limit is not checked
-	 *
-	 * @param src ThinUser (old account)
-	 * @param dst User (new account)
-	 * @returns Promise<void>
-	 */
 	@bindThis
 	public async updateLists(src: ThinUser, dst: MiUser): Promise<void> {
-		// Return if there is no list to be updated.
 		const oldMemberships = await this.userListMembershipsRepository.find({
 			where: {
 				userId: src.id,
@@ -260,7 +224,6 @@ export class AccountMoveService {
 
 		const newMemberships: Map<string, { userId: string; userListId: string; userListUserId: string; }> = new Map();
 
-		// 重複しないようにIDを生成
 		const genId = (): string => {
 			let id: string;
 			do {
@@ -269,7 +232,7 @@ export class AccountMoveService {
 			return id;
 		};
 		for (const membership of oldMemberships) {
-			if (existingUserListIds.includes(membership.userListId)) continue; // skip if dst exists in this user's list
+			if (existingUserListIds.includes(membership.userListId)) continue;
 			newMemberships.set(genId(), {
 				userId: dst.id,
 				userListId: membership.userListId,
@@ -280,7 +243,6 @@ export class AccountMoveService {
 		const arrayToInsert = Array.from(newMemberships.entries()).map(entry => ({ ...entry[1], id: entry[0] }));
 		await this.userListMembershipsRepository.insert(arrayToInsert);
 
-		// Have the proxy account follow the new account in the same way as UserListService.push
 		if (this.userEntityService.isRemoteUser(dst)) {
 			const proxy = await this.systemAccountService.fetch('proxy');
 			this.queueService.createFollowJob([{ from: { id: proxy.id }, to: { id: dst.id } }]);
@@ -291,19 +253,15 @@ export class AccountMoveService {
 	private async adjustFollowingCounts(localFollowerIds: string[], oldAccount: MiUser): Promise<void> {
 		if (localFollowerIds.length === 0) return;
 
-		// Set the old account's following and followers counts to 0.
 		await this.usersRepository.update({ id: oldAccount.id }, { followersCount: 0, followingCount: 0 });
 
-		// Decrease following counts of local followers by 1.
 		await this.usersRepository.decrement({ id: In(localFollowerIds) }, 'followingCount', 1);
 
-		// Decrease follower counts of local followees by 1.
 		const oldFollowings = await this.followingsRepository.findBy({ followerId: oldAccount.id });
 		if (oldFollowings.length > 0) {
 			await this.usersRepository.decrement({ id: In(oldFollowings.map(following => following.followeeId)) }, 'followersCount', 1);
 		}
 
-		// Update instance stats by decreasing remote followers count by the number of local followers who were following the old account.
 		if (this.meta.enableStatsForFederatedInstances) {
 			if (this.userEntityService.isRemoteUser(oldAccount)) {
 				this.federatedInstanceService.fetchOrRegister(oldAccount.host).then(async i => {
@@ -315,20 +273,11 @@ export class AccountMoveService {
 			}
 		}
 
-		// FIXME: expensive?
 		for (const followerId of localFollowerIds) {
 			this.perUserFollowingChart.update({ id: followerId, host: null }, oldAccount, false);
 		}
 	}
 
-	/**
-	 * dstユーザーのalsoKnownAsをfetchPersonしていき、本当にmovedToUrlをdstに指定するユーザーが存在するのかを調べる
-	 *
-	 * @param dst movedToUrlを指定するユーザー
-	 * @param check
-	 * @param instant checkがtrueであるユーザーが最初に見つかったら即座にreturnするかどうか
-	 * @returns Promise<LocalUser | RemoteUser | null>
-	 */
 	@bindThis
 	public async validateAlsoKnownAs(
 		dst: MiLocalUser | MiRemoteUser,
@@ -351,7 +300,7 @@ export class AccountMoveService {
 		for (const srcUri of dst.alsoKnownAs) {
 			try {
 				let src = await this.apPersonService.fetchPerson(srcUri);
-				if (!src) continue; // oldAccountを探してもこのサーバーに存在しない場合はフォロー関係もないということなのでスルー
+				if (!src) continue;
 
 				if (this.userEntityService.isRemoteUser(dst)) {
 					if (Date.now() - (src.lastFetchedAt?.getTime() ?? 0) > 10 * 1000) {
@@ -368,7 +317,6 @@ export class AccountMoveService {
 					if (instant && resultUser) return resultUser;
 				}
 			} catch {
-				/* skip if any error happens */
 			}
 		}
 

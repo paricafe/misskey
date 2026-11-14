@@ -13,8 +13,6 @@ import { PushNotificationService } from '@/core/PushNotificationService.js';
 export const meta = {
 	tags: ['account'],
 
-	// ブラウザ側の購読解除時に、同一ブラウザに登録された全アカウント分の登録を消せるように、
-	// 資格情報ではなく購読のauth secret (RFC 8291) で所有を確認する
 	requireCredential: false,
 
 	limit: {

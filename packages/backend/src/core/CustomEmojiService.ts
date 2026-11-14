@@ -73,11 +73,11 @@ export class CustomEmojiService implements OnApplicationShutdown {
 		private moderationLogService: ModerationLogService,
 		private globalEventService: GlobalEventService,
 	) {
-		this.emojisCache = new MemoryKVCache<MiEmoji | null>(1000 * 60 * 60 * 12); // 12h
+		this.emojisCache = new MemoryKVCache<MiEmoji | null>(1000 * 60 * 60 * 12);
 
 		this.localEmojisCache = new RedisSingleCache<Map<string, MiEmoji>>(this.redisClient, 'localEmojis', {
-			lifetime: 1000 * 60 * 30, // 30m
-			memoryCacheLifetime: 1000 * 60 * 10, // 10m
+			lifetime: 1000 * 60 * 30,
+			memoryCacheLifetime: 1000 * 60 * 10,
 			fetcher: () => this.emojisRepository.find({ where: { host: IsNull() } }).then(emojis => new Map(emojis.map(emoji => [emoji.name, emoji]))),
 			toRedisConverter: (value) => JSON.stringify(Array.from(value.values())),
 			fromRedisConverter: (value) => {
@@ -161,7 +161,6 @@ export class CustomEmojiService implements OnApplicationShutdown {
 		if (emoji === null) return 'NO_SUCH_EMOJI';
 		const id = emoji.id;
 
-		// IDと絵文字名が両方指定されている場合は絵文字名の変更を行うため重複チェックが必要
 		const doNameUpdate = data.id && data.name && (data.name !== emoji.name);
 		if (doNameUpdate) {
 			if (data.name) {
@@ -347,11 +346,10 @@ export class CustomEmojiService implements OnApplicationShutdown {
 
 	@bindThis
 	private normalizeHost(src: string | undefined, noteUserHost: string | null): string | null {
-		// クエリに使うホスト
-		let host = src === '.' ? null	// .はローカルホスト (ここがマッチするのはリアクションのみ)
-			: src === undefined ? noteUserHost	// ノートなどでホスト省略表記の場合はローカルホスト (ここがリアクションにマッチすることはない)
-			: this.utilityService.isSelfHost(src) ? null	// 自ホスト指定
-			: (src || noteUserHost);	// 指定されたホスト || ノートなどの所有者のホスト (こっちがリアクションにマッチすることはない)
+		let host = src === '.' ? null
+			: src === undefined ? noteUserHost
+			: this.utilityService.isSelfHost(src) ? null
+			: (src || noteUserHost);
 
 		host = this.utilityService.toPunyNullable(host);
 
@@ -365,18 +363,11 @@ export class CustomEmojiService implements OnApplicationShutdown {
 
 		const name = match[1];
 
-		// ホスト正規化
 		const host = this.utilityService.toPunyNullable(this.normalizeHost(match[2], noteUserHost));
 
 		return { name, host };
 	}
 
-	/**
-	 * 添付用(リモート)カスタム絵文字URLを解決する
-	 * @param emojiName ノートやユーザープロフィールに添付された、またはリアクションのカスタム絵文字名 (:は含めない, リアクションでローカルホストの場合は@.を付ける (これはdecodeReactionで可能))
-	 * @param noteUserHost ノートやユーザープロフィールの所有者のホスト
-	 * @returns URL, nullは未マッチを意味する
-	 */
 	@bindThis
 	public async populateEmoji(emojiName: string, noteUserHost: string | null): Promise<string | null> {
 		const { name, host } = this.parseEmojiStr(emojiName, noteUserHost);
@@ -391,12 +382,9 @@ export class CustomEmojiService implements OnApplicationShutdown {
 		const emoji = await this.emojisCache.fetch(`${name} ${host}`, queryOrNull);
 
 		if (emoji == null) return null;
-		return emoji.publicUrl || emoji.originalUrl; // || emoji.originalUrl してるのは後方互換性のため（publicUrlはstringなので??はだめ）
+		return emoji.publicUrl || emoji.originalUrl;
 	}
 
-	/**
-	 * 複数の添付用(リモート)カスタム絵文字URLを解決する (キャシュ付き, 存在しないものは結果から除外される)
-	 */
 	@bindThis
 	public async populateEmojis(emojiNames: string[], noteUserHost: string | null): Promise<Record<string, string>> {
 		const emojis = await Promise.all(emojiNames.map(x => this.populateEmoji(x, noteUserHost)));
@@ -410,9 +398,6 @@ export class CustomEmojiService implements OnApplicationShutdown {
 		return res;
 	}
 
-	/**
-	 * 与えられた絵文字のリストをデータベースから取得し、キャッシュに追加します
-	 */
 	@bindThis
 	public async prefetchEmojis(emojis: { name: string; host: string | null; }[]): Promise<void> {
 		const notCachedEmojis = emojis.filter(emoji => this.emojisCache.get(`${emoji.name} ${emoji.host}`) == null);
@@ -439,10 +424,6 @@ export class CustomEmojiService implements OnApplicationShutdown {
 		}
 	}
 
-	/**
-	 * ローカル内の絵文字に重複がないかチェックします
-	 * @param name 絵文字名
-	 */
 	@bindThis
 	public checkDuplicate(name: string): Promise<boolean> {
 		return this.emojisRepository.exists({ where: { name, host: IsNull() } });
@@ -494,11 +475,9 @@ export class CustomEmojiService implements OnApplicationShutdown {
 		if (params?.query) {
 			const q = params.query;
 			if (q.updatedAtFrom) {
-				// noIndexScan
 				builder.andWhere('CAST(emoji.updatedAt AS DATE) >= :updateAtFrom', { updateAtFrom: q.updatedAtFrom });
 			}
 			if (q.updatedAtTo) {
-				// noIndexScan
 				builder.andWhere('CAST(emoji.updatedAt AS DATE) <= :updateAtTo', { updateAtTo: q.updatedAtTo });
 			}
 			if (q.name) {
@@ -512,7 +491,6 @@ export class CustomEmojiService implements OnApplicationShutdown {
 				}
 				case q.hostType === 'remote': {
 					if (q.host) {
-						// noIndexScan
 						builder.andWhere('emoji.host ~~ ANY(ARRAY[:...host])', { host: multipleWordsToQuery(q.host) });
 					} else {
 						builder.andWhere('emoji.host IS NOT NULL');
@@ -522,19 +500,15 @@ export class CustomEmojiService implements OnApplicationShutdown {
 			}
 
 			if (q.uri) {
-				// noIndexScan
 				builder.andWhere('emoji.uri ~~ ANY(ARRAY[:...uri])', { uri: multipleWordsToQuery(q.uri) });
 			}
 			if (q.publicUrl) {
-				// noIndexScan
 				builder.andWhere('emoji.publicUrl ~~ ANY(ARRAY[:...publicUrl])', { publicUrl: multipleWordsToQuery(q.publicUrl) });
 			}
 			if (q.type) {
-				// noIndexScan
 				builder.andWhere('emoji.type ~~ ANY(ARRAY[:...type])', { type: multipleWordsToQuery(q.type) });
 			}
 			if (q.aliases) {
-				// noIndexScan
 				const subQueryBuilder = builder.subQuery()
 					.select('COUNT(0)', 'count')
 					.from(
@@ -553,15 +527,12 @@ export class CustomEmojiService implements OnApplicationShutdown {
 				builder.andWhere('emoji.category ~~ ANY(ARRAY[:...category])', { category: multipleWordsToQuery(q.category) });
 			}
 			if (q.license) {
-				// noIndexScan
 				builder.andWhere('emoji.license ~~ ANY(ARRAY[:...license])', { license: multipleWordsToQuery(q.license) });
 			}
 			if (q.isSensitive != null) {
-				// noIndexScan
 				builder.andWhere('emoji.isSensitive = :isSensitive', { isSensitive: q.isSensitive });
 			}
 			if (q.localOnly != null) {
-				// noIndexScan
 				builder.andWhere('emoji.localOnly = :localOnly', { localOnly: q.localOnly });
 			}
 			if (q.roleIds && q.roleIds.length > 0) {

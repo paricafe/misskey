@@ -119,7 +119,7 @@ watch(rootEl, (el) => {
 	if (el && scrollContainer == null) {
 		scrollContainer = getScrollContainer(el);
 		if (scrollContainer == null) return;
-		scrollContainer.addEventListener('scroll', onScrollContainerScroll, { passive: true }); // ほんとはscrollendにしたいけどiosが非対応
+		scrollContainer.addEventListener('scroll', onScrollContainerScroll, { passive: true });
 	}
 }, { immediate: true });
 
@@ -129,7 +129,7 @@ let isPausingUpdate = false;
 watch(visibility, () => {
 	if (visibility.value === 'hidden') {
 		isPausingUpdate = true;
-	} else { // 'visible'
+	} else {
 		isPausingUpdate = false;
 		if (isTop()) {
 			releaseQueue();
@@ -198,7 +198,6 @@ defineExpose({
 
 	&.content,
 	.content {
-		/* Skip Note Rendering有効時、TransitionGroupで通知を追加するときに一瞬がくっとなる問題を抑制する */
 		content-visibility: visible !important;
 	}
 }
@@ -214,7 +213,7 @@ defineExpose({
 
 @supports (interpolate-size: allow-keywords) {
 	.transition_x_enterFrom {
-		interpolate-size: allow-keywords; // heightのtransitionを動作させるために必要
+		interpolate-size: allow-keywords;
 		height: 0;
 	}
 }

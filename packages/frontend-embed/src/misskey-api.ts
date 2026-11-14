@@ -9,7 +9,6 @@ import { apiUrl } from '@@/js/config.js';
 
 export const pendingApiRequestsCount = ref(0);
 
-// Implements Misskey.api.ApiClient.request
 export function misskeyApi<
 	ResT = void,
 	E extends keyof Misskey.Endpoints = keyof Misskey.Endpoints,
@@ -28,7 +27,6 @@ export function misskeyApi<
 	};
 
 	const promise = new Promise<_ResT>((resolve, reject) => {
-		// Send request
 		window.fetch(`${apiUrl}/${endpoint}`, {
 			method: 'POST',
 			body: JSON.stringify(data),
@@ -44,7 +42,7 @@ export function misskeyApi<
 			if (res.status === 200) {
 				resolve(body);
 			} else if (res.status === 204) {
-				resolve(undefined as _ResT); // void -> undefined
+				resolve(undefined as _ResT);
 			} else {
 				reject(body.error);
 			}
@@ -56,7 +54,6 @@ export function misskeyApi<
 	return promise;
 }
 
-// Implements Misskey.api.ApiClient.request
 export function misskeyApiGet<
 	ResT = void,
 	E extends keyof Misskey.Endpoints = keyof Misskey.Endpoints,
@@ -75,7 +72,6 @@ export function misskeyApiGet<
 	const query = new URLSearchParams(data as any);
 
 	const promise = new Promise<_ResT>((resolve, reject) => {
-		// Send request
 		window.fetch(`${apiUrl}/${endpoint}?${query}`, {
 			method: 'GET',
 			credentials: 'omit',
@@ -86,7 +82,7 @@ export function misskeyApiGet<
 			if (res.status === 200) {
 				resolve(body);
 			} else if (res.status === 204) {
-				resolve(undefined as _ResT); // void -> undefined
+				resolve(undefined as _ResT);
 			} else {
 				reject(body.error);
 			}

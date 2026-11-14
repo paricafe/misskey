@@ -14,9 +14,6 @@ import Chart from '../core.js';
 import { name, schema } from './entities/test-unique.js';
 import type { KVs } from '../core.js';
 
-/**
- * For testing
- */
 @Injectable()
 export default class TestUniqueChart extends Chart<typeof schema> { // eslint-disable-line import/no-default-export
 	constructor(

@@ -16,7 +16,6 @@ const ignore = [
 	'**/.git/**/*',
 	'**/*ignore',
 	'**/.gitmodules',
-	// Exclude files you don't want to include in the tarball here
 ];
 
 export async function buildTarball() {

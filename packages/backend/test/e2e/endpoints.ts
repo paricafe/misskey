@@ -7,8 +7,6 @@ process.env.NODE_ENV = 'test';
 
 import * as assert from 'assert';
 import { describe, beforeAll, test, expect, vi } from 'vitest';
-// node-fetch only supports it's own Blob yet
-// https://github.com/node-fetch/node-fetch/pull/1664
 import { Blob } from 'node-fetch';
 import { api, castAsError, initTestDb, post, role, signup, simpleGet, uploadFile } from '../utils.js';
 import type * as misskey from 'misskey-js';
@@ -131,7 +129,6 @@ describe('Endpoints', () => {
 
 		test('名前の前後に空白（ホワイトスペース）を入れてもトリムされる', async () => {
 			const res = await api('i/update', {
-				// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Lexical_grammar#white_space
 				name: ' あ い う \u0009\u000b\u000c\u0020\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u202f\u205f\u3000\ufeff',
 			}, alice);
 			assert.strictEqual(res.status, 200);
@@ -652,7 +649,6 @@ describe('Endpoints', () => {
 			const mediaType = `image/${type}`;
 
 			const getWebpublicType = async (user: misskey.entities.SignupResponse, fileId: string): Promise<string> => {
-				// drive/files/create does not expose webpublicType directly, so get it by posting it
 				const res = await post(user, {
 					text: mediaType,
 					fileIds: [fileId],
@@ -739,7 +735,7 @@ describe('Endpoints', () => {
 				maxFileSizeMb: {
 					useDefault: false,
 					priority: 1,
-					value: 10 / 1024 / 1024, // 10バイト
+					value: 10 / 1024 / 1024,
 				},
 			});
 
@@ -767,7 +763,7 @@ describe('Endpoints', () => {
 				maxFileSizeMb: {
 					useDefault: false,
 					priority: 1,
-					value: 10 / 1024 / 1024, // 10バイト
+					value: 10 / 1024 / 1024,
 				},
 			});
 
@@ -1218,7 +1214,6 @@ describe('Endpoints', () => {
 				userId: bob.id,
 			}, alice);
 
-			// memoには常に文字列かnullが入っている(5cac151)
 			assert.strictEqual((res.body as unknown as { memo: string | null }).memo, null);
 		});
 

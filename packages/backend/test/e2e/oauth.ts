@@ -3,11 +3,6 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-/**
- * Basic OAuth tests to make sure the library is correctly integrated to Misskey
- * and not regressed by version updates or potential migration to another library.
- */
-
 process.env.NODE_ENV = 'test';
 
 import * as assert from 'assert';
@@ -141,9 +136,7 @@ function assertIndirectError(response: Response, error: string): void {
 	const location = new URL(locationHeader);
 	assert.strictEqual(location.searchParams.get('error'), error);
 
-	// https://datatracker.ietf.org/doc/html/rfc9207#name-response-parameter-iss
 	assert.strictEqual(location.searchParams.get('iss'), 'http://misskey.local');
-	// https://datatracker.ietf.org/doc/html/rfc6749.html#section-4.1.2.1
 	assert.ok(location.searchParams.has('state'));
 }
 
@@ -218,7 +211,6 @@ describe('OAuth', () => {
 		assert.strictEqual(location.origin + location.pathname, redirect_uri);
 		assert.ok(location.searchParams.has('code'));
 		assert.strictEqual(location.searchParams.get('state'), 'state');
-		// https://datatracker.ietf.org/doc/html/rfc9207#name-response-parameter-iss
 		assert.strictEqual(location.searchParams.get('iss'), 'http://misskey.local');
 
 		const code = new URL(location).searchParams.get('code');
@@ -317,15 +309,10 @@ describe('OAuth', () => {
 		assert.strictEqual(createResultBodyBob.createdNote.user.username, 'bob');
 	});
 
-	// https://datatracker.ietf.org/doc/html/rfc7636.html
 	describe('PKCE', () => {
-		// https://datatracker.ietf.org/doc/html/rfc7636.html#section-4.4.1
-		// '... the authorization endpoint MUST return the authorization
-		// error response with the "error" value set to "invalid_request".'
 		test('Require PKCE', async () => {
 			const client = new AuthorizationCode(clientConfig);
 
-			// Pattern 1: No PKCE fields at all
 			let response = await fetch(client.authorizeURL({
 				redirect_uri,
 				scope: 'write:notes',
@@ -333,7 +320,6 @@ describe('OAuth', () => {
 			}), { redirect: 'manual' });
 			assertIndirectError(response, 'invalid_request');
 
-			// Pattern 2: Only code_challenge
 			response = await fetch(client.authorizeURL({
 				redirect_uri,
 				scope: 'write:notes',
@@ -342,7 +328,6 @@ describe('OAuth', () => {
 			} as AuthorizationParamsExtended), { redirect: 'manual' });
 			assertIndirectError(response, 'invalid_request');
 
-			// Pattern 3: Only code_challenge_method
 			response = await fetch(client.authorizeURL({
 				redirect_uri,
 				scope: 'write:notes',
@@ -351,7 +336,6 @@ describe('OAuth', () => {
 			} as AuthorizationParamsExtended), { redirect: 'manual' });
 			assertIndirectError(response, 'invalid_request');
 
-			// Pattern 4: Unsupported code_challenge_method
 			response = await fetch(client.authorizeURL({
 				redirect_uri,
 				scope: 'write:notes',
@@ -362,7 +346,6 @@ describe('OAuth', () => {
 			assertIndirectError(response, 'invalid_request');
 		});
 
-		// Use precomputed challenge/verifier set here for deterministic test
 		const code_challenge = '4w2GDuvaxXlw2l46k5PFIoIcTGHdzw2i3hrn-C_Q6f7u0-nTYKd-beVEYy9XinYsGtAix.Nnvr.GByD3lAii2ibPRsSDrZgIN0YQb.kfevcfR9aDKoTLyOUm4hW4ABhs';
 		const code_verifier = 'Ew8VSBiH59JirLlg7ocFpLQ6NXuFC1W_rn8gmRzBKc8';
 
@@ -391,10 +374,6 @@ describe('OAuth', () => {
 		});
 	});
 
-	// https://datatracker.ietf.org/doc/html/rfc6749.html#section-4.1.2
-	// "If an authorization code is used more than once, the authorization server
-	// MUST deny the request and SHOULD revoke (when possible) all tokens
-	// previously issued based on that authorization code."
 	describe('Revoking authorization code', () => {
 		test('On success', async () => {
 			const { code_challenge, code_verifier } = await pkceChallenge(128);
@@ -491,13 +470,7 @@ describe('OAuth', () => {
 		assert.ok(location.searchParams.has('error'));
 	});
 
-	// https://datatracker.ietf.org/doc/html/rfc6749.html#section-3.3
 	describe('Scope', () => {
-		// "If the client omits the scope parameter when requesting
-		// authorization, the authorization server MUST either process the
-		// request using a pre-defined default value or fail the request
-		// indicating an invalid scope."
-		// (And Misskey does the latter)
 		test('Missing scope', async () => {
 			const client = new AuthorizationCode(clientConfig);
 
@@ -536,15 +509,9 @@ describe('OAuth', () => {
 			assertIndirectError(response, 'invalid_scope');
 		});
 
-		// "If the issued access token scope
-		// is different from the one requested by the client, the authorization
-		// server MUST include the "scope" response parameter to inform the
-		// client of the actual scope granted."
-		// (Although Misskey always return scope, which is also fine)
 		test('Partially known scopes', async () => {
 			const { code_challenge, code_verifier } = await pkceChallenge(128);
 
-			// Just get the known scope for this case for backward compatibility
 			const { client, code } = await fetchAuthorizationCode(
 				alice,
 				'write:notes test:unknown test:unknown2',
@@ -612,11 +579,6 @@ describe('OAuth', () => {
 		});
 	});
 
-	// https://datatracker.ietf.org/doc/html/rfc6749.html#section-3.1.2.4
-	// "If an authorization request fails validation due to a missing,
-	// invalid, or mismatching redirection URI, the authorization server
-	// SHOULD inform the resource owner of the error and MUST NOT
-	// automatically redirect the user-agent to the invalid redirection URI."
 	describe('Redirection', () => {
 		test('Invalid redirect_uri at authorization endpoint', async () => {
 			const client = new AuthorizationCode(clientConfig);
@@ -701,7 +663,6 @@ describe('OAuth', () => {
 		});
 	});
 
-	// https://datatracker.ietf.org/doc/html/rfc8414
 	test('Server metadata', async () => {
 		const response = await fetch(new URL('.well-known/oauth-authorization-server', host));
 		assert.strictEqual(response.status, 200);
@@ -711,8 +672,6 @@ describe('OAuth', () => {
 		assert.ok(body.scopes_supported.includes('write:notes'));
 	});
 
-	// Any error on decision endpoint is solely on Misskey side and nothing to do with the client.
-	// Do not use indirect error here.
 	describe('Decision endpoint', () => {
 		test('No login token', async () => {
 			const client = new AuthorizationCode(clientConfig);
@@ -766,7 +725,6 @@ describe('OAuth', () => {
 		});
 	});
 
-	// Only authorization code grant is supported
 	describe('Grant type', () => {
 		test('Implicit grant is not supported', async () => {
 			const url = new URL('/oauth/authorize', host);
@@ -870,7 +828,6 @@ describe('OAuth', () => {
 	});
 
 	describe('Client Information Discovery', () => {
-		// https://indieauth.spec.indieweb.org/#client-information-discovery
 		describe('JSON client metadata (11 July 2024)', () => {
 			test('Read JSON document', async () => {
 				sender = (reply): void => {
@@ -996,7 +953,6 @@ describe('OAuth', () => {
 			});
 		});
 
-		// https://indieauth.spec.indieweb.org/20220212/#client-information-discovery
 		describe('HTML link client metadata (12 Feb 2022)', () => {
 			describe('Redirection', () => {
 				const tests: Record<string, (reply: FastifyReply) => void> = {
@@ -1067,11 +1023,9 @@ describe('OAuth', () => {
 						code_challenge_method: 'S256',
 					} as AuthorizationParamsExtended));
 
-					// direct error because there's no redirect URI to ping
 					await assertDirectError(response, 400, 'invalid_request');
 				});
 			});
-
 
 			test('Disallow loopback', async () => {
 				await sendEnvUpdateRequest({ key: 'MISSKEY_TEST_CHECK_IP_RANGE', value: '1' });

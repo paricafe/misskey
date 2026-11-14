@@ -28,7 +28,6 @@ test('PostgreSQL idempotency uses the indexed TTL', postgresOnly, async t => {
 		const row = (await inspection.query('SELECT "expiresAt", "value" FROM "mastodon_compat_entry" WHERE "key" = $1', ['new'])).rows[0];
 		assert.equal(row.expiresAt, '100');
 		assert.equal(row.value.expiresAt, 100);
-		// The column, not stale JSON left by an older process, decides expiration.
 		await inspection.query('UPDATE "mastodon_compat_entry" SET "value" = jsonb_set("value", \'{expiresAt}\', \'200\') WHERE "key" = $1', ['new']);
 		assert.equal(await store.getIdempotency('alice', 'new', 100), undefined);
 		await store.putIdempotency('alice', 'live', { digest: 'pending', expiresAt: 200 });
@@ -113,7 +112,6 @@ test('an idle PostgreSQL connection failure is recoverable and close is idempote
 		assert.equal(sessions.rows.length, 1);
 		const pid = sessions.rows[0].pid;
 		assert.equal((await admin.query('SELECT pg_terminate_backend($1, 5000) AS terminated', [pid])).rows[0].terminated, true);
-		// Drain pending socket events after the server confirms process shutdown.
 		await setImmediate();
 		await setImmediate();
 		assert.deepEqual(await store.get('filter', 'alice', 'one'), { title: 'retained' });

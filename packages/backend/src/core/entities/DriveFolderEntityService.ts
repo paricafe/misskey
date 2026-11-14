@@ -81,9 +81,6 @@ export class DriveFolderEntityService {
 			detail: boolean
 		},
 	): Promise<Array<Packed<'DriveFolder'>>> {
-		/**
-		 * 重複を除去しつつ、必要なDriveFolderオブジェクトをすべて取得する
-		 */
 		const collectUniqueObjects = async (src: Array<MiDriveFolder['id'] | MiDriveFolder>) => {
 			const uniqueSrc = uniqueByKey(
 				src,
@@ -108,9 +105,6 @@ export class DriveFolderEntityService {
 			return uniqueObjects;
 		};
 
-		/**
-		 * 親フォルダーを再帰的に収集する
-		 */
 		const collectAncestors = async (folderMap: Map<string, MiDriveFolder>) => {
 			for (;;) {
 				const parentIds = new Set<string>();

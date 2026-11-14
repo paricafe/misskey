@@ -50,7 +50,6 @@ export function initChart() {
 		gradient,
 	);
 
-	// フォントカラー
 	Chart.defaults.color = themeManager.currentCompiledTheme!.fg;
 
 	Chart.defaults.borderColor = store.s.darkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';

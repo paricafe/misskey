@@ -84,7 +84,6 @@ function start(ev: PointerEvent) {
 }
 
 async function startUser() {
-	// TODO: localOnly は連合に対応したら消す
 	os.selectUser({ localOnly: true }).then(user => {
 		router.push('/chat/user/:userId', {
 			params: {

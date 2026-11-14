@@ -40,7 +40,6 @@ async function save() {
 
 	changed.value = false;
 
-	// Refresh filtered list to signal to the user how they've been saved
 	instanceMutes.value = mutes.join('\n');
 }
 

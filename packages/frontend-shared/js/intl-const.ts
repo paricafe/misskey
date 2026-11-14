@@ -22,7 +22,6 @@ try {
 	console.warn(err);
 	if (_DEV_) console.log('[Intl] Fallback to en-US');
 
-	// Fallback to en-US
 	_dateTimeFormat = new Intl.DateTimeFormat('en-US', {
 		year: 'numeric',
 		month: 'numeric',
@@ -45,7 +44,6 @@ try {
 	console.warn(err);
 	if (_DEV_) console.log('[Intl] Fallback to en-US');
 
-	// Fallback to en-US
 	_numberFormat = new Intl.NumberFormat('en-US');
 }
 export const numberFormat = _numberFormat;

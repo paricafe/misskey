@@ -17,7 +17,6 @@ export type FrontendDiagnosticsMarkdownInput = {
 		head: CollectedBundleReport;
 		baseStats: VisualizerReport;
 		headStats: VisualizerReport;
-		/** rollup-plugin-visualizer が出力したtreemap HTMLのartifact URL */
 		visualizerArtifactUrl: string;
 	};
 	browser: {
@@ -218,8 +217,6 @@ export function renderFrontendDiagnosticsMarkdown(input: FrontendDiagnosticsMark
 		'',
 		heapSnapshotTable ?? '_No V8 heap snapshot data._',
 		'',
-		//renderHeapSnapshotSankey(toHeapSnapshotReport(browser.head), 'Head'),
-		//'',
 		`Download representative heap snapshot: [base](${browser.baseHeapSnapshotUrl}) / [head](${browser.headHeapSnapshotUrl})`,
 		'</details>',
 		'',

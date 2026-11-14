@@ -27,7 +27,6 @@ export class HashtagChannel extends Channel {
 		private noteStreamingHidingService: NoteStreamingHidingService,
 	) {
 		super(request);
-		//this.onNote = this.onNote.bind(this);
 	}
 
 	@bindThis
@@ -40,7 +39,6 @@ export class HashtagChannel extends Channel {
 		))) return false;
 		this.q = params.q.map(tags => tags.map(tag => normalizeTag(tag)));
 
-		// Subscribe stream
 		this.subscriber.on('notesStream', this.onNote);
 
 		return true;
@@ -68,7 +66,6 @@ export class HashtagChannel extends Channel {
 
 	@bindThis
 	public dispose() {
-		// Unsubscribe events
 		this.subscriber.off('notesStream', this.onNote);
 	}
 }

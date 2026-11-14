@@ -31,18 +31,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 		</text>
 	</template>
 
-	<!--
-	<line
-		:x1="5 - (Math.sin(sAngle) * (sHandLengthRatio * handsTailLength))"
-		:y1="5 + (Math.cos(sAngle) * (sHandLengthRatio * handsTailLength))"
-		:x2="5 + (Math.sin(sAngle) * ((sHandLengthRatio * 5) - handsPadding))"
-		:y2="5 - (Math.cos(sAngle) * ((sHandLengthRatio * 5) - handsPadding))"
-		:stroke="sHandColor"
-		:stroke-width="thickness / 2"
-		stroke-linecap="round"
-	/>
-	-->
-
 	<line
 		ref="sLine"
 		:class="[$style.s, { [$style.animate]: !disableSAnimate && sAnimation !== 'none', [$style.elastic]: sAnimation === 'elastic', [$style.easeOut]: sAnimation === 'easeOut' }]"
@@ -84,7 +72,6 @@ import tinycolor from 'tinycolor2';
 import { themeManager } from '@/theme.js';
 import { defaultIdlingRenderScheduler } from '@/utility/idle-render.js';
 
-// https://stackoverflow.com/questions/1878907/how-can-i-find-the-difference-between-two-angles
 const angleDiff = (a: number, b: number) => {
 	const x = Math.abs(a - b);
 	return Math.abs((x + Math.PI) % (Math.PI * 2) - Math.PI);
@@ -139,7 +126,6 @@ const texts = computed(() => {
 
 let enabled = true;
 const majorGraduationColor = ref<string>();
-//let minorGraduationColor = $ref<string>();
 const sHandColor = ref<string>();
 const mHandColor = ref<string>();
 const hHandColor = ref<string>();
@@ -168,7 +154,7 @@ function tick() {
 	}
 	hAngle.value = Math.PI * (h.value % (props.twentyfour ? 24 : 12) + (m.value + s.value / 60) / 60) / (props.twentyfour ? 12 : 6);
 	mAngle.value = Math.PI * (m.value + s.value / 60) / 30;
-	if (sOneRound && sLine.value) { // 秒針が一周した際のアニメーションをよしなに処理する(これが無いと秒が59->0になったときに期待したアニメーションにならない)
+	if (sOneRound && sLine.value) {
 		sAngle.value = Math.PI * 60 / 30;
 		defaultIdlingRenderScheduler.delete(tick);
 		sLine.value.addEventListener('transitionend', () => {
@@ -196,7 +182,6 @@ function calcColors() {
 	const dark = tinycolor(themeValue.bg).isDark();
 	const accent = tinycolor(themeValue.accent).toHexString();
 	majorGraduationColor.value = dark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)';
-	//minorGraduationColor = dark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.2)';
 	sHandColor.value = dark ? 'rgba(255, 255, 255, 0.5)' : 'rgba(0, 0, 0, 0.3)';
 	mHandColor.value = tinycolor(themeValue.fg).toHexString();
 	hHandColor.value = accent;

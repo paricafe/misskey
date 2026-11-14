@@ -19,17 +19,14 @@ import { genId } from '@/utility/id.js';
 import { DEFAULT_DEVICE_KIND } from '@/utility/device-kind.js';
 import { deepEqual } from '@/utility/deep-equal.js';
 
-/** サウンド設定 */
 export type SoundStore = {
 	type: Exclude<SoundType, '_driveFile_'>;
 	volume: number;
 } | {
 	type: '_driveFile_';
 
-	/** ドライブのファイルID */
 	fileId: string;
 
-	/** ファイルURL（こちらが優先される） */
 	fileUrl: string;
 
 	volume: number;
@@ -53,8 +50,6 @@ export type DataSaverStore = {
 };
 
 type OmitStrict<T, K extends keyof T> = T extends any ? Pick<T, Exclude<keyof T, K>> : never;
-
-// NOTE: デフォルト値は他の設定の状態に依存してはならない(依存していた場合、ユーザーがその設定項目単体で「初期値にリセット」した場合不具合の原因になる)
 
 export const PREF_DEF = definePreferences({
 	accounts: {
@@ -115,9 +110,9 @@ export const PREF_DEF = definePreferences({
 			for (const x of a.concat(b)) {
 				const sameIdItem = mergedItems.find(y => y.id === x.id);
 				if (sameIdItem != null) {
-					if (deepEqual(x, sameIdItem)) { // 完全な重複は無視
+					if (deepEqual(x, sameIdItem)) {
 						continue;
-					} else { // IDは同じなのに内容が違う場合はマージ不可とする
+					} else {
 						throw new Error();
 					}
 				} else {
@@ -146,9 +141,9 @@ export const PREF_DEF = definePreferences({
 			for (const x of a.concat(b)) {
 				const sameIdItem = mergedItems.find(y => y.id === x.id);
 				if (sameIdItem != null) {
-					if (deepEqual(x, sameIdItem)) { // 完全な重複は無視
+					if (deepEqual(x, sameIdItem)) {
 						continue;
-					} else { // IDは同じなのに内容が違う場合はマージ不可とする
+					} else {
 						throw new Error();
 					}
 				} else {
@@ -292,9 +287,6 @@ export const PREF_DEF = definePreferences({
 		default: 3,
 	},
 	pollingInterval: {
-		// 1 ... 低
-		// 2 ... 中
-		// 3 ... 高
 		default: 2,
 	},
 	showNoteActionsOnlyHover: {
@@ -429,9 +421,9 @@ export const PREF_DEF = definePreferences({
 			for (const x of a.concat(b)) {
 				const sameIdItem = mergedItems.find(y => y.id === x.id);
 				if (sameIdItem != null) {
-					if (deepEqual(x, sameIdItem)) { // 完全な重複は無視
+					if (deepEqual(x, sameIdItem)) {
 						continue;
-					} else { // IDは同じなのに内容が違う場合はマージ不可とする
+					} else {
 						throw new Error();
 					}
 				} else {
@@ -453,9 +445,9 @@ export const PREF_DEF = definePreferences({
 			for (const x of a.concat(b)) {
 				const sameIdItem = mergedItems.find(y => y.id === x.id);
 				if (sameIdItem != null) {
-					if (deepEqual(x, sameIdItem)) { // 完全な重複は無視
+					if (deepEqual(x, sameIdItem)) {
 						continue;
-					} else { // IDは同じなのに内容が違う場合はマージ不可とする
+					} else {
 						throw new Error();
 					}
 				} else {

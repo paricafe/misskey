@@ -32,8 +32,6 @@ const common = {
 	async play({ canvasElement, args }) {
 		const canvas = within(canvasElement);
 		const a = canvas.getByRole<HTMLAnchorElement>('link');
-		// FIXME: 通るけどその後落ちるのでコメントアウト
-		// await expect(a.href).toMatch(/^https?:\/\/.*#test$/);
 		const img = within(a).getByRole('img');
 		await expect(img).toBeInTheDocument();
 		let buttons = canvas.getAllByRole<HTMLButtonElement>('button');

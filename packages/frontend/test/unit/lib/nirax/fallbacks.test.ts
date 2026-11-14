@@ -54,7 +54,7 @@ describe('[NIRAX] フォールバック', () => {
 
 		router.init();
 
-		assert.deepStrictEqual(forceReplacements, []); // 初回はforceReplaceを発火しない
+		assert.deepStrictEqual(forceReplacements, []);
 		assert.strictEqual(router.getCurrentFullPath(), '/missing');
 		assert.strictEqual(router.current.route.path, '/:(*)');
 	});
@@ -68,7 +68,7 @@ describe('[NIRAX] フォールバック', () => {
 			assert.strictEqual(ctx.onInit, true);
 		});
 
-		router.init(true); // forceReplaceを強制的に発火させる
+		router.init(true);
 
 		assert.deepStrictEqual(forceReplacements, ['/missing']);
 		assert.strictEqual(router.getCurrentFullPath(), '/missing');

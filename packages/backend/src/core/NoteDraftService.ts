@@ -60,7 +60,6 @@ export class NoteDraftService {
 
 	@bindThis
 	public async create(me: MiLocalUser, data: NoteDraftOptions): Promise<MiNoteDraft> {
-		//#region check draft limit
 		const policies = await this.roleService.getUserPolicies(me.id);
 
 		const currentCount = await this.noteDraftsRepository.countBy({
@@ -79,7 +78,6 @@ export class NoteDraftService {
 				throw new IdentifiableError('c3275f19-4558-4c59-83e1-4f684b5fab66', 'Too many scheduled notes');
 			}
 		}
-		//#endregion
 
 		await this.validate(me, data);
 
@@ -108,7 +106,6 @@ export class NoteDraftService {
 			throw new IdentifiableError('49cd6b9d-848e-41ee-b0b9-adaca711a6b1', 'No such note draft');
 		}
 
-		//#region check draft limit
 		const policies = await this.roleService.getUserPolicies(me.id);
 
 		if (!draft.isActuallyScheduled && data.isActuallyScheduled) {
@@ -120,7 +117,6 @@ export class NoteDraftService {
 				throw new IdentifiableError('bacdf856-5c51-4159-b88a-804fa5103be5', 'Too many scheduled notes');
 			}
 		}
-		//#endregion
 
 		await this.validate(me, data);
 
@@ -135,8 +131,6 @@ export class NoteDraftService {
 			throw new IdentifiableError('49cd6b9d-848e-41ee-b0b9-adaca711a6b1', 'No such note draft');
 		}
 
-		// Publish the new revision before removing the previous job. A locked old job
-		// is harmless because publication validates the revision again in PostgreSQL.
 		await this.schedulePersistedDraft(updatedDraft);
 		await this.clearObsoleteSchedule(draft.id, draft.scheduleRevision);
 
@@ -195,16 +189,13 @@ export class NoteDraftService {
 			}
 		}
 
-		//#region visibleUsers
 		let _visibleUsers: MiUser[] = [];
 		if (data.visibleUserIds != null && data.visibleUserIds.length > 0) {
 			_visibleUsers = await this.usersRepository.findBy({
 				id: In(data.visibleUserIds),
 			});
 		}
-		//#endregion
 
-		//#region files
 		let files: MiDriveFile[] = [];
 		const fileIds = data.fileIds ?? null;
 		if (fileIds != null && fileIds.length > 0) {
@@ -221,9 +212,7 @@ export class NoteDraftService {
 				throw new IdentifiableError('b6992544-63e7-67f0-fa7f-32444b1b5306', 'No such drive file');
 			}
 		}
-		//#endregion
 
-		//#region renote
 		let renote: MiNote | null = null;
 		if (data.renoteId != null) {
 			renote = await this.notesRepository.findOneBy({ id: data.renoteId });
@@ -234,7 +223,6 @@ export class NoteDraftService {
 				throw new IdentifiableError('76cc5583-5a14-4ad3-8717-0298507e32db', 'Cannot renote');
 			}
 
-			// Check blocking
 			if (renote.userId !== me.id) {
 				const blockExist = await this.blockingsRepository.exists({
 					where: {
@@ -248,32 +236,23 @@ export class NoteDraftService {
 			}
 
 			if (renote.visibility === 'followers' && renote.userId !== me.id) {
-				// 他人のfollowers noteはreject
 				throw new IdentifiableError('81eb8188-aea1-4e35-9a8f-3334a3be9855', 'Cannot Renote Due to Visibility');
 			} else if (renote.visibility === 'specified') {
-				// specified / direct noteはreject
 				throw new IdentifiableError('81eb8188-aea1-4e35-9a8f-3334a3be9855', 'Cannot Renote Due to Visibility');
 			}
 
 			if (renote.channelId && renote.channelId !== data.channelId) {
-				// チャンネルのノートに対しリノート要求がきたとき、チャンネル外へのリノート可否をチェック
-				// リノートのユースケースのうち、チャンネル内→チャンネル外は少数だと考えられるため、JOINはせず必要な時に都度取得する
 				const renoteChannel = await this.channelsRepository.findOneBy({ id: renote.channelId });
 				if (renoteChannel == null) {
-					// リノートしたいノートが書き込まれているチャンネルがない
 					throw new IdentifiableError('6815399a-6f13-4069-b60d-ed5156249d12', 'No such channel');
 				} else if (!renoteChannel.allowRenoteToExternal) {
-					// リノート作成のリクエストだが、対象チャンネルがリノート禁止だった場合
 					throw new IdentifiableError('ed1952ac-2d26-4957-8b30-2deda76bedf7', 'Cannot Renote to External');
 				}
 			}
 		}
-		//#endregion
 
-		//#region reply
 		let reply: MiNote | null = null;
 		if (data.replyId != null) {
-			// Fetch reply
 			reply = await this.notesRepository.findOneBy({ id: data.replyId });
 
 			if (reply == null) {
@@ -286,7 +265,6 @@ export class NoteDraftService {
 				throw new IdentifiableError('215dbc76-336c-4d2a-9605-95766ba7dab0', 'Cannot reply To Specified Note With Extended Visibility');
 			}
 
-			// Check blocking
 			if (reply.userId !== me.id) {
 				const blockExist = await this.blockingsRepository.exists({
 					where: {
@@ -299,9 +277,7 @@ export class NoteDraftService {
 				}
 			}
 		}
-		//#endregion
 
-		//#region channel
 		let channel: MiChannel | null = null;
 		if (data.channelId != null) {
 			channel = await this.channelsRepository.findOneBy({ id: data.channelId, isArchived: false });
@@ -310,15 +286,12 @@ export class NoteDraftService {
 				throw new IdentifiableError('6815399a-6f13-4069-b60d-ed5156249d12', 'No such channel');
 			}
 		}
-		//#endregion
 	}
 
 	private async schedulePersistedDraft(draft: MiNoteDraft): Promise<void> {
 		try {
 			await this.schedule(draft);
 		} catch (error) {
-			// A committed schedule is accepted even while Redis is unavailable.
-			// Reporting failure here would invite the client to create a duplicate.
 			this.loggerService.getLogger('note-drafts').error({ message: 'Failed to enqueue persisted draft; schedule recovery will retry', error });
 		}
 	}
@@ -327,7 +300,6 @@ export class NoteDraftService {
 		try {
 			await this.clearSchedule(draftId, revision);
 		} catch (error) {
-			// The old revision can no longer publish, even if Redis cleanup fails.
 			this.loggerService.getLogger('note-drafts').error({ message: 'Failed to remove obsolete scheduled job', error });
 		}
 	}
@@ -356,11 +328,11 @@ export class NoteDraftService {
 			attempts: 5,
 			backoff: { type: 'exponential', delay: 60_000 },
 			removeOnComplete: {
-				age: 3600 * 24 * 7, // keep up to 7 days
+				age: 3600 * 24 * 7,
 				count: 30,
 			},
 			removeOnFail: {
-				age: 3600 * 24 * 7, // keep up to 7 days
+				age: 3600 * 24 * 7,
 				count: 100,
 			},
 		});
@@ -373,19 +345,14 @@ export class NoteDraftService {
 		try {
 			await job.remove();
 		} catch (error) {
-			// The job may have become active between the state check and removal.
 			if (!await job.isActive()) throw error;
 		}
 	}
 
 	@bindThis
 	public async recoverSchedules(): Promise<void> {
-		// The database is the durable scheduling record. Bound both the look-ahead
-		// and each page so a Redis restart does not require loading every draft.
 		const dueBefore = new Date(Date.now() + 60_000);
 		let cursor: { scheduledAt: Date; id: string } | undefined;
-		// At most 1,000 schedules per sweep; subsequent sweeps continue as the
-		// publication workers consume these rows, without monopolizing system jobs.
 		for (let page = 0; page < 10; page++) {
 			const query = this.noteDraftsRepository.createQueryBuilder('draft')
 				.where('draft."isActuallyScheduled" = true')

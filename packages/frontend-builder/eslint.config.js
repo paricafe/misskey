@@ -14,12 +14,10 @@ export default [
 				...Object.fromEntries(Object.entries(globals.node).map(([key]) => [key, 'off'])),
 				...globals.browser,
 
-				// Node.js
 				module: false,
 				require: false,
 				__dirname: false,
 
-				// Misskey
 				_DEV_: false,
 				_LANGS_: false,
 				_VERSION_: false,
@@ -38,8 +36,6 @@ export default [
 				allowSingleExtends: true,
 			}],
 			'import/consistent-type-specifier-style': ['error', 'prefer-top-level'],
-			// window の禁止理由: グローバルスコープと衝突し、予期せぬ結果を招くため
-			// e の禁止理由: error や event など、複数のキーワードの頭文字であり分かりにくいため
 			'id-denylist': ['error', 'window', 'e'],
 			'no-shadow': ['warn'],
 		},

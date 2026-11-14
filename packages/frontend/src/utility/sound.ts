@@ -13,13 +13,10 @@ const cache = new Map<string, AudioBuffer>();
 let canPlay = true;
 
 export const soundsTypes = [
-	// 音声なし
 	null,
 
-	// ドライブの音声
 	'_driveFile_',
 
-	// プリインストール
 	'syuilo/n-aec',
 	'syuilo/n-aec-4va',
 	'syuilo/n-aec-4vb',
@@ -81,17 +78,10 @@ export const operationTypes = [
 	'chatMessage',
 ] as const;
 
-/** サウンドの種類 */
 export type SoundType = typeof soundsTypes[number];
 
-/** スプライトの種類 */
 export type OperationType = typeof operationTypes[number];
 
-/**
- * 音声を読み込む
- * @param url url
- * @param options `useCache`: デフォルトは`true` 一度再生した音声はキャッシュする
- */
 export async function loadAudio(url: string, options?: { useCache?: boolean; }) {
 	// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
 	if (ctx == null) {
@@ -125,15 +115,10 @@ export async function loadAudio(url: string, options?: { useCache?: boolean; }) 
 	return audioBuffer;
 }
 
-/**
- * 既定のスプライトを再生する
- * @param type スプライトの種類を指定
- */
 export function playMisskeySfx(operationType: OperationType) {
 	const sound = prefer.s[`sound.on.${operationType}`];
 	playMisskeySfxFile(sound).then((succeed) => {
 		if (!succeed && sound.type === '_driveFile_') {
-			// ドライブファイルが存在しない場合はデフォルトのサウンドを再生する
 			const default_ = getInitialPrefValue(`sound.on.${operationType}`);
 			const soundName = default_.type as Exclude<SoundType, '_driveFile_'>;
 			if (_DEV_) console.log(`Failed to play sound: ${sound.fileUrl}, so play default sound: ${soundName}`);
@@ -145,21 +130,13 @@ export function playMisskeySfx(operationType: OperationType) {
 	});
 }
 
-/**
- * サウンド設定形式で指定された音声を再生する
- * @param soundStore サウンド設定
- */
 export async function playMisskeySfxFile(soundStore: SoundStore): Promise<boolean> {
-	// 連続して再生しない
 	if (!canPlay) return false;
-	// ユーザーアクティベーションが必要な場合はそれがない場合は再生しない
 	if ('userActivation' in navigator && !navigator.userActivation.hasBeenActive) return false;
-	// サウンドがない場合は再生しない
 	if (soundStore.type === null || soundStore.type === '_driveFile_' && !soundStore.fileUrl) return false;
 
 	canPlay = false;
 	return await playMisskeySfxFileInternal(soundStore).finally(() => {
-		// ごく短時間に音が重複しないように
 		window.setTimeout(() => {
 			canPlay = true;
 		}, 25);
@@ -172,7 +149,7 @@ async function playMisskeySfxFileInternal(soundStore: SoundStore): Promise<boole
 	}
 	const masterVolume = prefer.s['sound.masterVolume'];
 	if (isMute() || masterVolume === 0 || soundStore.volume === 0) {
-		return true; // ミュート時は成功として扱う
+		return true;
 	}
 	const url = soundStore.type === '_driveFile_' ? soundStore.fileUrl : `/client-assets/sounds/${soundStore.type}.mp3`;
 	const buffer = await loadAudio(url).catch(() => {
@@ -224,10 +201,6 @@ export function createSourceNode(buffer: AudioBuffer, opts: {
 	return { soundSource, panNode, gainNode };
 }
 
-/**
- * 音声の長さをミリ秒で取得する
- * @param file ファイルのURL（ドライブIDではない）
- */
 export async function getSoundDuration(file: string): Promise<number> {
 	const audioEl = window.document.createElement('audio');
 	audioEl.src = file;
@@ -247,18 +220,12 @@ export async function getSoundDuration(file: string): Promise<number> {
 	});
 }
 
-/**
- * ミュートすべきかどうかを判断する
- */
 export function isMute(): boolean {
 	if (prefer.s['sound.notUseSound']) {
-		// サウンドを出力しない
 		return true;
 	}
 
-	// noinspection RedundantIfStatementJS
 	if (prefer.s['sound.useSoundOnlyWhenActive'] && window.document.visibilityState === 'hidden') {
-		// ブラウザがアクティブな時のみサウンドを出力する
 		return true;
 	}
 

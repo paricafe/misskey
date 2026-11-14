@@ -63,7 +63,6 @@ export async function getHighlighter(): Promise<HighlighterCore> {
 }
 
 async function initHighlighter() {
-	// テーマの重複を消す
 	const themes = unique([
 		darkPlus,
 		...(await Promise.all([getTheme('light'), getTheme('dark')])),
@@ -78,20 +77,6 @@ async function initHighlighter() {
 			async () => (await import('aiscript-vscode/aiscript/syntaxes/aiscript.tmLanguage.json')).default as unknown as LanguageRegistration,
 		],
 	});
-
-	// TODO
-	//watch('lightTheme', async () => {
-	//	const newTheme = await getTheme('light');
-	//	if (newTheme.name && !highlighter.getLoadedThemes().includes(newTheme.name)) {
-	//		highlighter.loadTheme(newTheme);
-	//	}
-	//});
-	//watch('darkTheme', async () => {
-	//	const newTheme = await getTheme('dark');
-	//	if (newTheme.name && !highlighter.getLoadedThemes().includes(newTheme.name)) {
-	//		highlighter.loadTheme(newTheme);
-	//	}
-	//});
 
 	_highlighter = highlighter;
 

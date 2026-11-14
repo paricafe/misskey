@@ -42,7 +42,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 
 			const profile = await this.userProfilesRepository.findOneByOrFail({ userId: me.id });
 
-			// Compare password
 			const same = await bcrypt.compare(ps.password, profile.password!);
 
 			if (!same) {
@@ -55,7 +54,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				token: newToken,
 			});
 
-			// Publish event
 			this.globalEventService.publishInternalEvent('userTokenRegenerated', { id: me.id, oldToken, newToken });
 			this.globalEventService.publishMainStream(me.id, 'myTokenRegenerated');
 		});

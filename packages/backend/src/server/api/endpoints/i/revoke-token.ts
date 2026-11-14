@@ -13,10 +13,6 @@ import { ApiError } from '../../error.js';
 export const meta = {
 	description: 'Revoke an access token of the authenticated user. Requires credential. When called with an access token (third-party app), only the token currently in use can be revoked.',
 
-	// アクセストークン自身を失効させられるようにするため requireCredential は使わず、
-	// 認証・権限チェックを実装内で行う (ApiCallService が requireCredential:true かつ kind なしの
-	// エンドポイントへのトークン経由のリクエストを一律 PERMISSION_DENIED にするため)
-
 	errors: {
 		credentialRequired: {
 			message: 'Credential required.',
@@ -73,7 +69,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 
 			if (target == null) return;
 
-			// サードパーティアプリ (アクセストークン) からのリクエストでは、いま使われているトークン自身のみ失効できる
 			if (token != null && token.id !== target.id) {
 				throw new ApiError(meta.errors.permissionDenied);
 			}

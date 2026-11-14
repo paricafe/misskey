@@ -25,9 +25,6 @@ export class GetterService {
 	) {
 	}
 
-	/**
-	 * Get note for API processing
-	 */
 	@bindThis
 	public async getNote(noteId: MiNote['id']) {
 		const note = await this.notesRepository.findOneBy({ id: noteId });
@@ -61,9 +58,6 @@ export class GetterService {
 		return note;
 	}
 
-	/**
-	 * Get user for API processing
-	 */
 	@bindThis
 	public async getUser(userId: MiUser['id']) {
 		const user = await this.usersRepository.findOneBy({ id: userId });
@@ -75,9 +69,6 @@ export class GetterService {
 		return user as MiLocalUser | MiRemoteUser;
 	}
 
-	/**
-	 * Get remote user for API processing
-	 */
 	@bindThis
 	public async getRemoteUser(userId: MiUser['id']) {
 		const user = await this.getUser(userId);
@@ -89,9 +80,6 @@ export class GetterService {
 		return user;
 	}
 
-	/**
-	 * Get local user for API processing
-	 */
 	@bindThis
 	public async getLocalUser(userId: MiUser['id']) {
 		const user = await this.getUser(userId);

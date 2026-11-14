@@ -9,7 +9,6 @@ export class HttpError extends Error {
 	constructor(readonly statusCode: number, message: string) { super(message); }
 }
 
-/** Decode Rails-style bracket parameters without prototype or inherited-property writes. */
 export function parameters(input: unknown): Json {
 	if (input == null) return {};
 	if (typeof input !== 'object' || Array.isArray(input)) throw new HttpError(422, 'Expected an object');
@@ -67,8 +66,6 @@ export function pagination(query: Json, limit = 20, maximum = 80): Json {
 	} else if (query.max_id) {
 		body.untilId = string(query.max_id);
 	}
-	// Native sinceId selects the *oldest* newer page (ASC). Mastodon since_id
-	// selects the latest page instead, so apply that lower bound after a DESC read.
 	return body;
 }
 
@@ -76,7 +73,6 @@ export function compareIds(a: string, b: string): number {
 	return a.length - b.length || (a < b ? -1 : a > b ? 1 : 0);
 }
 
-/** Apply Mastodon bounds to native source IDs before converting them to another entity. */
 export function pageRows(rows: Json[], query: Json, cursor = (item: Json): string => string(item.id), limit = 20, maximum = 80): Json[] {
 	const size = integer(query.limit, limit, 1, maximum);
 	const after = query.since_id ? string(query.since_id) : undefined;

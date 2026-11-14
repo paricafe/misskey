@@ -40,8 +40,6 @@ export class UserListChannel extends Channel {
 		private noteStreamingHidingService: NoteStreamingHidingService,
 	) {
 		super(request);
-		//this.updateListUsers = this.updateListUsers.bind(this);
-		//this.onNote = this.onNote.bind(this);
 	}
 
 	@bindThis
@@ -51,7 +49,6 @@ export class UserListChannel extends Channel {
 		this.withFiles = !!(params.withFiles ?? false);
 		this.withRenotes = !!(params.withRenotes ?? true);
 
-		// Check existence and owner
 		const listExist = await this.userListsRepository.exists({
 			where: {
 				id: this.listId,
@@ -60,7 +57,6 @@ export class UserListChannel extends Channel {
 		});
 		if (!listExist) return false;
 
-		// Subscribe stream
 		this.subscriber.on(`userListStream:${this.listId}`, this.send);
 
 		this.subscriber.on('notesStream', this.onNote);
@@ -93,7 +89,6 @@ export class UserListChannel extends Channel {
 	private async onNote(note: Packed<'Note'>) {
 		const isMe = this.user!.id === note.userId;
 
-		// チャンネル投稿は無視する
 		if (note.channelId) return;
 
 		if (this.withFiles && (note.fileIds == null || note.fileIds.length === 0)) return;
@@ -105,10 +100,8 @@ export class UserListChannel extends Channel {
 		if (note.reply) {
 			const reply = note.reply;
 			if (this.membershipsMap[note.userId]?.withReplies) {
-				// 自分のフォローしていないユーザーの visibility: followers な投稿への返信は弾く
 				if (reply.visibility === 'followers' && !Object.hasOwn(this.following, reply.userId)) return;
 			} else {
-				// 「チャンネル接続主への返信」でもなければ、「チャンネル接続主が行った返信」でもなければ、「投稿者の投稿者自身への返信」でもない場合
 				if (reply.userId !== this.user!.id && !isMe && reply.userId !== note.userId) return;
 			}
 		}
@@ -127,7 +120,6 @@ export class UserListChannel extends Channel {
 
 	@bindThis
 	public dispose() {
-		// Unsubscribe events
 		this.subscriber.off(`userListStream:${this.listId}`, this.send);
 		this.subscriber.off('notesStream', this.onNote);
 

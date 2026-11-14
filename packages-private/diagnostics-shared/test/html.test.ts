@@ -30,7 +30,6 @@ describe('html', () => {
 		expect(String(html`<p>${inner}</p>`)).toBe('<p><b>a&amp;b</b></p>');
 	});
 
-	// 配列をそのまま文字列化するとカンマ区切りで潰れる。実際に過去これで表が壊れた
 	test('joins arrays without separators instead of stringifying them', () => {
 		const items = [html`<li>1</li>`, html`<li>2</li>`];
 		expect(String(html`<ul>${items}</ul>`)).toBe('<ul><li>1</li><li>2</li></ul>');
