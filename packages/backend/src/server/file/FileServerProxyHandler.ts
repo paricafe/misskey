@@ -13,7 +13,7 @@ import { contentDisposition } from '@/misc/content-disposition.js';
 import { correctFilename } from '@/misc/correct-filename.js';
 import { isMimeImage } from '@/misc/is-mime-image.js';
 import { IImageStreamable, ImageProcessingService, webpDefault } from '@/core/ImageProcessingService.js';
-import { createRangeStream, attachStreamCleanup, needsCleanup } from './FileServerUtils.js';
+import { handleRangeRequest, attachStreamCleanup, needsCleanup } from './FileServerUtils.js';
 import type { DownloadedFileResult, FileResolveResult, FileServerFileResolver } from './FileServerFileResolver.js';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 
@@ -212,28 +212,15 @@ export class FileServerProxyHandler {
 		};
 	}
 
-	private createDefaultStream(
+	private async createDefaultStream(
 		file: AvailableFile,
 		request: FastifyRequest,
 		reply: FastifyReply,
-	): IImageStreamable {
-		if (request.headers.range && 'file' in file && file.file.size > 0) {
-			const { stream, start, end, chunksize } = createRangeStream(request.headers.range as string, file.file.size, file.path);
-
-			reply.header('Content-Range', `bytes ${start}-${end}/${file.file.size}`);
-			reply.header('Accept-Ranges', 'bytes');
-			reply.header('Content-Length', chunksize);
-			reply.code(206);
-
-			return {
-				data: stream,
-				ext: file.ext,
-				type: file.mime,
-			};
-		}
-
+	): Promise<IImageStreamable> {
 		return {
-			data: fs.createReadStream(file.path),
+			data: request.headers.range
+				? handleRangeRequest(reply, request.headers.range, (await fs.promises.stat(file.path)).size, file.path)
+				: fs.createReadStream(file.path),
 			ext: file.ext,
 			type: file.mime,
 		};

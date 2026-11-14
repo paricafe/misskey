@@ -54,7 +54,7 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				token: newToken,
 			});
 
-			this.globalEventService.publishInternalEvent('userTokenRegenerated', { id: me.id, oldToken, newToken });
+			await this.globalEventService.publishInternalEvent('userTokenRegenerated', { id: me.id, oldToken, newToken });
 			this.globalEventService.publishMainStream(me.id, 'myTokenRegenerated');
 		});
 	}

@@ -352,7 +352,7 @@ export class QueueProcessorService implements OnApplicationShutdown {
 						logger.error(`failed(${err.name}: ${err.message}) ${getJobInfo(job)} to=${job.data.to}`, { e: renderError(err) });
 						this.telemetryService.captureMessage(`Queue: UserWebhookDeliver: ${err.name}: ${err.message}`, {
 							level: 'error',
-							extra: { job, err },
+							extra: { jobId: job.id, attemptsMade: job.attemptsMade },
 						});
 					},
 				);
@@ -388,7 +388,7 @@ export class QueueProcessorService implements OnApplicationShutdown {
 						logger.error(`failed(${err.name}: ${err.message}) ${getJobInfo(job)} to=${job.data.to}`, { e: renderError(err) });
 						this.telemetryService.captureMessage(`Queue: SystemWebhookDeliver: ${err.name}: ${err.message}`, {
 							level: 'error',
-							extra: { job, err },
+							extra: { jobId: job.id, attemptsMade: job.attemptsMade },
 						});
 					},
 				);

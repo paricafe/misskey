@@ -146,7 +146,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				.andWhere('following.followerId = :userId', { userId: user.id })
 				.innerJoinAndSelect('following.followee', 'followee');
 
-			// @deprecated use get-following-users-by-birthday instead.
 			if (ps.birthday) {
 				query.innerJoin(this.userProfilesRepository.metadata.targetName, 'followeeProfile', 'followeeProfile.userId = following.followeeId');
 

@@ -15,8 +15,6 @@ export const DEFAULT_INTEGRATION_REFS = ['origin/develop', 'develop', 'origin/ma
 class GitOperationError extends Error {}
 
 /**
- * Git 子プロセスの終了状態と stderr を1行の診断情報にする。
- *
  * @param {unknown} error
  * @returns {string}
  */
@@ -33,8 +31,6 @@ function describeGitFailure(error) {
 }
 
 /**
- * Git コマンドを実行し、標準出力を Buffer で返す。
- *
  * @param {string[]} args
  * @param {{ quiet?: boolean }} [options]
  * @returns {Buffer}
@@ -52,8 +48,6 @@ function gitBuffer(args, options = {}) {
 }
 
 /**
- * Git の標準出力を UTF-8 文字列へ変換する。
- *
  * @param {Buffer} buffer
  * @param {string} context
  * @returns {string}
@@ -67,8 +61,6 @@ function decodeGitOutput(buffer, context) {
 }
 
 /**
- * Git の改行区切り出力を空行を除いた配列にする。
- *
  * @param {string[]} args
  * @param {{ quiet?: boolean }} [options]
  * @returns {string[]}
@@ -80,8 +72,6 @@ export function gitLines(args, options = {}) {
 }
 
 /**
- * Git の NUL 区切りパス出力を、空白・改行を壊さず配列にする。
- *
  * @param {string[]} args
  * @param {{ quiet?: boolean }} [options]
  * @returns {string[]}
@@ -93,8 +83,6 @@ export function gitPaths(args, options = {}) {
 }
 
 /**
- * 指定した ref と HEAD の merge-base を取得する。
- *
  * @param {string} ref
  * @returns {string}
  */
@@ -110,8 +98,6 @@ export function gitMergeBase(ref) {
 }
 
 /**
- * 利用可能な ref のうち、HEAD に最も近い merge-base を返す。
- *
  * @param {string[]} refs
  * @returns {string}
  */

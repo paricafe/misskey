@@ -494,3 +494,30 @@ describe(ApNoteService, () => {
 		expect(noteUpdateService.update).not.toHaveBeenCalled();
 	});
 });
+
+describe('ActivityPub poll vote dispatch', () => {
+	test('routes a remote vote through the shared transactional vote service', async () => {
+		const actor = { id: 'remote-voter', host: 'remote.example', uri: 'https://remote.example/users/alice' };
+		const vote = {
+			id: 'https://remote.example/votes/1', type: 'Note', attributedTo: actor.uri,
+			name: 'green', inReplyTo: 'https://local.example/notes/poll',
+		};
+		const pollVoteService = { vote: vi.fn().mockResolvedValue(undefined) };
+		const service = Object.create(ApNoteService.prototype) as ApNoteService;
+		Object.assign(service, {
+			logger: { debug: vi.fn(), info: vi.fn() },
+			apMentionService: { extractApMentionObjects: () => [], extractApMentions: vi.fn().mockResolvedValue([]) },
+			apQuestionService: { extractPollFromQuestion: vi.fn().mockResolvedValue(undefined) },
+			noteCreateService: { checkProhibitedWordsContain: () => false },
+			apAudienceService: { parseAudience: vi.fn().mockResolvedValue({ visibility: 'public', visibleUsers: [] }) },
+			pollsRepository: { findOneByOrFail: vi.fn().mockResolvedValue({ choices: ['red', 'green'], expiresAt: null }) },
+			pollVoteService,
+		});
+		Object.defineProperty(service, 'validateNote', { value: () => null });
+		Object.defineProperty(service, 'resolveNote', { value: vi.fn().mockResolvedValue({ id: 'poll', hasPoll: true }) });
+		const resolver = { resolve: vi.fn().mockResolvedValue(vote) };
+
+		await expect(service.createNote(vote, actor as never, resolver as never)).resolves.toBeNull();
+		expect(pollVoteService.vote).toHaveBeenCalledExactlyOnceWith('poll', [1], actor);
+	});
+});

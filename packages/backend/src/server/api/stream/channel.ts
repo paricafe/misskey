@@ -128,7 +128,7 @@ export default abstract class Channel {
 
 	public dispose?(): void;
 
-	public onMessage?(type: string, body: JsonValue): void;
+	public onMessage?(type: string, body: JsonValue): Awaitable<void>;
 }
 
 export interface ChannelRequest {

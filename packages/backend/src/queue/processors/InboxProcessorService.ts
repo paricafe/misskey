@@ -284,7 +284,9 @@ export class InboxProcessorService implements OnApplicationShutdown {
 		await this.federatedInstanceService.update(id, {
 			latestRequestReceivedAt: new Date(),
 			isNotResponding: false,
-			suspensionState: job.shouldUnsuspend ? 'none' : undefined,
+			suspensionState: job.shouldUnsuspend
+				? () => `CASE WHEN "suspensionState" = 'autoSuspendedForNotResponding' THEN 'none' ELSE "suspensionState" END`
+				: undefined,
 		});
 	}
 

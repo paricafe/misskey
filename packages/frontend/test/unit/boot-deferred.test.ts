@@ -16,7 +16,7 @@ vi.mock('@/widgets/index.js', () => ({ default: vi.fn() }));
 vi.mock('@/directives/index.js', () => ({ default: vi.fn() }));
 vi.mock('@/components/index.js', () => ({ default: vi.fn() }));
 vi.mock('@/theme.js', () => ({ themeManager: { updateTheme: vi.fn() } }));
-vi.mock('@/accounts.js', () => ({ refreshCurrentAccount: vi.fn(), login: vi.fn() }));
+vi.mock('@/accounts.js', () => ({ refreshCurrentAccount: vi.fn(), login: vi.fn(), initializeAccountStorage: vi.fn() }));
 vi.mock('@/store.js', async () => {
 	const { ref } = await import('vue');
 	return { store: { ready: Promise.resolve(), r: { darkMode: ref(false) }, s: { darkMode: false }, set: vi.fn() } };

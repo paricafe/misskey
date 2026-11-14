@@ -55,7 +55,7 @@ describe('Block', () => {
 
 		assert.strictEqual(res.status, 400);
 		assert.ok(res.body);
-		assert.strictEqual(castAsError(res.body).error.id, 'b390d7e1-8a5e-46ed-b625-06271cafd3d3');
+		assert.strictEqual(castAsError(res.body).error.id, 'b98980fa-3780-406c-a935-b6d0eeee10d1');
 	});
 
 	test('ブロックされているユーザーのノートをRenoteできない', async () => {

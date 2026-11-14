@@ -6,7 +6,6 @@ precision mediump float;
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-// エイリアスを解決してくれないので、プロジェクトルートからの絶対パスにする必要がある
 #include /src/shaders/snoise;
 
 in vec2 in_uv;
@@ -41,7 +40,6 @@ void main() {
 	} else {
 		float n = remap(noise, u_threshold, 1.0, 0.0, 1.0);
 
-		// TODO: マスクの形自体も揺らぎを与える
 		float d = distance(uv * vec2(2.0, 2.0), u_pos * vec2(2.0, 2.0));
 		float mask = d < u_maskSize ? 0.0 : ((d - u_maskSize) * (1.0 + (u_maskSize * 2.0)));
 		out_color = vec4(

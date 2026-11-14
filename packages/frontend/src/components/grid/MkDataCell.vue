@@ -22,7 +22,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 			$style.root,
 			[(cell.violation.valid || cell.selected) ? {} : $style.error],
 			[cell.selected ? $style.selected : {}],
-			// 行が選択されているときは範囲選択色の適用を行側に任せる
 			[(cell.ranged && !cell.row.ranged) ? $style.ranged : {}],
 			[needsContentCentering ? $style.center : {}],
 		]"

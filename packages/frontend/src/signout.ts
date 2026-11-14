@@ -18,7 +18,15 @@ export async function signout() {
 	waiting();
 
 	if (store.s.enablePreferencesAutoCloudBackup) {
-		await cloudBackup();
+		const controller = new AbortController();
+		const timeout = window.setTimeout(() => controller.abort(), 5000);
+		try {
+			await cloudBackup(controller.signal);
+		} catch (error) {
+			console.error('Failed to back up preferences before signing out', error);
+		} finally {
+			window.clearTimeout(timeout);
+		}
 	}
 
 	localStorage.clear();

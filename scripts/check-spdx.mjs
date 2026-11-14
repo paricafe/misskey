@@ -4,27 +4,7 @@
  */
 
 // @ts-check
-/**
- * Misskey SPDX ヘッダーの検査 / 自動修正。
- *
- * 使い方:
- *   node scripts/check-spdx.mjs                    ローカル検査 (repo 全体 + HTML コメント形式)
- *   node scripts/check-spdx.mjs --check            同上 (明示形)
- *   node scripts/check-spdx.mjs --ci               CI 互換検査 (現行の OR 判定を維持)
- *   node scripts/check-spdx.mjs --fix [--base REF] このブランチの欠落だけ自動修正して全体を再検査
- *
- * 終了コード:
- *   0 = 選択したモードの検査に合格
- *   1 = SPDX 欠落またはローカル検査でのコメント形式違反
- *   2 = 引数、Git ref、ファイル列挙・読取などの理由で検査不能
- *
- * CI 互換判定は、現行 CI と同じく copyright 行または AGPL license 行のどちらか
- * 一方が全文のどこかにあれば pass する。この判定はライセンス表記の完全性や正当性を
- * 保証しない。ローカル検査は、加えて .vue / .html のコメント形式を検査する。
- *
- * --check / --ci の合否はブランチの所有権で絞らない。--fix だけが統合先との差分を
- * 使い、自分の変更に含まれる欠落へ修正対象を限定する。修正後は必ず全体を再検査する。
- */
+/** Check SPDX headers and repair missing headers in local changes. */
 
 import { lstatSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, extname } from 'node:path';
@@ -74,8 +54,6 @@ const BLOCK_HEADER = `/*\n * ${COPYRIGHT_LINE}\n * ${LICENSE_LINE}\n */\n\n`;
 class OperationalError extends Error {}
 
 /**
- * パスが存在する通常ファイルかを判定する。
- *
  * @param {string} file
  * @returns {boolean}
  */
@@ -89,8 +67,6 @@ function isRegularFile(file) {
 }
 
 /**
- * パスが SPDX 検査の対象条件を満たすかを判定する。
- *
  * @param {string} file
  * @returns {boolean}
  */
@@ -108,8 +84,6 @@ function isTargetPath(file) {
 }
 
 /**
- * Git の index と必要に応じて untracked から SPDX 対象ファイルを列挙する。
- *
  * @param {boolean} includeUntracked
  * @returns {string[]}
  */
@@ -122,8 +96,6 @@ function listTargetFiles(includeUntracked) {
 }
 
 /**
- * 明示 ref または利用可能な統合先から merge-base を選ぶ。
- *
  * @param {string | null} explicitRef
  * @returns {string}
  */
@@ -139,8 +111,6 @@ function resolveMergeBase(explicitRef) {
 }
 
 /**
- * merge-base 以降の commit 済み・未commit・untracked の変更を集める。
- *
  * @param {string | null} explicitRef
  * @returns {Set<string>}
  */
@@ -154,8 +124,6 @@ function listLocalChanges(explicitRef) {
 }
 
 /**
- * 指定位置が閉じた HTML コメントの内側かを判定する。
- *
  * @param {string} text
  * @param {number} index
  * @returns {boolean}
@@ -169,8 +137,6 @@ function isInsideHtmlComment(text, index) {
 }
 
 /**
- * ファイルの SPDX 行と HTML コメント形式を判定する。
- *
  * @param {string} file
  * @returns {Verdict}
  */
@@ -190,8 +156,6 @@ function judge(file) {
 }
 
 /**
- * ファイル種別と先頭指示行に合わせ、SPDX ヘッダーを適切な位置へ挿入する。
- *
  * @param {string} file
  * @returns {void}
  */
@@ -222,8 +186,6 @@ function insertHeader(file) {
 }
 
 /**
- * CLI 引数を検証し、実行モードと基準 ref を取り出す。
- *
  * @param {string[]} args
  * @returns {{ mode: Mode, baseRef: string | null } | null}
  */
@@ -253,8 +215,6 @@ function parseArgs(args) {
 }
 
 /**
- * 対象ファイルを検査し、違反種別ごとの一覧にまとめる。
- *
  * @param {string[]} targets
  * @returns {{ missing: string[], wrongForm: string[] }}
  */
@@ -272,8 +232,6 @@ function inspectTargets(targets) {
 }
 
 /**
- * SPDX の検査・修正を実行し、集約した終了コードを返す。
- *
  * @returns {number}
  */
 function main() {

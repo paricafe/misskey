@@ -11,6 +11,13 @@ describe('Block', () => {
 		}, WAIT_FOR_FEDERATION);
 	}
 
+	async function waitForUnblocked(blocked: LoginUser, blockerId: string): Promise<void> {
+		await vi.waitFor(async () => {
+			const blocker = await blocked.client.request('users/show', { userId: blockerId });
+			strictEqual(blocker.isBlocked, false);
+		}, WAIT_FOR_FEDERATION);
+	}
+
 	describe('Check follow', () => {
 		let alice: LoginUser, bob: LoginUser;
 		let bobInA: Misskey.entities.UserDetailedNotMe, aliceInB: Misskey.entities.UserDetailedNotMe;
@@ -44,30 +51,16 @@ describe('Block', () => {
 			strictEqual(followers.length, 0);
 		});
 
-		test('Cannot follow even if unblocked', async () => {
+		test('Can follow if unblocked', async () => {
 			await alice.client.request('blocking/delete', { userId: bobInA.id });
-			await sleep();
-
-			await rejects(
-				async () => await bob.client.request('following/create', { userId: aliceInB.id }),
-				(err: any) => {
-					strictEqual(err.code, 'BLOCKED');
-					return true;
-				},
-			);
-		});
-
-		test.skip('Can follow if unblocked', async () => {
-			await alice.client.request('blocking/delete', { userId: bobInA.id });
-			await sleep();
-
+			await waitForUnblocked(bob, aliceInB.id);
 			await bob.client.request('following/create', { userId: aliceInB.id });
-			await sleep();
-
-			const following = await bob.client.request('users/following', { userId: bob.id });
-			strictEqual(following.length, 1);
-			const followers = await alice.client.request('users/followers', { userId: alice.id });
-			strictEqual(followers.length, 1);
+			await vi.waitFor(async () => {
+				const following = await bob.client.request('users/following', { userId: bob.id });
+				strictEqual(following.length, 1);
+				const followers = await alice.client.request('users/followers', { userId: alice.id });
+				strictEqual(followers.length, 1);
+			}, WAIT_FOR_FEDERATION);
 		});
 
 		test.skip('Remove follower when block them', async () => {
@@ -115,7 +108,7 @@ describe('Block', () => {
 			await rejects(
 				async () => await bob.client.request('notes/create', { text: 'b', replyId: resolvedNote.id }),
 				(err: any) => {
-					strictEqual(err.code, 'YOU_HAVE_BEEN_BLOCKED');
+					strictEqual(err.code, 'CANNOT_REPLY_TO_AN_INVISIBLE_NOTE');
 					return true;
 				},
 			);
@@ -164,32 +157,16 @@ describe('Block', () => {
 			);
 		});
 
-		test('Cannot reaction even if unblocked', async () => {
+		test('Can react if unblocked', async () => {
 			await alice.client.request('blocking/delete', { userId: bobInA.id });
-			await sleep();
-
-			const note = (await alice.client.request('notes/create', { text: 'a' })).createdNote;
-			const resolvedNote = await resolveRemoteNote('a.test', note.id, bob);
-
-			await rejects(
-				async () => await bob.client.request('notes/reactions/create', { noteId: resolvedNote.id, reaction: '😅' }),
-				(err: any) => {
-					strictEqual(err.code, 'YOU_HAVE_BEEN_BLOCKED');
-					return true;
-				},
-			);
-		});
-
-		test.skip('Can reaction if unblocked', async () => {
-			await alice.client.request('blocking/delete', { userId: bobInA.id });
-			await sleep();
-
+			await waitForUnblocked(bob, aliceInB.id);
 			const note = (await alice.client.request('notes/create', { text: 'a' })).createdNote;
 			const resolvedNote = await resolveRemoteNote('a.test', note.id, bob);
 			await bob.client.request('notes/reactions/create', { noteId: resolvedNote.id, reaction: '😅' });
-
-			const _note = await alice.client.request('notes/show', { noteId: note.id });
-			deepStrictEqual(_note.reactions, { '😅': 1 });
+			await vi.waitFor(async () => {
+				const updated = await alice.client.request('notes/show', { noteId: note.id });
+				deepStrictEqual(updated.reactions, { '😅': 1 });
+			}, WAIT_FOR_FEDERATION);
 		});
 	});
 

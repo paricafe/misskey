@@ -486,7 +486,7 @@ describe('User', () => {
 				);
 			});
 
-			test('Alice gets unsuspended, Bob succeeds in following Alice', async () => {
+			test('Alice gets unsuspended and resolves as a new remote account', async () => {
 				await aAdmin.client.request('admin/unsuspend-user', { userId: alice.id });
 				await sleep();
 
@@ -501,13 +501,8 @@ describe('User', () => {
 					},
 				);
 
-				await rejects(
-					async () => await resolveRemoteUser('a.test', alice.id, bob),
-					(err: any) => {
-						strictEqual(err.code, 'INTERNAL_ERROR');
-						return true;
-					},
-				);
+				const resolvedAlice = await resolveRemoteUser('a.test', alice.id, bob);
+				assert(resolvedAlice.id !== aliceInB.id);
 			});
 
 			test('Alice can follow Bob', async () => {
@@ -527,13 +522,8 @@ describe('User', () => {
 				await bob.client.request('following/create', { userId: renewedaliceInB.id });
 				await waitForFollowers(alice, 1);
 
-				await rejects(
-					async () => await resolveRemoteUser('a.test', alice.id, bob),
-					(err: any) => {
-						strictEqual(err.code, 'INTERNAL_ERROR');
-						return true;
-					},
-				);
+				const resolvedAlice = await resolveRemoteUser('a.test', alice.id, bob);
+				strictEqual(resolvedAlice.id, renewedaliceInB.id);
 			});
 		});
 	});

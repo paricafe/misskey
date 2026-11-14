@@ -7,11 +7,12 @@ import { Inject, Injectable, OnApplicationShutdown } from '@nestjs/common';
 import * as Redis from 'ioredis';
 import type { InstancesRepository } from '@/models/_.js';
 import type { MiInstance } from '@/models/Instance.js';
-import { MemoryKVCache, RedisKVCache } from '@/misc/cache.js';
+import { RedisKVCache } from '@/misc/cache.js';
 import { IdService } from '@/core/IdService.js';
 import { DI } from '@/di-symbols.js';
 import { UtilityService } from '@/core/UtilityService.js';
 import { bindThis } from '@/decorators.js';
+import type { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity.js';
 
 @Injectable()
 export class FederatedInstanceService implements OnApplicationShutdown {
@@ -89,7 +90,7 @@ export class FederatedInstanceService implements OnApplicationShutdown {
 	}
 
 	@bindThis
-	public async update(id: MiInstance['id'], data: Partial<MiInstance>): Promise<void> {
+	public async update(id: MiInstance['id'], data: QueryDeepPartialEntity<MiInstance>): Promise<void> {
 		const result = await this.instancesRepository.createQueryBuilder().update()
 			.set(data)
 			.where('id = :id', { id })

@@ -12,8 +12,6 @@ import type Logger from '@/logger.js';
 import { ApRequestService } from '@/core/activitypub/ApRequestService.js';
 import { FederatedInstanceService } from '@/core/FederatedInstanceService.js';
 import { FetchInstanceMetadataService } from '@/core/FetchInstanceMetadataService.js';
-import { MemorySingleCache } from '@/misc/cache.js';
-import type { MiInstance } from '@/models/Instance.js';
 import InstanceChart from '@/core/chart/charts/instance.js';
 import ApRequestChart from '@/core/chart/charts/ap-request.js';
 import FederationChart from '@/core/chart/charts/federation.js';
@@ -26,8 +24,6 @@ import type { DeliverJobData } from '../types.js';
 @Injectable()
 export class DeliverProcessorService {
 	private logger: Logger;
-	private suspendedHostsCache: MemorySingleCache<MiInstance[]>;
-	private latest: string | null;
 
 	constructor(
 		@Inject(DI.meta)
@@ -46,7 +42,6 @@ export class DeliverProcessorService {
 		private queueLoggerService: QueueLoggerService,
 	) {
 		this.logger = this.queueLoggerService.logger.createSubLogger('deliver');
-		this.suspendedHostsCache = new MemorySingleCache<MiInstance[]>(1000 * 60 * 60);
 	}
 
 	@bindThis
@@ -57,16 +52,10 @@ export class DeliverProcessorService {
 			return 'skip (blocked)';
 		}
 
-		let suspendedHosts = this.suspendedHostsCache.get();
-		if (suspendedHosts == null) {
-			suspendedHosts = await this.instancesRepository.find({
-				where: {
-					suspensionState: Not('none'),
-				},
-			});
-			this.suspendedHostsCache.set(suspendedHosts);
-		}
-		if (suspendedHosts.map(x => x.host).includes(this.utilityService.toPuny(host))) {
+		if (await this.instancesRepository.existsBy({
+			host: this.utilityService.toPuny(host),
+			suspensionState: Not('none'),
+		})) {
 			return 'skip (suspended)';
 		}
 

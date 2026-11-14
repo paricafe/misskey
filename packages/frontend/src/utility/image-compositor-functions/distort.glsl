@@ -16,7 +16,7 @@ uniform vec2 in_resolution;
 uniform float u_phase;
 uniform float u_frequency;
 uniform float u_strength;
-uniform int u_direction; // 0: vertical, 1: horizontal
+uniform int u_direction;
 out vec4 out_color;
 
 void main() {

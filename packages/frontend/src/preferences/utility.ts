@@ -139,7 +139,7 @@ function importProfile() {
 	input.click();
 }
 
-export async function cloudBackup() {
+export async function cloudBackup(signal?: AbortSignal) {
 	if ($i == null) return;
 	if (!canAutoBackup()) {
 		throw new Error('cannot auto backup for this profile');
@@ -149,7 +149,7 @@ export async function cloudBackup() {
 		scope: ['client', 'preferences', 'backups'],
 		key: prefer.profile.name,
 		value: prefer.profile,
-	});
+	}, undefined, signal);
 }
 
 export async function listCloudBackups() {

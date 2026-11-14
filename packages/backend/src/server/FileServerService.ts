@@ -48,7 +48,7 @@ export class FileServerService {
 		private loggerService: LoggerService,
 	) {
 		this.logger = this.loggerService.getLogger('server', 'gray');
-		this.assets = resolve(this.config.rootDir, 'packages/backend/src/server/file/assets');
+		this.assets = resolve(this.config.rootDir, 'packages/backend/src/server/assets');
 		this.fileResolver = new FileServerFileResolver(
 			this.driveFilesRepository,
 			this.fileInfoService,

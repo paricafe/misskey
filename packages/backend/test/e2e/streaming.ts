@@ -6,7 +6,7 @@
 process.env.NODE_ENV = 'test';
 
 import * as assert from 'assert';
-import { describe, beforeAll, test } from 'vitest';
+import { describe, beforeAll, test, vi } from 'vitest';
 import { WebSocket } from 'ws';
 import { api, captureNoteUpdatedEvents, connectStream, createAppToken, initTestDb, port, post, signup, waitFire } from '../utils.js';
 import type * as misskey from 'misskey-js';
@@ -848,6 +848,56 @@ describe('Streaming', () => {
 			);
 
 			assert.strictEqual(fired, true);
+		});
+
+		test('revoking a native application token closes its existing private stream', async () => {
+			const user = await signup({ username: 'streamrevoked' });
+			const token = await createAppToken(user, ['read:account']);
+			const messages: Record<string, any>[] = [];
+			const socket = await connectStream({ token }, 'main', message => messages.push(message));
+			try {
+				assert.strictEqual((await api('i/update', { description: 'before revocation' }, user)).status, 200);
+				await vi.waitFor(() => assert.ok(messages.some(message => message.type === 'meUpdated')), { timeout: 3000 });
+				const revoked = await api('i/revoke-token', { token }, user);
+				assert.strictEqual(revoked.status, 204);
+				await vi.waitFor(() => assert.strictEqual(socket.readyState, WebSocket.CLOSED), { timeout: 3000 });
+				messages.length = 0;
+				assert.strictEqual((await api('i/update', { description: 'after revocation' }, user)).status, 200);
+				assert.strictEqual((await api('i', {}, { token })).status, 401);
+				assert.deepStrictEqual(messages, []);
+			} finally {
+				socket.close();
+			}
+		});
+
+		test('leaving a room stops its existing subscription while other members receive new messages', async () => {
+			const owner = await signup({ username: 'streamroomowner' });
+			const member = await signup({ username: 'streamroommember' });
+			const room = await api('chat/rooms/create', { name: 'private stream room' }, owner);
+			assert.strictEqual(room.status, 200);
+			const roomId = room.body.id;
+			assert.strictEqual((await api('chat/rooms/invitations/create', { roomId, userId: member.id }, owner)).status, 200);
+			assert.strictEqual((await api('chat/rooms/join', { roomId }, member)).status, 204);
+			const received: Record<string, any>[] = [];
+			const ownerReceived: Record<string, any>[] = [];
+			const socket = await connectStream(member, 'chatRoom', message => received.push(message), { roomId });
+			const ownerSocket = await connectStream(owner, 'chatRoom', message => ownerReceived.push(message), { roomId });
+			try {
+				const first = await api('chat/messages/create-to-room', { toRoomId: roomId, text: 'before leaving' }, owner);
+				assert.strictEqual(first.status, 200);
+				await vi.waitFor(() => assert.ok(received.some(message => message.body.id === first.body.id)), { timeout: 3000 });
+				assert.strictEqual((await api('chat/rooms/leave', { roomId }, member)).status, 204);
+				received.length = 0;
+				const next = await api('chat/messages/create-to-room', { toRoomId: roomId, text: 'after leaving' }, owner);
+				assert.strictEqual(next.status, 200);
+				await vi.waitFor(() => assert.ok(ownerReceived.some(message => message.body.id === next.body.id)), { timeout: 3000 });
+				await new Promise<void>(resolve => { socket.once('pong', () => resolve()); socket.ping(); });
+				assert.deepStrictEqual(received, []);
+				assert.strictEqual((await api('chat/messages/room-timeline', { roomId }, member)).status, 400);
+			} finally {
+				socket.close();
+				ownerSocket.close();
+			}
 		});
 
 		describe('Hashtag Timeline', () => {

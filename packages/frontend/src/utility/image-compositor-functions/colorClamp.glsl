@@ -6,9 +6,6 @@ precision mediump float;
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-// colorClamp, colorClampAdvanced共通
-// colorClampではmax, minがすべて同じ値となる
-
 in vec2 in_uv;
 uniform sampler2D in_texture;
 uniform vec2 in_resolution;

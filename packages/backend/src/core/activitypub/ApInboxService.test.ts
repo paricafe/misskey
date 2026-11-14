@@ -8,6 +8,7 @@ import { IdentifiableError } from '@/misc/identifiable-error.js';
 import { StatusError } from '@/misc/status-error.js';
 import { NOTE_HISTORY_LIMIT_ERROR_ID, NOTE_NO_CONTENT_ERROR_ID, NOTE_NOT_FOUND_ERROR_ID } from '@/core/NoteUpdateService.js';
 import { ApInboxService } from './ApInboxService.js';
+import { ApDbResolverService } from './ApDbResolverService.js';
 import type { MiRemoteUser } from '@/models/User.js';
 
 describe(ApInboxService, () => {
@@ -246,5 +247,78 @@ describe(ApInboxService, () => {
 		const updateNote = vi.fn().mockRejectedValue(error);
 
 		await expect(createPostUpdate(post, updateNote)()).rejects.toBe(error);
+	});
+});
+
+describe('remote account deletion recovery', () => {
+	function createDeletionService() {
+		let exists = true;
+		let isDeleted = false;
+		const update = vi.fn(async (where: { id: string; isDeleted?: boolean }) => {
+			if (!exists || (where.isDeleted != null && where.isDeleted !== isDeleted)) return { affected: 0 };
+			isDeleted = true;
+			return { affected: 1 };
+		});
+		const createDeleteAccountJob = vi.fn().mockResolvedValue({ name: 'deleteAccount', id: 'job' });
+		const service = Object.create(ApInboxService.prototype) as ApInboxService;
+		Object.assign(service, {
+			logger: { info: vi.fn() },
+			usersRepository: { update, existsBy: vi.fn(async () => exists) },
+			queueService: { createDeleteAccountJob },
+			globalEventService: { publishInternalEvent: vi.fn() },
+		});
+		const actor = { id: 'remote-user', uri: 'https://remote.example/users/alice' };
+		const remove = () => (service as unknown as { deleteActor(actor: unknown, uri: string): Promise<string> }).deleteActor(actor, actor.uri);
+		return { remove, createDeleteAccountJob, actor, deleted: () => isDeleted, finish: () => { exists = false; } };
+	}
+
+	test('keeps the actor authenticatable when enqueue fails and retries deletion', async () => {
+		const { remove, createDeleteAccountJob, actor, deleted } = createDeletionService();
+		const resolver = Object.create(ApDbResolverService.prototype) as ApDbResolverService;
+		Object.assign(resolver, {
+			publicKeyCache: { fetch: vi.fn().mockResolvedValue({ userId: actor.id, keyPem: 'public-key' }) },
+			cacheService: { findUserById: vi.fn(async () => ({ ...actor, isDeleted: deleted() })) },
+		});
+		createDeleteAccountJob.mockRejectedValueOnce(new Error('Redis unavailable'));
+		await expect(remove()).rejects.toThrow('Redis unavailable');
+		expect(deleted()).toBe(false);
+		await expect(resolver.getAuthUserFromKeyId(`${actor.uri}#key`)).resolves.toMatchObject({ user: { id: actor.id } });
+		await expect(remove()).resolves.toBe('ok: queued deleteAccount job');
+		expect(deleted()).toBe(true);
+		await expect(resolver.getAuthUserFromKeyId(`${actor.uri}#key`)).resolves.toBeNull();
+		expect(createDeleteAccountJob).toHaveBeenCalledTimes(2);
+	});
+
+	test('does not recreate work once the account was physically deleted', async () => {
+		const { remove, createDeleteAccountJob, finish } = createDeletionService();
+		finish();
+		await expect(remove()).resolves.toBe('skip: actor not found');
+		expect(createDeleteAccountJob).not.toHaveBeenCalled();
+	});
+});
+
+describe('announce target retry classification', () => {
+	function createAnnounceService(error: Error) {
+		const service = Object.create(ApInboxService.prototype) as ApInboxService;
+		Object.assign(service, {
+			relayService: { isRelayActor: vi.fn().mockResolvedValue(false) },
+			utilityService: { isFederationAllowedUri: () => true },
+			redisClient: { set: vi.fn().mockResolvedValue('OK'), eval: vi.fn().mockResolvedValue(1) },
+			apNoteService: { fetchNote: vi.fn().mockResolvedValue(null), resolveNote: vi.fn().mockRejectedValue(error) },
+		});
+		return () => (service as unknown as { announceNote(actor: unknown, activity: unknown, target: unknown): Promise<string> }).announceNote(
+			{ id: 'actor', uri: 'https://remote.example/users/alice' },
+			{ id: 'https://remote.example/activities/1' },
+			{ id: 'https://target.example/notes/1' },
+		);
+	}
+
+	test.each([429, 503])('preserves retryable target HTTP %s failures', async (status) => {
+		const error = new StatusError('Temporary failure', status);
+		await expect(createAnnounceService(error)()).rejects.toBe(error);
+	});
+
+	test.each([404, 410])('skips permanently unavailable target HTTP %s', async (status) => {
+		await expect(createAnnounceService(new StatusError('Gone', status))()).resolves.toContain(`- ${status}`);
 	});
 });

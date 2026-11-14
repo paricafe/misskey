@@ -56,7 +56,6 @@ export async function setupCoverage(project: TestProject): Promise<void> {
 	};
 }
 
-/** バンドルの実行結果をistanbulのカバレッジへ変換する */
 async function collectServerCoverage(project: TestProject, provider: V8CoverageProvider): Promise<CoverageMapLike | null> {
 	if (!profiling) return null;
 

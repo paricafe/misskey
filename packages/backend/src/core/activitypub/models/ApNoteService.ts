@@ -19,7 +19,7 @@ import { NoteCreateService } from '@/core/NoteCreateService.js';
 import { NoteUpdateService } from '@/core/NoteUpdateService.js';
 import type Logger from '@/logger.js';
 import { IdService } from '@/core/IdService.js';
-import { PollService } from '@/core/PollService.js';
+import { PollVoteService } from '@/core/PollVoteService.js';
 import { StatusError } from '@/misc/status-error.js';
 import { UtilityService } from '@/core/UtilityService.js';
 import { bindThis } from '@/decorators.js';
@@ -74,7 +74,7 @@ export class ApNoteService {
 		private apMentionService: ApMentionService,
 		private apImageService: ApImageService,
 		private apQuestionService: ApQuestionService,
-		private pollService: PollService,
+		private pollVoteService: PollVoteService,
 		private noteCreateService: NoteCreateService,
 		private noteUpdateService: NoteUpdateService,
 		private apDbResolverService: ApDbResolverService,
@@ -272,9 +272,7 @@ export class ApNoteService {
 					this.logger.warn(`vote to expired poll from AP: actor=${actor.username}@${actor.host}, note=${note.id}, choice=${name}`);
 				} else if (index >= 0) {
 					this.logger.info(`vote from AP: actor=${actor.username}@${actor.host}, note=${note.id}, choice=${name}`);
-					await this.pollService.vote(actor, reply, index);
-
-					this.pollService.deliverQuestionUpdate(reply.id);
+					await this.pollVoteService.vote(reply.id, [index], actor);
 				}
 				return null;
 			};

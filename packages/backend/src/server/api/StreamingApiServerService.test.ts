@@ -20,13 +20,13 @@ describe('native streaming path isolation', () => {
 });
 
 describe('native streaming shutdown', () => {
-	async function setup(init: () => Promise<void> = async () => {}) {
+	async function setup(init: () => Promise<void> = async () => {}, authenticate = vi.fn().mockResolvedValue([null, null]), token?: string) {
 		const redis = new EventEmitter();
 		const stream = { init: vi.fn(init), listen: vi.fn().mockResolvedValue(undefined), dispose: vi.fn() };
 		const service = new StreamingApiServerService(
 			redis as never,
 			{ registerRequestByContextId: vi.fn(), create: vi.fn().mockResolvedValue(stream) } as never,
-			{ authenticate: vi.fn().mockResolvedValue([null, null]) } as never,
+			{ authenticate } as never,
 			{ updateLastActiveDate: vi.fn() } as never,
 		);
 		const server = createServer();
@@ -35,10 +35,137 @@ describe('native streaming shutdown', () => {
 		await once(server, 'listening');
 		const address = server.address();
 		if (address == null || typeof address === 'string') throw new Error('Missing test server port');
-		const client = new WebSocket(`ws://127.0.0.1:${address.port}/streaming`);
+		const client = new WebSocket(`ws://127.0.0.1:${address.port}/streaming${token ? `?i=${token}` : ''}`);
 		client.on('error', () => {});
-		return { redis, stream, service, server, client };
+		return { redis, stream, service, server, client, authenticate };
 	}
+
+	test('closes only the revoked token and blocks events already in flight', async () => {
+		const authenticate = vi.fn(async (token: string) => [{ id: 'alice' }, { id: token, permission: ['read:account'] }]);
+		const { redis, stream, service, server, client } = await setup(undefined, authenticate, 'revoked');
+		let second: WebSocket | undefined;
+		try {
+			await once(client, 'open');
+			second = new WebSocket(client.url.replace('revoked', 'retained'));
+			await once(second, 'open');
+			const closed = once(client, 'close');
+			redis.emit('message', 'test', JSON.stringify({ channel: 'internal', message: { type: 'accessTokenRevoked', body: { id: 'revoked', userId: 'alice' } } }));
+			await closed;
+			expect(second.readyState).toBe(WebSocket.OPEN);
+			const revokedSocket = stream.listen.mock.calls[0][1] as WebSocket;
+			expect(revokedSocket.readyState).not.toBe(WebSocket.OPEN);
+		} finally {
+			await service.detach();
+			client.terminate();
+			second?.terminate();
+			await new Promise<void>(resolve => server.close(() => resolve()));
+		}
+	});
+
+	test('rejects revocation while stream initialization is pending', async () => {
+		let finishInitialization!: () => void;
+		const initialization = new Promise<void>(resolve => { finishInitialization = resolve; });
+		const authenticate = vi.fn().mockResolvedValue([{ id: 'alice' }, { id: 'token', permission: ['read:account'] }]);
+		const { redis, stream, service, server, client } = await setup(() => initialization, authenticate, 'token');
+		try {
+			await vi.waitFor(() => expect(stream.init).toHaveBeenCalledOnce());
+			const closed = new Promise<void>(resolve => client.once('close', () => resolve()));
+			redis.emit('message', 'test', JSON.stringify({ channel: 'internal', message: { type: 'accessTokenRevoked', body: { id: 'token', userId: 'alice' } } }));
+			finishInitialization();
+			await closed;
+			await vi.waitFor(() => expect(stream.dispose).toHaveBeenCalledOnce());
+			expect(stream.listen).not.toHaveBeenCalled();
+		} finally {
+			finishInitialization();
+			await service.detach();
+			client.terminate();
+			await new Promise<void>(resolve => server.close(() => resolve()));
+		}
+	});
+
+	test.each([
+		{ type: 'userTokenRegenerated', body: { id: 'alice', oldToken: 'credential', newToken: 'replacement' } },
+		{ type: 'userChangeSuspendedState', body: { id: 'alice', isSuspended: true } },
+		{ type: 'userChangeDeletedState', body: { id: 'alice', isDeleted: true } },
+	])('closes active sessions on $type', async event => {
+		const authenticate = vi.fn().mockResolvedValue([{ id: 'alice' }, null]);
+		const { redis, service, server, client } = await setup(undefined, authenticate, 'credential');
+		try {
+			await once(client, 'open');
+			const closed = once(client, 'close');
+			redis.emit('message', 'test', JSON.stringify({ channel: 'internal', message: event }));
+			await closed;
+		} finally {
+			await service.detach();
+			client.terminate();
+			await new Promise<void>(resolve => server.close(() => resolve()));
+		}
+	});
+
+	test('checks fresh authorization again before completing the handshake', async () => {
+		const authenticate = vi.fn().mockResolvedValueOnce([{ id: 'alice' }, { id: 'token', permission: ['read:account'] }])
+			.mockRejectedValueOnce(new Error('token removed'));
+		const { stream, service, server, client } = await setup(undefined, authenticate, 'token');
+		try {
+			await new Promise<void>(resolve => client.once('close', () => resolve()));
+			expect(authenticate).toHaveBeenLastCalledWith('token', { fresh: true, updateLastUsedAt: false });
+			expect(stream.listen).not.toHaveBeenCalled();
+		} finally {
+			await service.detach();
+			client.terminate();
+			await new Promise<void>(resolve => server.close(() => resolve()));
+		}
+	});
+
+	test('does not reuse an authorization query started before a new handshake subscribed to revocations', async () => {
+		vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+		const valid = [{ id: 'alice' }, { id: 'token', permission: ['read:account'] }];
+		const authenticate = vi.fn().mockResolvedValue(valid);
+		const { service, server, client } = await setup(undefined, authenticate, 'token');
+		let second: WebSocket | undefined;
+		let finishOldCheck!: (value: unknown) => void;
+		try {
+			await once(client, 'open');
+			authenticate.mockImplementationOnce(() => new Promise(resolve => { finishOldCheck = resolve; }));
+			await vi.advanceTimersByTimeAsync(10_000);
+			authenticate.mockResolvedValueOnce(valid).mockRejectedValueOnce(new Error('token removed'));
+			second = new WebSocket(client.url);
+			second.on('error', () => {});
+			await new Promise<void>((resolve, reject) => {
+				second!.once('open', () => reject(new Error('A revoked token completed a new handshake')));
+				second!.once('close', () => resolve());
+			});
+			expect(authenticate).toHaveBeenCalledTimes(5);
+		} finally {
+			finishOldCheck?.(valid);
+			await service.detach();
+			vi.useRealTimers();
+			client.terminate();
+			second?.terminate();
+			await new Promise<void>(resolve => server.close(() => resolve()));
+		}
+	});
+
+	test('fails closed on periodic authorization failure without querying for each event', async () => {
+		vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+		const authenticate = vi.fn().mockResolvedValue([{ id: 'alice' }, { id: 'token', permission: ['read:account'] }]);
+		const { redis, service, server, client } = await setup(undefined, authenticate, 'token');
+		try {
+			await once(client, 'open');
+			const calls = authenticate.mock.calls.length;
+			for (let i = 0; i < 100; i++) redis.emit('message', 'test', JSON.stringify({ channel: 'broadcast', message: { type: 'public' } }));
+			expect(authenticate).toHaveBeenCalledTimes(calls);
+			authenticate.mockRejectedValue(new Error('database unavailable'));
+			const closed = once(client, 'close');
+			await vi.advanceTimersByTimeAsync(10_000);
+			await closed;
+		} finally {
+			await service.detach();
+			vi.useRealTimers();
+			client.terminate();
+			await new Promise<void>(resolve => server.close(() => resolve()));
+		}
+	});
 
 	test('closes connected clients and removes listeners before resolving detach', async () => {
 		const { redis, stream, service, server, client } = await setup();

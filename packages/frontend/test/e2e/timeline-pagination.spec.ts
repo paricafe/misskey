@@ -30,6 +30,7 @@ for (const scenario of [
 		await registerUser(url, 'admin', 'password', true);
 		const user = await registerUser(url, 'paginationreader', 'password');
 		const account = await api(url, 'i', { i: user.token });
+		const metadata = await api(url, 'meta', {});
 		await api(url, 'i/registry/set', { i: user.token, scope: ['client', 'base'], key: 'accountSetupWizard', value: -1 });
 		const { createdNote: seed } = await api(url, 'notes/create', { i: user.token, text: 'Pagination seed' });
 		const notes = Array.from({ length: 500 }, (_, i) => ({
@@ -57,7 +58,7 @@ for (const scenario of [
 					preferences: { 'deck.profile': [[scope, profile.name, {}]], 'deck.profiles': [[scope, [profile], {}]] },
 				}));
 			}
-		}, { data: { ...account, token: user.token }, server: new URL(url).host, ui: scenario.ui });
+		}, { data: { ...account, token: user.token }, server: new URL(metadata.uri).host, ui: scenario.ui });
 
 		const release = Promise.withResolvers<void>();
 		let olderRequests = 0;

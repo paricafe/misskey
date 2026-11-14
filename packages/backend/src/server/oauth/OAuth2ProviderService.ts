@@ -28,6 +28,7 @@ import { bindThis } from '@/decorators.js';
 import type { AccessTokensRepository, UsersRepository } from '@/models/_.js';
 import { IdService } from '@/core/IdService.js';
 import { CacheService } from '@/core/CacheService.js';
+import { GlobalEventService } from '@/core/GlobalEventService.js';
 import type { MiLocalUser } from '@/models/User.js';
 import { MemoryKVCache } from '@/misc/cache.js';
 import { LoggerService } from '@/core/LoggerService.js';
@@ -360,6 +361,7 @@ export class OAuth2ProviderService implements OnApplicationShutdown {
 		private idService: IdService,
 		private httpRequestService: HttpRequestService,
 		private cacheService: CacheService,
+		private globalEventService: GlobalEventService,
 		private htmlTemplateService: HtmlTemplateService,
 		loggerService: LoggerService,
 	) {
@@ -451,7 +453,17 @@ export class OAuth2ProviderService implements OnApplicationShutdown {
 		this.#grantCodeCache.delete(code);
 		granted.revoked = true;
 		if (granted.grantedToken) {
-			await this.accessTokensRepository.delete({ token: granted.grantedToken });
+			await this.#revokeToken(granted.grantedToken);
+		}
+	}
+
+	async #revokeToken(token: string): Promise<void> {
+		const deleted = await this.accessTokensRepository.createQueryBuilder().delete()
+			.where({ token })
+			.returning(['id', 'userId'])
+			.execute();
+		for (const row of deleted.raw as { id: string; userId: string }[]) {
+			await this.globalEventService.publishInternalEvent('accessTokenRevoked', row);
 		}
 	}
 
@@ -652,7 +664,7 @@ export class OAuth2ProviderService implements OnApplicationShutdown {
 
 				if (granted.revoked) {
 					this.#logger.info('Canceling the token as the authorization code was revoked in parallel during the process.');
-					await this.accessTokensRepository.delete({ token: accessToken });
+					await this.#revokeToken(accessToken);
 					throw new InvalidGrantError('grant request is invalid');
 				}
 

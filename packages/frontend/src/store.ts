@@ -98,6 +98,10 @@ export const store = markRaw(new Pizzax('base', {
 		where: 'deviceAccount',
 		default: {} as Record<string, string>,
 	},
+	accountHost: {
+		where: 'device',
+		default: '',
+	},
 	accountTokens: {
 		where: 'device',
 		default: {} as Record<string, string>,

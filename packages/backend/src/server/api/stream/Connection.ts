@@ -128,7 +128,9 @@ export default class Connection {
 		this.subscriber = subscriber;
 
 		this.wsConnection = wsConnection;
-		this.wsConnection.on('message', data => this.messageQueue(() => this.onWsConnectionMessage(data)));
+		this.wsConnection.on('message', data => {
+			void this.messageQueue(() => this.onWsConnectionMessage(data)).catch(() => this.wsConnection.terminate());
+		});
 
 		this.subscriber.on('broadcast', data => {
 			this.onBroadcastMessage(data);
@@ -150,7 +152,7 @@ export default class Connection {
 		const { type, body } = obj;
 
 		switch (type) {
-			case 'readNotification': this.onReadNotification(body); break;
+			case 'readNotification': await this.onReadNotification(body); break;
 			case 'subNote': this.onSubscribeNote(body); break;
 			case 's': this.onSubscribeNote(body); break;
 			case 'sr': this.onSubscribeNote(body); break;
@@ -158,8 +160,8 @@ export default class Connection {
 			case 'un': this.onUnsubscribeNote(body); break;
 			case 'connect': await this.onChannelConnectRequested(body); break;
 			case 'disconnect': this.onChannelDisconnectRequested(body); break;
-			case 'channel': this.onChannelMessageRequested(body); break;
-			case 'ch': this.onChannelMessageRequested(body); break;
+			case 'channel': await this.onChannelMessageRequested(body); break;
+			case 'ch': await this.onChannelMessageRequested(body); break;
 		}
 	}
 
@@ -169,8 +171,9 @@ export default class Connection {
 	}
 
 	@bindThis
-	private onReadNotification(payload: JsonValue | undefined) {
-		this.notificationService.readAllNotification(this.user!.id);
+	private async onReadNotification(payload: JsonValue | undefined) {
+		if (!this.user || (this.token && !this.token.permission.includes('write:notifications'))) return;
+		await this.notificationService.readAllNotification(this.user.id);
 	}
 
 	@bindThis
@@ -256,6 +259,7 @@ export default class Connection {
 
 	@bindThis
 	public sendMessageToWs(type: string, payload: JsonObject) {
+		if (this.wsConnection.readyState !== WebSocket.WebSocket.OPEN) return;
 		const message = JSON.stringify({
 			type: type,
 			body: payload,
@@ -308,6 +312,11 @@ export default class Connection {
 
 		this.channels.set(ch.id, ch);
 		const valid = await ch.init(params ?? {});
+		if (this.wsConnection.readyState !== WebSocket.WebSocket.OPEN) {
+			ch.dispose?.();
+			this.channels.delete(ch.id);
+			return;
+		}
 		if (typeof valid === 'boolean' && !valid) {
 			this.disconnectChannel(id);
 			return;
@@ -359,7 +368,7 @@ export default class Connection {
 	}
 
 	@bindThis
-	private onChannelMessageRequested(data: JsonValue | undefined) {
+	private async onChannelMessageRequested(data: JsonValue | undefined) {
 		if (!isJsonObject(data)) return;
 		if (typeof data.id !== 'string') return;
 		if (typeof data.type !== 'string') return;
@@ -367,7 +376,7 @@ export default class Connection {
 
 		const channel = this.channels.get(data.id);
 		if (channel != null && channel.onMessage != null) {
-			channel.onMessage(data.type, data.body);
+			await channel.onMessage(data.type, data.body);
 		}
 	}
 

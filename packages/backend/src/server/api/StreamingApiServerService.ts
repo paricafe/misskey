@@ -12,11 +12,13 @@ import type { MiAccessToken } from '@/models/_.js';
 import { bindThis } from '@/decorators.js';
 import type { MiLocalUser } from '@/models/User.js';
 import { UserService } from '@/core/UserService.js';
+import type { GlobalEvents } from '@/core/GlobalEventService.js';
 import { AuthenticateService, AuthenticationError } from './AuthenticateService.js';
 import MainStreamConnection, { ConnectionRequest } from './stream/Connection.js';
 import { ChannelEventBus } from './stream/ChannelEventBus.js';
 import type * as http from 'node:http';
 import type { Duplex } from 'node:stream';
+import type { EventEmitter } from 'node:events';
 
 export function isNativeStreamingPath(url: string): boolean {
 	try {
@@ -31,6 +33,9 @@ export class StreamingApiServerService {
 	#wss: WebSocket.WebSocketServer;
 	#connections = new Map<WebSocket.WebSocket, number>();
 	#cleanConnectionsIntervalId: NodeJS.Timeout | null = null;
+	#authorizationIntervalId: NodeJS.Timeout | null = null;
+	#authorizations = new Map<WebSocket.WebSocket, () => Promise<void>>();
+	#authorizationChecks = new Map<string, Promise<[MiLocalUser | null, MiAccessToken | null]>>();
 	#server?: http.Server;
 	#upgradeListener?: (request: http.IncomingMessage, socket: Duplex, head: Buffer) => void;
 	#redisListener?: (channel: string, data: string) => void;
@@ -58,6 +63,7 @@ export class StreamingApiServerService {
 			maxPayload: 1024 * 1024,
 			perMessageDeflate: false,
 		});
+		const events = new ChannelEventBus();
 
 		const handleUpgrade = async (request: http.IncomingMessage, socket: Duplex, head: Buffer) => {
 			if (request.url == null) {
@@ -95,31 +101,62 @@ export class StreamingApiServerService {
 				return;
 			}
 
-			if (user?.isSuspended) {
+			if (user?.isSuspended || user?.isDeleted) {
 				socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
 				socket.destroy();
 				return;
 			}
+			const ev = events.createSubscriber();
+			let connection: WebSocket.WebSocket | undefined;
+			let invalidated = false;
+			const invalidate = () => {
+				invalidated = true;
+				if (connection) connection.terminate();
+				else socket.destroy();
+			};
+			if (user) ev.on(`authorization:${user.id}`, (event: GlobalEvents['internal']['payload']) => {
+				if ((event.type === 'accessTokenRevoked' && event.body.id === app?.id)
+					|| (event.type === 'userTokenRegenerated' && event.body.oldToken === token)
+					|| (event.type === 'userChangeSuspendedState' && event.body.id === user.id && event.body.isSuspended)
+					|| (event.type === 'userChangeDeletedState' && event.body.id === user.id && event.body.isDeleted)) invalidate();
+			});
+			const authorize = async (reusePending = true) => {
+				if (!user || !token || invalidated || this.#detaching) return;
+				try {
+					const [currentUser, currentApp] = await this.authenticateFresh(token, reusePending);
+					if (currentUser?.id !== user.id || currentUser.isSuspended || currentUser.isDeleted
+						|| currentApp?.id !== app?.id
+						|| (app && app.permission.some(permission => !currentApp?.permission.includes(permission)))) invalidate();
+				} catch {
+					invalidate();
+				}
+			};
 
 			const contextId = ContextIdFactory.create();
 			this.moduleRef.registerRequestByContextId<ConnectionRequest>({
 				user,
 				token: app,
 			}, contextId);
-			const stream = await this.moduleRef.create(MainStreamConnection, contextId);
-
+			let stream: MainStreamConnection | undefined;
 			let adopted = false;
 			try {
+				stream = await this.moduleRef.create(MainStreamConnection, contextId);
 				await stream.init();
-				if (this.#detaching || socket.destroyed) return;
+				await authorize(false);
+				if (invalidated || this.#detaching || socket.destroyed) return;
 				this.#wss.handleUpgrade(request, socket, head, (ws) => {
+					connection = ws;
 					adopted = true;
+					if (user) this.#authorizations.set(ws, authorize);
 					this.#wss.emit('connection', ws, request, {
-						stream, user, app,
+						stream, user, app, ev,
 					});
 				});
 			} finally {
-				if (!adopted) stream.dispose();
+				if (!adopted) {
+					ev.removeAllListeners();
+					stream?.dispose();
+				}
 			}
 		};
 		this.#upgradeListener = (request, socket, head) => {
@@ -134,10 +171,17 @@ export class StreamingApiServerService {
 		};
 		server.on('upgrade', this.#upgradeListener);
 
-		const events = new ChannelEventBus();
-
 		this.#redisListener = (_: string, data: string) => {
 			const parsed = JSON.parse(data);
+			if (parsed.channel === 'internal') {
+				const event = parsed.message as GlobalEvents['internal']['payload'];
+				if (event.type === 'accessTokenRevoked') events.emit(`authorization:${event.body.userId}`, event);
+				else if (event.type === 'userTokenRegenerated' || event.type === 'userChangeSuspendedState' || event.type === 'userChangeDeletedState') {
+					events.emit(`authorization:${event.body.id}`, event);
+				} else if (event.type === 'chatRoomMemberLeft') {
+					events.emit(`chatRoomMembership:${event.body.roomId}:${event.body.userId}`, event);
+				}
+			}
 			events.emit(parsed.channel, parsed.message);
 		};
 		this.redisForSub.on('message', this.#redisListener);
@@ -146,10 +190,9 @@ export class StreamingApiServerService {
 			stream: MainStreamConnection,
 			user: MiLocalUser | null;
 			app: MiAccessToken | null
+			ev: EventEmitter;
 		}) => {
-			const { stream, user } = ctx;
-
-			const ev = events.createSubscriber();
+			const { stream, user, ev } = ctx;
 
 			this.#connections.set(connection, Date.now());
 
@@ -159,6 +202,7 @@ export class StreamingApiServerService {
 				ev.removeAllListeners();
 				stream.dispose();
 				this.#connections.delete(connection);
+				this.#authorizations.delete(connection);
 				if (user) this.onUserDisconnected(user);
 			});
 
@@ -179,6 +223,27 @@ export class StreamingApiServerService {
 				}
 			}
 		}, 1000 * 60);
+		this.#authorizationIntervalId = setInterval(() => {
+			for (const authorize of this.#authorizations.values()) void authorize();
+		}, 10_000);
+	}
+
+	private authenticateFresh(token: string, reusePending: boolean): Promise<[MiLocalUser | null, MiAccessToken | null]> {
+		const pending = reusePending ? this.#authorizationChecks.get(token) : undefined;
+		if (pending) return pending;
+		let timeout: NodeJS.Timeout;
+		const check = Promise.race([
+			this.authenticateService.authenticate(token, { fresh: true, updateLastUsedAt: false }),
+			new Promise<never>((_, reject) => {
+				timeout = setTimeout(() => reject(new AuthenticationError('Authorization check timed out')), 10_000);
+				timeout.unref();
+			}),
+		]).finally(() => {
+			clearTimeout(timeout);
+			if (this.#authorizationChecks.get(token) === check) this.#authorizationChecks.delete(token);
+		});
+		if (reusePending) this.#authorizationChecks.set(token, check);
+		return check;
 	}
 
 	@bindThis
@@ -219,6 +284,10 @@ export class StreamingApiServerService {
 		if (this.#cleanConnectionsIntervalId) {
 			clearInterval(this.#cleanConnectionsIntervalId);
 			this.#cleanConnectionsIntervalId = null;
+		}
+		if (this.#authorizationIntervalId) {
+			clearInterval(this.#authorizationIntervalId);
+			this.#authorizationIntervalId = null;
 		}
 		for (const socket of this.#pendingUpgrades) socket.destroy();
 		const close = new Promise<void>(resolve => {

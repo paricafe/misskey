@@ -13,6 +13,7 @@ import type { MiDriveFile } from '@/models/DriveFile.js';
 import type { MiNote } from '@/models/Note.js';
 import type { MiNoteReaction } from '@/models/NoteReaction.js';
 import { EmailService } from '@/core/EmailService.js';
+import { GlobalEventService } from '@/core/GlobalEventService.js';
 import { bindThis } from '@/decorators.js';
 import { SearchService } from '@/core/SearchService.js';
 import { PageService } from '@/core/PageService.js';
@@ -50,6 +51,7 @@ export class DeleteAccountProcessorService {
 		private queueLoggerService: QueueLoggerService,
 		private searchService: SearchService,
 		private reactionService: ReactionService,
+		private globalEventService: GlobalEventService,
 	) {
 		this.logger = this.queueLoggerService.logger.createSubLogger('delete-account');
 	}
@@ -188,9 +190,9 @@ export class DeleteAccountProcessorService {
 			}
 		}
 
-		if (job.data.soft) {
-		} else {
+		if (!job.data.soft) {
 			await this.usersRepository.delete(job.data.user.id);
+			this.globalEventService.publishInternalEvent('userChangeDeletedState', { id: user.id, isDeleted: true });
 		}
 
 		return 'Account deleted';

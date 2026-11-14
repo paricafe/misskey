@@ -16,7 +16,6 @@ uniform float u_lightness;
 uniform float u_saturation;
 out vec4 out_color;
 
-// RGB to HSL
 vec3 rgb2hsl(vec3 c) {
 	float maxc = max(max(c.r, c.g), c.b);
 	float minc = min(min(c.r, c.g), c.b);
@@ -38,7 +37,6 @@ vec3 rgb2hsl(vec3 c) {
 	return vec3(h, s, l);
 }
 
-// HSL to RGB
 float hue2rgb(float p, float q, float t) {
 	if (t < 0.0) t += 1.0;
 	if (t > 1.0) t -= 1.0;

@@ -23,6 +23,7 @@ test('keeps three Deck timelines independent with 500 loaded notes each', async 
 	await registerUser(url, 'admin', 'password', true);
 	const user = await registerUser(url, 'deckreader', 'password');
 	const account = await api(url, 'i', { i: user.token });
+	const metadata = await api(url, 'meta', {});
 	await api(url, 'i/registry/set', { i: user.token, scope: ['client', 'base'], key: 'accountSetupWizard', value: -1 });
 	const { createdNote: seed } = await api(url, 'notes/create', { i: user.token, text: 'Deck seed' });
 	const notes = Array.from({ length: 500 }, (_, i) => ({ ...seed, id: `deck${String(500 - i).padStart(6, '0')}`, createdAt: '2020-01-01T00:00:00Z', text: `Deck fixture ${i}` }));
@@ -37,7 +38,7 @@ test('keeps three Deck timelines independent with 500 loaded notes each', async 
 			id: 'performance', type: 'main', version: '2026.10.1-pari.2', modifiedAt: Date.now(), name: 'Performance',
 			preferences: { 'deck.profile': [[scope, profile.name, {}]], 'deck.profiles': [[scope, [profile], {}]] },
 		}));
-	}, { data: { ...account, token: user.token }, server: new URL(url).host });
+	}, { data: { ...account, token: user.token }, server: new URL(metadata.uri).host });
 	await page.route(/\/api\/notes\/timeline(?:\?|$)/, route => {
 		const data = route.request().postDataJSON() ?? {};
 		return route.fulfill({ json: data.sinceId || data.untilId ? [] : notes });

@@ -66,25 +66,26 @@ test.describe('realtime note counters and replies', () => {
 		await page.getByText('detail target', { exact: true }).waitFor();
 		const replyButton = counterButton(page, 'detail target', 'ti-arrow-back-up');
 		const renoteButton = counterButton(page, 'detail target', 'ti-repeat');
+		const detail = page.locator('article').filter({ hasText: 'detail target' }).first().locator('..');
 
 		const { createdNote: reply } = await api(request, bob, 'notes/create', {
 			text: 'visible live reply',
 			replyId: target.id,
 		});
 		await expect(replyButton.locator('p')).toHaveText('1');
-		await expect(page.getByText('visible live reply', { exact: true })).toBeVisible();
+		await expect(detail.getByText('visible live reply', { exact: true })).toBeVisible();
 		await api(request, bob, 'notes/delete', { noteId: reply.id });
 		await expect(replyButton.locator('p')).toHaveCount(0);
-		await expect(page.getByText('visible live reply', { exact: true })).toHaveCount(0);
+		await expect(detail.getByText('visible live reply', { exact: true })).toHaveCount(0);
 
 		const { createdNote: quote } = await api(request, bob, 'notes/create', {
 			text: 'visible live quote',
 			renoteId: target.id,
 		});
 		await expect(renoteButton.locator('p')).toHaveText('1');
-		await expect(page.getByText('visible live quote', { exact: true })).toBeVisible();
+		await expect(detail.getByText('visible live quote', { exact: true })).toBeVisible();
 		await api(request, bob, 'notes/delete', { noteId: quote.id });
 		await expect(renoteButton.locator('p')).toHaveCount(0);
-		await expect(page.getByText('visible live quote', { exact: true })).toHaveCount(0);
+		await expect(detail.getByText('visible live quote', { exact: true })).toHaveCount(0);
 	});
 });

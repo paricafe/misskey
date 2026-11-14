@@ -8,6 +8,7 @@ import { Endpoint } from '@/server/api/endpoint-base.js';
 import type { AccessTokensRepository } from '@/models/_.js';
 import type { MiAccessToken } from '@/models/AccessToken.js';
 import { DI } from '@/di-symbols.js';
+import { GlobalEventService } from '@/core/GlobalEventService.js';
 import { ApiError } from '../../error.js';
 
 export const meta = {
@@ -53,6 +54,8 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 	constructor(
 		@Inject(DI.accessTokensRepository)
 		private accessTokensRepository: AccessTokensRepository,
+
+		private globalEventService: GlobalEventService,
 	) {
 		super(meta, paramDef, async (ps, me, token) => {
 			if (me == null) {
@@ -74,6 +77,7 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 			}
 
 			await this.accessTokensRepository.delete({ id: target.id });
+			await this.globalEventService.publishInternalEvent('accessTokenRevoked', { id: target.id, userId: target.userId });
 		});
 	}
 }

@@ -20,6 +20,10 @@ export class ChatRoomChannel extends Channel {
 	public static requireCredential = true as const;
 	public static kind = 'read:chat';
 	private roomId: string;
+	private disposed = false;
+	private permissionExpiresAt = 0;
+	private permissionCheck: Promise<boolean> | null = null;
+	private permissionIntervalId: NodeJS.Timeout | null = null;
 
 	constructor(
 		@Inject(REQUEST)
@@ -39,30 +43,57 @@ export class ChatRoomChannel extends Channel {
 		if (!this.user) return false;
 
 		this.roomId = params.roomId;
-
-		const room = await this.chatRoomsRepository.findOneBy({
-			id: this.roomId,
-		});
-
-		if (room == null) return false;
-		if (!(await this.chatService.hasPermissionToViewRoomTimeline(this.user.id, room))) return false;
+		this.subscriber.on(`chatRoomMembership:${this.roomId}:${this.user.id}`, this.onInternalEvent);
+		if (!(await this.checkPermission()) || this.disposed) return false;
 
 		this.subscriber.on(`chatRoomStream:${this.roomId}`, this.onEvent);
+		this.permissionIntervalId = setInterval(() => { void this.checkPermission(); }, 10_000);
 
 		return true;
 	}
 
 	@bindThis
 	private async onEvent(data: GlobalEvents['chatRoom']['payload']) {
+		if (!(await this.checkPermission()) || this.disposed) return;
 		this.send(data.type, data.body);
 	}
 
 	@bindThis
-	public onMessage(type: string, body: any) {
+	private onInternalEvent(event: GlobalEvents['internal']['payload']) {
+		if (event.type !== 'chatRoomMemberLeft' || event.body.roomId !== this.roomId || event.body.userId !== this.user?.id) return;
+		this.connection.disconnectChannel(this.id);
+	}
+
+	private checkPermission(): Promise<boolean> {
+		if (this.disposed || !this.user) return Promise.resolve(false);
+		if (this.permissionCheck) return this.permissionCheck;
+		if (Date.now() < this.permissionExpiresAt) return Promise.resolve(true);
+		this.permissionCheck = (async () => {
+			try {
+				const room = await this.chatRoomsRepository.findOneBy({ id: this.roomId });
+				if (!room || !(await this.chatService.hasPermissionToViewRoomTimeline(this.user!.id, room))) {
+					this.connection.disconnectChannel(this.id);
+					return false;
+				}
+				this.permissionExpiresAt = Date.now() + 10_000;
+				return !this.disposed;
+			} catch {
+				this.connection.disconnectChannel(this.id);
+				return false;
+			} finally {
+				this.permissionCheck = null;
+			}
+		})();
+		return this.permissionCheck;
+	}
+
+	@bindThis
+	public async onMessage(type: string, body: any) {
+		if (!(await this.checkPermission()) || this.disposed) return;
 		switch (type) {
 			case 'read':
 				if (this.roomId) {
-					this.chatService.readRoomChatMessage(this.user!.id, this.roomId);
+					await this.chatService.readRoomChatMessage(this.user!.id, this.roomId);
 				}
 				break;
 		}
@@ -70,6 +101,9 @@ export class ChatRoomChannel extends Channel {
 
 	@bindThis
 	public dispose() {
+		this.disposed = true;
+		if (this.permissionIntervalId) clearInterval(this.permissionIntervalId);
+		this.subscriber.off(`chatRoomMembership:${this.roomId}:${this.user?.id}`, this.onInternalEvent);
 		this.subscriber.off(`chatRoomStream:${this.roomId}`, this.onEvent);
 	}
 }

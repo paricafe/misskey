@@ -13,7 +13,6 @@ import type * as misskey from 'misskey-js';
 import { DEFAULT_POLICIES } from '@/core/RoleService.js';
 
 describe('ユーザー', () => {
-
 	const stripUndefined = <T extends { [key: string]: any } >(orig: T): Partial<T> => {
 		return Object.entries({ ...orig })
 			.filter(([, value]) => value !== undefined)
@@ -30,6 +29,7 @@ describe('ユーザー', () => {
 	const userLite = (user: misskey.entities.UserLite): Partial<misskey.entities.UserLite> => {
 		return stripUndefined({
 			id: user.id,
+			approved: true,
 			name: user.name,
 			username: user.username,
 			host: user.host,
@@ -151,6 +151,7 @@ describe('ユーザー', () => {
 			...(security ? {
 				email: user.email,
 				emailVerified: user.emailVerified,
+				signupReason: user.signupReason,
 				securityKeysList: user.securityKeysList,
 			} : {}),
 		});
@@ -297,7 +298,7 @@ describe('ユーザー', () => {
 		assert.strictEqual(response.name, null);
 		assert.strictEqual(response.username, 'zoe');
 		assert.strictEqual(response.host, null);
-		response.avatarUrl && assert.match(response.avatarUrl, /^[-a-zA-Z0-9@:%._\+~#&?=\/]+$/);
+		if (response.avatarUrl) assert.match(response.avatarUrl, /^[-a-zA-Z0-9@:%._\+~#&?=\/]+$/);
 		assert.strictEqual(response.avatarBlurhash, null);
 		assert.deepStrictEqual(response.avatarDecorations, []);
 		assert.strictEqual(response.isBot, false);

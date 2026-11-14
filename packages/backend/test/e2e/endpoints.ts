@@ -1159,8 +1159,13 @@ describe('Endpoints', () => {
 	});
 
 	describe('URL preview', () => {
-		test('Error from summaly becomes HTTP 422', async () => {
+		test('Malformed URL is rejected with HTTP 400', async () => {
 			const res = await simpleGet('/url?url=https://e:xample.com');
+			assert.strictEqual(res.status, 400);
+		});
+
+		test('Error from summaly becomes HTTP 422', async () => {
+			const res = await simpleGet('/url?url=https://127.0.0.1:1');
 			assert.strictEqual(res.status, 422);
 			assert.strictEqual(res.body.error.code, 'URL_PREVIEW_FAILED');
 		});

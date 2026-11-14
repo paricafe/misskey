@@ -1,21 +1,10 @@
-/*
- * typeorm migration:generate の前準備をまとめて実行する (冪等・クロスプラットフォーム)。
- * リポジトリルートから実行: node .claude/skills/working-on-backend/scripts/prepare-generate.mjs
- *
- * generate はエンティティのビルド出力 (built/)、設定ファイル (.config/default.yml)、
- * 稼働中の DB を必要とする。手で 4 段並べると取りこぼすのでここに集約する。
- * migration:create (空雛形) しか使わないなら DB もビルドも不要なのでこのスクリプトは不要。
- *
- * Node で書いているのは pure Windows (bash の無い環境) でも動かすため。node はこのリポジトリの
- * ランタイムなので必ず存在し、build-pre.mjs と同じ流儀に揃う。
- */
+/* Prepare the build, configuration, and database for migration generation. */
 
 import { execSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 
-// このファイルの 4 つ上が repo root
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
 process.chdir(root);
 
@@ -34,7 +23,6 @@ if (!existsSync('.config/default.yml')) {
 		'  (example.yml の既定値は docker.env の例と一致するので、独自 DB を使わなければそのままで可)。',
 	].join('\n'));
 }
-// compose.local-db.yml の db サービスは .config/docker.env を env_file に要求する
 if (!existsSync('.config/docker.env')) {
 	fail([
 		'.config/docker.env が存在しません (compose.local-db.yml の db が要求)。',
@@ -53,10 +41,6 @@ step('3/4 backend のビルド (エンティティを built/ へ反映)');
 run('pnpm --filter backend build');
 
 step('4/4 ローカル DB の起動 (postgres のみ・healthcheck 完了まで待機)');
-// migration:generate が必要とするのは postgres だけ。db サービスに絞れば meilisearch.env 等が無くても動く。
-// --wait は compose の pg_isready healthcheck 完了まで待つ。直後の migration:generate が
-// DB 未起動で失敗しないために必須。--wait は Docker Compose v2.1.1 (2021-11) で導入されており、
-// このリポジトリが前提とする v2 の `docker compose` なら標準で使える (EOL の `docker-compose` v1 は対象外)。
 run('docker compose -f compose.local-db.yml up -d --wait db');
 
 console.log('\n準備完了。次を実行できます:');

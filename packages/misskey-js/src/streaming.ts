@@ -206,7 +206,6 @@ export default class Stream extends EventEmitter<StreamEvents> implements IStrea
 	}
 }
 
-// もしくは @internal を使う？ https://www.typescriptlang.org/tsconfig#stripInternal
 class Pool {
 	public channel: string;
 	public id: string;

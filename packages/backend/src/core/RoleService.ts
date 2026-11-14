@@ -554,7 +554,7 @@ export class RoleService implements OnApplicationShutdown, OnModuleInit {
 			userId: userId,
 		});
 
-		this.rolesRepository.update(roleId, {
+		await this.rolesRepository.update(roleId, {
 			lastUsedAt: new Date(),
 		});
 
@@ -597,7 +597,7 @@ export class RoleService implements OnApplicationShutdown, OnModuleInit {
 
 		await this.roleAssignmentsRepository.delete(existing.id);
 
-		this.rolesRepository.update(roleId, {
+		await this.rolesRepository.update(roleId, {
 			lastUsedAt: now,
 		});
 

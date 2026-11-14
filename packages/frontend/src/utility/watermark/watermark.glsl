@@ -8,24 +8,24 @@ precision mediump float;
 
 const float PI = 3.141592653589793;
 
-in vec2 in_uv;                       // 0..1
-uniform sampler2D in_texture;        // 背景
-uniform vec2 in_resolution;          // 出力解像度(px)
+in vec2 in_uv;
+uniform sampler2D in_texture;
+uniform vec2 in_resolution;
 
-uniform sampler2D u_watermark;       // ウォーターマーク
-uniform vec2 u_wmResolution;         // ウォーターマーク元解像度(px)
+uniform sampler2D u_watermark;
+uniform vec2 u_wmResolution;
 
-uniform float u_opacity;             // 0..1
-uniform float u_scale;               // watermarkのスケール
-uniform float u_angle;               // -1..1 (PI倍)
-uniform bool u_cover;                // cover基準 or fit基準
-uniform bool u_repeat;               // タイル敷き詰め
-uniform int u_alignX;                // 0:left 1:center 2:right
-uniform int u_alignY;                // 0:top 1:center 2:bottom
-uniform float u_margin;              // 余白(比率)
-uniform float u_repeatMargin;        // 敷き詰め時の余白(比率)
-uniform bool u_noBBoxExpansion;      // 回転時のBounding Box拡張を抑止
-uniform bool u_wmEnabled;            // watermark有効
+uniform float u_opacity;
+uniform float u_scale;
+uniform float u_angle;
+uniform bool u_cover;
+uniform bool u_repeat;
+uniform int u_alignX;
+uniform int u_alignY;
+uniform float u_margin;
+uniform float u_repeatMargin;
+uniform bool u_noBBoxExpansion;
+uniform bool u_wmEnabled;
 
 out vec4 out_color;
 
@@ -34,7 +34,6 @@ mat2 rot(float a) {
 	return mat2(c, -s, s, c);
 }
 
-// cover/fitとscaleから、最終的なサイズ(px)を計算
 vec2 computeWmSize(vec2 outSize, vec2 wmSize, bool cover, float scale) {
 	float wmAspect = wmSize.x / wmSize.y;
 	float outAspect = outSize.x / outSize.y;
@@ -61,7 +60,7 @@ vec2 computeWmSize(vec2 outSize, vec2 wmSize, bool cover, float scale) {
 
 void main() {
 	vec2 outSize = in_resolution;
-	vec2 p = in_uv * outSize; // 出力のピクセル座標
+	vec2 p = in_uv * outSize;
 	vec4 base = texture(in_texture, in_uv);
 
 	if (!u_wmEnabled) {
@@ -69,11 +68,10 @@ void main() {
 		return;
 	}
 
-	float theta = u_angle * PI; // ラジアン
+	float theta = u_angle * PI;
 	vec2 wmSize = computeWmSize(outSize, u_wmResolution, u_cover, u_scale);
 	vec2 margin = u_repeat ? wmSize * u_repeatMargin : outSize * u_margin;
 
-	// アライメントに基づく回転中心を計算
 	float rotateX = 0.0;
 	float rotateY = 0.0;
 	if (abs(theta) > 1e-6 && !u_noBBoxExpansion) {
@@ -106,34 +104,29 @@ void main() {
 	vec4 wmCol = vec4(0.0);
 
 	if (u_repeat) {
-		// アライメントに基づく中心で回転
+
 		vec2 q = rectCenter + rot(theta) * (p - rectCenter);
 
-		// タイルグリッドの原点をrectMin（アライメント位置）に設定
 		vec2 gridOrigin = rectMin - margin;
 		vec2 qFromOrigin = q - gridOrigin;
 
-		// タイルサイズ(ウォーターマーク + マージン)で正規化
 		vec2 tile = wmSize + margin * 2.0;
 		vec2 tileUv = qFromOrigin / tile;
 
-		// タイル内のローカル座標(0..1)を取得
 		vec2 localUv = fract(tileUv);
 
-		// ローカル座標をピクセル単位に変換
 		vec2 localPos = localUv * tile;
 
-		// マージン領域内かチェック
 		bool inMargin = any(lessThan(localPos, margin)) || any(greaterThanEqual(localPos, margin + wmSize));
 
 		if (!inMargin) {
-			// ウォーターマーク領域内: UV座標を計算
+
 			vec2 uvWm = (localPos - margin) / wmSize;
 			wmCol = texture(u_watermark, uvWm);
 		}
-		// マージン領域の場合は透明(wmCol = vec4(0.0))のまま
+
 	} else {
-		// アライメントと回転に従い一枚だけ描画
+
 		vec2 q = rectCenter + rot(theta) * (p - rectCenter);
 		bool inside = all(greaterThanEqual(q, rectMin)) && all(lessThan(q, rectMax));
 		if (inside) {

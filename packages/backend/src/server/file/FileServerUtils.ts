@@ -6,6 +6,7 @@
 import * as fs from 'node:fs';
 import { FILE_TYPE_BROWSERSAFE } from '@/const.js';
 import { contentDisposition } from '@/misc/content-disposition.js';
+import { StatusError } from '@/misc/status-error.js';
 import type { IImageStreamable } from '@/core/ImageProcessingService.js';
 import type { FastifyReply } from 'fastify';
 
@@ -17,12 +18,16 @@ export type RangeStream = {
 };
 
 export function createRangeStream(rangeHeader: string, size: number, path: string): RangeStream {
-	const parts = rangeHeader.replace(/bytes=/, '').split('-');
-	const start = parseInt(parts[0], 10);
-	let end = parts[1] ? parseInt(parts[1], 10) : size - 1;
-	if (end > size) {
-		end = size - 1;
+	const match = /^bytes=(\d*)-(\d*)$/i.exec(rangeHeader.trim());
+	if (!match || (!match[1] && !match[2]) || size === 0) throw new StatusError('Range not satisfiable', 416);
+	const first = match[1] ? Number(match[1]) : null;
+	const last = match[2] ? Number(match[2]) : null;
+	if (first != null && !Number.isSafeInteger(first)) {
+		throw new StatusError('Range not satisfiable', 416);
 	}
+	const start = first ?? Math.max(0, size - last!);
+	const end = first == null || last == null ? size - 1 : Math.min(last, size - 1);
+	if (start >= size || start > end) throw new StatusError('Range not satisfiable', 416);
 	const chunksize = end - start + 1;
 
 	return {
@@ -53,8 +58,15 @@ export function handleRangeRequest(
 	path: string,
 ): fs.ReadStream {
 	reply.header('Accept-Ranges', 'bytes');
-	if (rangeHeader && size > 0) {
-		const { stream, start, end, chunksize } = createRangeStream(rangeHeader, size, path);
+	if (rangeHeader) {
+		let range: RangeStream;
+		try {
+			range = createRangeStream(rangeHeader, size, path);
+		} catch (error) {
+			if (error instanceof StatusError && error.statusCode === 416) reply.header('Content-Range', `bytes */${size}`);
+			throw error;
+		}
+		const { stream, start, end, chunksize } = range;
 		reply.header('Content-Range', `bytes ${start}-${end}/${size}`);
 		reply.header('Content-Length', chunksize);
 		reply.code(206);

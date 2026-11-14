@@ -6,6 +6,8 @@
 import { defineAsyncComponent, ref } from 'vue';
 import * as Misskey from 'misskey-js';
 import { apiUrl, host } from '@@/js/config.js';
+import { ACCOUNT_DEVICE_STATE_KEY, readStoredAccounts } from '@@/js/stored-accounts.js';
+import { get, del } from '@/utility/idb-proxy.js';
 import type { MenuItem } from '@/types/menu.js';
 import { showSuspendedDialog } from '@/utility/show-suspended-dialog.js';
 import { i18n } from '@/i18n.js';
@@ -18,6 +20,20 @@ import { $i } from '@/i.js';
 import { signout } from '@/signout.js';
 
 type AccountWithToken = Misskey.entities.MeDetailed & { token: string };
+
+export async function initializeAccountStorage() {
+	await store.ready;
+	const state = await get(ACCOUNT_DEVICE_STATE_KEY);
+	if (state?.accountTokens == null) {
+		const accounts = await readStoredAccounts(get, host);
+		await store.set('accountTokens', {
+			...Object.fromEntries(accounts.map(account => [host + '/' + account.id, account.token])),
+			...store.s.accountTokens,
+		});
+	}
+	if (state?.accountHost !== host) await store.set('accountHost', host);
+	await del('accounts');
+}
 
 export async function getAccounts(): Promise<{
 	host: string;
@@ -39,9 +55,9 @@ export async function getAccounts(): Promise<{
 }
 
 async function addAccount(host: string, user: Misskey.entities.MeDetailed, token: AccountWithToken['token']) {
+	await store.set('accountTokens', { ...store.s.accountTokens, [host + '/' + user.id]: token });
+	await store.set('accountInfos', { ...store.s.accountInfos, [host + '/' + user.id]: user });
 	if (!prefer.s.accounts.some(x => x[0] === host && x[1].id === user.id)) {
-		store.set('accountTokens', { ...store.s.accountTokens, [host + '/' + user.id]: token });
-		store.set('accountInfos', { ...store.s.accountInfos, [host + '/' + user.id]: user });
 		prefer.commit('accounts', [...prefer.s.accounts, [host, { id: user.id, username: user.username }]]);
 	}
 }
@@ -49,10 +65,10 @@ async function addAccount(host: string, user: Misskey.entities.MeDetailed, token
 export async function removeAccount(host: string, id: AccountWithToken['id']) {
 	const tokens = JSON.parse(JSON.stringify(store.s.accountTokens));
 	delete tokens[host + '/' + id];
-	store.set('accountTokens', tokens);
+	await store.set('accountTokens', tokens);
 	const accountInfos = JSON.parse(JSON.stringify(store.s.accountInfos));
 	delete accountInfos[host + '/' + id];
-	store.set('accountInfos', accountInfos);
+	await store.set('accountInfos', accountInfos);
 
 	prefer.commit('accounts', prefer.s.accounts.filter(x => x[0] !== host || x[1].id !== id));
 }
@@ -143,13 +159,14 @@ export function updateCurrentAccount(accountData: Partial<Misskey.entities.MeDet
 export async function refreshCurrentAccount() {
 	if (!$i) return;
 	const me = $i;
-	return fetchAccount($i.token, $i.id).then(replaceCurrentAccountData).catch(reason => {
+	return fetchAccount($i.token, $i.id).then(replaceCurrentAccountData).catch(async reason => {
 		if (reason === isAccountDeleted) {
-			removeAccount(host, me.id);
-			if (Object.keys(store.s.accountTokens).length > 0) {
-				login(Object.values(store.s.accountTokens)[0]);
+			await removeAccount(host, me.id);
+			const nextToken = Object.entries(store.s.accountTokens).find(([key]) => key.startsWith(host + '/'))?.[1];
+			if (nextToken) {
+				await login(nextToken);
 			} else {
-				signout();
+				await signout();
 			}
 		}
 	});
@@ -185,14 +202,15 @@ export async function login(token: AccountWithToken['token'], redirect?: string)
 	unisonReload();
 }
 
-export async function switchAccount(host: string, id: string) {
-	const token = store.s.accountTokens[host + '/' + id];
+export async function switchAccount(accountHost: string, id: string) {
+	if (accountHost !== host) throw new Error('Cannot sign in to an account from another host');
+	const token = store.s.accountTokens[accountHost + '/' + id];
 	if (token) {
 		login(token);
 	} else {
 		const { dispose } = popup(defineAsyncComponent(() => import('@/components/MkSigninDialog.vue')), {}, {
 			done: async (res: Misskey.entities.SigninFlowResponse & { finished: true }) => {
-				store.set('accountTokens', { ...store.s.accountTokens, [host + '/' + res.id]: res.i });
+				await store.set('accountTokens', { ...store.s.accountTokens, [host + '/' + res.id]: res.i });
 				login(res.i);
 			},
 			closed: () => {
@@ -252,7 +270,7 @@ export async function getAccountMenu(opts: {
 						initialUsername: username,
 					}, {
 						done: async (res: Misskey.entities.SigninFlowResponse & { finished: true }) => {
-							store.set('accountTokens', { ...store.s.accountTokens, [host + '/' + res.id]: res.i });
+							await store.set('accountTokens', { ...store.s.accountTokens, [host + '/' + res.id]: res.i });
 
 							if (callback) {
 								fetchAccount(res.i, id).then(account => {
@@ -273,7 +291,7 @@ export async function getAccountMenu(opts: {
 
 	const menuItems: MenuItem[] = [];
 
-	const accountItems = (await getAccounts().then(accounts => accounts.filter(x => x.id !== me.id))).map(a => createItem(a.host, a.id, a.username, a.user, a.token));
+	const accountItems = (await getAccounts().then(accounts => accounts.filter(x => x.host === host && x.id !== me.id))).map(a => createItem(a.host, a.id, a.username, a.user, a.token));
 
 	if (opts.withExtraOperation) {
 		menuItems.push({

@@ -9,7 +9,7 @@ import type { NotesRepository, PollVotesRepository, UsersRepository } from '@/mo
 import { MiPoll } from '@/models/Poll.js';
 import { MiPollVote } from '@/models/PollVote.js';
 import type { MiNote } from '@/models/Note.js';
-import type { MiLocalUser, MiRemoteUser } from '@/models/User.js';
+import type { MiLocalUser, MiRemoteUser, MiUser } from '@/models/User.js';
 import { bindThis } from '@/decorators.js';
 import { ApiError } from '@/server/api/error.js';
 import { ApRendererService } from '@/core/activitypub/ApRendererService.js';
@@ -81,7 +81,7 @@ export class PollVoteService {
 	}
 
 	@bindThis
-	public async vote(noteId: MiNote['id'], choices: number[], me: MiLocalUser): Promise<void> {
+	public async vote(noteId: MiNote['id'], choices: number[], me: MiUser): Promise<void> {
 		const uniqueChoices = [...new Set(choices)];
 		const note = await this.notesRepository.findOneBy({ id: noteId });
 
@@ -168,12 +168,12 @@ export class PollVoteService {
 			});
 		}
 
-		if (note.userHost != null) {
+		if (me.host == null && note.userHost != null) {
 			const pollOwner = await this.usersRepository.findOneByOrFail({ id: note.userId }) as MiRemoteUser;
 			for (const vote of result.votes) {
 				this.queueService.deliver(
-					me,
-					this.apRendererService.addContext(await this.apRendererService.renderVote(me, vote, note, result.poll, pollOwner)),
+					me as MiLocalUser,
+					this.apRendererService.addContext(await this.apRendererService.renderVote(me as MiLocalUser, vote, note, result.poll, pollOwner)),
 					pollOwner.inbox,
 					false,
 				);

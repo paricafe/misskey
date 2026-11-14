@@ -21,13 +21,10 @@ let persistentChildProcessFailed = false;
 let shutdownPromise = null;
 
 /**
- * 開発用コマンドを起動し、終了時にまとめて停止できるよう追跡する。
- * Windows では Ctrl+C の配信先を分離し、出力を親コンソールへ中継する。
- *
- * @param {string} command - 実行するコマンド。
- * @param {string[]} args - コマンドへ渡す引数。
- * @param {import('execa').Options} options - execa の起動オプション。
- * @returns {import('execa').ResultPromise} 起動した子プロセス。
+ * @param {string} command
+ * @param {string[]} args
+ * @param {import('execa').Options} options
+ * @returns {import('execa').ResultPromise}
  */
 function spawnChildProcess(command, args, options) {
 	const isWindows = process.platform === 'win32';
@@ -62,12 +59,10 @@ function spawnChildProcess(command, args, options) {
 }
 
 /**
- * 子プロセスの終了を待機し、追跡対象から取り除く。
- *
- * @param {string} command - 実行するコマンド。
- * @param {string[]} args - コマンドへ渡す引数。
- * @param {import('execa').Options} options - execa の起動オプション。
- * @returns {Promise<import('execa').Result>} 子プロセスの実行結果。
+ * @param {string} command
+ * @param {string[]} args
+ * @param {import('execa').Options} options
+ * @returns {Promise<import('execa').Result>}
  */
 async function runChildProcess(command, args, options) {
 	const childProcess = spawnChildProcess(command, args, options);
@@ -80,8 +75,6 @@ async function runChildProcess(command, args, options) {
 }
 
 /**
- * 常駐する子プロセスがすべて終了していれば、終了結果を引き継いで親も終了する。
- *
  * @returns {void}
  */
 function shutdownIfAllPersistentChildProcessesStopped() {
@@ -91,11 +84,9 @@ function shutdownIfAllPersistentChildProcessesStopped() {
 }
 
 /**
- * 常駐する子プロセスを起動し、終了時の追跡解除・エラー出力・親の終了判定を設定する。
- *
- * @param {string} command - 実行するコマンド。
- * @param {string[]} args - コマンドへ渡す引数。
- * @param {import('execa').Options} options - execa の起動オプション。
+ * @param {string} command
+ * @param {string[]} args
+ * @param {import('execa').Options} options
  * @returns {void}
  */
 function startChildProcess(command, args, options) {
@@ -118,9 +109,7 @@ function startChildProcess(command, args, options) {
 }
 
 /**
- * 子プロセスとその配下のプロセスを停止し、終了を待機する。
- *
- * @param {import('execa').ResultPromise} childProcess - 停止する子プロセス。
+ * @param {import('execa').ResultPromise} childProcess
  * @returns {Promise<void>}
  */
 async function stopChildProcess(childProcess) {
@@ -137,10 +126,8 @@ async function stopChildProcess(childProcess) {
 }
 
 /**
- * 追跡中の子プロセスを一度だけ停止して、指定した終了コードで終了する。
- *
- * @param {number} exitCode - 親プロセスに返す終了コード。
- * @returns {Promise<void>} 実行中または完了した停止処理。
+ * @param {number} exitCode
+ * @returns {Promise<void>}
  */
 function shutdown(exitCode) {
 	if (shutdownPromise != null) return shutdownPromise;

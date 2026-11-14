@@ -26,7 +26,6 @@ const compareBy = <T extends { id: string }>(selector: (s: T) => string = (s: T)
 };
 
 describe('アンテナ', () => {
-
 	type Antenna = misskey.entities.Antenna;
 	type User = misskey.entities.SignupResponse;
 	type Note = misskey.entities.Note;
@@ -57,6 +56,7 @@ describe('アンテナ', () => {
 	let userNotExplorable: User;
 	let userLocking: User;
 	let userSilenced: User;
+	let userSilencedFollowedByAlice: User;
 	let userSuspended: User;
 	let userDeletedBySelf: User;
 	let userDeletedByAdmin: User;
@@ -93,6 +93,9 @@ describe('アンテナ', () => {
 		await post(userSilenced, { text: 'test' });
 		const roleSilenced = await role(root, {}, { canPublicNote: { priority: 0, useDefault: false, value: false } });
 		await api('admin/roles/assign', { userId: userSilenced.id, roleId: roleSilenced.id }, root);
+		userSilencedFollowedByAlice = await signup({ username: 'silencedFollowed' });
+		await successfulApiCall({ endpoint: 'admin/roles/assign', parameters: { userId: userSilencedFollowedByAlice.id, roleId: roleSilenced.id }, user: root });
+		await successfulApiCall({ endpoint: 'following/create', parameters: { userId: userSilencedFollowedByAlice.id }, user: alice });
 		userSuspended = await signup({ username: 'userSuspended' });
 		await post(userSuspended, { text: 'test' });
 		await successfulApiCall({ endpoint: 'i/update', parameters: { description: '#user_testuserSuspended' }, user: userSuspended });
@@ -320,7 +323,6 @@ describe('アンテナ', () => {
 	test.todo('は他人のものを削除できない');
 
 	describe('のノート', () => {
-
 		test('を取得できること。', async () => {
 			const keyword = 'キーワード';
 			await post(bob, { text: `test ${keyword} beforehand` });
@@ -499,10 +501,25 @@ describe('アンテナ', () => {
 				],
 			},
 			{
-				label: 'サイレンスのノートも含まれる',
+				label: 'フォローしていないサイレンスユーザーのフォロワー限定ノートは含まない',
 				parameters: () => ({}),
 				posts: [
-					{ note: (): Promise<Note> => post(userSilenced, { text: `${keyword}` }), included: true },
+					{ note: async (): Promise<Note> => {
+						const note = await post(userSilenced, { text: `${keyword}` });
+						assert.strictEqual(note.visibility, 'followers');
+						return note;
+					} },
+				],
+			},
+			{
+				label: 'フォローしているサイレンスユーザーのフォロワー限定ノートは含まれる',
+				parameters: () => ({}),
+				posts: [
+					{ note: async (): Promise<Note> => {
+						const note = await post(userSilencedFollowedByAlice, { text: `${keyword}` });
+						assert.strictEqual(note.visibility, 'followers');
+						return note;
+					}, included: true },
 				],
 			},
 			{
@@ -772,6 +789,5 @@ describe('アンテナ', () => {
 		});
 
 		test.todo('を取得したときActiveに戻る');
-
 	});
 });

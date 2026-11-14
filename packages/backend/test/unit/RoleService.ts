@@ -1118,6 +1118,21 @@ describe('RoleService', () => {
 	});
 
 	describe('assign', () => {
+		test('propagates the last-used update failure before returning', async () => {
+			const user = await createUser();
+			const role = await createRole();
+			vi.spyOn(rolesRepository, 'update').mockRejectedValueOnce(new Error('update failed'));
+			await expect(roleService.assign(user.id, role.id)).rejects.toThrow('update failed');
+		});
+
+		test('unassign awaits the last-used update', async () => {
+			const user = await createUser();
+			const role = await createRole();
+			await roleService.assign(user.id, role.id);
+			vi.spyOn(rolesRepository, 'update').mockRejectedValueOnce(new Error('update failed'));
+			await expect(roleService.unassign(user.id, role.id)).rejects.toThrow('update failed');
+		});
+
 		test('公開ロールの場合は通知される', async () => {
 			const user = await createUser();
 			const role = await createRole({

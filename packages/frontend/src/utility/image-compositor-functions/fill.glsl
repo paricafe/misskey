@@ -23,8 +23,6 @@ out vec4 out_color;
 
 void main() {
 	vec4 in_color = texture(in_texture, in_uv);
-	//float x_ratio = max(in_resolution.x / in_resolution.y, 1.0);
-	//float y_ratio = max(in_resolution.y / in_resolution.x, 1.0);
 
 	float angle = -(u_angle * PI);
 	float aspect = in_resolution.x / max(in_resolution.y, 1.0);

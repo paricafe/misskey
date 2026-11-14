@@ -326,7 +326,7 @@ export class ApInboxService {
 					if (!err.isRetryable) {
 						return `Ignored announce target ${target.id} - ${err.statusCode}`;
 					}
-					return `Error in announce target ${target.id} - ${err.statusCode}`;
+					throw err;
 				}
 				throw err;
 			}
@@ -501,11 +501,12 @@ export class ApInboxService {
 			return `skip: delete actor ${actor.uri} !== ${uri}`;
 		}
 
-		if (!(await this.usersRepository.update({ id: actor.id, isDeleted: false }, { isDeleted: true })).affected) {
-			return 'skip: already deleted or actor not found';
+		if (!await this.usersRepository.existsBy({ id: actor.id })) {
+			return 'skip: actor not found';
 		}
 
 		const job = await this.queueService.createDeleteAccountJob(actor);
+		await this.usersRepository.update({ id: actor.id }, { isDeleted: true });
 
 		this.globalEventService.publishInternalEvent('remoteUserUpdated', { id: actor.id });
 

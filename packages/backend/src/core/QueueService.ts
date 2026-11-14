@@ -662,6 +662,7 @@ export class QueueService implements OnModuleInit {
 			user: { id: user.id },
 			soft: opts.soft,
 		}, {
+			deduplication: { id: `deleteAccount-${user.id}-${opts.soft ? 'soft' : 'hard'}` },
 			removeOnComplete: {
 				age: 3600 * 24 * 7,
 				count: 30,

@@ -4,21 +4,7 @@
  */
 
 // @ts-check
-/**
- * Misskey 変更の完了前検査。
- *
- * 変更ファイル lint、SPDX 自動修正と再検査、locale safety を独立して実行し、
- * 最後に終了コードを集約する。
- *
- * 使い方:
- *   node scripts/check-shipping.mjs
- *   node scripts/check-shipping.mjs --base <ref>
- *
- * 終了コード:
- *   0 = 全検査に合格 (lint 対象なしの SKIPPED を含む)
- *   1 = lint / SPDX / locale の違反
- *   2 = 引数、Git ref、コマンド起動などの理由で検査不能
- */
+/** Validate changed-file lint, SPDX headers, and locale safety. */
 
 import { statSync } from 'node:fs';
 import { join } from 'node:path';
@@ -45,8 +31,6 @@ const LINT_TARGETS = [
 class OperationalError extends Error {}
 
 /**
- * 明示 ref または最も近い統合先から merge-base を選ぶ。
- *
  * @param {string | null} explicitRef
  * @returns {string}
  */
@@ -62,8 +46,6 @@ function resolveMergeBase(explicitRef) {
 }
 
 /**
- * commit 済み・未commit・untracked を含む変更ファイルを列挙する。
- *
  * @param {string} base
  * @returns {string[]}
  */
@@ -76,8 +58,6 @@ function listChangedFiles(base) {
 }
 
 /**
- * パスが存在する通常ファイルかを判定する。
- *
  * @param {string} file
  * @returns {boolean}
  */
@@ -91,8 +71,6 @@ function isRegularFile(file) {
 }
 
 /**
- * 指定ディレクトリでコマンドを実行し、終了コードを返す。
- *
  * @param {string} command
  * @param {string[]} args
  * @param {string} cwd
@@ -112,8 +90,6 @@ function runCommand(command, args, cwd) {
 }
 
 /**
- * 子プロセスの終了コードを検査結果の 0・1・2 に正規化する。
- *
  * @param {number} status
  * @returns {0 | 1 | 2}
  */
@@ -124,8 +100,6 @@ function normalizeStatus(status) {
 }
 
 /**
- * 変更ファイルを package ごとに分け、対象限定 ESLint を実行する。
- *
  * @param {string[]} changedFiles
  * @param {string} repoRoot
  * @returns {{ status: 0 | 1 | 2, summary: 'PASS' | 'FAIL' | 'ERROR' | 'SKIPPED' }}
@@ -160,8 +134,6 @@ function runChangedFileLint(changedFiles, repoRoot) {
 }
 
 /**
- * SPDX 検査を実行し、違反時は対象内を修正して再検査する。
- *
  * @param {string} base
  * @param {string} repoRoot
  * @returns {0 | 1 | 2}
@@ -185,8 +157,6 @@ function runSpdx(base, repoRoot) {
 }
 
 /**
- * ja-JP.yml 以外の locale YAML 変更がないかを検査する。
- *
  * @param {string[]} changedFiles
  * @returns {0 | 1}
  */
@@ -205,8 +175,6 @@ function runLocaleSafety(changedFiles) {
 }
 
 /**
- * CLI 引数または環境変数から基準 ref を取り出す。
- *
  * @param {string[]} args
  * @returns {string | null | undefined}
  */
@@ -217,8 +185,6 @@ function parseBaseRef(args) {
 }
 
 /**
- * lint・SPDX・locale safety を実行し、終了コードを集約する。
- *
  * @returns {number}
  */
 function main() {

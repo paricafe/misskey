@@ -18,12 +18,13 @@ function createService(options: {
 	blocked?: boolean;
 	failurePoint?: FailurePoint;
 	remote?: boolean;
+	voterHost?: string;
 	hasPoll?: boolean;
 	noteMissing?: boolean;
 	visible?: boolean;
 	advisoryLockWait?: () => Promise<void>;
 } = {}) {
-	const me = { id: 'voter-id' };
+	const me = { id: 'voter-id', host: options.voterHost ?? null };
 	const note = {
 		id: 'note-id',
 		userId: 'poll-owner-id',
@@ -463,5 +464,42 @@ describe(PollVoteService, () => {
 		expect(globalEventService.publishNoteStream).toHaveBeenCalledTimes(2);
 		expect(queueService.deliver).toHaveBeenCalledTimes(2);
 		expect(pollService.deliverQuestionUpdate).toHaveBeenCalledTimes(1);
+	});
+});
+
+describe('federated poll voting', () => {
+	test('uses the shared transaction lock for a remote actor without sending a local vote', async () => {
+		const { service, note, me, pollsRepository, queueService, pollService, persisted, order } = createService({ voterHost: 'remote.example', remote: true });
+		await service.vote(note.id, [0, 1], me as never);
+		expect(pollsRepository.query).toHaveBeenCalledWith(expect.stringContaining('pg_advisory_xact_lock'), [JSON.stringify([note.id, me.id])]);
+		expect(order.indexOf('lock')).toBeLessThan(order.indexOf('votes:read'));
+		expect(persisted().votes).toHaveLength(2);
+		expect(persisted().poll.votes).toEqual([1, 1, 0]);
+		expect(queueService.deliver).not.toHaveBeenCalled();
+		expect(pollService.deliverQuestionUpdate).toHaveBeenCalledOnce();
+	});
+
+	test('rejects a second remote choice on a single-choice poll after re-reading votes', async () => {
+		const { service, note, me, persisted } = createService({ voterHost: 'remote.example', multiple: false });
+		await service.vote(note.id, [0], me as never);
+		await expect(service.vote(note.id, [1], me as never)).rejects.toMatchObject({ code: 'ALREADY_VOTED' });
+		expect(persisted().votes.map(vote => vote.choice)).toEqual([0]);
+	});
+
+	test('rolls back remote votes with their counters on storage failure', async () => {
+		const { service, note, me, persisted, globalEventService } = createService({ voterHost: 'remote.example', failurePoint: 'firstUpdate' });
+		await expect(service.vote(note.id, [0], me as never)).rejects.toThrow('forced update failure');
+		expect(persisted().votes).toHaveLength(0);
+		expect(persisted().poll.votes).toEqual([0, 0, 0]);
+		expect(globalEventService.publishNoteStream).not.toHaveBeenCalled();
+	});
+
+	test.each([
+		[{ blocked: true }, 'YOU_HAVE_BEEN_BLOCKED'],
+		[{ expiresAt: new Date(0) }, 'ALREADY_EXPIRED'],
+	])('applies shared validation to remote votes: %s', async (options, code) => {
+		const { service, note, me, persisted } = createService({ ...options, voterHost: 'remote.example' });
+		await expect(service.vote(note.id, [0], me as never)).rejects.toMatchObject({ code });
+		expect(persisted().votes).toHaveLength(0);
 	});
 });

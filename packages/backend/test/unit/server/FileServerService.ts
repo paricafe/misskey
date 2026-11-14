@@ -89,8 +89,6 @@ describe('FileServerService', () => {
 	let remoteTextUrl: string;
 	let remoteFlatPngUrl: string;
 	const storedPaths: string[] = [];
-	let createdFallbackAssets = false;
-	let fallbackAssetsDir = '';
 
 	function writeInternalFile(key: string, data: Buffer = dummyBuffer) {
 		const dest = internalStorageService.resolvePath(key);
@@ -209,13 +207,6 @@ describe('FileServerService', () => {
 		remoteSvgUrl = remoteServerInfo.svgUrl;
 		remoteTextUrl = remoteServerInfo.textUrl;
 		remoteFlatPngUrl = remoteServerInfo.flatPngUrl;
-
-		fallbackAssetsDir = path.resolve('src/server/file/assets');
-		if (!fs.existsSync(fallbackAssetsDir)) {
-			fs.mkdirSync(fallbackAssetsDir, { recursive: true });
-			fs.copyFileSync(dummyPath, path.join(fallbackAssetsDir, 'dummy.png'));
-			createdFallbackAssets = true;
-		}
 	});
 
 	afterEach(async () => {
@@ -234,9 +225,6 @@ describe('FileServerService', () => {
 		await externalFastify.close();
 		await remoteServer.close();
 		await db.destroy();
-		if (createdFallbackAssets) {
-			fs.rmSync(fallbackAssetsDir, { recursive: true, force: true });
-		}
 	});
 
 	describe('GET /files/app-default.jpg', () => {
@@ -254,6 +242,7 @@ describe('FileServerService', () => {
 				expect(res.headers['content-security-policy']).toBe('default-src \'none\'; img-src \'self\'; media-src \'self\'; style-src \'unsafe-inline\'');
 				expect(res.headers['cache-control']).toBe('max-age=31536000, immutable');
 				expect(res.headers['content-type']).toBe('image/jpeg');
+				expect(res.rawPayload).toEqual(fs.readFileSync(path.resolve('src/server/assets/dummy.png')));
 				expect(res.headers['access-control-allow-origin']).toBeUndefined();
 			} finally {
 				process.env.NODE_ENV = prevNodeEnv;
@@ -310,6 +299,7 @@ describe('FileServerService', () => {
 
 			expect(res.statusCode).toBe(404);
 			expect(res.headers['cache-control']).toBe('public, max-age=0');
+			expect(res.rawPayload).toEqual(fs.readFileSync(path.resolve('src/server/assets/dummy.png')));
 		});
 
 		test('GET /files/:key 画像配信ヘッダを検証する', async () => {
@@ -383,6 +373,34 @@ describe('FileServerService', () => {
 			expect(res.headers['content-length']).toBe(String(dummySize));
 		});
 
+		test.each([
+			{ range: 'bytes=-5', start: dummySize - 5, end: dummySize - 1 },
+			{ range: 'bytes=3-', start: 3, end: dummySize - 1 },
+			{ range: `bytes=0-${dummySize}`, start: 0, end: dummySize - 1 },
+		])('serves a valid $range without overstating Content-Length', async ({ range, start, end }) => {
+			const accessKey = randomString();
+			writeInternalFile(accessKey);
+			await insertDriveFile({ accessKey, storedInternal: true, isLink: false });
+			for (const url of [`/files/${accessKey}`, `/proxy/any?url=${encodeURIComponent(`${config.url}/files/${accessKey}`)}`]) {
+				const response = await fastify.inject({ url, headers: { range, 'user-agent': 'Mozilla/5.0' } });
+				expect(response.statusCode).toBe(206);
+				expect(response.headers['content-range']).toBe(`bytes ${start}-${end}/${dummySize}`);
+				expect(response.headers['content-length']).toBe(String(end - start + 1));
+				expect(response.rawPayload).toEqual(dummyBuffer.subarray(start, end + 1));
+			}
+		});
+
+		test.each(['bytes=-0', `bytes=${dummySize}-`, 'bytes=5-2', 'bytes=bad'])('rejects an unsatisfiable %s with the actual size', async range => {
+			const accessKey = randomString();
+			writeInternalFile(accessKey);
+			await insertDriveFile({ accessKey, storedInternal: true, isLink: false });
+			for (const url of [`/files/${accessKey}`, `/proxy/any?url=${encodeURIComponent(`${config.url}/files/${accessKey}`)}`]) {
+				const response = await fastify.inject({ url, headers: { range, 'user-agent': 'Mozilla/5.0' } });
+				expect(response.statusCode).toBe(416);
+				expect(response.headers['content-range']).toBe(`bytes */${dummySize}`);
+			}
+		});
+
 		test('GET /files/:key thumbnail の Range で部分配信する', async () => {
 			const accessKey = randomString();
 			const thumbnailKey = randomString();
@@ -413,6 +431,13 @@ describe('FileServerService', () => {
 			expect(res.headers['content-type']).toBe('image/png');
 			expect(res.headers['cache-control']).toBe('max-age=31536000, immutable');
 			expect(res.rawPayload).toEqual(thumbnailBuffer.subarray(0, 4));
+			const proxied = await fastify.inject({
+				url: `/proxy/any?url=${encodeURIComponent(`${config.url}/files/${thumbnailKey}`)}`,
+				headers: { range: 'bytes=-4', 'user-agent': 'Mozilla/5.0' },
+			});
+			expect(proxied.statusCode).toBe(206);
+			expect(proxied.headers['content-range']).toBe(`bytes ${thumbnailBuffer.length - 4}-${thumbnailBuffer.length - 1}/${thumbnailBuffer.length}`);
+			expect(proxied.rawPayload).toEqual(thumbnailBuffer.subarray(-4));
 		});
 
 		test('GET /files/:key thumbnail のファイル名と配信サイズを検証する', async () => {

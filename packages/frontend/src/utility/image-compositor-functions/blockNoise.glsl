@@ -17,7 +17,7 @@ uniform float u_channelShift;
 out vec4 out_color;
 
 void main() {
-	// TODO: ピクセル毎に計算する必要はないのでuniformにする
+
 	float aspect_ratio = min(in_resolution.x, in_resolution.y) / max(in_resolution.x, in_resolution.y);
 	float aspect_ratio_x = in_resolution.x > in_resolution.y ? 1.0 : aspect_ratio;
 	float aspect_ratio_y = in_resolution.x < in_resolution.y ? 1.0 : aspect_ratio;

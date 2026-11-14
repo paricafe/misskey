@@ -3,7 +3,6 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { isAbsolute, resolve } from 'node:path';
@@ -43,7 +42,6 @@ const pathOptions = new Set([
 ]);
 
 /**
- * 相対パスの値を元の作業ディレクトリ基準で解決する
  * @param {string} name
  * @param {string} value
  */
@@ -58,7 +56,6 @@ function resolveOptionValue(name, value) {
 }
 
 /**
- * Node.js のオプション列に含まれる相対パスを解決する
  * @param {string[]} args
  */
 function resolveOptionArgs(args) {
@@ -75,7 +72,6 @@ function resolveOptionArgs(args) {
 }
 
 /**
- * NODE_OPTIONS に含まれる相対パスを解決する。変更しない引数は元の記述（クォートを含む）のまま残す
  * @param {string} nodeOptions
  */
 function resolveNodeOptions(nodeOptions) {
@@ -116,9 +112,8 @@ if (process.env.NODE_OPTIONS) {
 }
 
 /**
- * 停止シグナルを子プロセスへ転送する
  * @param {import('node:child_process').ChildProcess} child
- * @returns {() => void} 転送を解除する関数
+ * @returns {() => void}
  */
 function forwardSignals(child) {
 	const handlers = forwardedSignals.map(signal => {
@@ -135,7 +130,6 @@ function forwardSignals(child) {
 }
 
 /**
- * 前処理を子プロセスで実行し、失敗または停止要求があればその終了コードで終了する
  * @param {string[]} args
  */
 async function runStep(args) {

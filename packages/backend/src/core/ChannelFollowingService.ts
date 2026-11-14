@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, OnModuleDestroy } from '@nestjs/common';
 import Redis from 'ioredis';
 import { DI } from '@/di-symbols.js';
 import type { ChannelFollowingsRepository, ChannelsRepository, MiUser } from '@/models/_.js';
@@ -15,9 +15,10 @@ import type { MiLocalUser } from '@/models/User.js';
 import { RedisKVCache } from '@/misc/cache.js';
 import { IdentifiableError } from '@/misc/identifiable-error.js';
 import { isDuplicateKeyValueError } from '@/misc/is-duplicate-key-value-error.js';
+import { trackPromise } from '@/misc/promise-tracker.js';
 
 @Injectable()
-export class ChannelFollowingService implements OnModuleInit {
+export class ChannelFollowingService implements OnModuleDestroy {
 	public userFollowingChannelsCache: RedisKVCache<Set<string>>;
 
 	constructor(
@@ -46,7 +47,8 @@ export class ChannelFollowingService implements OnModuleInit {
 		this.redisForSub.on('message', this.onMessage);
 	}
 
-	onModuleInit() {
+	onModuleDestroy() {
+		this.dispose();
 	}
 
 	@bindThis
@@ -133,11 +135,11 @@ export class ChannelFollowingService implements OnModuleInit {
 			const { type, body } = obj.message as GlobalEvents['internal']['payload'];
 			switch (type) {
 				case 'followChannel': {
-					this.userFollowingChannelsCache.refresh(body.userId);
+					trackPromise(this.userFollowingChannelsCache.refresh(body.userId));
 					break;
 				}
 				case 'unfollowChannel': {
-					this.userFollowingChannelsCache.delete(body.userId);
+					trackPromise(this.userFollowingChannelsCache.delete(body.userId));
 					break;
 				}
 			}
@@ -146,6 +148,7 @@ export class ChannelFollowingService implements OnModuleInit {
 
 	@bindThis
 	public dispose(): void {
+		this.redisForSub.off('message', this.onMessage);
 		this.userFollowingChannelsCache.dispose();
 	}
 

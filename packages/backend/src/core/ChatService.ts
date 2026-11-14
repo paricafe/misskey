@@ -753,6 +753,7 @@ export class ChatService {
 	public async leaveRoom(userId: MiUser['id'], roomId: MiChatRoom['id']) {
 		const membership = await this.chatRoomMembershipsRepository.findOneByOrFail({ roomId, userId });
 		await this.chatRoomMembershipsRepository.delete(membership.id);
+		await this.globalEventService.publishInternalEvent('chatRoomMemberLeft', { roomId, userId });
 
 		const redisPipeline = this.redisClient.pipeline();
 		redisPipeline.del(`newRoomChatMessageExists:${userId}:${roomId}`);

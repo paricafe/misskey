@@ -5,16 +5,13 @@
 
 import { Inject, Injectable } from '@nestjs/common';
 import { DI } from '@/di-symbols.js';
-import type { NotesRepository, UsersRepository, PollsRepository, PollVotesRepository, MiUser } from '@/models/_.js';
+import type { NotesRepository, UsersRepository } from '@/models/_.js';
 import type { MiNote } from '@/models/Note.js';
 import { RelayService } from '@/core/RelayService.js';
-import { IdService } from '@/core/IdService.js';
-import { GlobalEventService } from '@/core/GlobalEventService.js';
 import { ApRendererService } from '@/core/activitypub/ApRendererService.js';
 import { UserEntityService } from '@/core/entities/UserEntityService.js';
 import { ApDeliverManagerService } from '@/core/activitypub/ApDeliverManagerService.js';
 import { bindThis } from '@/decorators.js';
-import { UserBlockingService } from '@/core/UserBlockingService.js';
 
 @Injectable()
 export class PollService {
@@ -25,64 +22,11 @@ export class PollService {
 		@Inject(DI.notesRepository)
 		private notesRepository: NotesRepository,
 
-		@Inject(DI.pollsRepository)
-		private pollsRepository: PollsRepository,
-
-		@Inject(DI.pollVotesRepository)
-		private pollVotesRepository: PollVotesRepository,
-
 		private userEntityService: UserEntityService,
-		private idService: IdService,
 		private relayService: RelayService,
-		private globalEventService: GlobalEventService,
-		private userBlockingService: UserBlockingService,
 		private apRendererService: ApRendererService,
 		private apDeliverManagerService: ApDeliverManagerService,
 	) {
-	}
-
-	@bindThis
-	public async vote(user: MiUser, note: MiNote, choice: number) {
-		const poll = await this.pollsRepository.findOneBy({ noteId: note.id });
-
-		if (poll == null) throw new Error('poll not found');
-
-		if (poll.choices[choice] == null) throw new Error('invalid choice param');
-
-		if (note.userId !== user.id) {
-			const blocked = await this.userBlockingService.checkBlocked(note.userId, user.id);
-			if (blocked) {
-				throw new Error('blocked');
-			}
-		}
-
-		const exist = await this.pollVotesRepository.findBy({
-			noteId: note.id,
-			userId: user.id,
-		});
-
-		if (poll.multiple) {
-			if (exist.some(x => x.choice === choice)) {
-				throw new Error('already voted');
-			}
-		} else if (exist.length !== 0) {
-			throw new Error('already voted');
-		}
-
-		await this.pollVotesRepository.insert({
-			id: this.idService.gen(),
-			noteId: note.id,
-			userId: user.id,
-			choice: choice,
-		});
-
-		const index = choice + 1;
-		await this.pollsRepository.query('UPDATE poll SET votes[$1] = votes[$1] + 1 WHERE "noteId" = $2', [index, poll.noteId]);
-
-		this.globalEventService.publishNoteStream(note, 'pollVoted', {
-			choice: choice,
-			userId: user.id,
-		});
 	}
 
 	@bindThis

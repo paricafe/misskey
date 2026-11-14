@@ -16,7 +16,7 @@ import components from '@/components/index.js';
 import { themeManager } from '@/theme.js';
 import { isDeviceDarkmode } from '@/utility/is-device-darkmode.js';
 import { i18n } from '@/i18n.js';
-import { refreshCurrentAccount, login } from '@/accounts.js';
+import { refreshCurrentAccount, login, initializeAccountStorage } from '@/accounts.js';
 import { store } from '@/store.js';
 import { fetchInstance, instance } from '@/instance.js';
 import { updateDeviceKind } from '@/utility/device-kind.js';
@@ -94,6 +94,7 @@ export async function common(createVue: () => Promise<App<Element>>) {
 	html.setAttribute('lang', lang);
 
 	await store.ready;
+	await initializeAccountStorage();
 	await deckStore.ready;
 
 	const fetchInstanceMetaPromise = fetchInstance();

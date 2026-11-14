@@ -240,6 +240,8 @@ type UndefinedAsNullAll<T> = {
 };
 
 export interface InternalEventTypes {
+	accessTokenRevoked: { id: string; userId: MiUser['id']; };
+	chatRoomMemberLeft: { roomId: MiChatRoom['id']; userId: MiUser['id']; };
 	userChangeSuspendedState: { id: MiUser['id']; isSuspended: MiUser['isSuspended']; };
 	userChangeDeletedState: { id: MiUser['id']; isDeleted: MiUser['isDeleted']; };
 	userTokenRegenerated: { id: MiUser['id']; oldToken: string; newToken: string; };
@@ -334,6 +336,10 @@ export type GlobalEvents = {
 		name: `chatRoomStream:${MiChatRoom['id']}`;
 		payload: EventTypesToEventPayload<ChatEventTypes>;
 	};
+	chatRoomMembership: {
+		name: `chatRoomMembership:${MiChatRoom['id']}:${MiUser['id']}`;
+		payload: EventTypesToEventPayload<Pick<InternalEventTypes, 'chatRoomMemberLeft'>>;
+	};
 	reversi: {
 		name: `reversiStream:${MiUser['id']}`;
 		payload: EventTypesToEventPayload<ReversiEventTypes>;
@@ -362,20 +368,20 @@ export class GlobalEventService {
 	}
 
 	@bindThis
-	private publish(channel: StreamChannels, type: string | null, value?: any): void {
+	private publish(channel: StreamChannels, type: string | null, value?: any): Promise<number> {
 		const message = type == null ? value : value == null ?
 			{ type: type, body: null } :
 			{ type: type, body: value };
 
-		this.redisForPub.publish(this.config.host, JSON.stringify({
+		return this.redisForPub.publish(this.config.host, JSON.stringify({
 			channel: channel,
 			message: message,
 		}));
 	}
 
 	@bindThis
-	public publishInternalEvent<K extends keyof InternalEventTypes>(type: K, value?: InternalEventTypes[K]): void {
-		this.publish('internal', type, typeof value === 'undefined' ? null : value);
+	public publishInternalEvent<K extends keyof InternalEventTypes>(type: K, value?: InternalEventTypes[K]): Promise<number> {
+		return this.publish('internal', type, typeof value === 'undefined' ? null : value);
 	}
 
 	@bindThis

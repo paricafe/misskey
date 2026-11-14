@@ -101,7 +101,7 @@ export class ActivityPubServerService {
 	}
 
 	@bindThis
-	private inbox(request: FastifyRequest, reply: FastifyReply) {
+	private async inbox(request: FastifyRequest, reply: FastifyReply) {
 		if (this.meta.federation === 'none') {
 			reply.code(403);
 			return;
@@ -169,7 +169,7 @@ export class ActivityPubServerService {
 			return;
 		}
 
-		this.queueService.inbox(body as IActivity, signature);
+		await this.queueService.inbox(body as IActivity, signature);
 
 		reply.code(202);
 	}

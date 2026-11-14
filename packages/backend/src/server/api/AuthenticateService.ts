@@ -41,14 +41,14 @@ export class AuthenticateService implements OnApplicationShutdown {
 	}
 
 	@bindThis
-	public async authenticate(token: string | null | undefined): Promise<[MiLocalUser | null, MiAccessToken | null]> {
+	public async authenticate(token: string | null | undefined, options: { fresh?: boolean; updateLastUsedAt?: boolean } = {}): Promise<[MiLocalUser | null, MiAccessToken | null]> {
 		if (token == null) {
 			return [null, null];
 		}
 
 		if (isNativeUserToken(token)) {
-			const user = await this.cacheService.localUserByNativeTokenCache.fetch(token,
-				() => this.usersRepository.findOneBy({ token }) as Promise<MiLocalUser | null>);
+			const findUser = () => this.usersRepository.findOneBy({ token }) as Promise<MiLocalUser | null>;
+			const user = await (options.fresh ? findUser() : this.cacheService.localUserByNativeTokenCache.fetch(token, findUser));
 
 			if (user == null) {
 				throw new AuthenticationError('user not found');
@@ -68,18 +68,19 @@ export class AuthenticateService implements OnApplicationShutdown {
 				throw new AuthenticationError('invalid signature');
 			}
 
-			this.accessTokensRepository.update(accessToken.id, {
-				lastUsedAt: new Date(),
-			});
+			if (options.updateLastUsedAt !== false) {
+				this.accessTokensRepository.update(accessToken.id, {
+					lastUsedAt: new Date(),
+				});
+			}
 
-			const user = await this.cacheService.localUserByIdCache.fetch(accessToken.userId,
-				() => this.usersRepository.findOneBy({
-					id: accessToken.userId,
-				}) as Promise<MiLocalUser>);
+			const findUser = () => this.usersRepository.findOneBy({ id: accessToken.userId }) as Promise<MiLocalUser>;
+			const user = await (options.fresh ? findUser() : this.cacheService.localUserByIdCache.fetch(accessToken.userId, findUser));
+			if (user == null) throw new AuthenticationError('user not found');
 
 			if (accessToken.appId) {
-				const app = await this.appCache.fetch(accessToken.appId,
-					() => this.appsRepository.findOneByOrFail({ id: accessToken.appId! }));
+				const findApp = () => this.appsRepository.findOneByOrFail({ id: accessToken.appId! });
+				const app = await (options.fresh ? findApp() : this.appCache.fetch(accessToken.appId, findApp));
 
 				return [user, {
 					id: accessToken.id,
