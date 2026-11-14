@@ -1,0 +1,4563 @@
+packages/frontend/src/components/MkHeatmap.vue
+  a98097cae5c78d9d 130
+packages/misskey-js/src/entities.ts
+  a98097cae5c78d9d 42
+packages/backend/src/core/MetaService.ts
+  a98097cae5c78d9d 51,53
+packages/backend/src/core/chart/charts/test.ts
+  a98097cae5c78d9d 19
+packages/backend/src/server/api/openapi/gen-spec.ts
+  a98097cae5c78d9d 94
+packages/backend/test/e2e/streaming.ts
+  a98097cae5c78d9d 56,174-176,184-186,196-197,206-207,216-218,226-228,238-239,250-252,263-265,273-275,283-285,293-294,305,317,327-329,338-340,349-351,361-363,372-374,379,384-385,394-396,404-406,414-416,424,426,434,448,481,493,506-507,517,526-528,536,538,546,548,556,558,566,576,587-589,598-600,609-611,621-623,631-633,641-643
+packages/frontend/src/components/MkEmojiPicker.vue
+  a98097cae5c78d9d 153,239,313
+packages/frontend/src/utility/lightbox.ts
+  a98097cae5c78d9d 8
+packages/frontend/src/components/MkReactionsViewer.details.vue
+  a98097cae5c78d9d 68
+packages/backend/src/core/UserFollowingService.ts
+  a98097cae5c78d9d 417,519
+packages/backend/src/core/chart/charts/entities/drive.ts
+  a98097cae5c78d9d 12,14,16,18
+packages/backend/src/misc/json-schema.ts
+  a98097cae5c78d9d 263
+packages/backend/src/server/api/endpoints/notes/mentions.ts
+  a98097cae5c78d9d 64
+packages/backend/src/core/entities/AntennaEntityService.ts
+  a98097cae5c78d9d 46-47
+packages/frontend/src/utility/image-frame-renderer/ImageFrameRenderer.ts
+  a98097cae5c78d9d 32,87
+packages/backend/src/core/HashtagService.ts
+  a98097cae5c78d9d 43,187-188,193-194
+packages/frontend/src/pages/welcome.entrance.classic.vue
+  a98097cae5c78d9d 72,103,114
+packages/frontend/src/utility/idle-render.ts
+  a98097cae5c78d9d 10,13
+packages/frontend/src/pages/emoji-edit-dialog.vue
+  a98097cae5c78d9d 191
+packages/frontend-embed/src/style.scss
+  a98097cae5c78d9d 121,133
+packages/backend/src/misc/cache.ts
+  a98097cae5c78d9d 229
+packages/backend/src/core/ReactionService.ts
+  a98097cae5c78d9d 38,398
+packages/frontend/test/unit/emoji.test.ts
+  a98097cae5c78d9d 30-31
+packages/frontend/src/utility/sound.ts
+  a98097cae5c78d9d 152
+packages/backend/src/core/SystemAccountService.ts
+  a98097cae5c78d9d 50,100
+packages/backend/src/queue/processors/DeleteAccountProcessorService.ts
+  a98097cae5c78d9d 66,97,132,182
+packages/frontend/src/components/MkCropperDialog.vue
+  a98097cae5c78d9d 102
+packages/backend/test/unit/misc/zip.ts
+  a98097cae5c78d9d 37,40,159
+packages/backend/src/core/CacheService.ts
+  a98097cae5c78d9d 37,74-77,80-81,84,88-89,99-100,110-111,121-122,132-133,149-150
+packages/frontend/src/components/MkImageFrameEditorDialog.vue
+  a98097cae5c78d9d 332
+packages/backend/src/core/chart/charts/entities/per-user-drive.ts
+  a98097cae5c78d9d 12,14,16
+packages/misskey-js/src/streaming.types.ts
+  a98097cae5c78d9d 43-45
+packages/frontend/src/utility/get-embed-code.ts
+  a98097cae5c78d9d 38
+packages/backend/src/server/api/endpoints/stats.ts
+  a98097cae5c78d9d 89
+packages/frontend/src/components/MkSwiper.vue
+  a98097cae5c78d9d 75,168
+packages/backend/src/core/DownloadService.ts
+  a98097cae5c78d9d 57,60,78
+packages/frontend-embed/src/misskey-api.ts
+  a98097cae5c78d9d 45,85
+packages/frontend/src/components/MkMenu.vue
+  a98097cae5c78d9d 302,516,533-536,684
+packages/frontend/src/pages/chat/room.vue
+  a98097cae5c78d9d 334
+packages/backend/src/core/UserKeypairService.ts
+  a98097cae5c78d9d 28-29
+packages/backend/test/e2e/endpoints.ts
+  a98097cae5c78d9d 738,766
+packages/backend/src/server/api/endpoints/users/reactions.ts
+  a98097cae5c78d9d 79,115
+packages/frontend/src/ui/_common_/mobile-footer-menu.vue
+  a98097cae5c78d9d 57
+packages/frontend/src/utility/get-user-menu.ts
+  a98097cae5c78d9d 214
+packages/frontend/src/components/MkAccountMoved.vue
+  a98097cae5c78d9d 25
+packages/backend/src/core/entities/UserEntityService.ts
+  a98097cae5c78d9d 328,385,582,629-630,635-636,642
+packages/frontend/src/components/global/MkUrl.vue
+  a98097cae5c78d9d 91,99,103
+packages/backend/test/unit/ap-request.ts
+  a98097cae5c78d9d 19,21,26
+packages/backend/src/server/file/FileServerFileResolver.ts
+  a98097cae5c78d9d 89
+packages/backend/src/models/NoteDraft.ts
+  a98097cae5c78d9d 15-16
+packages-private/diagnostics-shared/src/metric-table.ts
+  a98097cae5c78d9d 39
+packages/frontend-embed/src/components/EmPagination.vue
+  a98097cae5c78d9d 328
+packages/frontend/src/di.ts
+  a98097cae5c78d9d 25
+packages/misskey-reversi/src/game.ts
+  a98097cae5c78d9d 144-146,153-160,166,175,178,180-182
+packages/frontend/src/composables/use-uploader.ts
+  a98097cae5c78d9d 41,99-100,104-105,301-303,597
+packages/frontend/src/pages/settings/theme.vue
+  a98097cae5c78d9d 255,268,457
+packages/frontend/src/styles-font/yishanbeizhuan.scss
+  a98097cae5c78d9d 7,14
+packages/frontend/src/utility/misskey-api.ts
+  a98097cae5c78d9d 49,89
+packages/backend/src/core/RoleService.ts
+  a98097cae5c78d9d 169-170,221,224-225
+packages/backend/src/server/api/endpoints/notes/user-list-timeline.ts
+  a98097cae5c78d9d 54,166,169,171,176,181
+packages/backend/src/core/activitypub/ApDbResolverService.ts
+  a98097cae5c78d9d 53-54
+packages/backend/src/server/api/AuthenticateService.ts
+  a98097cae5c78d9d 40,61,63
+packages/frontend/src/components/MkWidgetSettingsDialog.vue
+  a98097cae5c78d9d 109-110,112
+packages/backend/src/core/UserWebhookService.ts
+  a98097cae5c78d9d 103,106,115,118,121,124
+packages/backend/src/server/web/ClientServerService.ts
+  a98097cae5c78d9d 335,874
+packages/frontend-embed/src/components/EmInstanceTicker.vue
+  a98097cae5c78d9d 53
+packages/frontend/src/os.ts
+  a98097cae5c78d9d 216
+packages/frontend/src/styles-font/maokentangyuan.scss
+  a98097cae5c78d9d 7,14
+packages/frontend/src/lib/nirax.ts
+  a98097cae5c78d9d 212
+packages/backend/src/queue/processors/ImportCustomEmojisProcessorService.ts
+  a98097cae5c78d9d 22-23,91
+packages/backend/src/core/FanoutTimelineEndpointService.ts
+  a98097cae5c78d9d 177
+packages/backend/test/performance/benchmark.ts
+  a98097cae5c78d9d 95
+packages/frontend/src/components/MkPushNotificationAllowButton.vue
+  a98097cae5c78d9d 106
+packages/backend/src/misc/generate-invite-code.ts
+  a98097cae5c78d9d 8
+packages/backend/src/core/ChatService.ts
+  a98097cae5c78d9d 140,144,225,245,603,929
+packages/frontend/src/components/MkContextMenu.vue
+  a98097cae5c78d9d 44-45
+packages/misskey-js/src/streaming.ts
+  a98097cae5c78d9d 82,291-293
+packages/frontend/lib/vite-plugin-create-search-index.ts
+  a98097cae5c78d9d 206,210,224,312,420,455,460,463-464,545,580
+packages/backend/test/e2e/clips.ts
+  a98097cae5c78d9d 437,840,844,848
+packages/frontend/src/pages/user/index.activity.vue
+  a98097cae5c78d9d 52-54
+packages/backend/src/server/api/endpoints/notes/local-timeline.ts
+  a98097cae5c78d9d 58,183,185
+packages/frontend/src/components/MkStreamingNotificationsTimeline.vue
+  a98097cae5c78d9d 122,132,216
+packages/frontend/src/boot/common.ts
+  a98097cae5c78d9d 60,64
+packages/frontend/src/local-storage.ts
+  a98097cae5c78d9d 40,42-43
+packages/backend/src/core/FileInfoService.ts
+  a98097cae5c78d9d 208-209,214,216,220,222,228-229,231,244,256,277,309,315
+packages/backend/test/unit/FileInfoService.ts
+  a98097cae5c78d9d 184
+packages/frontend/src/accounts.ts
+  a98097cae5c78d9d 245
+packages/backend/src/core/PageService.ts
+  a98097cae5c78d9d 168
+packages/backend/test-federation/test/user.test.ts
+  a98097cae5c78d9d 391,394,424,448,451,475,478,494,515,522,525
+packages/backend/src/core/activitypub/models/ApNoteService.ts
+  a98097cae5c78d9d 208
+packages/frontend/src/components/MkTabs.vue
+  a98097cae5c78d9d 136,155
+packages/frontend-builder/locale-inliner/collect-modifications.ts
+  a98097cae5c78d9d 124-126,134,141,151,201,257,269
+packages/frontend/src/preferences/def.ts
+  a98097cae5c78d9d 113,115,144,146,424,426,448,450
+packages/backend/src/models/UserProfile.ts
+  a98097cae5c78d9d 14
+packages/backend/src/queue/processors/ExportCustomEmojisProcessorService.ts
+  a98097cae5c78d9d 106
+packages/backend/src/queue/processors/DeliverProcessorService.ts
+  a98097cae5c78d9d 49
+packages/misskey-bubble-game/src/game.ts
+  a98097cae5c78d9d 46-47,51,54,71-72
+packages/backend/test/unit/misc/should-hide-note-by-time.ts
+  a98097cae5c78d9d 28,33,40-41,46-47,52-53,58-60,65,71,79,85,91,102-106,112-113,118-119,124-125,130-131
+packages/backend/src/core/entities/PageEntityService.ts
+  a98097cae5c78d9d 95
+packages/frontend/src/components/MkCaptcha.vue
+  a98097cae5c78d9d 60
+packages/backend/src/core/activitypub/type.ts
+  a98097cae5c78d9d 170
+packages/backend/src/models/Emoji.ts
+  a98097cae5c78d9d 11
+packages/backend/src/core/ReversiService.ts
+  a98097cae5c78d9d 28,174
+packages/frontend/src/components/MkEmojiPicker.stories.impl.ts
+  a98097cae5c78d9d 43,47
+packages/frontend-embed/src/ui.vue
+  a98097cae5c78d9d 62-63
+packages/backend/test/unit/queue/processors/CleanRemoteNotesProcessorService.ts
+  a98097cae5c78d9d 205,265,282,298,343,348,371-372,392,397,417,422,432,437,476,481-486,569,590,594,596,898,904,977,983,1037,1183
+packages/frontend/src/components/MkLightbox.item.audio-visualizer.vue
+  a98097cae5c78d9d 48
+packages/backend/src/const.ts
+  a98097cae5c78d9d 9-10
+packages/backend/src/models/Note.ts
+  a98097cae5c78d9d 14-15,32
+packages/backend/src/misc/prelude/array.ts
+  a98097cae5c78d9d 65
+packages/frontend/src/utility/check-reaction-permissions.ts
+  a98097cae5c78d9d 10-11
+packages/frontend/src/store.ts
+  a98097cae5c78d9d 22,83,99,103,107
+packages/backend/src/core/NoteDraftService.ts
+  a98097cae5c78d9d 331,335
+packages/frontend/src/utility/physics.ts
+  a98097cae5c78d9d 31-32
+packages/backend/src/server/ActivityPubServerService.ts
+  a98097cae5c78d9d 454
+packages/frontend/src/composables/use-note.ts
+  a98097cae5c78d9d 189
+packages/frontend/src/utility/intl-string.ts
+  a98097cae5c78d9d 30-55,70,77
+packages/frontend/src/utility/random-id.ts
+  a98097cae5c78d9d 6
+packages/backend/src/server/file/FileServerProxyHandler.ts
+  a98097cae5c78d9d 96,192
+packages/backend/test/unit/misc/gen-identicon.ts
+  a98097cae5c78d9d 67-69
+packages/backend/src/core/UserAuthService.ts
+  a98097cae5c78d9d 53
+packages/backend/src/core/entities/NoteEntityService.ts
+  a98097cae5c78d9d 416,687
+scripts/check-spdx.mjs
+  a98097cae5c78d9d 61
+packages/backend/src/server/api/endpoints/users/notes.ts
+  a98097cae5c78d9d 67,134-135
+packages/frontend-builder/locale-inliner/apply-with-locale.ts
+  a98097cae5c78d9d 47,69,93
+packages/backend/src/queue/processors/ImportNotesProcessorService.ts
+  a98097cae5c78d9d 32-33,249,280,314,377,430,578,702,727
+packages/frontend/src/components/global/MkPageHeader.tabs.vue
+  a98097cae5c78d9d 144,163
+packages/backend/src/queue/processors/ExportNotesProcessorService.ts
+  a98097cae5c78d9d 71,84,86
+packages/backend/test/unit/misc/cache.ts
+  a98097cae5c78d9d 456,458,463-464
+packages/backend/src/core/FeaturedService.ts
+  a98097cae5c78d9d 12-15,23,44
+packages/frontend/src/components/MkLightbox.item.vue
+  a98097cae5c78d9d 218,240-241,470,486,631,717-718,726-727,827,854
+packages/backend/src/server/api/endpoints/reset-password.ts
+  a98097cae5c78d9d 51
+packages/misskey-js/src/consts.ts
+  a98097cae5c78d9d 61-62
+packages/backend/src/queue/QueueProcessorService.ts
+  a98097cae5c78d9d 57-58
+packages/frontend/src/pages/chat/XMessage.vue
+  a98097cae5c78d9d 272
+packages/backend/src/core/QueueService.ts
+  a98097cae5c78d9d 131,134,190,194,212,216,251,255,284,288,305,309,321,325,338,350,354,366,370,382,386,400,404,416,420,432,436,448,452,464,468,482,486,553,557,570,574,597,601,615,619,632,636,649,653,666,670,723,727,741,745,755,759,789,793,822,826
+packages/frontend/src/composables/use-tooltip.ts
+  a98097cae5c78d9d 29
+packages/frontend/src/utility/popup-position.ts
+  a98097cae5c78d9d 104-105,114
+packages/frontend-embed/src/components/EmTime.vue
+  a98097cae5c78d9d 47,50
+packages/frontend/src/components/MkButton.vue
+  a98097cae5c78d9d 133
+packages/backend/src/server/NodeinfoServerService.ts
+  a98097cae5c78d9d 135
+packages/backend/src/server/api/endpoints/admin/update-proxy-account.ts
+  a98097cae5c78d9d 54
+packages/frontend/src/composables/use-note-capture.ts
+  a98097cae5c78d9d 86,88,431,439
+packages/backend/src/core/S3Service.ts
+  a98097cae5c78d9d 29,45,47
+packages/backend/src/server/api/endpoints/admin/roles/create.ts
+  a98097cae5c78d9d 37
+packages/frontend/src/components/MkStreamingNotesTimeline.vue
+  a98097cae5c78d9d 219,235,450
+packages/frontend/src/components/MkWatermarkEditorDialog.vue
+  a98097cae5c78d9d 293
+packages/backend/src/core/UserSearchService.ts
+  a98097cae5c78d9d 175,191
+packages/backend/src/core/activitypub/ApRequestService.ts
+  a98097cae5c78d9d 158,232
+packages/frontend/src/pages/admin/announcements.vue
+  a98097cae5c78d9d 214,226,238
+packages/frontend/src/utility/watermark/WatermarkRenderer.ts
+  a98097cae5c78d9d 255
+packages/frontend/src/widgets/WidgetCalendar.vue
+  a98097cae5c78d9d 104
+packages/frontend-shared/js/theme.ts
+  a98097cae5c78d9d 16,78,80,82,113
+packages/backend/test/unit/activitypub.ts
+  a98097cae5c78d9d 421
+packages/backend/src/core/VideoProcessingService.ts
+  a98097cae5c78d9d 39
+packages/frontend/src/pages/reversi/index.vue
+  a98097cae5c78d9d 254
+packages/frontend/src/pages/user/activity.pv.vue
+  a98097cae5c78d9d 171
+packages/frontend/src/components/MkUserOnlineIndicator.vue
+  a98097cae5c78d9d 40
+packages/backend/src/core/CustomEmojiService.ts
+  a98097cae5c78d9d 76,79-80,349-352,385
+packages/frontend/src/pages/user/activity.following.vue
+  a98097cae5c78d9d 163
+packages/frontend/src/components/MkImageEffectorDialog.vue
+  a98097cae5c78d9d 144,198,200-201,252,254,264,267,324,327
+packages/frontend/src/components/MkNote.body.vue
+  a98097cae5c78d9d 718
+packages/frontend/src/pages/miauth.vue
+  a98097cae5c78d9d 43
+packages/frontend/src/components/MkImgWithBlurhash.vue
+  a98097cae5c78d9d 70
+packages/backend/test/e2e/fetch-resource.ts
+  a98097cae5c78d9d 97
+packages-private/diagnostics-frontend/src/bundle/chunk-report.ts
+  a98097cae5c78d9d 123,143
+packages/backend/src/server/api/endpoints/notes/hybrid-timeline.ts
+  a98097cae5c78d9d 64,244,246
+packages/frontend/src/pages/drop-and-fusion.game.vue
+  a98097cae5c78d9d 608-609
+packages/frontend/src/components/MkAnnouncementDialog.vue
+  a98097cae5c78d9d 95
+packages/misskey-js/test/api.ts
+  a98097cae5c78d9d 116
+packages/backend/src/core/EmailService.ts
+  a98097cae5c78d9d 206-208
+packages/backend/src/core/UserListService.ts
+  a98097cae5c78d9d 50-51
+packages/frontend/src/pages/settings/2fa.qrdialog.vue
+  a98097cae5c78d9d 152
+packages/frontend/src/components/MkAnalogClock.vue
+  a98097cae5c78d9d 157
+packages/frontend/src/utility/array.ts
+  a98097cae5c78d9d 77
+packages/backend/src/core/AvatarDecorationService.ts
+  a98097cae5c78d9d 32
+packages/frontend/src/components/MkEmbedCodeGenDialog.vue
+  a98097cae5c78d9d 144,227,235,242-243,245
+packages/frontend/src/components/MkFolder.vue
+  a98097cae5c78d9d 140,157,212,223
+packages-private/diagnostics-shared/src/heap-snapshot/render.ts
+  a98097cae5c78d9d 23
+packages/frontend/src/components/MkFoldableSection.vue
+  a98097cae5c78d9d 65,78
+packages/frontend/src/pages/settings/2fa.vue
+  a98097cae5c78d9d 214
+packages/backend/src/core/AntennaService.ts
+  a98097cae5c78d9d 61,64-65,71,74-75,78,81-82
+packages/frontend-shared/js/use-lowres-time.ts
+  a98097cae5c78d9d 11
+packages/backend/src/core/PollService.ts
+  a98097cae5c78d9d 79
+packages/backend/src/GlobalModule.ts
+  a98097cae5c78d9d 139
+packages/frontend-builder/locale-inliner.ts
+  a98097cae5c78d9d 110
+packages/backend/src/core/DriveService.ts
+  a98097cae5c78d9d 200,280-281,356,358,427
+packages/frontend/src/pages/settings/notifications.notification-config.vue
+  a98097cae5c78d9d 51
+packages/backend/src/core/NoteCreateService.ts
+  a98097cae5c78d9d 614,840,844
+packages/backend/src/core/chart/charts/entities/instance.ts
+  a98097cae5c78d9d 33-34
+packages/backend/src/core/entities/DriveFileEntityService.ts
+  a98097cae5c78d9d 110,118
+packages/frontend/src/components/MkContainer.vue
+  a98097cae5c78d9d 71,84
+packages/frontend/src/components/MkPullToRefresh.vue
+  a98097cae5c78d9d 64,92,220
+packages/frontend/src/preferences/manager.ts
+  a98097cae5c78d9d 26-28,116,242,247-248,381,407,413,428,453,484,496
+packages/frontend-embed/src/components/EmImgWithBlurhash.vue
+  a98097cae5c78d9d 60
+packages/backend/src/core/chart/core.ts
+  a98097cae5c78d9d 56-57,432
+packages/backend/src/server/api/endpoints/channels/timeline.ts
+  a98097cae5c78d9d 53
+packages/backend/src/server/api/endpoints/users/following.ts
+  a98097cae5c78d9d 155
+packages/backend/src/models/Meta.ts
+  a98097cae5c78d9d 733,738
+packages/backend/src/server/api/stream/Connection.ts
+  a98097cae5c78d9d 49,155,158,162
+packages/backend/src/models/User.ts
+  a98097cae5c78d9d 11
+packages/backend/src/server/api/endpoints/notes/timeline.ts
+  a98097cae5c78d9d 47,199,201
+packages/backend/src/core/FanoutTimelineService.ts
+  a98097cae5c78d9d 14-18,22-25,28,30,32,49
+packages/backend/test/e2e/2fa.ts
+  a98097cae5c78d9d 81-84,139-140
+packages/frontend/src/components/global/MkTime.stories.impl.ts
+  a98097cae5c78d9d 52
+packages/backend/test-federation/tsconfig.json
+  a98097cae5c78d9d 4-6,8,10,12-13,15,17
+packages/frontend/src/components/global/MkTime.vue
+  a98097cae5c78d9d 47,50
+packages/frontend/src/pages/flash/flash-edit.vue
+  a98097cae5c78d9d 385
+packages/frontend/src/composables/use-scroll-position-keeper.ts
+  a98097cae5c78d9d 32
+packages/frontend/test/unit/lib/nirax/navigation.test.ts
+  a98097cae5c78d9d 26,81
+packages/backend/lib/backend-dev-server.ts
+  a98097cae5c78d9d 24
+packages/frontend/src/preferences/utility.ts
+  a98097cae5c78d9d 226
+packages/backend/src/core/HttpRequestService.ts
+  a98097cae5c78d9d 139-141,238
+packages/frontend/src/components/MkModal.vue
+  a98097cae5c78d9d 94
+packages/backend/src/core/AccountMoveService.ts
+  a98097cae5c78d9d 125,148,176,198,235,303
+packages/frontend/src/components/MkLightbox.vue
+  a98097cae5c78d9d 65,120,122,248
+packages/backend/test/e2e/users.ts
+  a98097cae5c78d9d 292,395,419,488
+packages/frontend/src/components/MkPostForm.vue
+  a98097cae5c78d9d 451,597,621,1065-1066
+packages/backend/src/misc/zip.ts
+  a98097cae5c78d9d 24
+packages/backend/test/unit/chart.ts
+  a98097cae5c78d9d 69
+packages/frontend/test/unit/i18n.test.ts
+  a98097cae5c78d9d 7
+packages/backend/src/server/api/ApiCallService.ts
+  a98097cae5c78d9d 41,46,48
+packages/frontend/src/pages/admin/overview.active-users.vue
+  a98097cae5c78d9d 155
+packages/frontend/src/pages/search.note.vue
+  a98097cae5c78d9d 252
+packages/frontend/src/components/MkLightbox.item.controls.vue
+  a98097cae5c78d9d 115-116,129,344
+packages/backend/src/core/WebAuthnService.ts
+  a98097cae5c78d9d 253,257-261
+packages/backend/src/server/api/StreamingApiServerService.ts
+  a98097cae5c78d9d 58
+packages/frontend/src/pages/settings/profile.vue
+  a98097cae5c78d9d 283,361
+packages/frontend/src/pages/settings/index.vue
+  a98097cae5c78d9d 204,216
+packages/sw/build.js
+  a98097cae5c78d9d 25
+packages/frontend/src/components/MkReactionTooltip.vue
+  a98097cae5c78d9d 40
+packages/frontend/src/components/MkMediaList.vue
+  a98097cae5c78d9d 71,130,220,226,232,273
+packages/frontend/src/plugin.ts
+  a98097cae5c78d9d 299
+packages/frontend/src/style.scss
+  a98097cae5c78d9d 4,300,325
+packages/frontend/src/theme.ts
+  a98097cae5c78d9d 53
+packages/mastodon-compat/test/native-client.test.ts
+  a98097cae5c78d9d 99
+packages/frontend/src/preferences.ts
+  a98097cae5c78d9d 45,61
+packages/sw/src/sw.ts
+  a98097cae5c78d9d 245
+packages/frontend-builder/locale-inliner/facade-chunk-detection.ts
+  a98097cae5c78d9d 38
+packages/backend/src/postgres.ts
+  a98097cae5c78d9d 299
+packages/backend/src/queue/processors/InboxProcessorService.ts
+  a98097cae5c78d9d 73,257,261
+packages/frontend/src/components/MkDrive.vue
+  a98097cae5c78d9d 244,253
+packages/frontend-embed/src/components/EmNote.vue
+  a98097cae5c78d9d 15
+packages/backend/src/queue/processors/ExportAntennasProcessorService.ts
+  a98097cae5c78d9d 83
+packages/backend/src/core/MfmService.ts
+  a98097cae5c78d9d 120,128,266
+packages/frontend-embed/src/components/EmAvatar.vue
+  a98097cae5c78d9d 193-194,197,222-223,227
+packages/frontend/src/pages/admin/overview.ap-requests.vue
+  a98097cae5c78d9d 183,271
+packages/frontend/src/components/MkSwitch.button.vue
+  a98097cae5c78d9d 53
+packages/frontend/src/styles-font/chongxiseal.scss
+  a98097cae5c78d9d 7,14
+packages/frontend/src/ui/_common_/navbar.vue
+  a98097cae5c78d9d 220
+packages/backend/src/core/FederatedInstanceService.ts
+  a98097cae5c78d9d 31-32
+packages/frontend/src/components/MkWindow.vue
+  a98097cae5c78d9d 136-138,157,273,327,331,355,358,381,384,407,411,465-468
+packages/frontend/src/utility/paginator.ts
+  a98097cae5c78d9d 384,392,416
+packages/frontend-embed/src/components/EmMediaList.vue
+  a98097cae5c78d9d 45,77,83,89,130
+packages/backend/src/core/QueryService.ts
+  a98097cae5c78d9d 321,323,331-332,346,354
+packages/frontend/src/components/global/StackingRouterView.vue
+  a98097cae5c78d9d 77
+packages/backend/src/core/ChannelMutingService.ts
+  a98097cae5c78d9d 33-34
+packages/backend/src/misc/gen-identicon.ts
+  a98097cae5c78d9d 9-11,41,48-51
+packages/backend/test/e2e/note.ts
+  a98097cae5c78d9d 270,278
+packages/frontend/test/unit/lib/nirax/fallbacks.test.ts
+  a98097cae5c78d9d 57,71
+packages/backend/src/core/entities/ChannelEntityService.ts
+  a98097cae5c78d9d 127
+packages/frontend/src/components/global/MkAvatar.vue
+  a98097cae5c78d9d 273,276,302,306
+packages/backend/src/server/web/UrlPreviewService.ts
+  a98097cae5c78d9d 40
+packages/frontend/src/utility/double-tap.ts
+  a98097cae5c78d9d 7-8,23
+packages/frontend/src/components/MkSuperMenu.vue
+  a98097cae5c78d9d 162
+packages/backend/src/core/ChannelFollowingService.ts
+  a98097cae5c78d9d 36-37
+packages/backend/src/core/RelayService.ts
+  a98097cae5c78d9d 32
+packages/frontend/src/pages/reversi/game.board.vue
+  a98097cae5c78d9d 309,329
+packages/frontend/src/pages/user/activity.notes.vue
+  a98097cae5c78d9d 162
+packages/backend/test/unit/S3Service.ts
+  a98097cae5c78d9d 65,85
+packages-private/diagnostics-shared/src/format.ts
+  a98097cae5c78d9d 36,47,73,75
+packages/backend/src/core/PushNotificationService.ts
+  a98097cae5c78d9d 67-68
+packages/frontend/src/components/MkRange.vue
+  a98097cae5c78d9d 182,243
+packages/frontend-embed/src/boot.ts
+  a98097cae5c78d9d 89
+packages/frontend/vite.config.ts
+  a98097cae5c78d9d 127
+packages/backend/src/core/activitypub/models/ApPersonService.ts
+  a98097cae5c78d9d 644,676,697-698
+packages/backend/src/core/telemetry/adapters/SentryTelemetryAdapter.ts
+  a98097cae5c78d9d 71
+packages/backend/test/e2e/timelines.ts
+  a98097cae5c78d9d 157,208,229,280,297,603,1255,1272,2772
+packages/backend/src/core/NotificationService.ts
+  a98097cae5c78d9d 194
+packages/backend/test/unit/RoleService.ts
+  a98097cae5c78d9d 191,346,417,679
+packages/frontend/src/widgets/WidgetClock.vue
+  a98097cae5c78d9d 93-95
+packages/backend/src/queue/processors/CleanRemoteNotesProcessorService.ts
+  a98097cae5c78d9d 65,298
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8-ntes.10",
+  "base_commit_sha": "04614929664451ca591da8bb003fa827f8bce65d",
+  "prompts": {
+    "a98097cae5c78d9d": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1d8ff-2f59-7090-b1bb-0db4713ea2aa",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Natsuki-Kaede",
+      "messages": [],
+      "total_additions": 3190,
+      "total_deletions": 12681,
+      "accepted_lines": 1034,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "packages/frontend/src/utility/typed-broadcast-channel.ts": {
+          "deletions": 4
+        },
+        "packages/frontend/src/components/MkAutocomplete.stories.impl.ts": {
+          "deletions": 1
+        },
+        "packages/backend/test/unit/AnnouncementService.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/models/Poll.ts": {
+          "deletions": 2
+        },
+        "packages/frontend-builder/locale-inliner/collect-modifications.ts": {
+          "additions": 18,
+          "deletions": 56,
+          "accepted_lines": 9
+        },
+        "packages/frontend/src/ui/deck/column.vue": {
+          "deletions": 4
+        },
+        "packages/backend/src/logging/types.ts": {
+          "deletions": 31
+        },
+        "packages/frontend/src/components/MkPullToRefresh.vue": {
+          "additions": 8,
+          "deletions": 15,
+          "accepted_lines": 3
+        },
+        "packages/frontend/src/pages/settings/preferences.vue": {
+          "additions": 2,
+          "deletions": 5
+        },
+        "packages/mastodon-compat/src/oauth.ts": {
+          "deletions": 3
+        },
+        "packages/backend/test/unit/FlashService.ts": {
+          "deletions": 10
+        },
+        "packages/backend/src/core/telemetry/adapters/SentryTelemetryAdapter.ts": {
+          "additions": 2,
+          "deletions": 21,
+          "accepted_lines": 1
+        },
+        "packages/frontend/src/widgets/WidgetAiscriptApp.vue": {
+          "deletions": 2
+        },
+        "packages/backend/src/core/entities/FollowingEntityService.ts": {
+          "deletions": 4
+        },
+        "packages/backend/src/core/chart/charts/per-user-drive.ts": {
+          "deletions": 6
+        },
+        "packages/backend/test/utils.ts": {
+          "deletions": 67
+        },
+        "packages/backend/src/models/Announcement.ts": {
+          "deletions": 4
+        },
+        "packages/frontend/src/components/form/section.vue": {
+          "deletions": 1
+        },
+        "packages/backend/scripts/watch.mjs": {
+          "deletions": 7
+        },
+        "packages/backend/src/server/api/endpoints/chat/messages/unreact.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/server/api/endpoints/roles/notes.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/core/NoteCreateService.ts": {
+          "additions": 6,
+          "deletions": 92,
+          "accepted_lines": 3
+        },
+        "packages/frontend/src/pages/lookup.vue": {
+          "deletions": 2
+        },
+        "packages/backend/src/server/api/endpoints/i/update.ts": {
+          "deletions": 11
+        },
+        "packages/backend/src/core/NotificationService.ts": {
+          "additions": 2,
+          "deletions": 36,
+          "accepted_lines": 1
+        },
+        "packages/frontend-embed/src/style.scss": {
+          "additions": 4,
+          "deletions": 14,
+          "accepted_lines": 2
+        },
+        "packages/backend/src/core/AccountUpdateService.ts": {
+          "deletions": 1
+        },
+        "packages/frontend/src/utility/please-login.ts": {
+          "deletions": 23
+        },
+        "packages/backend/src/core/FanoutTimelineEndpointService.ts": {
+          "additions": 2,
+          "deletions": 7,
+          "accepted_lines": 1
+        },
+        "packages/backend/test-federation/test/timeline.test.ts": {
+          "deletions": 15
+        },
+        "packages/frontend/src/components/MkContextMenu.vue": {
+          "additions": 4,
+          "deletions": 4,
+          "accepted_lines": 2
+        },
+        "packages/mastodon-compat/test/postgres-store.test.ts": {
+          "deletions": 2
+        },
+        "packages/backend/test-federation/tsconfig.json": {
+          "additions": 26,
+          "deletions": 117,
+          "accepted_lines": 15
+        },
+        "packages/backend/test/e2e/synalio/user-create.ts": {
+          "deletions": 5
+        },
+        "packages/backend/src/core/CoreModule.ts": {
+          "deletions": 6
+        },
+        "packages/frontend/src/pages/admin/custom-emojis-manager.remote.vue": {
+          "additions": 2,
+          "deletions": 6
+        },
+        "packages/backend/src/server/api/stream/channels/drive.ts": {
+          "deletions": 1
+        },
+        "packages/frontend/src/utility/copy-to-clipboard.ts": {
+          "deletions": 3
+        },
+        "packages/backend/src/server/api/stream/channels/admin.ts": {
+          "deletions": 1
+        },
+        "packages-private/diagnostics-frontend/src/inspect-browser.ts": {
+          "deletions": 9
+        },
+        "packages/frontend/src/utility/check-reaction-permissions.ts": {
+          "additions": 4,
+          "deletions": 4,
+          "accepted_lines": 2
+        },
+        "packages/backend/src/server/api/endpoints/admin/update-proxy-account.ts": {
+          "additions": 2,
+          "deletions": 2,
+          "accepted_lines": 1
+        },
+        "packages/frontend/src/components/MkVisitorDashboard.vue": {
+          "additions": 3,
+          "deletions": 5
+        },
+        "packages/frontend/src/components/MkSignin.password.vue": {
+          "additions": 3,
+          "deletions": 5
+        },
+        "packages/frontend-embed/src/workers/test-webgl2.ts": {
+          "deletions": 1
+        },
+        "packages/frontend/src/components/MkLightbox.item.vue": {
+          "additions": 24,
+          "deletions": 67,
+          "accepted_lines": 12
+        },
+        "packages/backend/rolldown.config.ts": {
+          "deletions": 14
+        },
+        "packages/backend/test-server/server.ts": {
+          "deletions": 19
+        },
+        "packages/frontend/src/widgets/WidgetActivity.chart.vue": {
+          "deletions": 1
+        },
+        "packages/frontend/src/utility/group-avatar-decorations.ts": {
+          "deletions": 5
+        },
+        "packages/backend/src/queue/processors/ImportFollowingProcessorService.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/core/FeaturedService.ts": {
+          "additions": 12,
+          "deletions": 12,
+          "accepted_lines": 6
+        },
+        "packages/frontend/src/components/MkExtensionInstaller.vue": {
+          "additions": 2,
+          "deletions": 3
+        },
+        "packages/backend/test/unit/misc/zip.ts": {
+          "additions": 6,
+          "deletions": 18,
+          "accepted_lines": 3
+        },
+        "packages/backend/src/server/api/stream/channels/server-stats.ts": {
+          "deletions": 2
+        },
+        "packages/frontend/src/components/MkReactionsViewer.reaction.vue": {
+          "deletions": 7
+        },
+        "packages/frontend/src/widgets/WidgetBirthdayFollowings.vue": {
+          "deletions": 1
+        },
+        "packages-private/diagnostics-shared/src/heap-snapshot/analyze.ts": {
+          "deletions": 12
+        },
+        "packages/frontend/src/pages/settings/notifications.notification-config.vue": {
+          "additions": 2,
+          "deletions": 2,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/server/api/endpoints/following/requests/accept.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/boot/master.ts": {
+          "deletions": 36
+        },
+        "packages/frontend/src/utility/double-tap.ts": {
+          "additions": 6,
+          "deletions": 6,
+          "accepted_lines": 3
+        },
+        "packages-private/diagnostics-frontend/src/browser/server.ts": {
+          "deletions": 8
+        },
+        "packages/backend/src/server/WellKnownServerService.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/server/api/endpoints/drive/folders/update.ts": {
+          "deletions": 5
+        },
+        "packages/backend/src/server/api/endpoints/i/regenerate-token.ts": {
+          "deletions": 2
+        },
+        "packages/backend/test-federation/test/note.test.ts": {
+          "deletions": 19
+        },
+        "packages/misskey-js/test/streaming.ts": {
+          "deletions": 3
+        },
+        "packages/backend/test/e2e/mute.ts": {
+          "deletions": 4
+        },
+        "packages/frontend/src/pages/admin/custom-emojis-manager.local.list.vue": {
+          "deletions": 9
+        },
+        "packages/frontend/src/pages/admin/settings.vue": {
+          "deletions": 1
+        },
+        "packages/backend/test/e2e/oauth.ts": {
+          "deletions": 46
+        },
+        "packages/frontend/src/pages/note.vue": {
+          "deletions": 2
+        },
+        "packages/backend/src/server/api/endpoints/admin/emoji/copy.ts": {
+          "deletions": 5
+        },
+        "packages/frontend/test/e2e/timeline-performance.spec.ts": {
+          "deletions": 3
+        },
+        "packages/frontend/src/pages/settings/profile.vue": {
+          "additions": 4,
+          "deletions": 9,
+          "accepted_lines": 2
+        },
+        "packages/backend/src/server/api/stream/channels/global-timeline.ts": {
+          "deletions": 3
+        },
+        "packages/backend/test/unit/entities/UserEntityService.ts": {
+          "deletions": 25
+        },
+        "packages/backend/src/core/AbuseReportNotificationService.ts": {
+          "deletions": 69
+        },
+        "packages/backend/src/server/api/stream/channels/user-list.ts": {
+          "deletions": 8
+        },
+        "packages/frontend/src/components/MkColorInput.vue": {
+          "deletions": 1
+        },
+        "packages/backend/src/server/api/endpoints/admin/accounts/create.ts": {
+          "deletions": 5
+        },
+        "packages/backend/src/server/api/endpoints/channels/update.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/server/api/endpoints/clips/update.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/core/telemetry/telemetry-registry.ts": {
+          "deletions": 12
+        },
+        "packages/frontend/src/lib/pizzax.ts": {
+          "deletions": 26
+        },
+        "packages/backend/src/server/api/endpoints/reset-db.ts": {
+          "deletions": 2
+        },
+        "packages/backend/test/unit/CacheService.ts": {
+          "deletions": 1
+        },
+        "packages/frontend/src/utility/misskey-api.ts": {
+          "additions": 4,
+          "deletions": 9,
+          "accepted_lines": 2
+        },
+        "packages/backend/src/server/api/endpoints/flash/unlike.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/server/api/endpoints/blocking/create.ts": {
+          "deletions": 3
+        },
+        "packages/backend/test/unit/logging/PrettyConsoleBackend.ts": {
+          "deletions": 2
+        },
+        "packages/backend/test-federation/test/utils.ts": {
+          "deletions": 24
+        },
+        "packages/i18n/scripts/generateLocaleInterface.ts": {
+          "deletions": 2
+        },
+        "packages/backend/src/core/chart/charts/per-user-following.ts": {
+          "deletions": 3
+        },
+        "packages/frontend-embed/src/components/EmImgWithBlurhash.vue": {
+          "additions": 2,
+          "deletions": 7,
+          "accepted_lines": 1
+        },
+        "packages/backend/test/unit/SystemWebhookService.ts": {
+          "deletions": 27
+        },
+        "packages/frontend/src/utility/langmap.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/server/api/endpoints/renote-mute/create.ts": {
+          "deletions": 4
+        },
+        "packages/frontend/src/widgets/index.ts": {
+          "deletions": 1
+        },
+        "packages/frontend/src/pages/settings/2fa.vue": {
+          "additions": 2,
+          "deletions": 4,
+          "accepted_lines": 1
+        },
+        "packages/frontend/src/components/page/page.block.vue": {
+          "deletions": 1
+        },
+        "packages/frontend/src/components/MkSignupDialog.rules.stories.impl.ts": {
+          "deletions": 1
+        },
+        "packages/frontend/src/utility/id.ts": {
+          "deletions": 2
+        },
+        "packages/frontend/src/types/overload-to-union.ts": {
+          "deletions": 1
+        },
+        "packages/misskey-js/src/nyaize.ts": {
+          "deletions": 6
+        },
+        "packages/frontend/src/pages/admin/overview.vue": {
+          "deletions": 10
+        },
+        "packages/backend/src/misc/get-ip-hash.ts": {
+          "deletions": 3
+        },
+        "packages/frontend/src/ui/deck/role-timeline-column.vue": {
+          "deletions": 9
+        },
+        "packages/frontend/src/composables/use-scroll-position-keeper.ts": {
+          "additions": 2,
+          "deletions": 19,
+          "accepted_lines": 1
+        },
+        "packages/frontend/src/components/MkAsUi.vue": {
+          "deletions": 2
+        },
+        "packages/mastodon-compat/test/streaming-transport.test.ts": {
+          "deletions": 2
+        },
+        "packages/backend/src/misc/sql-string-escape.ts": {
+          "deletions": 9
+        },
+        "packages/backend/src/server/api/endpoints/notes/timeline.ts": {
+          "additions": 6,
+          "deletions": 16,
+          "accepted_lines": 3
+        },
+        "packages/frontend/src/pages/drop-and-fusion.vue": {
+          "deletions": 1
+        },
+        "packages/backend/assets/misc/cli.js": {
+          "deletions": 2
+        },
+        "packages/frontend-embed/build.ts": {
+          "deletions": 5
+        },
+        "packages/frontend/src/local-storage.ts": {
+          "additions": 6,
+          "deletions": 9,
+          "accepted_lines": 3
+        },
+        "packages/misskey-js/build.js": {
+          "deletions": 2
+        },
+        "packages/frontend/src/components/global/MkStickyContainer.vue": {
+          "deletions": 2
+        },
+        "packages/backend/src/models/Note.ts": {
+          "additions": 7,
+          "deletions": 31,
+          "accepted_lines": 3
+        },
+        "packages/frontend/vite.config.ts": {
+          "additions": 2,
+          "deletions": 17,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/core/RelayService.ts": {
+          "additions": 2,
+          "deletions": 3,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/server/api/endpoints/notes/global-timeline.ts": {
+          "deletions": 2
+        },
+        "packages/frontend/src/boot/main-boot.ts": {
+          "deletions": 31
+        },
+        "packages/backend/src/core/ReactionsBufferingService.test.ts": {
+          "deletions": 6
+        },
+        "packages/frontend/src/components/MkTooltip.vue": {
+          "deletions": 1
+        },
+        "packages/frontend/src/utility/get-file-menu.ts": {
+          "deletions": 1
+        },
+        "packages/frontend/src/pages/settings/theme.vue": {
+          "additions": 6,
+          "deletions": 6,
+          "accepted_lines": 3
+        },
+        "packages/frontend/src/components/grid/MkGrid.vue": {
+          "deletions": 160
+        },
+        "packages/misskey-reversi/src/serializer.ts": {
+          "deletions": 13
+        },
+        "packages/frontend/src/components/MkChannelFollowButton.vue": {
+          "deletions": 2
+        },
+        "packages/backend/src/server/api/stream/channels/clip.ts": {
+          "deletions": 2
+        },
+        "packages/backend/src/postgres.ts": {
+          "additions": 2,
+          "deletions": 3,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/core/activitypub/type.ts": {
+          "additions": 2,
+          "deletions": 21,
+          "accepted_lines": 1
+        },
+        "packages/frontend/src/pages/settings/mute-block.word-mute.vue": {
+          "deletions": 7
+        },
+        "packages/backend/src/core/chart/charts/per-user-notes.ts": {
+          "deletions": 3
+        },
+        "packages/frontend/src/ui/_common_/navbar.vue": {
+          "additions": 3,
+          "deletions": 14,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/misc/FileWriterStream.ts": {
+          "deletions": 3
+        },
+        "packages/frontend/src/ui/universal.vue": {
+          "deletions": 1
+        },
+        "packages/frontend/src/utility/watermark/WatermarkRenderer.ts": {
+          "additions": 2,
+          "deletions": 8,
+          "accepted_lines": 1
+        },
+        "packages/backend/test/e2e/2fa.ts": {
+          "additions": 12,
+          "deletions": 28,
+          "accepted_lines": 6
+        },
+        "packages/frontend/src/components/global/StackingRouterView.vue": {
+          "additions": 2,
+          "deletions": 3,
+          "accepted_lines": 1
+        },
+        "packages/frontend/src/pages/admin/bot-protection.vue": {
+          "deletions": 3
+        },
+        "packages/backend/src/models/PromoNote.ts": {
+          "deletions": 2
+        },
+        "packages/frontend/src/components/MkContainer.vue": {
+          "additions": 4,
+          "deletions": 10,
+          "accepted_lines": 2
+        },
+        "packages/frontend/vitest.config.unit.ts": {
+          "deletions": 1
+        },
+        "packages/frontend/src/components/MkDrive.navFolder.vue": {
+          "deletions": 7
+        },
+        "scripts/start.mjs": {
+          "deletions": 16
+        },
+        "packages/backend/src/core/UserFollowingService.ts": {
+          "additions": 4,
+          "deletions": 77,
+          "accepted_lines": 2
+        },
+        "packages/backend/test/e2e/timelines.ts": {
+          "additions": 9,
+          "deletions": 53,
+          "accepted_lines": 9
+        },
+        "packages/backend/src/core/UserSuspendService.ts": {
+          "deletions": 2
+        },
+        "packages/frontend/src/pages/auth.form.vue": {
+          "deletions": 6
+        },
+        "packages/backend/src/server/api/endpoints/channels/mute/create.ts": {
+          "deletions": 3
+        },
+        "packages/frontend/src/utility/get-embed-code.ts": {
+          "additions": 2,
+          "deletions": 18,
+          "accepted_lines": 1
+        },
+        "packages/frontend/src/utility/image-frame-renderer/ImageFrameRenderer.ts": {
+          "additions": 4,
+          "deletions": 8,
+          "accepted_lines": 2
+        },
+        "packages/frontend/src/pages/miauth.vue": {
+          "additions": 2,
+          "deletions": 2,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/server/api/endpoints/reset-password.ts": {
+          "additions": 2,
+          "deletions": 4,
+          "accepted_lines": 1
+        },
+        "packages/mastodon-compat/src/postgres-store.ts": {
+          "deletions": 5
+        },
+        "packages/backend/src/queue/processors/ImportNotesProcessorService.ts": {
+          "additions": 20,
+          "deletions": 33,
+          "accepted_lines": 10
+        },
+        "packages/frontend/src/ui/_common_/statusbar-user-list.vue": {
+          "additions": 2,
+          "deletions": 3
+        },
+        "packages/frontend/src/components/global/MkAd.stories.impl.ts": {
+          "deletions": 2
+        },
+        "packages/frontend/src/components/MkUserCardMini.vue": {
+          "deletions": 1
+        },
+        "packages/misskey-reversi/src/game.ts": {
+          "additions": 34,
+          "deletions": 59,
+          "accepted_lines": 17
+        },
+        "packages/i18n/scripts/verify.ts": {
+          "deletions": 2
+        },
+        "packages/backend/src/models/User.ts": {
+          "additions": 2,
+          "deletions": 15,
+          "accepted_lines": 1
+        },
+        "packages/frontend/src/aiscript/api.ts": {
+          "deletions": 13
+        },
+        "packages/backend/src/server/api/endpoints/users/lists/push.ts": {
+          "deletions": 3
+        },
+        "packages/backend/src/queue/QueueProcessorService.ts": {
+          "additions": 4,
+          "deletions": 28,
+          "accepted_lines": 2
+        },
+        "packages/frontend/src/directives/tooltip.ts": {
+          "deletions": 3
+        },
+        "packages/backend/src/core/activitypub/ApRendererService.ts": {
+          "deletions": 31
+        },
+        "packages/frontend/src/components/MkEmojiPicker.stories.impl.ts": {
+          "additions": 4,
+          "deletions": 4,
+          "accepted_lines": 2
+        },
+        "packages/backend/src/misc/extract-mentions.ts": {
+          "deletions": 3
+        },
+        "packages/backend/src/server/api/endpoints/notes/thread-muting/create.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/core/ClipService.ts": {
+          "deletions": 4
+        },
+        "packages/backend/test/unit/queue/processors/CheckModeratorsActivityProcessorService.ts": {
+          "deletions": 31
+        },
+        "packages/frontend/src/components/MkVirtualList.vue": {
+          "deletions": 2
+        },
+        "packages/frontend/src/pages/page-editor/page-editor.blocks.vue": {
+          "additions": 2,
+          "deletions": 3
+        },
+        "packages/backend/test/e2e/synalio/abuse-report.ts": {
+          "deletions": 18
+        },
+        "packages/frontend/src/workers/draw-blurhash.ts": {
+          "deletions": 1
+        },
+        "packages/backend/test/e2e/exports.ts": {
+          "deletions": 3
+        },
+        "packages/backend/test/unit/misc/cache.ts": {
+          "additions": 8,
+          "deletions": 24,
+          "accepted_lines": 4
+        },
+        "packages/backend/src/models/AbuseReportNotificationRecipient.ts": {
+          "deletions": 30
+        },
+        "packages/backend/src/boot/worker.ts": {
+          "deletions": 4
+        },
+        "packages/frontend/src/components/MkUserSelectDialog.vue": {
+          "deletions": 1
+        },
+        "packages/backend/src/core/S3Service.ts": {
+          "additions": 6,
+          "deletions": 6,
+          "accepted_lines": 3
+        },
+        "packages/frontend-embed/src/components/EmPagination.vue": {
+          "additions": 2,
+          "deletions": 46,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/server/api/endpoints/users/get-following-users-by-birthday.ts": {
+          "deletions": 4
+        },
+        "packages-private/diagnostics-backend/src/compare.ts": {
+          "deletions": 7
+        },
+        "packages/frontend/src/utility/search-emoji.ts": {
+          "deletions": 12
+        },
+        "packages-private/changelog-checker/test/checker.test.ts": {
+          "deletions": 3
+        },
+        "packages/frontend-shared/js/use-lowres-time.ts": {
+          "additions": 2,
+          "deletions": 15,
+          "accepted_lines": 1
+        },
+        "packages/frontend/src/components/MkRemoteEmojiEditDialog.vue": {
+          "deletions": 1
+        },
+        "packages/frontend/src/pages/admin/custom-emojis-manager.impl.ts": {
+          "deletions": 1
+        },
+        "packages-private/diagnostics-shared/src/format.ts": {
+          "additions": 8,
+          "deletions": 18,
+          "accepted_lines": 4
+        },
+        "packages/backend/src/server/api/endpoints/endpoints.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/server/api/endpoints/users/update-memo.ts": {
+          "deletions": 3
+        },
+        "packages-private/diagnostics-backend/src/report/markdown.ts": {
+          "deletions": 10
+        },
+        "packages/backend/src/core/entities/DriveFileEntityService.ts": {
+          "additions": 4,
+          "deletions": 15,
+          "accepted_lines": 2
+        },
+        "packages/backend/src/server/ActivityPubServerService.ts": {
+          "additions": 2,
+          "deletions": 55,
+          "accepted_lines": 1
+        },
+        "packages-private/diagnostics-shared/test/stats.test.ts": {
+          "deletions": 3
+        },
+        "packages/backend/src/server/api/endpoints/users/featured-notes.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/queue/processors/DeliverProcessorService.ts": {
+          "additions": 2,
+          "deletions": 13,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/queue/processors/UserWebhookDeliverProcessorService.ts": {
+          "deletions": 3
+        },
+        "packages/backend/src/server/api/endpoints/mute/create.ts": {
+          "deletions": 3
+        },
+        "packages/frontend-embed/src/i18n.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/models/ReversiGame.ts": {
+          "deletions": 6
+        },
+        "packages/misskey-js/generator/src/generator.ts": {
+          "deletions": 5
+        },
+        "packages/frontend/.storybook/fake-utils.ts": {
+          "deletions": 10
+        },
+        "packages/backend/src/server/api/endpoints/ap/show.ts": {
+          "deletions": 11
+        },
+        "packages/frontend/src/components/global/MkA.stories.impl.ts": {
+          "deletions": 2
+        },
+        "packages/backend/src/core/entities/AntennaEntityService.ts": {
+          "additions": 4,
+          "deletions": 4,
+          "accepted_lines": 2
+        },
+        "packages/frontend/src/components/global/MkAvatar.vue": {
+          "additions": 8,
+          "deletions": 8,
+          "accepted_lines": 4
+        },
+        "packages/frontend/src/i.ts": {
+          "deletions": 3
+        },
+        "scripts/dev.mjs": {
+          "deletions": 4
+        },
+        "packages/frontend/src/utility/hotkey.ts": {
+          "deletions": 8
+        },
+        "packages/backend/test/unit/logging/NestLogger.ts": {
+          "deletions": 8
+        },
+        "packages/frontend/src/ui/_common_/common.vue": {
+          "deletions": 1
+        },
+        "packages/frontend/src/components/MkRange.vue": {
+          "additions": 4,
+          "deletions": 6,
+          "accepted_lines": 2
+        },
+        "packages/backend/src/core/chart/charts/federation.ts": {
+          "deletions": 3
+        },
+        "packages/frontend/src/pages/chat/home.home.vue": {
+          "deletions": 1
+        },
+        "packages/frontend/src/components/MkImgWithBlurhash.vue": {
+          "additions": 2,
+          "deletions": 2,
+          "accepted_lines": 1
+        },
+        "packages/frontend/src/pages/qr.vue": {
+          "deletions": 1
+        },
+        "packages/frontend/src/pages/admin-user.vue": {
+          "additions": 3,
+          "deletions": 45
+        },
+        "packages/frontend-embed/public/loader/boot.js": {
+          "deletions": 11
+        },
+        "packages/backend/src/server/web/views/oauth.tsx": {
+          "deletions": 3
+        },
+        "packages/backend/src/core/NoteUpdateService.test.ts": {
+          "deletions": 1
+        },
+        "packages/backend/test/unit/misc/ulid.ts": {
+          "deletions": 14
+        },
+        "packages/backend/src/server/api/stream/channels/role-timeline.ts": {
+          "deletions": 2
+        },
+        "packages/frontend/src/utility/get-user-menu.ts": {
+          "additions": 2,
+          "deletions": 5,
+          "accepted_lines": 1
+        },
+        "packages/frontend/src/utility/watermark/watermark.ts": {
+          "deletions": 3
+        },
+        "packages/backend/src/server/api/endpoints/chat/messages/react.ts": {
+          "deletions": 1
+        },
+        "packages/frontend/src/composables/use-note-view-cache.ts": {
+          "deletions": 1
+        },
+        "packages/mastodon-compat/src/metadata.ts": {
+          "deletions": 7
+        },
+        "packages/backend/test/unit/MetaService.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/boot/process-error-handler.ts": {
+          "deletions": 7
+        },
+        "packages/frontend/src/utility/extract-mentions.ts": {
+          "deletions": 3
+        },
+        "packages/backend/src/core/chart/ChartManagementService.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/server/api/endpoints/i/import-following.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/models/Instance.ts": {
+          "deletions": 30
+        },
+        "packages/frontend/build.ts": {
+          "deletions": 4
+        },
+        "packages/backend/src/boot/unix-socket.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/server/api/endpoints/drive/folders/delete.ts": {
+          "deletions": 2
+        },
+        "packages/frontend-embed/src/pages/user-timeline.vue": {
+          "deletions": 1
+        },
+        "packages/frontend/src/utility/focus-trap.ts": {
+          "deletions": 2
+        },
+        "packages/frontend-shared/js/intl-const.ts": {
+          "deletions": 2
+        },
+        "packages/frontend/src/widgets/WidgetButton.vue": {
+          "deletions": 2
+        },
+        "src/boot.ts": {
+          "additions": 157,
+          "deletions": 157
+        },
+        "packages/icons-subsetter/src/subsetter.ts": {
+          "deletions": 8
+        },
+        "packages/frontend/src/components/MkNotesTimeline.vue": {
+          "deletions": 1
+        },
+        "packages/backend/src/server/api/endpoints/clips/notes.ts": {
+          "deletions": 1
+        },
+        "packages/frontend/src/components/MkLightbox.item.controls.vue": {
+          "additions": 8,
+          "deletions": 29,
+          "accepted_lines": 4
+        },
+        "packages/frontend/src/utility/sound.ts": {
+          "additions": 2,
+          "deletions": 35,
+          "accepted_lines": 1
+        },
+        "packages/misskey-bubble-game/build.js": {
+          "deletions": 1
+        },
+        "packages/frontend-shared/js/media-proxy.ts": {
+          "deletions": 3
+        },
+        "packages/backend/src/core/SystemWebhookService.ts": {
+          "deletions": 16
+        },
+        "packages/backend/src/core/chart/core.ts": {
+          "additions": 6,
+          "deletions": 98,
+          "accepted_lines": 3
+        },
+        "packages/backend/src/core/AbuseReportService.ts": {
+          "deletions": 17
+        },
+        "packages/frontend/src/utility/is-birthday.ts": {
+          "deletions": 1
+        },
+        "packages/sw/src/scripts/lang.ts": {
+          "deletions": 5
+        },
+        "packages/backend/scripts/check_connect.js": {
+          "deletions": 2
+        },
+        "packages/frontend/src/components/global/MkTime.stories.impl.ts": {
+          "additions": 2,
+          "deletions": 2,
+          "accepted_lines": 1
+        },
+        "packages/frontend/src/components/MkSparkle.vue": {
+          "additions": 5,
+          "deletions": 36
+        },
+        "packages/backend/src/server/api/GetterService.ts": {
+          "deletions": 12
+        },
+        "packages/backend/test/unit/WebhookTestService.ts": {
+          "deletions": 6
+        },
+        "packages/frontend/src/components/form/slot.vue": {
+          "deletions": 1
+        },
+        "packages-private/diagnostics-frontend/src/report.ts": {
+          "deletions": 3
+        },
+        "packages/backend/src/misc/prelude/array.ts": {
+          "additions": 2,
+          "deletions": 32,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/queue/processors/TickChartsProcessorService.ts": {
+          "deletions": 1
+        },
+        "packages/frontend/src/components/MkEmojiPickerDialog.vue": {
+          "deletions": 1
+        },
+        "packages/backend/src/core/activitypub/models/ApPersonService.ts": {
+          "additions": 8,
+          "deletions": 103,
+          "accepted_lines": 4
+        },
+        "packages/frontend/src/components/global/PageWithAnimBg.vue": {
+          "deletions": 1
+        },
+        "packages/backend/src/core/ChannelFollowingService.ts": {
+          "additions": 4,
+          "deletions": 12,
+          "accepted_lines": 2
+        },
+        "packages/backend/src/core/NotePiningService.ts": {
+          "deletions": 14
+        },
+        "packages/frontend/src/page.ts": {
+          "deletions": 2
+        },
+        "packages/backend/src/queue/processors/ExportMutingProcessorService.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/queue/processors/ExportFollowingProcessorService.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/server/api/endpoints/miauth/gen-token.ts": {
+          "deletions": 3
+        },
+        "packages/i18n/src/index.ts": {
+          "deletions": 22
+        },
+        "packages/backend/src/misc/html-to-plain-text.ts": {
+          "deletions": 2
+        },
+        "packages/frontend/src/components/MkInput.vue": {
+          "deletions": 3
+        },
+        "packages/frontend-embed/lib/vite-plugin-json5.ts": {
+          "deletions": 2
+        },
+        "packages/backend/src/misc/check-word-mute.ts": {
+          "deletions": 4
+        },
+        "packages/backend/src/core/entities/GalleryPostEntityService.ts": {
+          "deletions": 1
+        },
+        "packages/mastodon-compat/src/types.ts": {
+          "deletions": 3
+        },
+        "packages/backend/src/server/api/endpoints/notes/translate.ts": {
+          "deletions": 1
+        },
+        "packages/frontend/src/components/MkBlurhash.vue": {
+          "deletions": 6
+        },
+        "packages/backend/src/server/NodeinfoServerService.ts": {
+          "additions": 2,
+          "deletions": 7,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/models/UserListMembership.ts": {
+          "deletions": 3
+        },
+        "packages/frontend/src/components/MkCaptcha.vue": {
+          "additions": 2,
+          "deletions": 13,
+          "accepted_lines": 1
+        },
+        "packages/frontend/src/components/MkDriveFileThumbnail.stories.impl.ts": {
+          "deletions": 1
+        },
+        "packages/frontend-embed/src/workers/draw-blurhash.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/core/AvatarDecorationService.ts": {
+          "additions": 2,
+          "deletions": 2,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/models/Webhook.ts": {
+          "deletions": 6
+        },
+        "packages/backend/test/unit/boot/performance-preload.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/server/api/endpoints/blocking/delete.ts": {
+          "deletions": 4
+        },
+        "packages/backend/test/unit/SensitiveMediaDetectionService.ts": {
+          "deletions": 1
+        },
+        "packages/frontend/src/pages/drop-and-fusion.game.vue": {
+          "additions": 8,
+          "deletions": 38,
+          "accepted_lines": 2
+        },
+        "packages/backend/src/core/SystemAccountService.ts": {
+          "additions": 4,
+          "deletions": 7,
+          "accepted_lines": 2
+        },
+        "packages/frontend/src/directives/anim.ts": {
+          "deletions": 2
+        },
+        "packages/backend/src/core/ChatService.ts": {
+          "additions": 12,
+          "deletions": 30,
+          "accepted_lines": 6
+        },
+        "packages/backend/src/server/api/endpoints/following/requests/reject.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/core/UserService.ts": {
+          "deletions": 6
+        },
+        "packages/frontend/src/components/MkSwitch.vue": {
+          "additions": 2,
+          "deletions": 3
+        },
+        "packages-private/diagnostics-frontend/src/browser/report/html-styles.ts": {
+          "deletions": 1
+        },
+        "packages-private/diagnostics-shared/src/stats.ts": {
+          "deletions": 14
+        },
+        "packages/frontend/src/pages/qr.read.vue": {
+          "deletions": 6
+        },
+        "packages/mastodon-compat/src/entities.ts": {
+          "deletions": 2
+        },
+        "packages/frontend/src/pages/flash/flash-edit.vue": {
+          "additions": 2,
+          "deletions": 2,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/core/entities/PageEntityService.ts": {
+          "additions": 2,
+          "deletions": 3,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/core/SignupService.ts": {
+          "deletions": 11
+        },
+        "packages/backend/src/queue/processors/ExportAntennasProcessorService.ts": {
+          "additions": 2,
+          "deletions": 2,
+          "accepted_lines": 1
+        },
+        "packages-private/diagnostics-shared/src/heap-snapshot/summarize.ts": {
+          "deletions": 6
+        },
+        "packages/backend/src/server/api/endpoints/i/update-email.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/server/api/endpoints/i/2fa/register.ts": {
+          "deletions": 2
+        },
+        "packages/misskey-js/generator/src/ast-transformer.ts": {
+          "deletions": 15
+        },
+        "packages/frontend/src/components/MkTabs.vue": {
+          "additions": 4,
+          "deletions": 8,
+          "accepted_lines": 2
+        },
+        "packages/backend/src/server/api/endpoints/notes/search.ts": {
+          "deletions": 2
+        },
+        "packages/backend/src/server/api/endpoints/request-reset-password.ts": {
+          "deletions": 3
+        },
+        "packages/frontend-embed/src/components/I18n.vue": {
+          "deletions": 2
+        },
+        "packages/backend/src/server/web/views/info-card.tsx": {
+          "deletions": 1
+        },
+        "packages/frontend/src/pages/install-extensions.vue": {
+          "additions": 2,
+          "deletions": 4
+        },
+        "packages/backend/src/decorators.ts": {
+          "deletions": 7
+        },
+        "packages/frontend-shared/js/i18n.ts": {
+          "deletions": 3
+        },
+        "packages/backend/src/server/file/FileServerProxyHandler.ts": {
+          "additions": 4,
+          "deletions": 24,
+          "accepted_lines": 2
+        },
+        "packages/sw/build.js": {
+          "additions": 2,
+          "deletions": 2,
+          "accepted_lines": 1
+        },
+        "packages/frontend/src/components/MkCode.core.vue": {
+          "deletions": 4
+        },
+        "packages/backend/src/core/chart/charts/test.ts": {
+          "additions": 2,
+          "deletions": 5,
+          "accepted_lines": 1
+        },
+        "packages/frontend/test/unit/mfm-render.test.ts": {
+          "deletions": 1
+        },
+        "packages-private/diagnostics-shared/src/heap-snapshot/categories.ts": {
+          "deletions": 3
+        },
+        "packages/backend/src/server/api/endpoints/i/import-muting.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/server/api/stream/channels/reversi-game.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/models/UserProfile.ts": {
+          "additions": 2,
+          "deletions": 12,
+          "accepted_lines": 1
+        },
+        "packages/backend/test/unit/SigninWithPasskeyApiService.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/server/api/endpoints/i/2fa/done.ts": {
+          "deletions": 1
+        },
+        "packages/frontend/src/preferences/manager.ts": {
+          "additions": 28,
+          "deletions": 62,
+          "accepted_lines": 14
+        },
+        "packages/backend/test/unit/boot/process-error-handler.ts": {
+          "deletions": 1
+        },
+        "packages/frontend/test/unit/url-preview.test.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/server/api/endpoints/sw/unregister.ts": {
+          "deletions": 2
+        },
+        "packages/frontend-embed/@types/global.d.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/server/api/endpoints/clips/create.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/core/entities/NoteEntityService.ts": {
+          "additions": 4,
+          "deletions": 45,
+          "accepted_lines": 2
+        },
+        "packages/frontend/lib/vite-plugin-watch-locales.ts": {
+          "deletions": 4
+        },
+        "packages/frontend/src/pages/welcome.entrance.classic.vue": {
+          "additions": 8,
+          "deletions": 10,
+          "accepted_lines": 3
+        },
+        "packages/backend/src/server/api/endpoints/notes/drafts/update.ts": {
+          "deletions": 2
+        },
+        "packages/frontend/src/router.definition.ts": {
+          "deletions": 3
+        },
+        "packages/frontend/src/components/MkDrive.vue": {
+          "additions": 4,
+          "deletions": 19,
+          "accepted_lines": 2
+        },
+        "packages/frontend/test/e2e/basic.spec.ts": {
+          "deletions": 17
+        },
+        "packages/backend/scripts/generate_api_json.js": {
+          "deletions": 2
+        },
+        "packages/backend/src/core/entities/NoteReactionEntityService.ts": {
+          "deletions": 4
+        },
+        "packages/backend/src/core/activitypub/JsonLdService.ts": {
+          "deletions": 8
+        },
+        "packages/frontend/src/pages/search.note.vue": {
+          "additions": 2,
+          "deletions": 7,
+          "accepted_lines": 1
+        },
+        "packages-private/diagnostics-frontend/test/report.test.ts": {
+          "deletions": 16
+        },
+        "packages/backend/test/e2e/note.ts": {
+          "additions": 4,
+          "deletions": 5,
+          "accepted_lines": 2
+        },
+        "packages/frontend/test/unit/custom-locales.test.ts": {
+          "deletions": 2
+        },
+        "packages/backend/src/core/PushNotificationService.ts": {
+          "additions": 4,
+          "deletions": 12,
+          "accepted_lines": 2
+        },
+        "packages/backend/src/core/MfmService.ts": {
+          "additions": 6,
+          "deletions": 20,
+          "accepted_lines": 3
+        },
+        "packages/backend/src/logging/JsonConsoleBackend.ts": {
+          "deletions": 18
+        },
+        "packages/backend/src/server/api/stream/channels/antenna.ts": {
+          "deletions": 3
+        },
+        "packages/backend/test/unit/DriveService.ts": {
+          "deletions": 1
+        },
+        "packages/backend/test/unit/FileInfoService.ts": {
+          "additions": 2,
+          "deletions": 7,
+          "accepted_lines": 1
+        },
+        "packages/frontend/src/widgets/WidgetCalendar.vue": {
+          "additions": 2,
+          "deletions": 3,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/server/api/endpoints/admin/update-meta.ts": {
+          "deletions": 1
+        },
+        "packages/frontend/src/components/MkNote.body.vue": {
+          "additions": 4,
+          "deletions": 18,
+          "accepted_lines": 1
+        },
+        "packages/frontend-embed/src/misskey-api.ts": {
+          "additions": 4,
+          "deletions": 8,
+          "accepted_lines": 2
+        },
+        "packages/frontend/src/utility/emoji-mute.ts": {
+          "deletions": 4
+        },
+        "packages/frontend/src/components/MkHeatmap.vue": {
+          "additions": 2,
+          "deletions": 7,
+          "accepted_lines": 1
+        },
+        "packages/frontend/src/components/MkDrive.stories.impl.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/models/json-schema/user.ts": {
+          "deletions": 4
+        },
+        "packages/backend/src/core/chart/charts/test-grouped.ts": {
+          "deletions": 3
+        },
+        "packages/backend/src/misc/extract-urls-for-keyword-check.ts": {
+          "deletions": 8
+        },
+        "packages/backend/src/server/api/stream/ChannelEventBus.ts": {
+          "deletions": 2
+        },
+        "packages/frontend/src/utility/autocomplete.ts": {
+          "deletions": 46
+        },
+        "packages/backend/src/logger.ts": {
+          "deletions": 21
+        },
+        "packages/frontend/src/pages/admin/overview.active-users.vue": {
+          "additions": 2,
+          "deletions": 3,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/server/api/endpoints/i/change-password.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/core/FetchInstanceMetadataService.ts": {
+          "deletions": 5
+        },
+        "packages-private/diagnostics-frontend/src/browser/scenario.ts": {
+          "deletions": 4
+        },
+        "packages/backend/src/server/api/endpoints/i/2fa/password-less.ts": {
+          "deletions": 2
+        },
+        "packages/frontend/lib/vite-plugin-json5.ts": {
+          "deletions": 2
+        },
+        "packages/backend/test-server/entry.ts": {
+          "deletions": 23
+        },
+        "packages/frontend/src/components/MkAccountMoved.vue": {
+          "additions": 2,
+          "deletions": 2,
+          "accepted_lines": 1
+        },
+        "packages/backend/test/e2e/fetch-resource.ts": {
+          "additions": 2,
+          "deletions": 32,
+          "accepted_lines": 1
+        },
+        "packages/frontend-shared/js/worker-multi-dispatch.ts": {
+          "deletions": 4
+        },
+        "packages/backend/src/di-symbols.ts": {
+          "deletions": 2
+        },
+        "packages/frontend/src/components/MkButton.vue": {
+          "additions": 2,
+          "deletions": 5,
+          "accepted_lines": 1
+        },
+        "packages/frontend/src/components/global/MkUrl.vue": {
+          "additions": 6,
+          "deletions": 7,
+          "accepted_lines": 3
+        },
+        "packages/frontend-embed/src/components/EmMediaList.vue": {
+          "additions": 10,
+          "deletions": 13,
+          "accepted_lines": 5
+        },
+        "packages/mastodon-compat/src/index.ts": {
+          "deletions": 3
+        },
+        "packages/backend/test/setup.unit.ts": {
+          "deletions": 1
+        },
+        "packages/backend/test-federation/test/block.test.ts": {
+          "deletions": 7
+        },
+        "packages/backend/src/core/PageService.ts": {
+          "additions": 2,
+          "deletions": 2,
+          "accepted_lines": 1
+        },
+        "packages/frontend/src/components/MkNumber.vue": {
+          "deletions": 1
+        },
+        "packages/backend/src/core/NoteDeleteService.test.ts": {
+          "deletions": 2
+        },
+        "packages/backend/src/misc/id/meid.ts": {
+          "deletions": 1
+        },
+        "packages/frontend-embed/src/components/EmTime.vue": {
+          "additions": 3,
+          "deletions": 4,
+          "accepted_lines": 2
+        },
+        "packages/backend/src/misc/should-hide-note-by-time.ts": {
+          "deletions": 8
+        },
+        "packages/frontend/src/utility/init-chart.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/core/chart/charts/entities/drive.ts": {
+          "additions": 8,
+          "deletions": 8,
+          "accepted_lines": 4
+        },
+        "packages-private/diagnostics-shared/src/heap-snapshot/render.ts": {
+          "additions": 2,
+          "deletions": 10,
+          "accepted_lines": 1
+        },
+        "packages/mastodon-compat/src/routes.ts": {
+          "deletions": 13
+        },
+        "packages/backend/src/server/http-access-log.ts": {
+          "deletions": 17
+        },
+        "packages/frontend/src/components/MkAnnouncementDialog.vue": {
+          "additions": 2,
+          "deletions": 2,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/config.ts": {
+          "deletions": 11
+        },
+        "packages/backend/src/core/chart/charts/users.ts": {
+          "deletions": 3
+        },
+        "packages/backend/src/core/chart/charts/notes.ts": {
+          "deletions": 3
+        },
+        "packages/frontend-embed/src/post-message.ts": {
+          "deletions": 3
+        },
+        "packages-private/diagnostics-shared/src/heap-snapshot/breakdown.ts": {
+          "deletions": 6
+        },
+        "packages/backend/src/const.ts": {
+          "additions": 4,
+          "deletions": 29,
+          "accepted_lines": 2
+        },
+        "packages/backend/src/server/api/endpoints/notes/drafts/create.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/server/api/endpoints/admin/emoji/list.ts": {
+          "deletions": 4
+        },
+        "packages/backend/src/queue/processors/ExportNotesProcessorService.ts": {
+          "additions": 6,
+          "deletions": 8,
+          "accepted_lines": 3
+        },
+        "packages/backend/src/misc/generate-invite-code.ts": {
+          "additions": 2,
+          "deletions": 2,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/server/api/endpoints/admin/captcha/save.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/server/api/endpoints/gallery/posts/like.ts": {
+          "deletions": 3
+        },
+        "packages/backend/src/core/SensitiveMediaDetectionService.ts": {
+          "deletions": 20
+        },
+        "packages/mastodon-compat/src/streaming.ts": {
+          "deletions": 8
+        },
+        "packages/backend/src/queue/processors/ExportClipsProcessorService.ts": {
+          "deletions": 2
+        },
+        "packages/backend/src/core/activitypub/models/ApNoteService.ts": {
+          "additions": 2,
+          "deletions": 55,
+          "accepted_lines": 1
+        },
+        "packages/frontend/src/components/MkNoteDetailed.body.vue": {
+          "deletions": 9
+        },
+        "packages/backend/src/core/activitypub/ApDeliverManagerService.ts": {
+          "deletions": 50
+        },
+        "packages/backend/src/server/api/endpoints/notes/update.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/core/chart/charts/drive.ts": {
+          "deletions": 3
+        },
+        "packages/sw/src/scripts/operations.ts": {
+          "deletions": 10
+        },
+        "packages/frontend/src/pages/user/home.vue": {
+          "additions": 3,
+          "deletions": 11
+        },
+        "packages/frontend/src/preferences.ts": {
+          "additions": 4,
+          "deletions": 13,
+          "accepted_lines": 2
+        },
+        "packages/mastodon-compat/src/media-search.ts": {
+          "deletions": 7
+        },
+        "packages/backend/src/server/api/endpoints/app/show.ts": {
+          "deletions": 1
+        },
+        "packages/frontend/src/components/MkSelect.vue": {
+          "deletions": 3
+        },
+        "packages/frontend/src/utility/merge.ts": {
+          "deletions": 4
+        },
+        "packages/frontend-shared/js/interval.ts": {
+          "deletions": 3
+        },
+        "packages/backend/src/core/entities/EmojiEntityService.ts": {
+          "deletions": 4
+        },
+        "packages/backend/test/unit/telemetry-registry.ts": {
+          "deletions": 1
+        },
+        "packages/frontend/src/components/MkMiniChart.vue": {
+          "deletions": 1
+        },
+        "packages/backend/src/core/IdService.ts": {
+          "deletions": 5
+        },
+        "packages/frontend/src/components/global/MkPageHeader.vue": {
+          "deletions": 1
+        },
+        "packages/backend/src/boot/application-lifecycle.ts": {
+          "deletions": 3
+        },
+        "packages/backend/src/core/HttpRequestService.ts": {
+          "additions": 8,
+          "deletions": 42,
+          "accepted_lines": 4
+        },
+        "packages/frontend/src/aiscript/ui.ts": {
+          "deletions": 3
+        },
+        "packages/backend/src/server/api/endpoints/notes/search-by-tag.ts": {
+          "deletions": 1
+        },
+        "packages/frontend/src/ui/_common_/sw-inject.ts": {
+          "deletions": 2
+        },
+        "packages/backend/src/server/api/endpoints/admin/emoji/add.ts": {
+          "deletions": 2
+        },
+        "packages/backend/test-federation/test/notification.test.ts": {
+          "deletions": 6
+        },
+        "packages/frontend/src/components/MkSignin.input.vue": {
+          "additions": 4,
+          "deletions": 13
+        },
+        "packages/frontend/src/components/MkVisitorDashboard.ActiveUsersChart.vue": {
+          "deletions": 1
+        },
+        "packages/backend/test/unit/entities/NoteEntityService.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/server/file/FileServerUtils.ts": {
+          "deletions": 21
+        },
+        "packages/frontend/src/components/MkModal.vue": {
+          "additions": 2,
+          "deletions": 12,
+          "accepted_lines": 1
+        },
+        "packages/frontend/src/boot/common.ts": {
+          "additions": 4,
+          "deletions": 52,
+          "accepted_lines": 2
+        },
+        "packages/backend/src/queue/processors/SystemWebhookDeliverProcessorService.ts": {
+          "deletions": 3
+        },
+        "packages/frontend/test/unit/lib/nirax/fallbacks.test.ts": {
+          "additions": 4,
+          "deletions": 4,
+          "accepted_lines": 2
+        },
+        "packages/frontend/src/components/MkSignupDialog.form.vue": {
+          "deletions": 4
+        },
+        "packages/frontend/src/utility/get-user-environment.ts": {
+          "deletions": 1
+        },
+        "packages/frontend/@types/global.d.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/models/Flash.ts": {
+          "deletions": 4
+        },
+        "packages/frontend/src/ui/zen.vue": {
+          "additions": 2,
+          "deletions": 6
+        },
+        "packages/backend/src/core/UserBlockingService.ts": {
+          "deletions": 6
+        },
+        "packages/backend/src/core/chart/charts/entities/per-user-drive.ts": {
+          "additions": 6,
+          "deletions": 6,
+          "accepted_lines": 3
+        },
+        "packages/frontend/src/components/MkAnimBg.vue": {
+          "deletions": 2
+        },
+        "packages/backend/src/core/QueryService.ts": {
+          "additions": 12,
+          "deletions": 50,
+          "accepted_lines": 6
+        },
+        "packages/backend/src/queue/processors/ImportCustomEmojisProcessorService.ts": {
+          "additions": 7,
+          "deletions": 19,
+          "accepted_lines": 4
+        },
+        "packages/backend/src/server/api/endpoints/users/show.ts": {
+          "deletions": 8
+        },
+        "packages/backend/src/server/api/stream/channels/hybrid-timeline.ts": {
+          "deletions": 13
+        },
+        "packages/frontend/src/components/MkMediaImage.vue": {
+          "deletions": 3
+        },
+        "packages/backend/src/server/api/endpoints/notes/hybrid-timeline.ts": {
+          "additions": 6,
+          "deletions": 7,
+          "accepted_lines": 3
+        },
+        "packages/frontend/src/drag-and-drop.ts": {
+          "deletions": 2
+        },
+        "packages/frontend/src/deck.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/core/activitypub/misc/check-against-url.ts": {
+          "deletions": 43
+        },
+        "packages/frontend-shared/js/const.ts": {
+          "deletions": 17
+        },
+        "packages/misskey-js/src/index.ts": {
+          "deletions": 5
+        },
+        "packages/backend/src/core/RoleService.ts": {
+          "additions": 10,
+          "deletions": 46,
+          "accepted_lines": 5
+        },
+        "packages/backend/src/server/api/endpoints/drive/files.ts": {
+          "deletions": 2
+        },
+        "packages/backend/src/queue/processors/ImportMutingProcessorService.ts": {
+          "deletions": 1
+        },
+        "packages/frontend/src/components/MkFoldableSection.vue": {
+          "additions": 4,
+          "deletions": 4,
+          "accepted_lines": 2
+        },
+        "packages/backend/src/models/json-schema/queue.ts": {
+          "deletions": 1
+        },
+        "packages/frontend/src/components/MkInstanceCardMini.vue": {
+          "deletions": 1
+        },
+        "packages/backend/src/core/VideoProcessingService.ts": {
+          "additions": 2,
+          "deletions": 2,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/server/oauth/OAuth2ProviderService.ts": {
+          "additions": 1,
+          "deletions": 72
+        },
+        "packages/mastodon-compat/src/native-client.ts": {
+          "deletions": 5
+        },
+        "packages/backend/src/server/api/stream/channels/channel.ts": {
+          "deletions": 13
+        },
+        "packages/backend/src/queue/processors/ExportFavoritesProcessorService.ts": {
+          "deletions": 1
+        },
+        "packages/frontend/src/pages/clip.vue": {
+          "deletions": 1
+        },
+        "packages/backend/src/server/api/endpoints/users/lists/pull.ts": {
+          "deletions": 2
+        },
+        "packages/backend/src/queue/processors/ExportAccountDataProcessorService.test.ts": {
+          "deletions": 2
+        },
+        "packages/frontend/src/pages/settings/mute-block.vue": {
+          "deletions": 3
+        },
+        "packages/frontend/src/pages/admin/job-queue.vue": {
+          "additions": 2,
+          "deletions": 3
+        },
+        "packages/backend/src/models/Meta.ts": {
+          "additions": 4,
+          "deletions": 12,
+          "accepted_lines": 2
+        },
+        "packages/frontend/src/components/MkCropperDialog.vue": {
+          "additions": 2,
+          "deletions": 4,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/core/FanoutTimelineService.ts": {
+          "additions": 27,
+          "deletions": 37,
+          "accepted_lines": 14
+        },
+        "packages/frontend/src/ui/_common_/statusbar-rss.vue": {
+          "additions": 2,
+          "deletions": 3
+        },
+        "packages/frontend-builder/eslint.config.js": {
+          "deletions": 4
+        },
+        "packages/frontend/src/stream.ts": {
+          "deletions": 2
+        },
+        "packages/frontend/src/ui/deck/clip-column.vue": {
+          "deletions": 2
+        },
+        "packages/backend/src/server/api/stream/channels/queue-stats.ts": {
+          "deletions": 2
+        },
+        "packages/backend/src/models/FollowRequest.ts": {
+          "deletions": 2
+        },
+        "packages/backend/src/models/Ad.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/daemons/ServerStatsService.ts": {
+          "deletions": 7
+        },
+        "packages/backend/src/misc/langmap.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/core/QueueModule.ts": {
+          "deletions": 2
+        },
+        "packages/frontend-embed/src/components/EmAvatar.vue": {
+          "additions": 10,
+          "deletions": 10,
+          "accepted_lines": 6
+        },
+        "packages/backend/src/server/api/endpoints/pages/like.ts": {
+          "deletions": 2
+        },
+        "packages/backend/src/core/entities/UserEntityService.ts": {
+          "additions": 16,
+          "deletions": 50,
+          "accepted_lines": 8
+        },
+        "packages/frontend/src/components/MkAchievements.vue": {
+          "deletions": 1
+        },
+        "packages/backend/src/server/api/stream/Connection.ts": {
+          "additions": 8,
+          "deletions": 53,
+          "accepted_lines": 4
+        },
+        "packages/backend/src/server/api/endpoints/auth/session/userkey.ts": {
+          "deletions": 4
+        },
+        "packages/frontend/src/utility/check-word-mute.ts": {
+          "deletions": 8
+        },
+        "packages/backend/src/server/api/endpoints/i/2fa/key-done.ts": {
+          "deletions": 1
+        },
+        "packages/frontend-embed/src/components/EmInstanceTicker.vue": {
+          "additions": 1,
+          "deletions": 2,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/logging/logging-runtime.ts": {
+          "deletions": 10
+        },
+        "packages/backend/test/unit/UserSearchService.ts": {
+          "additions": 1,
+          "deletions": 15
+        },
+        "packages/backend/src/server/api/stream/channels/hashtag.ts": {
+          "deletions": 3
+        },
+        "packages/backend/test/unit/RelayService.ts": {
+          "deletions": 2
+        },
+        "packages/frontend/src/components/MkFollowButton.vue": {
+          "additions": 2,
+          "deletions": 5
+        },
+        "packages/frontend/src/components/MkImageEffectorDialog.vue": {
+          "additions": 20,
+          "deletions": 24,
+          "accepted_lines": 10
+        },
+        "packages/frontend/src/components/MkPollEditor.vue": {
+          "deletions": 5
+        },
+        "packages/frontend-embed/src/server-metadata.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/server/api/stream/channels/local-timeline.ts": {
+          "deletions": 5
+        },
+        "packages/frontend/src/pages/admin/RolesEditorFormula.vue": {
+          "additions": 2,
+          "deletions": 3
+        },
+        "packages/sw/src/types.ts": {
+          "deletions": 1
+        },
+        "packages/frontend/src/pages/admin/roles.editor.vue": {
+          "deletions": 1
+        },
+        "packages/backend/src/server/file/FileServerFileResolver.ts": {
+          "additions": 2,
+          "deletions": 4,
+          "accepted_lines": 1
+        },
+        "packages-private/diagnostics-frontend/test/browser/render.test.ts": {
+          "deletions": 2
+        },
+        "packages/frontend-embed/src/components/EmNote.vue": {
+          "additions": 3,
+          "deletions": 4,
+          "accepted_lines": 1
+        },
+        "packages/mastodon-compat/test/native-client.test.ts": {
+          "additions": 1,
+          "deletions": 1,
+          "accepted_lines": 1
+        },
+        "packages/frontend/src/utility/array.ts": {
+          "additions": 2,
+          "deletions": 32,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/misc/clone.ts": {
+          "deletions": 3
+        },
+        "packages/backend/src/server/api/endpoint-list.ts": {
+          "deletions": 7
+        },
+        "packages/backend/src/core/chart/charts/instance.ts": {
+          "deletions": 3
+        },
+        "packages/misskey-js/src/api.types.ts": {
+          "deletions": 3
+        },
+        "packages/backend/src/server/api/endpoints/i/webhooks/list.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/misc/get-note-summary.ts": {
+          "deletions": 9
+        },
+        "packages/backend/src/core/activitypub/ApResolverService.ts": {
+          "deletions": 5
+        },
+        "packages/frontend/src/components/MkLightbox.item.audio-visualizer.vue": {
+          "additions": 5,
+          "deletions": 123,
+          "accepted_lines": 2
+        },
+        "packages/backend/src/models/Antenna.ts": {
+          "deletions": 3
+        },
+        "packages/frontend/src/utility/intl-const.ts": {
+          "deletions": 2
+        },
+        "packages/backend/src/core/ReversiService.ts": {
+          "additions": 4,
+          "deletions": 19,
+          "accepted_lines": 2
+        },
+        "packages/frontend/src/pages/flash/flash.vue": {
+          "deletions": 2
+        },
+        "packages/backend/src/server/api/stream/NoteStreamingHidingService.ts": {
+          "deletions": 14
+        },
+        "packages/frontend/src/filters/hms.ts": {
+          "deletions": 7
+        },
+        "packages/frontend/src/composables/use-uploader.ts": {
+          "additions": 20,
+          "deletions": 31,
+          "accepted_lines": 9
+        },
+        "packages/frontend/src/analytics.ts": {
+          "deletions": 5
+        },
+        "packages/frontend/src/components/global/MkAd.vue": {
+          "additions": 2,
+          "deletions": 3
+        },
+        "packages/backend/test-server/coverage.ts": {
+          "additions": 1,
+          "deletions": 39
+        },
+        "packages/backend/src/core/NoteCreateService.silent.test.ts": {
+          "deletions": 3
+        },
+        "packages/backend/test/unit/core/telemetry/adapters/SentryTelemetryAdapter.ts": {
+          "deletions": 2
+        },
+        "packages/backend/src/core/ChannelMutingService.ts": {
+          "additions": 4,
+          "deletions": 36,
+          "accepted_lines": 2
+        },
+        "packages/frontend-shared/js/mfm-renderer.ts": {
+          "deletions": 31
+        },
+        "packages/frontend/src/components/MkSwitch.button.vue": {
+          "additions": 2,
+          "deletions": 2,
+          "accepted_lines": 1
+        },
+        "packages/frontend/src/utility/idle-render.ts": {
+          "additions": 4,
+          "deletions": 4,
+          "accepted_lines": 2
+        },
+        "packages/backend/src/server/api/endpoints/i/notifications-grouped.ts": {
+          "deletions": 5
+        },
+        "packages/backend/src/core/entities/MetaEntityService.ts": {
+          "deletions": 2
+        },
+        "packages/frontend/src/pages/settings/other.vue": {
+          "additions": 2,
+          "deletions": 11
+        },
+        "packages/backend/src/core/chart/charts/active-users.ts": {
+          "deletions": 3
+        },
+        "scripts/check-spdx.mjs": {
+          "additions": 2,
+          "deletions": 4,
+          "accepted_lines": 1
+        },
+        "packages/frontend/src/pages/admin/job-queue.job.vue": {
+          "additions": 2,
+          "deletions": 8
+        },
+        "packages/backend/src/misc/promise-tracker.ts": {
+          "deletions": 7
+        },
+        "packages/backend/src/server/api/endpoints.ts": {
+          "deletions": 50
+        },
+        "packages/backend/src/core/activitypub/models/ApImageService.ts": {
+          "deletions": 16
+        },
+        "packages/mastodon-compat/test/streaming.test.ts": {
+          "deletions": 3
+        },
+        "packages/backend/src/server/api/endpoints/auth/accept.ts": {
+          "deletions": 4
+        },
+        "packages/frontend/src/components/MkTagCloud.vue": {
+          "deletions": 1
+        },
+        "packages/mastodon-compat/test/postgres-http-fixture.ts": {
+          "deletions": 1
+        },
+        "packages/frontend/src/components/MkForm.vue": {
+          "deletions": 2
+        },
+        "packages/backend/src/logging/LogBackend.ts": {
+          "deletions": 8
+        },
+        "packages/backend/src/server/api/endpoints/users/lists/get-memberships.ts": {
+          "deletions": 1
+        },
+        "packages/backend/test/e2e/drive.ts": {
+          "deletions": 2
+        },
+        "packages/frontend/src/directives/ripple.ts": {
+          "deletions": 1
+        },
+        "packages/frontend/src/pages/user/home.stories.impl.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/server/api/endpoints/following/invalidate.ts": {
+          "deletions": 3
+        },
+        "packages/frontend/src/utility/snowfall-effect.ts": {
+          "deletions": 4
+        },
+        "packages/backend/test/e2e/endpoints.ts": {
+          "additions": 4,
+          "deletions": 9,
+          "accepted_lines": 2
+        },
+        "packages/frontend/src/pages/page-editor/page-editor.vue": {
+          "deletions": 1
+        },
+        "packages/mastodon-compat/src/store.ts": {
+          "deletions": 4
+        },
+        "packages/frontend/src/custom-emojis.ts": {
+          "deletions": 2
+        },
+        "packages/frontend/src/components/MkSignin.totp.vue": {
+          "additions": 1,
+          "deletions": 2
+        },
+        "packages/backend/scripts/performance-preload.mjs": {
+          "deletions": 3
+        },
+        "packages/frontend/src/directives/user-preview.ts": {
+          "deletions": 2
+        },
+        "packages/frontend-shared/js/emoji-base.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/core/RemoteUserResolveService.ts": {
+          "deletions": 5
+        },
+        "packages/backend/test/unit/server/ApiCallService.ts": {
+          "deletions": 2
+        },
+        "packages-private/diagnostics-shared/src/metric-table.ts": {
+          "additions": 2,
+          "deletions": 2,
+          "accepted_lines": 1
+        },
+        "packages/backend/test/e2e/streaming.ts": {
+          "additions": 202,
+          "deletions": 306,
+          "accepted_lines": 101
+        },
+        "packages/frontend/src/components/MkWindow.vue": {
+          "additions": 34,
+          "deletions": 62,
+          "accepted_lines": 17
+        },
+        "packages/backend/src/core/AntennaService.ts": {
+          "additions": 18,
+          "deletions": 31,
+          "accepted_lines": 9
+        },
+        "packages/frontend/src/components/MkTutorialDialog.vue": {
+          "deletions": 1
+        },
+        "packages/backend/src/core/chart/charts/per-user-reactions.ts": {
+          "deletions": 3
+        },
+        "packages/frontend/src/components/grid/MkDataCell.vue": {
+          "deletions": 6
+        },
+        "packages/frontend-shared/js/url.ts": {
+          "deletions": 13
+        },
+        "packages/frontend/src/utility/code-highlighter.ts": {
+          "deletions": 15
+        },
+        "packages/backend/src/server/api/endpoints/sw/register.ts": {
+          "deletions": 1
+        },
+        "packages/frontend-builder/locale-inliner/facade-chunk-detection.ts": {
+          "additions": 2,
+          "deletions": 20,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/server/api/stream/channels/reversi.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/server/api/openapi/schemas.ts": {
+          "deletions": 2
+        },
+        "packages/frontend/src/pages/drive.file.info.vue": {
+          "deletions": 1
+        },
+        "packages/frontend/src/components/global/MkEmoji.vue": {
+          "deletions": 1
+        },
+        "packages/backend/lib/backend-dev-server.ts": {
+          "additions": 2,
+          "deletions": 5,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/server/api/endpoints/antennas/notes.ts": {
+          "deletions": 5
+        },
+        "packages/frontend/src/components/MkDrive.folder.vue": {
+          "deletions": 10
+        },
+        "packages/frontend/src/pages/admin/ads.vue": {
+          "deletions": 2
+        },
+        "packages/frontend/test/unit/lib/nirax/navigation.test.ts": {
+          "additions": 4,
+          "deletions": 4,
+          "accepted_lines": 2
+        },
+        "packages/frontend/src/components/MkDraggable.vue": {
+          "deletions": 4
+        },
+        "packages/backend/src/server/api/endpoints/drive/files/create.ts": {
+          "deletions": 2
+        },
+        "packages/backend/src/boot/common.ts": {
+          "deletions": 3
+        },
+        "packages/frontend/src/pages/reversi/index.vue": {
+          "additions": 2,
+          "deletions": 2,
+          "accepted_lines": 1
+        },
+        "packages/misskey-js/src/consts.ts": {
+          "additions": 4,
+          "deletions": 5,
+          "accepted_lines": 2
+        },
+        "packages/frontend/src/directives/get-size.ts": {
+          "deletions": 2
+        },
+        "packages/backend/src/logging/BootstrapConsoleBackend.ts": {
+          "deletions": 6
+        },
+        "packages/frontend-embed/src/ui.vue": {
+          "additions": 4,
+          "deletions": 8,
+          "accepted_lines": 2
+        },
+        "packages/backend/test/unit/RoleService.ts": {
+          "additions": 8,
+          "deletions": 32,
+          "accepted_lines": 4
+        },
+        "packages/frontend/src/utility/get-note-summary.ts": {
+          "deletions": 21
+        },
+        "packages/backend/src/server/api/ApiServerService.ts": {
+          "deletions": 8
+        },
+        "packages/frontend/src/utility/fetch-as-data-uri.ts": {
+          "deletions": 3
+        },
+        "packages/backend/src/server/api/endpoints/channels/mute/delete.ts": {
+          "deletions": 2
+        },
+        "packages/frontend/src/utility/file-drop.ts": {
+          "deletions": 8
+        },
+        "packages/backend/src/misc/JsonArrayStream.ts": {
+          "deletions": 5
+        },
+        "packages/backend/src/server/api/endpoints/users/report-abuse.ts": {
+          "deletions": 1
+        },
+        "packages/misskey-reversi/build.js": {
+          "deletions": 1
+        },
+        "packages/backend/src/core/ReactionsBufferingService.ts": {
+          "deletions": 8
+        },
+        "packages/backend/test/unit/CaptchaService.ts": {
+          "deletions": 1
+        },
+        "packages/backend/test/unit/chart.ts": {
+          "additions": 2,
+          "deletions": 38,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/core/activitypub/ApRequestService.ts": {
+          "additions": 4,
+          "deletions": 13,
+          "accepted_lines": 2
+        },
+        "packages/backend/src/server/api/endpoints/drive/files/attached-notes.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/models/Following.ts": {
+          "deletions": 3
+        },
+        "packages/frontend/test/setup.unit.ts": {
+          "deletions": 6
+        },
+        "packages/frontend/src/pages/emoji-edit-dialog.vue": {
+          "additions": 2,
+          "deletions": 2,
+          "accepted_lines": 1
+        },
+        "packages/frontend/src/components/MkDonation.vue": {
+          "additions": 2,
+          "deletions": 3
+        },
+        "packages-private/diagnostics-frontend/src/bundle/fs-utils.ts": {
+          "deletions": 4
+        },
+        "packages/backend/scripts/benchmark-backend.mjs": {
+          "deletions": 4
+        },
+        "packages/backend/test-federation/daemon.ts": {
+          "deletions": 6
+        },
+        "packages/backend/src/daemons/QueueStatsService.ts": {
+          "deletions": 3
+        },
+        "packages/backend/src/misc/prelude/url.ts": {
+          "deletions": 5
+        },
+        "packages/backend/src/misc/safe-decode-uri-component.ts": {
+          "deletions": 9
+        },
+        "packages/frontend/src/components/grid/MkHeaderCell.vue": {
+          "deletions": 5
+        },
+        "packages/backend/lib/bullmq-esm.ts": {
+          "deletions": 7
+        },
+        "packages/backend/src/queue/processors/ExportUserListsProcessorService.ts": {
+          "deletions": 2
+        },
+        "packages/frontend/src/pages/settings/accounts.vue": {
+          "additions": 2,
+          "deletions": 4
+        },
+        "packages/frontend/src/utility/interactive-components.ts": {
+          "deletions": 1
+        },
+        "packages/frontend/src/styles-font/chongxiseal.scss": {
+          "additions": 4,
+          "deletions": 4,
+          "accepted_lines": 2
+        },
+        "packages/frontend/src/components/MkChart.vue": {
+          "deletions": 7
+        },
+        "packages/backend/test/e2e/antennas.ts": {
+          "deletions": 29
+        },
+        "packages/backend/test/unit/S3Service.ts": {
+          "additions": 4,
+          "deletions": 4,
+          "accepted_lines": 2
+        },
+        "packages-private/diagnostics-frontend/src/browser/summarize.ts": {
+          "deletions": 4
+        },
+        "packages/frontend/src/components/MkUploaderDialog.vue": {
+          "additions": 4,
+          "deletions": 8
+        },
+        "packages/frontend/src/components/MkSubNoteContent.vue": {
+          "deletions": 1
+        },
+        "packages/frontend/src/composables/use-note-capture.ts": {
+          "additions": 8,
+          "deletions": 22,
+          "accepted_lines": 4
+        },
+        "packages/frontend/src/ui/deck.vue": {
+          "additions": 4,
+          "deletions": 17
+        },
+        "packages/backend/test/unit/boot/shutdown-process.ts": {
+          "deletions": 2
+        },
+        "packages/backend/src/server/api/endpoints/drive/folders/create.ts": {
+          "deletions": 4
+        },
+        "packages/backend/src/models/AvatarDecoration.ts": {
+          "deletions": 1
+        },
+        "packages/frontend/public/loader/boot.js": {
+          "deletions": 13
+        },
+        "packages/frontend/src/pages/welcome.entrance.simple.vue": {
+          "deletions": 1
+        },
+        "packages/frontend/src/ui/_common_/statusbar-federation.vue": {
+          "additions": 2,
+          "deletions": 3
+        },
+        "packages-private/diagnostics-frontend/src/bundle/chunk-report.ts": {
+          "additions": 4,
+          "deletions": 16,
+          "accepted_lines": 2
+        },
+        "packages/backend/test/e2e/api.ts": {
+          "deletions": 4
+        },
+        "packages/backend/test/unit/ChannelMutingService.ts": {
+          "deletions": 1
+        },
+        "packages/backend/test/e2e/clips.ts": {
+          "additions": 8,
+          "deletions": 27,
+          "accepted_lines": 4
+        },
+        "packages/frontend/src/pages/scratchpad.vue": {
+          "deletions": 1
+        },
+        "packages/backend/src/server/api/endpoints/following/requests/cancel.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/server/api/SigninWithPasskeyApiService.ts": {
+          "deletions": 8
+        },
+        "packages/backend/src/server/api/openapi/gen-spec.ts": {
+          "additions": 2,
+          "deletions": 4,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/server/api/stream/channels/home-timeline.ts": {
+          "deletions": 8
+        },
+        "packages/frontend/src/utility/encode-push-subscription-key.ts": {
+          "deletions": 4
+        },
+        "packages/backend/src/core/PollService.ts": {
+          "additions": 2,
+          "deletions": 6,
+          "accepted_lines": 1
+        },
+        "packages/frontend/src/components/MkLightbox.vue": {
+          "additions": 11,
+          "deletions": 14,
+          "accepted_lines": 4
+        },
+        "packages/backend/src/core/entities/UserEntityService.decorations.test.ts": {
+          "deletions": 1
+        },
+        "packages/frontend/src/utility/random-id.ts": {
+          "additions": 2,
+          "deletions": 2,
+          "accepted_lines": 1
+        },
+        "packages/frontend/lib/vite-plugin-create-search-index.ts": {
+          "additions": 22,
+          "deletions": 104,
+          "accepted_lines": 11
+        },
+        "packages/frontend/src/utility/extract-url-from-mfm.ts": {
+          "deletions": 2
+        },
+        "packages/backend/src/core/AnnouncementService.ts": {
+          "deletions": 4
+        },
+        "packages/backend/src/server/api/endpoints/i/notifications.ts": {
+          "deletions": 4
+        },
+        "packages/backend/test/e2e/mastodon-api.ts": {
+          "deletions": 3
+        },
+        "packages/backend/src/core/ImageProcessingService.ts": {
+          "deletions": 12
+        },
+        "packages/backend/src/misc/id/aid.ts": {
+          "deletions": 3
+        },
+        "packages/backend/test/unit/AbuseReportNotificationService.ts": {
+          "deletions": 13
+        },
+        "packages/frontend/src/components/MkChannelList.stories.impl.ts": {
+          "deletions": 1
+        },
+        "packages-private/diagnostics-shared/test/format.test.ts": {
+          "deletions": 4
+        },
+        "packages/backend/src/server/api/endpoints/users/lists/update-membership.ts": {
+          "deletions": 2
+        },
+        "packages/backend/src/queue/processors/CleanRemoteNotesProcessorService.ts": {
+          "additions": 5,
+          "deletions": 55,
+          "accepted_lines": 2
+        },
+        "packages/backend/src/core/chart/charts/entities/instance.ts": {
+          "additions": 4,
+          "deletions": 4,
+          "accepted_lines": 2
+        },
+        "packages/backend/src/core/activitypub/misc/contexts.ts": {
+          "deletions": 6
+        },
+        "packages/frontend/src/ui/deck/clip-column.ts": {
+          "deletions": 1
+        },
+        "packages/frontend-builder/rollup-plugin-remove-unref-i18n.ts": {
+          "deletions": 8
+        },
+        "packages-private/diagnostics-backend/src/measure/server.ts": {
+          "deletions": 18
+        },
+        "packages/frontend/src/ui/_common_/navbar-h.vue": {
+          "deletions": 1
+        },
+        "packages/frontend/src/utility/paginator.ts": {
+          "additions": 6,
+          "deletions": 36,
+          "accepted_lines": 3
+        },
+        "packages/frontend/src/pages/admin/roles.role.vue": {
+          "deletions": 2
+        },
+        "packages/sw/src/@types/global.d.ts": {
+          "deletions": 2
+        },
+        "packages/backend/test/e2e/move.ts": {
+          "deletions": 4
+        },
+        "packages/frontend/src/preferences/utility.ts": {
+          "additions": 2,
+          "deletions": 3,
+          "accepted_lines": 1
+        },
+        "packages/frontend/src/styles-font/yishanbeizhuan.scss": {
+          "additions": 4,
+          "deletions": 4,
+          "accepted_lines": 2
+        },
+        "packages/frontend/src/utility/achievements.ts": {
+          "deletions": 7
+        },
+        "packages/frontend/src/utility/check-permissions.ts": {
+          "deletions": 2
+        },
+        "packages/frontend/src/components/MkFolder.vue": {
+          "additions": 8,
+          "deletions": 10,
+          "accepted_lines": 4
+        },
+        "packages/frontend/src/pages/search.vue": {
+          "deletions": 1
+        },
+        "packages/backend/test/unit/server/FileServerService.ts": {
+          "deletions": 4
+        },
+        "packages/backend/src/server/api/endpoints/users/notes.ts": {
+          "additions": 6,
+          "deletions": 8,
+          "accepted_lines": 3
+        },
+        "packages/frontend/src/utility/shuffle.ts": {
+          "deletions": 6
+        },
+        "packages/frontend/src/accounts.ts": {
+          "additions": 2,
+          "deletions": 12,
+          "accepted_lines": 1
+        },
+        "packages-private/changelog-checker/src/checker.ts": {
+          "deletions": 16
+        },
+        "packages/frontend/src/components/MkAnalogClock.vue": {
+          "additions": 3,
+          "deletions": 18,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/core/UserSearchService.ts": {
+          "additions": 4,
+          "deletions": 51,
+          "accepted_lines": 2
+        },
+        "packages/frontend-shared/js/embed-page.ts": {
+          "deletions": 15
+        },
+        "packages/frontend/src/utility/lightbox.ts": {
+          "additions": 2,
+          "deletions": 3,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/core/activitypub/models/ApQuestionService.ts": {
+          "deletions": 9
+        },
+        "packages/frontend/src/ui/deck/main-column.vue": {
+          "deletions": 5
+        },
+        "packages/backend/src/server/api/endpoints/admin/captcha/current.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/types.ts": {
+          "deletions": 32
+        },
+        "packages/frontend/lib/rollup-plugin-unwind-css-module-class-name.ts": {
+          "deletions": 200
+        },
+        "packages/backend/src/server/web/HtmlTemplateService.ts": {
+          "deletions": 2
+        },
+        "packages/backend/src/GlobalModule.ts": {
+          "additions": 2,
+          "deletions": 6,
+          "accepted_lines": 1
+        },
+        "packages/frontend/src/di.ts": {
+          "additions": 2,
+          "deletions": 2,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/core/SearchService.ts": {
+          "deletions": 20
+        },
+        "packages/frontend/test/unit/scroll.test.ts": {
+          "deletions": 30
+        },
+        "packages/backend/src/misc/id/object-id.ts": {
+          "deletions": 1
+        },
+        "packages-private/diagnostics-frontend/src/browser/controller.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/queue/processors/ExportAccountDataProcessorService.ts": {
+          "deletions": 2
+        },
+        "packages/backend/src/models/Emoji.ts": {
+          "additions": 2,
+          "deletions": 4,
+          "accepted_lines": 1
+        },
+        "src/browser/types.ts": {
+          "additions": 138,
+          "deletions": 138
+        },
+        "packages/frontend/src/pages/settings/index.vue": {
+          "additions": 4,
+          "deletions": 6,
+          "accepted_lines": 2
+        },
+        "packages/frontend/src/components/MkMediaRange.vue": {
+          "additions": 1,
+          "deletions": 2
+        },
+        "packages/backend/src/server/api/SigninApiService.ts": {
+          "deletions": 6
+        },
+        "packages/frontend-shared/eslint.config.js": {
+          "deletions": 17
+        },
+        "packages/backend/src/server/api/endpoints/antennas/show.ts": {
+          "deletions": 1
+        },
+        "packages/sw/src/scripts/create-notification.ts": {
+          "deletions": 21
+        },
+        "packages/frontend/lib/client-chunks.ts": {
+          "deletions": 1
+        },
+        "packages-private/diagnostics-frontend/src/browser/report/html.ts": {
+          "deletions": 5
+        },
+        "packages/backend/src/models/Role.ts": {
+          "deletions": 62
+        },
+        "packages/backend/src/core/GlobalEventService.ts": {
+          "additions": 1,
+          "deletions": 13,
+          "accepted_lines": 1
+        },
+        "packages/frontend/test/e2e/fixtures.ts": {
+          "deletions": 2
+        },
+        "packages/frontend/src/pages/reversi/game.board.vue": {
+          "additions": 4,
+          "deletions": 4,
+          "accepted_lines": 2
+        },
+        "packages/frontend/src/utility/post-message.ts": {
+          "deletions": 3
+        },
+        "packages/backend/test/unit/misc/gen-identicon.ts": {
+          "additions": 6,
+          "deletions": 8,
+          "accepted_lines": 3
+        },
+        "packages/backend/src/core/entities/NoteDraftEntityService.ts": {
+          "deletions": 1
+        },
+        "packages/frontend/src/pages/admin/security.vue": {
+          "additions": 1,
+          "deletions": 6
+        },
+        "packages/backend/src/server/ServerService.ts": {
+          "deletions": 20
+        },
+        "packages/frontend/src/signout.ts": {
+          "deletions": 6
+        },
+        "packages/frontend/src/_boot_.ts": {
+          "deletions": 1
+        },
+        "packages/frontend/src/widgets/WidgetAichan.vue": {
+          "deletions": 1
+        },
+        "packages/backend/src/server/api/endpoints/following/delete.ts": {
+          "deletions": 3
+        },
+        "packages/backend/src/queue/processors/ImportBlockingProcessorService.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/server/api/endpoints/users/reactions.ts": {
+          "additions": 4,
+          "deletions": 5,
+          "accepted_lines": 2
+        },
+        "packages/backend/src/models/Notification.ts": {
+          "deletions": 15
+        },
+        "packages/backend/src/server/api/endpoints/notes/reactions.ts": {
+          "deletions": 2
+        },
+        "packages/backend/src/queue/processors/ExportCustomEmojisProcessorService.ts": {
+          "additions": 2,
+          "deletions": 9,
+          "accepted_lines": 1
+        },
+        "packages/frontend/src/components/MkCwButton.stories.impl.ts": {
+          "deletions": 1
+        },
+        "packages/backend/test/unit/ap-request.ts": {
+          "additions": 6,
+          "deletions": 8,
+          "accepted_lines": 3
+        },
+        "packages/backend/test-federation/setup.sh": {
+          "deletions": 2
+        },
+        "packages/frontend/src/components/MkUserSetupDialog.Profile.vue": {
+          "deletions": 2
+        },
+        "packages/backend/src/server/web/UrlPreviewService.ts": {
+          "additions": 2,
+          "deletions": 3,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/logging/LogManager.ts": {
+          "deletions": 42
+        },
+        "packages/backend/src/core/UserListService.ts": {
+          "additions": 4,
+          "deletions": 5,
+          "accepted_lines": 2
+        },
+        "packages/frontend-shared/js/scroll.ts": {
+          "deletions": 17
+        },
+        "packages/frontend/src/utility/sticky-sidebar.ts": {
+          "deletions": 53
+        },
+        "packages/backend/src/core/MetaService.ts": {
+          "additions": 4,
+          "deletions": 9,
+          "accepted_lines": 2
+        },
+        "packages/backend/test/unit/UserWebhookService.ts": {
+          "deletions": 10
+        },
+        "packages/backend/src/misc/id/meidg.ts": {
+          "deletions": 3
+        },
+        "packages/backend/src/server/api/endpoints/pages/unlike.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/core/DeleteAccountService.ts": {
+          "deletions": 3
+        },
+        "packages/backend/src/NestLogger.ts": {
+          "deletions": 5
+        },
+        "packages/frontend/src/utility/clear-cache.ts": {
+          "deletions": 1
+        },
+        "packages/backend/test/unit/MfmService.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/server/api/stream/channels/main.ts": {
+          "deletions": 1
+        },
+        "scripts/check-dts.mjs": {
+          "deletions": 11
+        },
+        "packages-private/diagnostics-backend/src/measure/index.ts": {
+          "deletions": 8
+        },
+        "packages/backend/src/server/FileServerService.ts": {
+          "deletions": 2
+        },
+        "packages/i18n/build.ts": {
+          "deletions": 7
+        },
+        "packages/backend/src/server/api/endpoints/i/authorized-apps.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/server/api/endpoints/endpoint.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/server/api/endpoints/i/webhooks/delete.ts": {
+          "deletions": 2
+        },
+        "packages-private/diagnostics-backend/src/db.ts": {
+          "deletions": 4
+        },
+        "packages/frontend/src/pages/gallery/post.vue": {
+          "additions": 2,
+          "deletions": 3
+        },
+        "packages/frontend/test/unit/intl-string.test.ts": {
+          "deletions": 6
+        },
+        "packages/frontend-shared/js/emojilist.ts": {
+          "deletions": 16
+        },
+        "packages/frontend/src/utility/emoji-picker.ts": {
+          "deletions": 8
+        },
+        "packages/frontend-builder/locale-inliner/apply-with-locale.ts": {
+          "additions": 6,
+          "deletions": 10,
+          "accepted_lines": 3
+        },
+        "packages-private/diagnostics-backend/src/measure-once.ts": {
+          "deletions": 1
+        },
+        "packages/frontend/src/components/global/MkAvatar.stories.impl.ts": {
+          "deletions": 4
+        },
+        "packages/backend/test-federation/test/user.test.ts": {
+          "additions": 23,
+          "deletions": 46,
+          "accepted_lines": 12
+        },
+        "packages/backend/src/server/api/endpoints/users/lists/show.ts": {
+          "deletions": 1
+        },
+        "packages/frontend/src/lib/nirax.ts": {
+          "additions": 2,
+          "deletions": 17,
+          "accepted_lines": 1
+        },
+        "packages/frontend/src/components/MkUrlPreview.vue": {
+          "deletions": 1
+        },
+        "packages/frontend/src/components/MkSwiper.vue": {
+          "additions": 4,
+          "deletions": 16,
+          "accepted_lines": 2
+        },
+        "packages/backend/src/core/FileInfoService.ts": {
+          "additions": 28,
+          "deletions": 72,
+          "accepted_lines": 14
+        },
+        "packages/misskey-bubble-game/src/game.ts": {
+          "additions": 12,
+          "deletions": 28,
+          "accepted_lines": 6
+        },
+        "packages/frontend/src/ui/_common_/widgets.vue": {
+          "deletions": 3
+        },
+        "packages/backend/test/e2e/users.ts": {
+          "additions": 8,
+          "deletions": 70,
+          "accepted_lines": 4
+        },
+        "packages/frontend/src/pages/reversi/game.vue": {
+          "deletions": 1
+        },
+        "packages/frontend/src/composables/use-note.ts": {
+          "additions": 2,
+          "deletions": 21,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/server/api/endpoints/antennas/update.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/server/api/endpoints/notes/mentions.ts": {
+          "additions": 2,
+          "deletions": 3,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/core/EmailService.ts": {
+          "additions": 6,
+          "deletions": 7,
+          "accepted_lines": 3
+        },
+        "packages/backend/src/server/api/endpoints/auth/session/generate.ts": {
+          "deletions": 3
+        },
+        "packages/frontend/src/pages/user/index.vue": {
+          "deletions": 3
+        },
+        "packages/backend/src/server/api/endpoints/i/webhooks/update.ts": {
+          "deletions": 2
+        },
+        "packages/backend/src/misc/fastify-reply-error.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/misc/collapsed-queue.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/server/api/endpoints/i/webhooks/show.ts": {
+          "deletions": 1
+        },
+        "packages/frontend/src/components/MkEmojiPicker.section.vue": {
+          "additions": 3,
+          "deletions": 7
+        },
+        "packages/frontend/src/pages/page-editor/els/page-editor.el.section.vue": {
+          "deletions": 1
+        },
+        "packages/backend/src/core/HashtagService.ts": {
+          "additions": 10,
+          "deletions": 16,
+          "accepted_lines": 5
+        },
+        "packages/frontend/src/utility/confetti.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/server/api/endpoints/admin/unset-mfa.ts": {
+          "deletions": 2
+        },
+        "packages/frontend/src/pages/my-clips/index.vue": {
+          "deletions": 1
+        },
+        "packages/frontend/src/pages/admin/custom-emojis-manager2.stories.impl.ts": {
+          "deletions": 1
+        },
+        "packages/backend/vitest.config.fed.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/server/api/endpoints/i/move.ts": {
+          "deletions": 9
+        },
+        "packages/backend/src/server/api/endpoints/i/2fa/remove-key.ts": {
+          "deletions": 3
+        },
+        "packages/backend/src/server/web/views/base-embed.tsx": {
+          "deletions": 1
+        },
+        "packages/frontend/src/components/MkSuperMenu.vue": {
+          "additions": 2,
+          "deletions": 5,
+          "accepted_lines": 1
+        },
+        "packages/frontend-shared/@types/global.d.ts": {
+          "deletions": 1
+        },
+        "packages/frontend/src/utility/reaction-picker.ts": {
+          "deletions": 2
+        },
+        "packages/backend/test/e2e/renote-mute.ts": {
+          "deletions": 3
+        },
+        "packages/frontend/.storybook/generate.tsx": {
+          "deletions": 1
+        },
+        "packages/backend/src/core/UserWebhookService.ts": {
+          "additions": 12,
+          "deletions": 19,
+          "accepted_lines": 6
+        },
+        "packages/backend/src/server/api/endpoints/notes/search-by-tag.test.ts": {
+          "deletions": 1
+        },
+        "packages/frontend/src/telemetry.ts": {
+          "deletions": 8
+        },
+        "packages/frontend/src/pages/admin/announcements.vue": {
+          "additions": 6,
+          "deletions": 6,
+          "accepted_lines": 3
+        },
+        "packages/backend/assets/misc/bios.js": {
+          "deletions": 2
+        },
+        "packages/frontend/src/utility/get-note-menu.ts": {
+          "deletions": 2
+        },
+        "packages/sw/src/sw.ts": {
+          "additions": 2,
+          "deletions": 17,
+          "accepted_lines": 1
+        },
+        "packages/frontend/src/components/MkLink.vue": {
+          "deletions": 1
+        },
+        "packages/i18n/src/custom-locales.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/server/api/endpoints/notes/favorites/delete.ts": {
+          "deletions": 3
+        },
+        "packages/backend/src/core/activitypub/ApDbResolverService.ts": {
+          "additions": 4,
+          "deletions": 22,
+          "accepted_lines": 2
+        },
+        "idea/MkAnimatedBg.dotted.vue": {
+          "deletions": 3
+        },
+        "packages/backend/src/server/api/endpoints/flash/like.ts": {
+          "deletions": 2
+        },
+        "packages/frontend/src/components/page/page.dynamic.vue": {
+          "additions": 1,
+          "deletions": 2
+        },
+        "packages/backend/src/server/api/endpoints/bubble-game/register.ts": {
+          "deletions": 2
+        },
+        "packages/backend/test/unit/misc/should-hide-note-by-time.ts": {
+          "additions": 58,
+          "deletions": 59,
+          "accepted_lines": 29
+        },
+        "packages/misskey-js/test/api.ts": {
+          "additions": 2,
+          "deletions": 3,
+          "accepted_lines": 1
+        },
+        "idea/MkAnimatedBg.dotted-ripples.vue": {
+          "deletions": 3
+        },
+        "packages/frontend/src/theme.ts": {
+          "additions": 2,
+          "deletions": 22,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/misc/zip.ts": {
+          "additions": 2,
+          "deletions": 63,
+          "accepted_lines": 1
+        },
+        "packages/frontend/src/components/MkRetentionHeatmap.vue": {
+          "deletions": 1
+        },
+        "packages-private/diagnostics-frontend/src/browser/network.ts": {
+          "deletions": 8
+        },
+        "packages/backend/src/models/RegistryItem.ts": {
+          "deletions": 2
+        },
+        "packages/backend/src/core/DownloadService.ts": {
+          "additions": 6,
+          "deletions": 10,
+          "accepted_lines": 3
+        },
+        "packages/backend/src/server/api/endpoints/auth/session/show.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/queue/processors/ResyncChartsProcessorService.ts": {
+          "deletions": 3
+        },
+        "packages/backend/src/misc/identifiable-error.ts": {
+          "deletions": 3
+        },
+        "packages/frontend/src/utility/cache.ts": {
+          "deletions": 5
+        },
+        "packages/frontend-embed/eslint.config.js": {
+          "deletions": 15
+        },
+        "packages/backend/test/unit/logging/LogManager.ts": {
+          "deletions": 2
+        },
+        "packages/icons-subsetter/src/generator.ts": {
+          "deletions": 12
+        },
+        "packages/frontend/src/ui/_common_/mobile-footer-menu.vue": {
+          "additions": 2,
+          "deletions": 2,
+          "accepted_lines": 1
+        },
+        "packages/frontend/src/components/MkYouTubePlayer.vue": {
+          "deletions": 3
+        },
+        "packages/frontend/src/components/MkUserOnlineIndicator.vue": {
+          "additions": 2,
+          "deletions": 2,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/core/WebAuthnService.ts": {
+          "additions": 12,
+          "deletions": 22,
+          "accepted_lines": 6
+        },
+        "packages/frontend/src/ui/deck/deck-store.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/core/telemetry/adapters/TelemetryAdapter.ts": {
+          "deletions": 21
+        },
+        "packages/frontend/src/components/global/MkTime.vue": {
+          "additions": 3,
+          "deletions": 4,
+          "accepted_lines": 2
+        },
+        "packages/backend/src/core/UserKeypairService.ts": {
+          "additions": 4,
+          "deletions": 5,
+          "accepted_lines": 2
+        },
+        "packages/misskey-js/src/api.ts": {
+          "deletions": 3
+        },
+        "packages/frontend/src/components/MkPushNotificationAllowButton.vue": {
+          "additions": 2,
+          "deletions": 19,
+          "accepted_lines": 1
+        },
+        "packages/frontend/src/components/MkInfo.vue": {
+          "deletions": 1
+        },
+        "packages/backend/test/e2e/block.ts": {
+          "deletions": 5
+        },
+        "packages/backend/src/core/entities/NotificationEntityService.ts": {
+          "deletions": 21
+        },
+        "packages/backend/test/unit/CustomEmojiService.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/boot/worker-supervisor.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/models/Page.ts": {
+          "deletions": 5
+        },
+        "scripts/tarball.mjs": {
+          "deletions": 1
+        },
+        "packages/backend/test-federation/test/abuse-report.test.ts": {
+          "deletions": 2
+        },
+        "packages/backend/src/server/api/endpoints/i/import-user-lists.ts": {
+          "deletions": 1
+        },
+        "packages/frontend/src/components/MkPostForm.vue": {
+          "additions": 12,
+          "deletions": 42,
+          "accepted_lines": 5
+        },
+        "packages/frontend-embed/vite.config.ts": {
+          "deletions": 12
+        },
+        "packages-private/diagnostics-backend/test/render-md.test.ts": {
+          "deletions": 4
+        },
+        "packages/misskey-js/src/streaming.types.ts": {
+          "additions": 6,
+          "deletions": 6,
+          "accepted_lines": 3
+        },
+        "packages/backend/src/server/api/endpoints/users/get-frequently-replied-users.ts": {
+          "deletions": 11
+        },
+        "packages/backend/src/misc/is-channel-related.ts": {
+          "deletions": 11
+        },
+        "packages/backend/src/core/CaptchaService.ts": {
+          "deletions": 17
+        },
+        "packages/misskey-reversi/src/maps.ts": {
+          "deletions": 10
+        },
+        "packages/backend/src/server/api/endpoints/i/2fa/update-key.ts": {
+          "deletions": 1
+        },
+        "packages/frontend/src/components/MkReactionsViewer.vue": {
+          "deletions": 3
+        },
+        "packages/frontend/src/pages/chat/XMessage.vue": {
+          "additions": 2,
+          "deletions": 2,
+          "accepted_lines": 1
+        },
+        "packages/frontend/eslint.config.js": {
+          "deletions": 16
+        },
+        "packages-private/diagnostics-frontend/src/bundle/manifest.ts": {
+          "deletions": 19
+        },
+        "packages/frontend/src/pages/settings/emoji-palette.palette.vue": {
+          "additions": 2,
+          "deletions": 4
+        },
+        "packages/frontend/src/components/MkChatHistories.vue": {
+          "deletions": 1
+        },
+        "packages/backend/src/core/activitypub/ApInboxService.ts": {
+          "deletions": 28
+        },
+        "packages/frontend/src/pages/user/index.activity.vue": {
+          "additions": 12,
+          "deletions": 20,
+          "accepted_lines": 3
+        },
+        "packages/backend/test/unit/logging/JsonConsoleBackend.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/core/entities/ChannelEntityService.ts": {
+          "additions": 2,
+          "deletions": 3,
+          "accepted_lines": 1
+        },
+        "packages/backend/test/e2e/api-visibility.ts": {
+          "deletions": 54
+        },
+        "packages/frontend/src/components/MkNoteSub.vue": {
+          "deletions": 1
+        },
+        "packages/frontend-embed/src/theme.ts": {
+          "deletions": 5
+        },
+        "packages/frontend-embed/src/components/EmNoteSub.vue": {
+          "deletions": 1
+        },
+        "packages/backend/src/misc/is-renote.ts": {
+          "deletions": 3
+        },
+        "packages/backend/src/boot/cluster-shutdown.ts": {
+          "deletions": 2
+        },
+        "packages/frontend/src/components/MkReactionTooltip.vue": {
+          "additions": 2,
+          "deletions": 2,
+          "accepted_lines": 1
+        },
+        "packages/mastodon-compat/src/notifications-v2.ts": {
+          "deletions": 5
+        },
+        "packages/backend/src/server/api/endpoints/notes/delete.ts": {
+          "deletions": 1
+        },
+        "packages/frontend/src/utility/popup-position.ts": {
+          "additions": 6,
+          "deletions": 11,
+          "accepted_lines": 3
+        },
+        "packages/frontend/src/components/MkStreamingNotificationsTimeline.vue": {
+          "additions": 6,
+          "deletions": 7,
+          "accepted_lines": 3
+        },
+        "packages/backend/vitest.config.e2e.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/server/api/endpoints/i/webhooks/create.ts": {
+          "deletions": 3
+        },
+        "packages/backend/src/server/api/endpoints/renote-mute/delete.ts": {
+          "deletions": 4
+        },
+        "packages/frontend/src/widgets/WidgetSlideshow.vue": {
+          "deletions": 1
+        },
+        "packages/frontend/src/i18n.ts": {
+          "deletions": 1
+        },
+        "packages/frontend/test/e2e/timeline-pagination.spec.ts": {
+          "deletions": 2
+        },
+        "packages/backend/src/models/SystemWebhook.ts": {
+          "deletions": 29
+        },
+        "packages/backend/src/misc/json-schema.ts": {
+          "additions": 2,
+          "deletions": 13,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/server/api/endpoints/gallery/posts/unlike.ts": {
+          "deletions": 2
+        },
+        "packages/frontend-shared/js/relative-time.ts": {
+          "deletions": 11
+        },
+        "packages/frontend/src/ui/deck/channel-column.vue": {
+          "deletions": 2
+        },
+        "packages/backend/src/server/api/RateLimiterService.ts": {
+          "deletions": 2
+        },
+        "packages/backend/src/core/chart/charts/ap-request.ts": {
+          "deletions": 3
+        },
+        "packages/backend/src/core/RegistryApiService.ts": {
+          "deletions": 3
+        },
+        "packages/backend/test/unit/server/http-access-log.ts": {
+          "deletions": 2
+        },
+        "packages/frontend/src/components/MkEmojiPicker.vue": {
+          "additions": 8,
+          "deletions": 21,
+          "accepted_lines": 3
+        },
+        "packages/frontend/src/utility/drive.ts": {
+          "deletions": 19
+        },
+        "packages/frontend/src/components/MkChartLegend.vue": {
+          "deletions": 1
+        },
+        "packages/frontend/src/components/MkPoll.vue": {
+          "deletions": 1
+        },
+        "packages/backend/test/e2e/thread-mute.ts": {
+          "deletions": 1
+        },
+        "packages/frontend/src/pages/settings/2fa.qrdialog.vue": {
+          "additions": 2,
+          "deletions": 2,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/misc/id/ulid.ts": {
+          "deletions": 3
+        },
+        "packages/backend/src/core/DriveService.ts": {
+          "additions": 12,
+          "deletions": 89,
+          "accepted_lines": 6
+        },
+        "packages/backend/src/core/UserAuthService.ts": {
+          "additions": 2,
+          "deletions": 7,
+          "accepted_lines": 1
+        },
+        "packages/frontend/src/pages/settings/mute-block.instance-mute.vue": {
+          "deletions": 1
+        },
+        "packages/backend/src/core/entities/ChatEntityService.ts": {
+          "deletions": 3
+        },
+        "packages/backend/src/server/api/StreamingApiServerService.ts": {
+          "additions": 2,
+          "deletions": 6,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/models/NoteReaction.ts": {
+          "deletions": 2
+        },
+        "packages/frontend/src/components/global/MkPageHeader.tabs.vue": {
+          "additions": 4,
+          "deletions": 8,
+          "accepted_lines": 2
+        },
+        "packages/backend/test-federation/test/move.test.ts": {
+          "deletions": 6
+        },
+        "packages/backend/src/core/AccountMoveService.ts": {
+          "additions": 12,
+          "deletions": 64,
+          "accepted_lines": 6
+        },
+        "packages/frontend-embed/src/boot.ts": {
+          "additions": 2,
+          "deletions": 17,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/server/api/endpoints/following/create.ts": {
+          "deletions": 2
+        },
+        "packages/mastodon-compat/src/parameters.ts": {
+          "deletions": 4
+        },
+        "packages/frontend/src/utility/image-effector/ImageEffector.ts": {
+          "deletions": 3
+        },
+        "packages/frontend/src/components/MkInstanceTicker.vue": {
+          "deletions": 9
+        },
+        "packages/frontend/src/pages/timeline.vue": {
+          "deletions": 1
+        },
+        "packages/backend/src/server/api/ApiCallService.ts": {
+          "additions": 6,
+          "deletions": 33,
+          "accepted_lines": 3
+        },
+        "packages/frontend/src/utility/url-preview.ts": {
+          "deletions": 2
+        },
+        "packages/frontend/src/pages/admin/email-settings.vue": {
+          "deletions": 3
+        },
+        "packages/frontend/src/widgets/WidgetUnixClock.vue": {
+          "deletions": 1
+        },
+        "packages-private/diagnostics-shared/src/html.ts": {
+          "deletions": 21
+        },
+        "packages/frontend/src/memory-storage.ts": {
+          "deletions": 6
+        },
+        "packages/backend/src/core/chart/charts/per-user-pv.ts": {
+          "deletions": 3
+        },
+        "packages/backend/src/queue/processors/CleanChartsProcessorService.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/core/chart/charts/test-unique.ts": {
+          "deletions": 3
+        },
+        "packages/frontend/src/utility/timeline-date-separate.ts": {
+          "deletions": 2
+        },
+        "packages/shared/eslint.config.js": {
+          "deletions": 3
+        },
+        "packages/backend/src/server/api/endpoints/admin/roles/create.ts": {
+          "additions": 2,
+          "deletions": 2,
+          "accepted_lines": 1
+        },
+        "packages/frontend/src/utility/virtual-list.ts": {
+          "deletions": 1
+        },
+        "packages/frontend/src/pages/user/activity.following.vue": {
+          "additions": 2,
+          "deletions": 6,
+          "accepted_lines": 1
+        },
+        "packages/frontend/.storybook/main.ts": {
+          "deletions": 2
+        },
+        "packages/backend/src/server/api/endpoints/drive/folders/show.ts": {
+          "deletions": 1
+        },
+        "packages/frontend/src/components/page/page.image.vue": {
+          "deletions": 1
+        },
+        "packages/frontend/src/utility/physics.ts": {
+          "additions": 4,
+          "deletions": 19,
+          "accepted_lines": 2
+        },
+        "packages/backend/src/core/FlashService.ts": {
+          "deletions": 6
+        },
+        "packages/frontend/src/components/MkReactionsViewer.details.vue": {
+          "additions": 2,
+          "deletions": 2,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/server/api/endpoints/admin/reset-password.ts": {
+          "deletions": 1
+        },
+        "packages/frontend/src/components/MkMenu.vue": {
+          "additions": 14,
+          "deletions": 15,
+          "accepted_lines": 7
+        },
+        "packages/frontend/src/style.scss": {
+          "additions": 6,
+          "deletions": 27,
+          "accepted_lines": 3
+        },
+        "packages/frontend/src/ui/deck/antenna-column.vue": {
+          "deletions": 9
+        },
+        "packages/frontend/src/utility/unison-reload.ts": {
+          "deletions": 1
+        },
+        "packages/backend/lib/esm-shim.ts": {
+          "deletions": 3
+        },
+        "packages/frontend/src/pages/admin/custom-emojis-manager.register.vue": {
+          "deletions": 10
+        },
+        "packages/frontend-embed/src/server-context.ts": {
+          "deletions": 1
+        },
+        "packages/frontend/src/pages/channel.vue": {
+          "additions": 1,
+          "deletions": 2
+        },
+        "packages/frontend/src/os.ts": {
+          "additions": 2,
+          "deletions": 38,
+          "accepted_lines": 1
+        },
+        "packages-private/changelog-checker/src/parser.ts": {
+          "deletions": 5
+        },
+        "packages/frontend/src/pages/qr.show.vue": {
+          "deletions": 6
+        },
+        "packages/backend/test/setup.e2e.ts": {
+          "deletions": 3
+        },
+        "packages/frontend-shared/js/emoji-name.ts": {
+          "deletions": 21
+        },
+        "packages/backend/src/core/entities/DriveFolderEntityService.ts": {
+          "deletions": 6
+        },
+        "packages/frontend/src/pages/share.vue": {
+          "deletions": 32
+        },
+        "packages/backend/test/e2e/note-notify.ts": {
+          "deletions": 16
+        },
+        "packages/backend/src/server/api/endpoints/sw/show-registration.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/misc/unique-by-key.ts": {
+          "deletions": 6
+        },
+        "packages/frontend/src/composables/use-leave-guard.ts": {
+          "deletions": 40
+        },
+        "packages/frontend/src/components/MkDrive.file.stories.impl.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/core/activitypub/models/ApNoteService.test.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/logging/LogNormalizer.ts": {
+          "deletions": 30
+        },
+        "packages/frontend/src/utility/idb-proxy.ts": {
+          "deletions": 2
+        },
+        "packages/backend/src/queue/queue-job-runner.ts": {
+          "deletions": 3
+        },
+        "packages/backend/src/server/api/endpoints/following/update.ts": {
+          "deletions": 3
+        },
+        "packages/backend/src/server/api/endpoints/notes/favorites/create.ts": {
+          "deletions": 4
+        },
+        "packages/frontend/test/unit/emoji.test.ts": {
+          "additions": 4,
+          "deletions": 4,
+          "accepted_lines": 2
+        },
+        "packages/backend/src/server/api/endpoints/channels/timeline.ts": {
+          "additions": 2,
+          "deletions": 4,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/server/api/SignupApiService.ts": {
+          "deletions": 27
+        },
+        "packages/frontend-embed/src/components/EmPoll.vue": {
+          "deletions": 1
+        },
+        "packages/frontend-embed/src/components/EmMediaImage.vue": {
+          "deletions": 2
+        },
+        "packages/frontend/src/pages/search.user.vue": {
+          "deletions": 3
+        },
+        "packages/frontend/src/preferences/def.ts": {
+          "additions": 16,
+          "deletions": 24,
+          "accepted_lines": 8
+        },
+        "packages/backend/test/unit/queue/processors/CleanRemoteNotesProcessorService.ts": {
+          "additions": 65,
+          "deletions": 222,
+          "accepted_lines": 34
+        },
+        "packages/frontend/src/components/MkWatermarkEditorDialog.vue": {
+          "additions": 2,
+          "deletions": 2,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/queue/processors/CleanProcessorService.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/server/api/endpoints/mute/delete.ts": {
+          "deletions": 3
+        },
+        "packages-private/diagnostics-shared/test/html.test.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/server/api/AuthenticateService.ts": {
+          "additions": 6,
+          "deletions": 6,
+          "accepted_lines": 3
+        },
+        "packages/frontend-shared/js/theme.ts": {
+          "additions": 10,
+          "deletions": 11,
+          "accepted_lines": 5
+        },
+        "packages/backend/src/core/UtilityService.ts": {
+          "deletions": 11
+        },
+        "packages/frontend/src/utility/clone.ts": {
+          "deletions": 5
+        },
+        "js/mfm-renderer.ts": {
+          "additions": 525,
+          "deletions": 525
+        },
+        "packages-private/diagnostics-backend/src/measure/stability.ts": {
+          "deletions": 4
+        },
+        "packages/backend/src/server/api/endpoints/i/import-blocking.ts": {
+          "deletions": 1
+        },
+        "packages/frontend/src/utility/intl-string.ts": {
+          "additions": 56,
+          "deletions": 78,
+          "accepted_lines": 28
+        },
+        "packages/backend/src/server/api/endpoints/i/revoke-token.ts": {
+          "deletions": 5
+        },
+        "packages-private/diagnostics-frontend/src/browser/types.ts": {
+          "deletions": 6
+        },
+        "packages/frontend/src/components/MkDialog.vue": {
+          "deletions": 6
+        },
+        "packages/backend/src/misc/split-id-and-objects.ts": {
+          "deletions": 5
+        },
+        "packages/backend/src/core/CustomEmojiService.ts": {
+          "additions": 16,
+          "deletions": 45,
+          "accepted_lines": 8
+        },
+        "packages/backend/src/server/api/endpoints/notes/local-timeline.ts": {
+          "additions": 6,
+          "deletions": 6,
+          "accepted_lines": 3
+        },
+        "packages/backend/src/boot/shutdown-handler.ts": {
+          "deletions": 26
+        },
+        "packages/backend/src/logging/PrettyConsoleBackend.ts": {
+          "deletions": 19
+        },
+        "packages/frontend/src/pages/admin/overview.ap-requests.vue": {
+          "additions": 4,
+          "deletions": 5,
+          "accepted_lines": 2
+        },
+        "packages/frontend/src/plugin.ts": {
+          "additions": 2,
+          "deletions": 4,
+          "accepted_lines": 1
+        },
+        "packages/frontend/src/components/MkNoteDraftsDialog.vue": {
+          "additions": 2,
+          "deletions": 10
+        },
+        "packages/backend/src/misc/gen-identicon.ts": {
+          "additions": 16,
+          "deletions": 33,
+          "accepted_lines": 8
+        },
+        "packages/backend/src/server/api/endpoint-base.ts": {
+          "deletions": 1
+        },
+        "packages/frontend/src/utility/touch.ts": {
+          "deletions": 3
+        },
+        "packages/frontend/src/components/MkMediaList.vue": {
+          "additions": 12,
+          "deletions": 13,
+          "accepted_lines": 6
+        },
+        "packages/frontend/src/utility/mfm-function-picker.ts": {
+          "deletions": 3
+        },
+        "packages/frontend/src/utility/inapp-search.ts": {
+          "deletions": 1
+        },
+        "packages-private/diagnostics-backend/test/server.test.ts": {
+          "deletions": 3
+        },
+        "packages/backend/src/server/api/endpoints/app/create.ts": {
+          "deletions": 3
+        },
+        "packages-private/diagnostics-backend/src/heap-snapshot-sampling.ts": {
+          "deletions": 3
+        },
+        "packages/backend/test-federation/test/emoji.test.ts": {
+          "deletions": 1
+        },
+        "packages/frontend/test/e2e/router.spec.ts": {
+          "deletions": 4
+        },
+        "packages/backend/src/core/activitypub/ApDeliverManagerService.test.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/server/api/endpoints/stats.ts": {
+          "additions": 2,
+          "deletions": 9,
+          "accepted_lines": 1
+        },
+        "packages/frontend/src/components/MkSignin.vue": {
+          "additions": 5,
+          "deletions": 11
+        },
+        "packages-private/diagnostics-shared/src/env.ts": {
+          "deletions": 6
+        },
+        "packages/frontend/src/components/MkPagination.vue": {
+          "additions": 1,
+          "deletions": 11
+        },
+        "packages/backend/vitest.config.ts": {
+          "deletions": 2
+        },
+        "packages/backend/src/server/hsts.ts": {
+          "deletions": 4
+        },
+        "packages/backend/src/queue/types.ts": {
+          "deletions": 6
+        },
+        "packages/frontend/src/components/MkAntennaEditor.vue": {
+          "deletions": 2
+        },
+        "packages/frontend/src/instance.ts": {
+          "deletions": 6
+        },
+        "packages/frontend/src/components/global/MkCustomEmoji.vue": {
+          "deletions": 3
+        },
+        "packages/frontend/src/components/MkPostFormAttaches.vue": {
+          "additions": 2,
+          "deletions": 4
+        },
+        "packages-private/diagnostics-frontend/src/bundle/visualizer.ts": {
+          "deletions": 10
+        },
+        "packages/frontend/src/components/MkCropperDialog.stories.impl.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/models/AbuseUserReport.ts": {
+          "deletions": 10
+        },
+        "packages/backend/src/core/chart/charts/test-intersection.ts": {
+          "deletions": 3
+        },
+        "packages/backend/src/server/web/views/base.tsx": {
+          "deletions": 1
+        },
+        "packages/backend/src/misc/should-require-follow-approval-by-account-age.ts": {
+          "deletions": 2
+        },
+        "packages/backend/src/core/FederatedInstanceService.ts": {
+          "additions": 4,
+          "deletions": 4,
+          "accepted_lines": 2
+        },
+        "packages/frontend/src/components/global/MkA.vue": {
+          "deletions": 1
+        },
+        "packages/backend/src/misc/id/aidx.ts": {
+          "deletions": 5
+        },
+        "packages/backend/src/server/api/endpoints/notes/create.ts": {
+          "deletions": 4
+        },
+        "packages/backend/test/performance/benchmark.ts": {
+          "additions": 2,
+          "deletions": 5,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/core/CacheService.ts": {
+          "additions": 40,
+          "deletions": 45,
+          "accepted_lines": 20
+        },
+        "packages/backend/test/unit/activitypub.ts": {
+          "additions": 2,
+          "deletions": 10,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/queue/processors/PostScheduledNoteProcessorService.ts": {
+          "deletions": 4
+        },
+        "packages/frontend/test/e2e/utils.ts": {
+          "deletions": 4
+        },
+        "packages/backend/src/core/WebhookTestService.ts": {
+          "deletions": 21
+        },
+        "packages/frontend/src/components/MkImageFrameEditorDialog.vue": {
+          "additions": 2,
+          "deletions": 2,
+          "accepted_lines": 1
+        },
+        "packages/backend/scripts/check_migrations_clean.js": {
+          "deletions": 2
+        },
+        "packages/backend/src/server/api/endpoints/notes/polls/recommendation.ts": {
+          "deletions": 6
+        },
+        "packages/frontend-embed/src/pages/note.vue": {
+          "deletions": 1
+        },
+        "packages/frontend/src/pages/user/activity.pv.vue": {
+          "additions": 2,
+          "deletions": 6,
+          "accepted_lines": 1
+        },
+        "packages-private/diagnostics-backend/src/types.ts": {
+          "deletions": 4
+        },
+        "packages/backend/src/server/api/endpoints/notes/user-list-timeline.ts": {
+          "additions": 12,
+          "deletions": 15,
+          "accepted_lines": 6
+        },
+        "packages/backend/src/misc/normalize-tag.ts": {
+          "deletions": 10
+        },
+        "packages/backend/src/core/NoteDraftService.ts": {
+          "additions": 4,
+          "deletions": 37,
+          "accepted_lines": 2
+        },
+        "packages/backend/src/boot/entry.ts": {
+          "deletions": 14
+        },
+        "packages/frontend/src/widgets/WidgetClock.vue": {
+          "additions": 5,
+          "deletions": 6,
+          "accepted_lines": 3
+        },
+        "packages-private/diagnostics-backend/src/measure/proc.ts": {
+          "deletions": 4
+        },
+        "packages/backend/src/queue/processors/InboxProcessorService.ts": {
+          "additions": 6,
+          "deletions": 30,
+          "accepted_lines": 3
+        },
+        "packages/frontend/test/e2e/shared.ts": {
+          "deletions": 1
+        },
+        "packages/frontend/src/pages/user/activity.notes.vue": {
+          "additions": 2,
+          "deletions": 6,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/server/web/ClientServerService.ts": {
+          "additions": 4,
+          "deletions": 46,
+          "accepted_lines": 2
+        },
+        "packages/backend/src/models/NoteDraft.ts": {
+          "additions": 4,
+          "deletions": 22,
+          "accepted_lines": 2
+        },
+        "packages/frontend/src/styles-font/maokentangyuan.scss": {
+          "additions": 4,
+          "deletions": 4,
+          "accepted_lines": 2
+        },
+        "packages/frontend/src/composables/use-tooltip.ts": {
+          "additions": 2,
+          "deletions": 6,
+          "accepted_lines": 1
+        },
+        "packages/frontend/src/composables/use-mkselect.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/queue/processors/CheckModeratorsActivityProcessorService.ts": {
+          "deletions": 43
+        },
+        "packages/backend/src/core/QueueService.ts": {
+          "additions": 114,
+          "deletions": 137,
+          "accepted_lines": 57
+        },
+        "packages/backend/src/server/api/endpoints/chat/messages/create-to-user.ts": {
+          "deletions": 2
+        },
+        "packages/backend/src/queue/processors/AggregateRetentionProcessorService.ts": {
+          "deletions": 3
+        },
+        "packages/backend/src/server/api/endpoints/chat/messages/create-to-room.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/core/NoteUpdateService.ts": {
+          "deletions": 19
+        },
+        "packages/misskey-js/src/streaming.ts": {
+          "additions": 8,
+          "deletions": 35,
+          "accepted_lines": 4
+        },
+        "packages/backend/src/misc/cache.ts": {
+          "additions": 2,
+          "deletions": 53,
+          "accepted_lines": 1
+        },
+        "packages/frontend/src/store.ts": {
+          "additions": 10,
+          "deletions": 15,
+          "accepted_lines": 5
+        },
+        "packages/backend/src/queue/processors/ExportBlockingProcessorService.ts": {
+          "deletions": 1
+        },
+        "packages/frontend/src/components/MkGalleryPostPreview.stories.impl.ts": {
+          "deletions": 1
+        },
+        "packages/frontend/test/unit/i18n.test.ts": {
+          "additions": 2,
+          "deletions": 4,
+          "accepted_lines": 1
+        },
+        "src/report/markdown.ts": {
+          "additions": 164,
+          "deletions": 164
+        },
+        "packages/frontend/src/components/MkPopupMenu.vue": {
+          "deletions": 4
+        },
+        "packages/backend/src/server/api/endpoints/i.ts": {
+          "deletions": 1
+        },
+        "packages/misskey-js/api-extractor.json": {
+          "additions": 8,
+          "deletions": 312,
+          "accepted_lines": 8
+        },
+        "packages/backend/test/unit/SearchService.ts": {
+          "deletions": 6
+        },
+        "packages/backend/src/core/NoteDeleteService.ts": {
+          "deletions": 11
+        },
+        "packages/backend/src/core/entities/FlashEntityService.ts": {
+          "deletions": 1
+        },
+        "packages/frontend/src/utility/theme-editor.ts": {
+          "deletions": 2
+        },
+        "packages/backend/src/server/api/endpoints/clips/show.ts": {
+          "deletions": 1
+        },
+        "packages/frontend/src/utility/get-drive-file-menu.ts": {
+          "deletions": 6
+        },
+        "packages/backend/src/models/DriveFile.ts": {
+          "deletions": 3
+        },
+        "packages/frontend/src/components/MkWidgetSettingsDialog.vue": {
+          "additions": 6,
+          "deletions": 8,
+          "accepted_lines": 3
+        },
+        "packages/frontend/src/workers/test-webgl2.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/server/api/stream/channel.ts": {
+          "deletions": 25
+        },
+        "packages/frontend/src/pages/admin/abuses.vue": {
+          "additions": 1,
+          "deletions": 12
+        },
+        "packages/backend/test-federation/test/drive.test.ts": {
+          "deletions": 12
+        },
+        "packages/frontend/src/pages/auth.vue": {
+          "deletions": 1
+        },
+        "packages/backend/src/server/api/endpoints/users/following.ts": {
+          "additions": 2,
+          "deletions": 3,
+          "accepted_lines": 1
+        },
+        "packages/frontend/src/pages/chat/room.form.vue": {
+          "deletions": 11
+        },
+        "packages/frontend/src/components/MkAutocomplete.vue": {
+          "deletions": 15
+        },
+        "packages/frontend-shared/js/locale.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/misc/correct-filename.ts": {
+          "deletions": 17
+        },
+        "packages/backend/src/server/api/endpoints/admin/emoji/update.ts": {
+          "deletions": 1
+        },
+        "packages/frontend-builder/locale-inliner.ts": {
+          "additions": 2,
+          "deletions": 6,
+          "accepted_lines": 1
+        },
+        "packages/frontend/src/pages/page.vue": {
+          "additions": 2,
+          "deletions": 4
+        },
+        "packages/frontend/src/components/grid/grid-utils.ts": {
+          "deletions": 15
+        },
+        "packages/frontend/src/pages/chat/room.vue": {
+          "additions": 2,
+          "deletions": 9,
+          "accepted_lines": 1
+        },
+        "packages/frontend/src/components/MkStreamingNotesTimeline.vue": {
+          "additions": 6,
+          "deletions": 9,
+          "accepted_lines": 3
+        },
+        "packages/backend/src/queue/processors/DeleteAccountProcessorService.ts": {
+          "additions": 8,
+          "deletions": 13,
+          "accepted_lines": 4
+        },
+        "packages/backend/src/server/api/endpoints/notes.ts": {
+          "deletions": 5
+        },
+        "packages/backend/src/core/ReactionService.ts": {
+          "additions": 4,
+          "deletions": 56,
+          "accepted_lines": 2
+        },
+        "packages/misskey-js/src/entities.ts": {
+          "additions": 2,
+          "deletions": 2,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/misc/bigint.ts": {
+          "deletions": 6
+        },
+        "packages/mastodon-compat/src/features.ts": {
+          "deletions": 4
+        },
+        "packages/frontend/src/components/MkEmbedCodeGenDialog.vue": {
+          "additions": 12,
+          "deletions": 23,
+          "accepted_lines": 6
+        },
+        "packages/frontend/src/utility/chart-legend.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/misc/i18n.ts": {
+          "deletions": 6
+        },
+        "packages/backend/src/server/api/endpoints/i/2fa/unregister.ts": {
+          "deletions": 1
+        },
+        "src/theme.ts": {
+          "additions": 49,
+          "deletions": 49
+        },
+        "packages/frontend/src/components/global/RouterView.vue": {
+          "deletions": 5
+        },
+        "packages/frontend/src/lib/ImageCompositor.ts": {
+          "deletions": 8
+        }
+      }
+    }
+  }
+}
