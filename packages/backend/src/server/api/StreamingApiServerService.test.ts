@@ -149,8 +149,8 @@ describe('native streaming shutdown', () => {
 		}
 	});
 
-	test('fails closed on periodic authorization failure without querying for each event', async () => {
-		vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+	test('allows a temporary periodic check failure but closes at 30 seconds without verification', async () => {
+		vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval', 'setTimeout', 'clearTimeout'] });
 		const authenticate = vi.fn().mockResolvedValue([{ id: 'alice' }, { id: 'token', permission: ['read:account'] }]);
 		const { redis, service, server, client, verifyStreamingCredentials } = await setup(undefined, authenticate, 'token');
 		try {
@@ -160,11 +160,38 @@ describe('native streaming shutdown', () => {
 			expect(authenticate).toHaveBeenCalledTimes(calls);
 			verifyStreamingCredentials.mockRejectedValue(new Error('database unavailable'));
 			const closed = once(client, 'close');
-			await vi.advanceTimersByTimeAsync(10_000);
+			await vi.advanceTimersByTimeAsync(29_999);
+			expect(verifyStreamingCredentials).toHaveBeenCalled();
+			expect(client.readyState).toBe(WebSocket.OPEN);
+			await vi.advanceTimersByTimeAsync(1);
 			await closed;
 		} finally {
 			await service.detach();
 			vi.useRealTimers();
+			client.terminate();
+			await new Promise<void>(resolve => server.close(() => resolve()));
+		}
+	});
+
+	test('successful periodic verification renews the deadline after database recovery', async () => {
+		vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval', 'setTimeout', 'clearTimeout'] });
+		const authenticate = vi.fn().mockResolvedValue([{ id: 'alice' }, null]);
+		const { service, server, client, verifyStreamingCredentials } = await setup(undefined, authenticate, 'token');
+		try {
+			await once(client, 'open');
+			verifyStreamingCredentials.mockRejectedValueOnce(new Error('temporarily unavailable'));
+			await vi.advanceTimersByTimeAsync(20_000);
+			expect(verifyStreamingCredentials).toHaveBeenCalledTimes(2);
+			verifyStreamingCredentials.mockRejectedValue(new Error('temporarily unavailable'));
+			await vi.advanceTimersByTimeAsync(11_000);
+			expect(client.readyState).toBe(WebSocket.OPEN);
+			const closed = once(client, 'close');
+			verifyStreamingCredentials.mockResolvedValue(new Set());
+			await vi.advanceTimersByTimeAsync(10_000);
+			await closed;
+		} finally {
+			vi.useRealTimers();
+			await service.detach();
 			client.terminate();
 			await new Promise<void>(resolve => server.close(() => resolve()));
 		}
@@ -228,7 +255,9 @@ describe('native streaming shutdown', () => {
 			const probe = new WebSocket(client.url.replace('member-0', 'probe'));
 			sockets.push(probe);
 			await once(probe, 'open');
-			await vi.advanceTimersByTimeAsync(10_500);
+			await vi.advanceTimersByTimeAsync(20_499);
+			expect(sockets.every(ws => ws.readyState === WebSocket.OPEN)).toBe(true);
+			await vi.advanceTimersByTimeAsync(1);
 			await closed;
 			expect(verifyStreamingCredentials).toHaveBeenCalledTimes(2);
 			blocked.resolve(new Set([0]));

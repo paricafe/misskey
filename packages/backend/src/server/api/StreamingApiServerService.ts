@@ -24,7 +24,8 @@ import type { EventEmitter } from 'node:events';
 const AUTHORIZATION_INTERVAL = 10_000;
 const AUTHORIZATION_BUCKETS = 40;
 const AUTHORIZATION_BATCH_SIZE = 128;
-type StreamingSessions = { credential: StreamingCredential; sockets: Set<WebSocket.WebSocket> };
+const AUTHORIZATION_MAX_STALENESS = 3 * AUTHORIZATION_INTERVAL;
+type StreamingSessions = { credential: StreamingCredential; sockets: Set<WebSocket.WebSocket>; expiry: NodeJS.Timeout };
 
 class AuthorizationQueue {
 	private pending = new Set<() => void>();
@@ -287,12 +288,24 @@ export class StreamingApiServerService {
 		const index = createHash('sha256').update(credential.token).digest().readUInt32BE() % AUTHORIZATION_BUCKETS;
 		const bucket = this.#authorizationBuckets[index];
 		const key = JSON.stringify(credential);
-		const group = bucket.get(key) ?? { credential, sockets: new Set<WebSocket.WebSocket>() };
+		let group = bucket.get(key);
+		if (group == null) {
+			const sockets = new Set<WebSocket.WebSocket>();
+			const expiry = setTimeout(() => {
+				for (const socket of sockets) socket.terminate();
+			}, AUTHORIZATION_MAX_STALENESS).unref();
+			group = { credential, sockets, expiry };
+			bucket.set(key, group);
+		} else {
+			group.expiry.refresh();
+		}
 		group.sockets.add(ws);
-		bucket.set(key, group);
 		ws.once('close', () => {
 			group.sockets.delete(ws);
-			if (!group.sockets.size) bucket.delete(key);
+			if (!group.sockets.size) {
+				clearTimeout(group.expiry);
+				bucket.delete(key);
+			}
 		});
 	}
 
@@ -300,9 +313,13 @@ export class StreamingApiServerService {
 		const sockets = groups.map(group => [...group.sockets]);
 		const credentials = groups.map(group => group.credential);
 		const valid = await this.#periodicChecks.run(timeoutMs => this.authenticateService.verifyStreamingCredentials(credentials, timeoutMs))
-			.catch(() => new Set<number>());
+			.catch(() => null);
+		if (!valid) return;
 		for (const [index, connections] of sockets.entries()) {
-			if (!valid.has(index)) {
+			if (valid.has(index)) {
+				const group = groups[index];
+				if (group.sockets.size) group.expiry.refresh();
+			} else {
 				for (const ws of connections) ws.terminate();
 			}
 		}

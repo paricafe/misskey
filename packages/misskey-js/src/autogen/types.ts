@@ -27416,6 +27416,11 @@ export interface operations {
             content: {
                 'application/json': {
                     password: string;
+                    pushSubscription?: {
+                        endpoint: string;
+                        auth: string;
+                        publickey: string;
+                    };
                 };
             };
         };

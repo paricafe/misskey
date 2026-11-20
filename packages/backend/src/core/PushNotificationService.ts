@@ -13,6 +13,7 @@ import { getNoteSummary } from '@/misc/get-note-summary.js';
 import type { MiMeta, MiSwSubscription, SwSubscriptionsRepository } from '@/models/_.js';
 import { bindThis } from '@/decorators.js';
 import { RedisKVCache } from '@/misc/cache.js';
+import type { GlobalEvents } from '@/core/GlobalEventService.js';
 import { HttpRequestService } from '@/core/HttpRequestService.js';
 
 type PushNotificationsTypes = {
@@ -58,6 +59,9 @@ export class PushNotificationService implements OnApplicationShutdown {
 		@Inject(DI.redis)
 		private redisClient: Redis.Redis,
 
+		@Inject(DI.redisForSub)
+		private redisForSub: Redis.Redis,
+
 		@Inject(DI.swSubscriptionsRepository)
 		private swSubscriptionsRepository: SwSubscriptionsRepository,
 
@@ -70,6 +74,15 @@ export class PushNotificationService implements OnApplicationShutdown {
 			toRedisConverter: (value) => JSON.stringify(value),
 			fromRedisConverter: (value) => JSON.parse(value),
 		});
+		this.redisForSub.on('message', this.onMessage);
+	}
+
+	@bindThis
+	private async onMessage(_: string, data: string) {
+		const event = JSON.parse(data);
+		if (event.channel !== 'internal') return;
+		const message = event.message as GlobalEvents['internal']['payload'];
+		if (message.type === 'userTokenRegenerated') await this.subscriptionsCache.delete(message.body.id);
 	}
 
 	@bindThis
@@ -141,6 +154,7 @@ export class PushNotificationService implements OnApplicationShutdown {
 
 	@bindThis
 	public dispose(): void {
+		this.redisForSub.off('message', this.onMessage);
 		this.subscriptionsCache.dispose();
 	}
 

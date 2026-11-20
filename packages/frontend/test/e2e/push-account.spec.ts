@@ -5,7 +5,9 @@
 
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures.js';
-import { BASE_URL } from './utils.js';
+import { BASE_URL, completeAccountSetup, registerUser, resetState, signIn } from './utils.js';
+
+test.use({ channel: 'chromium' });
 
 async function pushFixture(page: Page) {
 	const context = page.context();
@@ -45,11 +47,11 @@ async function pushFixture(page: Page) {
 	});
 	return {
 		worker,
-		deliver: async (userId: string, text: string, type = 'newChatMessage') => {
+		deliver: async (userId: string | undefined, text: string, type = 'newChatMessage', dateTime = Date.now()) => {
 			const completed = await log.evaluate(state => state.completed);
 			await cdp.send('ServiceWorker.deliverPushMessage', {
 				origin: BASE_URL, registrationId: registrationId!,
-				data: JSON.stringify({ userId, type, dateTime: Date.now(), body: { fromUserId: 'sender', fromUser: { username: 'sender' }, text } }),
+				data: JSON.stringify({ userId, type, dateTime, body: { fromUserId: 'sender', fromUser: { username: 'sender' }, text } }),
 			});
 			await expect.poll(() => log.evaluate(state => state.completed)).toBeGreaterThan(completed);
 		},
@@ -95,7 +97,9 @@ test('pushes from one sender replace only the same recipient, including after a 
 	expect(updated.tag).toBe(first.tag);
 });
 
-test('an explicitly empty account store suppresses late pushes with no open client', async ({ page }) => {
+const generic = { title: new URL(BASE_URL).host, tag: 'misskey-activity', body: undefined, data: undefined };
+
+test('an explicitly empty account store shows a content-free alert for late pushes', async ({ page }) => {
 	const f = await pushFixture(page);
 	await setAccounts(page, {});
 	await f.worker.evaluate(() => {
@@ -103,7 +107,7 @@ test('an explicitly empty account store suppresses late pushes with no open clie
 		scope.clients.matchAll = async () => [];
 	});
 	await f.deliver('removed', 'private message');
-	expect(await f.shown()).toEqual([]);
+	expect(await f.shown()).toEqual([generic]);
 });
 
 test('localStorage accounts can receive pushes and an offline worker without a window hides their content', async ({ page }) => {
@@ -117,7 +121,7 @@ test('localStorage accounts can receive pushes and an offline worker without a w
 	expect(await f.shown()).toMatchObject([{ title: 'sender: confirmed' }]);
 	await page.evaluate(() => localStorage.setItem('idbfallback::pizzax::base', JSON.stringify({ accountTokens: {} })));
 	await f.deliver('a', 'removed');
-	expect(await f.shown()).toHaveLength(1);
+	expect((await f.shown())[1]).toEqual(generic);
 	await f.worker.evaluate(() => {
 		// CDP needs a live network transport to deliver the push. The offline worker has no clients or fetch.
 		const scope = globalThis as unknown as { clients: { matchAll: () => Promise<unknown[]> } };
@@ -125,8 +129,39 @@ test('localStorage accounts can receive pushes and an offline worker without a w
 		globalThis.fetch = async () => { throw new TypeError('offline'); };
 	});
 	await f.deliver('a', 'private message');
-	const [, generic] = await f.shown();
-	expect(generic.title).toBe(new URL(BASE_URL).host);
-	expect(generic.body).toBeUndefined();
-	expect(generic.data).toBeUndefined();
+	expect((await f.shown())[2]).toEqual(generic);
+});
+
+test('read receipts only clear notifications belonging to the confirmed account', async ({ page }) => {
+	await resetState();
+	const alice = await registerUser('alice', 'pass', true);
+	await completeAccountSetup(alice.token);
+	await signIn(page, 'alice', 'pass');
+	await expect(page.getByTestId('open-post-form')).toBeVisible();
+	const f = await pushFixture(page);
+	const recipients = () => page.evaluate(async () => {
+		const notifications = await (await navigator.serviceWorker.ready).getNotifications();
+		return notifications.map(n => n.data?.userId).filter(Boolean);
+	});
+	await f.deliver('removed', 'private');
+	expect(await f.shown()).toEqual([generic]);
+	await f.deliver(alice.id, 'hello');
+	await expect.poll(recipients).toEqual([alice.id]);
+	await f.deliver('removed', '', 'readAllNotifications');
+	expect(await recipients()).toEqual([alice.id]);
+	await f.deliver(alice.id, '', 'readAllNotifications');
+	await expect.poll(recipients).toEqual([]);
+});
+
+test('unattributed and unknown pushes show generic alerts and stale content is omitted', async ({ page }) => {
+	const f = await pushFixture(page);
+	await setAccounts(page, { 'local.test/a': 'a' });
+	await f.deliver(undefined, 'no recipient');
+	await f.deliver('a', 'unknown event', 'futureType');
+	await f.deliver('unknown', 'read', 'readAllNotifications');
+	await f.deliver('a', 'stale message', 'newChatMessage', Date.now() - 86_400_001);
+	const shown = await f.shown();
+	expect(shown.slice(0, 3)).toEqual([generic, generic, generic]);
+	expect(shown[3]).toMatchObject({ title: generic.title, tag: 'read_notification', data: {} });
+	expect(shown[3].body).not.toContain('stale message');
 });

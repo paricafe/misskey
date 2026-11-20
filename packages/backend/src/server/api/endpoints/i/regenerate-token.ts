@@ -9,6 +9,7 @@ import { Endpoint } from '@/server/api/endpoint-base.js';
 import type { UsersRepository, UserProfilesRepository } from '@/models/_.js';
 import { generateNativeUserToken } from '@/misc/token.js';
 import { GlobalEventService } from '@/core/GlobalEventService.js';
+import { MiSwSubscription } from '@/models/SwSubscription.js';
 import { DI } from '@/di-symbols.js';
 
 export const meta = {
@@ -21,6 +22,15 @@ export const paramDef = {
 	type: 'object',
 	properties: {
 		password: { type: 'string' },
+		pushSubscription: {
+			type: 'object',
+			properties: {
+				endpoint: { type: 'string' },
+				auth: { type: 'string' },
+				publickey: { type: 'string' },
+			},
+			required: ['endpoint', 'auth', 'publickey'],
+		},
 	},
 	required: ['password'],
 } as const;
@@ -37,9 +47,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 		private globalEventService: GlobalEventService,
 	) {
 		super(meta, paramDef, async (ps, me) => {
-			const freshUser = await this.usersRepository.findOneByOrFail({ id: me.id });
-			const oldToken = freshUser.token!;
-
 			const profile = await this.userProfilesRepository.findOneByOrFail({ userId: me.id });
 
 			const same = await bcrypt.compare(ps.password, profile.password!);
@@ -50,8 +57,15 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 
 			const newToken = generateNativeUserToken();
 
-			await this.usersRepository.update(me.id, {
-				token: newToken,
+			const oldToken = await this.usersRepository.manager.transaction(async manager => {
+				const users = manager.withRepository(this.usersRepository);
+				const user = await users.findOneOrFail({ where: { id: me.id }, select: { token: true }, lock: { mode: 'pessimistic_write' } });
+				await users.update(me.id, { token: newToken });
+				if (ps.pushSubscription) {
+					const { endpoint, auth, publickey } = ps.pushSubscription;
+					await manager.delete(MiSwSubscription, { userId: me.id, endpoint, auth, publickey });
+				}
+				return user.token!;
 			});
 
 			await this.globalEventService.publishInternalEvent('userTokenRegenerated', { id: me.id, oldToken, newToken });

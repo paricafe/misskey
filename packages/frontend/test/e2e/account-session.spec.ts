@@ -5,6 +5,7 @@
 
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures.js';
+import { api } from './shared.js';
 import { BASE_URL, closeUserSetupDialog, completeAccountSetup, registerUser, resetState, signIn } from './utils.js';
 import type { RegisteredUser } from './utils.js';
 
@@ -69,41 +70,6 @@ test.describe('account session persistence', () => {
 		await expect(page.getByTestId('signin')).toBeVisible();
 		await expect(page).toHaveURL(`${BASE_URL}/`);
 		expect(await signedInAccount(page)).toBeNull();
-	});
-
-	test('the service worker displays pushes only for accounts saved on this device', async ({ page, context }) => {
-		await context.grantPermissions(['notifications'], { origin: BASE_URL });
-		await completeAccountSetup(alice.token);
-		await signIn(page, 'alice', 'alice1234');
-		await expect(page.getByTestId('open-post-form')).toBeVisible();
-		await page.evaluate(async () => {
-			await navigator.serviceWorker.register('/sw.js');
-			await navigator.serviceWorker.ready;
-		});
-		const cdp = await context.newCDPSession(page);
-		let registrationId: string | undefined;
-		cdp.on('ServiceWorker.workerRegistrationUpdated', ({ registrations }) => {
-			registrationId = registrations.find(r => r.scopeURL === BASE_URL + '/' && !r.isDeleted)?.registrationId;
-		});
-		await cdp.send('ServiceWorker.enable');
-		await expect.poll(() => registrationId).toBeDefined();
-		const deliver = async (userId: string, type = 'newChatMessage') => cdp.send('ServiceWorker.deliverPushMessage', {
-			origin: BASE_URL,
-			registrationId: registrationId!,
-			data: JSON.stringify({ userId, type, dateTime: Date.now(), body: { fromUserId: userId, fromUser: { username: 'sender' }, text: userId } }),
-		});
-		const recipients = () => page.evaluate(async () => {
-			const notifications = await (await navigator.serviceWorker.ready).getNotifications();
-			return notifications.map(n => n.data?.userId).filter(Boolean);
-		});
-		await deliver('removed');
-		expect(await recipients()).toEqual([]);
-		await deliver(alice.id);
-		await expect.poll(recipients).toEqual([alice.id]);
-		await deliver('removed', 'readAllNotifications');
-		expect(await recipients()).toEqual([alice.id]);
-		await deliver(alice.id, 'readAllNotifications');
-		await expect.poll(recipients).toEqual([]);
 	});
 
 	test('loginId switches accounts using credentials persisted in IndexedDB', async ({ page }) => {
@@ -266,6 +232,60 @@ test.describe('account session persistence', () => {
 			expect(await page.evaluate(() => localStorage.getItem('scratchpad'))).toBe('local unsaved text');
 		});
 	}
+
+	test('token reset removes only this account and device subscription after verifying the password', async ({ page }) => {
+		const bob = await registerUser('bob', 'bob1234');
+		const endpoint = 'https://localhost/push/this-device';
+		const otherDevice = 'https://localhost/push/other-device';
+		const registration = { endpoint, auth: 'AQ==', publickey: 'Ag==' };
+		const subscribed = (token: string, url = endpoint) => api(BASE_URL, 'sw/show-registration', { i: token, endpoint: url });
+		await api(BASE_URL, 'sw/register', { ...registration, i: alice.token });
+		await api(BASE_URL, 'sw/register', { ...registration, i: bob.token });
+		await api(BASE_URL, 'sw/register', { ...registration, i: alice.token, endpoint: otherDevice });
+		await completeAccountSetup(alice.token);
+		await signIn(page, 'alice', 'alice1234');
+		await expect(page.getByTestId('open-post-form')).toBeVisible();
+		await page.goto(`${BASE_URL}/settings/security`);
+		await page.evaluate(async endpoint => {
+			await navigator.serviceWorker.register('/sw.js');
+			await navigator.serviceWorker.ready;
+			Object.defineProperty(PushManager.prototype, 'getSubscription', {
+				value: async () => ({ endpoint, getKey: (name: string) => Uint8Array.of(name === 'auth' ? 1 : 2).buffer }),
+			});
+		}, endpoint);
+
+		await regenerateToken(page, 'wrong-password');
+		await page.getByTestId('modal-dialog-ok').click();
+		expect(await subscribed(alice.token)).toMatchObject({ userId: alice.id });
+		await expect(page.getByPlaceholder('Password')).toHaveCount(0);
+		await regenerateToken(page, 'alice1234');
+		await expect(page.getByTestId('signin')).toBeVisible();
+		await signIn(page, 'alice', 'alice1234');
+		await expect(page.getByTestId('open-post-form')).toBeVisible();
+		const current = (await signedInAccount(page))!;
+		expect(current.token).not.toBe(alice.token);
+		expect(await subscribed(current.token)).toBeNull();
+		expect(await subscribed(current.token, otherDevice)).toMatchObject({ userId: alice.id });
+		expect(await subscribed(bob.token)).toMatchObject({ userId: bob.id });
+	});
+
+	test('a stalled push subscription lookup still allows the token to be reset', async ({ page }) => {
+		await completeAccountSetup(alice.token);
+		await signIn(page, 'alice', 'alice1234');
+		await expect(page.getByTestId('open-post-form')).toBeVisible();
+		await page.goto(`${BASE_URL}/settings/security`);
+		await page.evaluate(async () => {
+			await navigator.serviceWorker.register('/sw.js');
+			await navigator.serviceWorker.ready;
+			Object.defineProperty(PushManager.prototype, 'getSubscription', { value: () => new Promise(() => {}) });
+		});
+		const reset = page.waitForResponse(res => res.url().endsWith('/api/i/regenerate-token'));
+		await regenerateToken(page, 'alice1234');
+		const response = await reset;
+		expect(response.status()).toBe(204);
+		expect(response.request().postDataJSON()).not.toHaveProperty('pushSubscription');
+		await expect(page.getByTestId('signin')).toBeVisible();
+	});
 
 	for (const failure of ['bad password', 'network'] as const) {
 		test(`regenerating a token recovers from ${failure}`, async ({ page }) => {

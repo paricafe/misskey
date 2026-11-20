@@ -105,29 +105,34 @@ globalThis.addEventListener('fetch', ev => {
 });
 
 function showGenericPush(): Promise<void> {
-	return globalThis.registration.showNotification(globalThis.location.host, { tag: 'misskey-activity' });
+	return globalThis.registration.showNotification(globalThis.location.host, { tag: 'misskey-activity' }).catch(() => {});
+}
+
+async function handlePush(ev: PushEvent): Promise<void> {
+	const data: PushNotificationDataMap[keyof PushNotificationDataMap] | undefined = ev.data?.json();
+	if (!data?.userId) return showGenericPush();
+	const account = await confirmPushAccount(data.userId);
+	if (!account) return showGenericPush();
+	switch (data.type) {
+		case 'notification':
+		case 'unreadAntennaNote':
+		case 'newChatMessage':
+			if (Date.now() - data.dateTime > 1000 * 60 * 60 * 24) return createEmptyNotification();
+			return createNotification(data, account.token);
+		case 'readAllNotifications': {
+			const notifications = await globalThis.registration.getNotifications();
+			for (const n of notifications) {
+				if (n.data?.userId === data.userId) n.close();
+			}
+			return createEmptyNotification();
+		}
+		default:
+			return showGenericPush();
+	}
 }
 
 globalThis.addEventListener('push', ev => {
-	ev.waitUntil((async () => {
-		const data: PushNotificationDataMap[keyof PushNotificationDataMap] | undefined = ev.data?.json();
-		if (!data?.userId) return;
-		const account = await confirmPushAccount(data.userId);
-		if (account === false) return;
-		switch (data.type) {
-			case 'notification':
-			case 'unreadAntennaNote':
-			case 'newChatMessage':
-				if (Date.now() - data.dateTime > 1000 * 60 * 60 * 24) return;
-				if (!account) return showGenericPush();
-				return createNotification(data, account.token).catch(showGenericPush);
-			case 'readAllNotifications':
-				if (!account) return;
-				await globalThis.registration.getNotifications()
-					.then(notifications => notifications.forEach(n => n.data?.userId === data.userId && n.close()));
-				await createEmptyNotification().catch(() => {});
-		}
-	})());
+	ev.waitUntil(handlePush(ev).catch(showGenericPush));
 });
 
 globalThis.addEventListener('notificationclick', (ev: ServiceWorkerGlobalScopeEventMap['notificationclick']) => {

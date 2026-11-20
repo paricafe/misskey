@@ -64,6 +64,7 @@ import FormSlot from '@/components/form/slot.vue';
 import MkButton from '@/components/MkButton.vue';
 import MkPagination from '@/components/MkPagination.vue';
 import * as os from '@/os.js';
+import { encodePushSubscriptionKey } from '@/utility/encode-push-subscription-key.js';
 import { misskeyApi } from '@/utility/misskey-api.js';
 import { i18n } from '@/i18n.js';
 import { cloudBackup } from '@/preferences/utility.js';
@@ -111,6 +112,27 @@ async function change() {
 	});
 }
 
+async function getDevicePushSubscription() {
+	if (!('serviceWorker' in navigator)) return undefined;
+	let timeout: number | undefined;
+	try {
+		const subscription = await Promise.race([
+			navigator.serviceWorker.getRegistration().then(reg => reg?.pushManager?.getSubscription()),
+			new Promise<undefined>(resolve => { timeout = window.setTimeout(() => resolve(undefined), 5000); }),
+		]);
+		if (!subscription) return undefined;
+		return {
+			endpoint: subscription.endpoint,
+			auth: encodePushSubscriptionKey(subscription.getKey('auth')),
+			publickey: encodePushSubscriptionKey(subscription.getKey('p256dh')),
+		};
+	} catch {
+		return undefined;
+	} finally {
+		window.clearTimeout(timeout);
+	}
+}
+
 async function regenerateToken() {
 	const me = ensureSignin();
 	const auth = await os.authenticateDialog();
@@ -123,9 +145,10 @@ async function regenerateToken() {
 		}
 
 		await misskeyApi('i/regenerate-token', {
+			pushSubscription: await getDevicePushSubscription(),
 			password: auth.result.password,
 			token: auth.result.token,
-		});
+		}, me.token);
 		await leaveRevokedAccount(me);
 	} catch (error) {
 		os.alert({
