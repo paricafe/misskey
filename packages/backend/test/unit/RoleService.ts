@@ -1117,6 +1117,19 @@ describe('RoleService', () => {
 		});
 	});
 
+	test('uses current operator roles even if the cached role still grants edit access', async () => {
+		const operator = await createUser();
+		const member = await createUser();
+		const adminRole = await createRole({ isAdministrator: true });
+		const target = await createRole({ canEditMembersByModerator: false });
+		await roleService.assign(operator.id, adminRole.id);
+		expect(await roleService.isAdministrator(operator)).toBe(true);
+		await roleService.assign(member.id, target.id, null, operator);
+		await roleAssignmentsRepository.delete({ userId: operator.id, roleId: adminRole.id });
+		await expect(roleService.unassign(member.id, target.id, operator)).rejects.toBeInstanceOf(RoleService.MemberEditDeniedError);
+		expect(await roleAssignmentsRepository.existsBy({ userId: member.id, roleId: target.id })).toBe(true);
+	});
+
 	test('rolls back assignment changes when updating the role fails, and allows retry', async () => {
 		const role = await createRole({ name: 'test-rollback', isModerator: true });
 		const existing = await createUser();

@@ -4,6 +4,7 @@
  */
 
 import * as Misskey from 'misskey-js';
+import { LOCAL_ACCOUNT_STORAGE_MARKER } from '@@/js/stored-accounts.js';
 import { FETCH_TIMEOUT_MS } from '@/const.js';
 import type { PushNotificationDataMap } from '@/types.js';
 import type { I18n } from '@@/js/i18n.js';
@@ -11,7 +12,7 @@ import type { Locale } from 'i18n';
 import { createEmptyNotification, createNotification } from '@/scripts/create-notification.js';
 import { swLang } from '@/scripts/lang.js';
 import * as swos from '@/scripts/operations.js';
-import { getAccountFromId, getAccounts } from '@/scripts/get-account-from-id.js';
+import { confirmPushAccount, getAccounts } from '@/scripts/get-account-from-id.js';
 
 async function respondToNavigation(request: Request): Promise<Response> {
 	const controller = new AbortController();
@@ -82,7 +83,7 @@ globalThis.addEventListener('activate', ev => {
 		caches.keys()
 			.then(cacheNames => Promise.all(
 				cacheNames
-					.filter((v) => v !== swLang.cacheName)
+					.filter(v => v !== swLang.cacheName && v !== LOCAL_ACCOUNT_STORAGE_MARKER)
 					.map(name => caches.delete(name)),
 			))
 			.then(() => globalThis.clients.claim()),
@@ -103,31 +104,30 @@ globalThis.addEventListener('fetch', ev => {
 	ev.respondWith(respondToNavigation(ev.request));
 });
 
-globalThis.addEventListener('push', ev => {
-	ev.waitUntil(globalThis.clients.matchAll({
-		includeUncontrolled: true,
-		type: 'window',
-	}).then(async () => {
-		const data: PushNotificationDataMap[keyof PushNotificationDataMap] = ev.data?.json();
-		const account = await getAccountFromId(data.userId);
-		if (!account) return;
+function showGenericPush(): Promise<void> {
+	return globalThis.registration.showNotification(globalThis.location.host, { tag: 'misskey-activity' });
+}
 
+globalThis.addEventListener('push', ev => {
+	ev.waitUntil((async () => {
+		const data: PushNotificationDataMap[keyof PushNotificationDataMap] | undefined = ev.data?.json();
+		if (!data?.userId) return;
+		const account = await confirmPushAccount(data.userId);
+		if (account === false) return;
 		switch (data.type) {
 			case 'notification':
 			case 'unreadAntennaNote':
 			case 'newChatMessage':
-				if (Date.now() - data.dateTime > 1000 * 60 * 60 * 24) break;
-
-				return createNotification(data, account.token);
+				if (Date.now() - data.dateTime > 1000 * 60 * 60 * 24) return;
+				if (!account) return showGenericPush();
+				return createNotification(data, account.token).catch(showGenericPush);
 			case 'readAllNotifications':
+				if (!account) return;
 				await globalThis.registration.getNotifications()
 					.then(notifications => notifications.forEach(n => n.data?.userId === data.userId && n.close()));
-				break;
+				await createEmptyNotification().catch(() => {});
 		}
-
-		await createEmptyNotification();
-		return;
-	}));
+	})());
 });
 
 globalThis.addEventListener('notificationclick', (ev: ServiceWorkerGlobalScopeEventMap['notificationclick']) => {
@@ -140,6 +140,11 @@ globalThis.addEventListener('notificationclick', (ev: ServiceWorkerGlobalScopeEv
 		const data: PushNotificationDataMap[keyof PushNotificationDataMap] = notification.data ?? {};
 		const { userId: loginId } = data;
 		let client: WindowClient | null = null;
+		if (notification.tag === 'misskey-activity') {
+			await swos.openClient('push', '/').then(client => client?.focus());
+			notification.close();
+			return;
+		}
 
 		switch (data.type) {
 			case 'notification':
@@ -217,7 +222,7 @@ globalThis.addEventListener('notificationclick', (ev: ServiceWorkerGlobalScopeEv
 		if (client) {
 			client.focus();
 		}
-		if (data.type === 'notification') {
+		if (data?.type === 'notification') {
 			await swos.sendMarkAllAsRead(loginId);
 		}
 
@@ -229,7 +234,7 @@ globalThis.addEventListener('notificationclose', (ev: ServiceWorkerGlobalScopeEv
 	const data: PushNotificationDataMap[keyof PushNotificationDataMap] = ev.notification.data;
 
 	ev.waitUntil((async (): Promise<void> => {
-		if (data.type === 'notification') {
+		if (data?.type === 'notification') {
 			await swos.sendMarkAllAsRead(data.userId);
 		}
 		return;
@@ -242,7 +247,7 @@ globalThis.addEventListener('message', (ev: ServiceWorkerGlobalScopeEventMap['me
 			case 'clear':
 				await caches.keys()
 					.then(cacheNames => Promise.all(
-						cacheNames.map(name => caches.delete(name)),
+						cacheNames.filter(name => name !== LOCAL_ACCOUNT_STORAGE_MARKER).map(name => caches.delete(name)),
 					));
 				return;
 		}
@@ -252,7 +257,7 @@ globalThis.addEventListener('message', (ev: ServiceWorkerGlobalScopeEventMap['me
 
 			if (otype === 'object') {
 				if (ev.data.msg === 'initialize') {
-					swLang.setLang(ev.data.lang);
+					await swLang.setLang(ev.data.lang).catch(() => {});
 				}
 			}
 		}

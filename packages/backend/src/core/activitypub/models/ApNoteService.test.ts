@@ -63,7 +63,7 @@ function createService(originNoteOverrides: Record<string, unknown> = {}) {
 	};
 	const notesRepository = {
 		findOneBy: vi.fn().mockResolvedValue(originNote),
-		existsBy: vi.fn(),
+		findOne: vi.fn(),
 	};
 	const apMfmService = { htmlToMfm: vi.fn().mockReturnValue('edited text') };
 	const apMentionService = { extractApMentions: vi.fn().mockResolvedValue([]) };
@@ -185,16 +185,19 @@ describe(ApNoteService, () => {
 		expect(noteUpdateService.update.mock.calls[0]?.[2]).toMatchObject({ apMentions: [mentioned] });
 	});
 
-	test.each([
-		['stored-quote', true, true],
-		['different-quote', false, false],
-		[null, false, false],
-	] as const)('matches the edited quote URL to the stored target %s', async (renoteId, matches, hasQuote) => {
-		const { service, apMfmService, notesRepository } = createService({ renoteId });
-		notesRepository.existsBy.mockResolvedValue(matches);
-		const tag = [{ type: 'Hashtag', name: '#example' }];
-		await service.updateNote({ ...update, tag, quoteUrl: 'https://other.example/notes/quoted' } as never);
-		expect(apMfmService.htmlToMfm).toHaveBeenCalledWith(update.content, { tag, hasQuote });
+	test.each([true, false])('edits HTML with two quote links when the stored target matches: %s', async matches => {
+		const { service, notesRepository, noteUpdateService } = createService({ renoteId: 'quoted' });
+		const other = 'https://unrelated.example/notes/other';
+		const uri = 'https://remote.example/notes/quoted';
+		const url = 'https://remote.example/@user/123';
+		notesRepository.findOne.mockResolvedValue({ id: 'quoted', uri, url });
+		Object.assign(service, { apMfmService: new ApMfmService(new MfmService(loadConfig())) });
+		const content = [other, url].map(href => `<p class="quote-inline">RE: <a href="${href}">${href}</a></p>`).join('');
+		await service.updateNote({ ...update, content, quoteUrl: matches ? uri : other } as never);
+		const text = noteUpdateService.update.mock.calls[0]?.[2].text;
+		expect(text).toContain(other);
+		if (matches) expect(text).not.toContain(url);
+		else expect(text).toContain(url);
 	});
 
 	test.each([
@@ -506,11 +509,18 @@ describe(ApNoteService, () => {
 });
 
 describe('incoming HTML quotes', () => {
-	test.each(['resolved', 'missing', 'temporary'] as const)('handles a %s target', async outcome => {
+	test.each(['resolved', 'missing', 'temporary', 'conflict', 'alias', 'blocked'] as const)('handles a %s target', async outcome => {
 		const { service } = createService();
 		const actor = { id: 'remote-user', host: 'remote.example', uri: update.attributedTo };
 		const quoteUrl = 'https://other.example/notes/quoted';
-		const note = { ...update, quoteUrl, content: `<p>comment</p><span class="quote-inline">RE: <a href="${quoteUrl}">${quoteUrl}</a></span>` };
+		const unrelated = 'https://unrelated.example/notes/other';
+		const displayUrl = outcome === 'alias' ? 'https://other.example/@user/display-url' : quoteUrl;
+		const note = {
+			...update,
+			_misskey_quote: quoteUrl,
+			quoteUrl: outcome === 'conflict' ? unrelated : quoteUrl,
+			content: `<p class="quote-inline"><a href="${unrelated}">${unrelated}</a></p><p>comment</p><span class="quote-inline">RE: <a href="${displayUrl}">${displayUrl}</a></span>`,
+		};
 		const create = vi.fn();
 		Object.assign(service, {
 			logger: { debug: vi.fn(), info: vi.fn() },
@@ -518,22 +528,30 @@ describe('incoming HTML quotes', () => {
 			apMentionService: { extractApMentionObjects: () => [], extractApMentions: async () => [] },
 			apAudienceService: { parseAudience: async () => ({ visibility: 'public', visibleUsers: [] }) },
 			apQuestionService: { extractPollFromQuestion: async () => undefined },
-			noteCreateService: { create, checkProhibitedWordsContain: () => false },
+			noteCreateService: {
+				create,
+				checkProhibitedWordsContain: ({ text }: { text: string }) => text.includes(outcome === 'blocked' ? unrelated : 'display-url'),
+			},
 		});
 		vi.spyOn(service, 'validateNote').mockReturnValue(null);
-		const target = { id: 'quoted', userHost: 'other.example' };
+		const target = { id: 'quoted', uri: quoteUrl, url: displayUrl, userHost: 'other.example' };
 		const resolve = vi.spyOn(service, 'resolveNote');
-		if (outcome === 'resolved') resolve.mockResolvedValue(target as never);
+		if (outcome === 'conflict') resolve.mockResolvedValueOnce(target as never).mockResolvedValueOnce({ id: 'other', uri: unrelated } as never);
+		else if (outcome === 'resolved' || outcome === 'alias' || outcome === 'blocked') resolve.mockResolvedValue(target as never);
 		else resolve.mockRejectedValue(new StatusError('remote error', outcome === 'missing' ? 404 : 503, 'remote error'));
 		const incoming = service.createNote(note as never, actor as never, { resolve: async () => note } as never);
-		if (outcome === 'temporary') {
+		if (outcome === 'blocked') {
+			await expect(incoming).rejects.toThrow('Note contains prohibited words');
+			expect(create).not.toHaveBeenCalled();
+		} else if (outcome === 'temporary') {
 			await expect(incoming).rejects.toThrow('quote resolve failed');
 			expect(create).not.toHaveBeenCalled();
 		} else {
 			await incoming;
-			expect(create.mock.calls[0][1]).toMatchObject(outcome === 'resolved'
-				? { text: 'comment', renote: target }
+			expect(create.mock.calls[0][1]).toMatchObject(outcome !== 'missing'
+				? { text: `${unrelated}\n\ncomment`, renote: target }
 				: { text: expect.stringContaining(quoteUrl), renote: undefined });
+			expect(create.mock.calls[0][1].text).toContain(unrelated);
 		}
 	});
 });

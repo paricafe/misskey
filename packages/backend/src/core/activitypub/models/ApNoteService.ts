@@ -123,10 +123,38 @@ export class ApNoteService {
 		return await this.apDbResolverService.getNoteFromApId(object);
 	}
 
-	private readText(note: IPost, hasQuote: boolean): string | null {
+	private quoteUrls(target: Pick<MiNote, 'id' | 'uri' | 'url'>): string[] {
+		return [target.uri, target.url, `${this.config.url}/notes/${target.id}`].filter(url => url != null);
+	}
+
+	private async resolveQuote(uris: string[]): Promise<{ quote: MiNote | null | undefined; urls: string[] }> {
+		if (uris.length === 0) return { quote: null, urls: [] };
+
+		const results = await Promise.all(uris.map(async uri => {
+			if (!/^https?:/.test(uri)) return null;
+			try {
+				const note = await this.resolveNote(uri);
+				if (!note || (note.userHost === null && note.localOnly)) return null;
+				return { note, uri };
+			} catch (err) {
+				return err instanceof StatusError && !err.isRetryable ? null : 'retry' as const;
+			}
+		}));
+		const resolved = results.filter(result => result != null && result !== 'retry');
+		const quote = resolved[0]?.note;
+		if (!quote) {
+			if (results.includes('retry')) throw new Error('quote resolve failed');
+			return { quote: undefined, urls: [] };
+		}
+
+		const aliases = resolved.filter(result => result.note.id === quote.id).map(result => result.uri);
+		return { quote, urls: [...aliases, ...this.quoteUrls(quote)] };
+	}
+
+	private readText(note: IPost, quoteUrls: readonly string[]): string | null {
 		if (note.source?.mediaType === 'text/x.misskeymarkdown' && typeof note.source.content === 'string') return note.source.content;
 		if (typeof note._misskey_content !== 'undefined') return note._misskey_content;
-		if (typeof note.content === 'string') return this.apMfmService.htmlToMfm(note.content, { tag: note.tag, hasQuote });
+		if (typeof note.content === 'string') return this.apMfmService.htmlToMfm(note.content, { tag: note.tag, quoteUrls });
 		return null;
 	}
 
@@ -187,14 +215,15 @@ export class ApNoteService {
 		const cw = note.summary === '' ? null : note.summary;
 
 		const poll = await this.apQuestionService.extractPollFromQuestion(note, resolver).catch(() => undefined);
-		const checkedText = (hasQuote: boolean) => {
-			const text = this.readText(note, hasQuote);
+		const declaredQuotes = unique([note._misskey_quote, note.quoteUrl].filter(uri => uri != null));
+		const checkedText = (urls: string[]) => {
+			const text = this.readText(note, urls);
 			if (this.noteCreateService.checkProhibitedWordsContain({ cw, text, pollChoices: poll?.choices })) {
 				throw new IdentifiableError('689ee33f-f97c-479a-ac49-1b9f8140af99', 'Note contains prohibited words');
 			}
 			return text;
 		};
-		let text = checkedText(!!(note._misskey_quote ?? note.quoteUrl));
+		let text = declaredQuotes.length ? null : checkedText([]);
 
 		// eslint-disable-next-line no-param-reassign
 		actor ??= await this.apPersonService.resolvePerson(uri, resolver) as MiRemoteUser;
@@ -202,6 +231,9 @@ export class ApNoteService {
 		if (actor.isSuspended) {
 			throw new IdentifiableError('85ab9bd7-3a41-4530-959d-f07073900109', 'actor has been suspended');
 		}
+
+		const { quote, urls } = await this.resolveQuote(declaredQuotes);
+		if (declaredQuotes.length > 0) text = checkedText(urls);
 
 		const noteAudience = await this.apAudienceService.parseAudience(actor, note.to, note.cc, resolver);
 		let visibility = noteAudience.visibility;
@@ -244,38 +276,6 @@ export class ApNoteService {
 					throw err;
 				})
 			: null;
-
-		let quote: MiNote | undefined | null = null;
-
-		if (note._misskey_quote ?? note.quoteUrl) {
-			const tryResolveNote = async (uri: string): Promise<
-				| { status: 'ok'; res: MiNote }
-				| { status: 'permerror' | 'temperror' }
-			> => {
-				if (!/^https?:/.test(uri)) return { status: 'permerror' };
-				try {
-					const res = await this.resolveNote(uri);
-					if (res == null) return { status: 'permerror' };
-					if (res.userHost === null && res.localOnly) return { status: 'permerror' };
-					return { status: 'ok', res };
-				} catch (e) {
-					return {
-						status: (e instanceof StatusError && !e.isRetryable) ? 'permerror' : 'temperror',
-					};
-				}
-			};
-
-			const uris = unique([note._misskey_quote, note.quoteUrl].filter(x => x != null));
-			const results = await Promise.all(uris.map(tryResolveNote));
-
-			quote = results.filter((x): x is { status: 'ok', res: MiNote } => x.status === 'ok').map(x => x.res).at(0);
-			if (!quote) {
-				if (results.some(x => x.status === 'temperror')) {
-					throw new Error('quote resolve failed');
-				}
-				text = checkedText(false);
-			}
-		}
 
 		if (reply && reply.hasPoll) {
 			const poll = await this.pollsRepository.findOneByOrFail({ noteId: reply.id });
@@ -382,13 +382,12 @@ export class ApNoteService {
 
 		const cw = note.summary || null;
 
-		const quoteUris = [note._misskey_quote, note.quoteUrl].filter(uri => uri != null);
-		const targetId = originNote.renoteId;
-		const hasQuote = targetId != null && quoteUris.length > 0 && (
-			quoteUris.includes(`${this.config.url}/notes/${targetId}`) ||
-			await this.notesRepository.existsBy([{ id: targetId, uri: In(quoteUris) }, { id: targetId, url: In(quoteUris) }])
-		);
-		const text = this.readText(note, hasQuote);
+		const declaredQuotes = [note._misskey_quote, note.quoteUrl].filter(uri => uri != null);
+		const target = originNote.renoteId && declaredQuotes.length > 0
+			? await this.notesRepository.findOne({ select: { id: true, uri: true, url: true }, where: { id: originNote.renoteId } })
+			: null;
+		const aliases = target ? this.quoteUrls(target) : [];
+		const text = this.readText(note, declaredQuotes.some(uri => aliases.includes(uri)) ? aliases : []);
 
 		await this.noteUpdateService.prepareUpdate(actor, originNote);
 

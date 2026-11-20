@@ -84,7 +84,12 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				return;
 			}
 
-			await this.roleService.assign(user.id, role.id, ps.expiresAt ? new Date(ps.expiresAt) : null, me);
+			try {
+				await this.roleService.assign(user.id, role.id, ps.expiresAt ? new Date(ps.expiresAt) : null, me);
+			} catch (err) {
+				if (err instanceof RoleService.MemberEditDeniedError) throw new ApiError(meta.errors.accessDenied);
+				throw err;
+			}
 		});
 	}
 }

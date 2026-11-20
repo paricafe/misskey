@@ -10,7 +10,7 @@ import { describe, beforeAll, test, expect, vi } from 'vitest';
 import { Blob } from 'node-fetch';
 import { api, castAsError, initTestDb, post, role, signup, simpleGet, uploadFile } from '../utils.js';
 import type * as misskey from 'misskey-js';
-import { MiUser } from '@/models/_.js';
+import { MiRole, MiRoleAssignment, MiUser } from '@/models/_.js';
 
 const waitForPushToTlOptions = { timeout: 3000, interval: 25 };
 
@@ -27,6 +27,37 @@ describe('Endpoints', () => {
 		dave = await signup({ username: 'dave' });
 		await api('admin/update-meta', { federation: 'all' }, alice as misskey.entities.SignupResponse);
 	}, 1000 * 60 * 2);
+
+	test.each(['admin/roles/assign', 'admin/roles/unassign'] as const)('%s rechecks moderator permission after the role lock is released', async endpoint => {
+		const moderator = await signup();
+		const modRole = await role(alice, { isModerator: true });
+		const target = await role(alice, { canEditMembersByModerator: true });
+		const membership = { userId: bob.id, roleId: target.id };
+		expect((await api('admin/roles/assign', { userId: moderator.id, roleId: modRole.id }, alice)).status).toBe(204);
+		const alreadyAssigned = endpoint === 'admin/roles/unassign';
+		if (alreadyAssigned) expect((await api('admin/roles/assign', membership, moderator)).status).toBe(204);
+
+		const db = await initTestDb(true);
+		const runner = db.createQueryRunner();
+		try {
+			await runner.startTransaction();
+			await runner.manager.update(MiRole, target.id, { canEditMembersByModerator: false });
+			const [{ pid }] = await runner.query('SELECT pg_backend_pid() AS pid');
+			const request = api(endpoint, membership, moderator);
+			await vi.waitFor(async () => {
+				const [{ waiting }] = await db.query('SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE $1 = ANY(pg_blocking_pids(pid))) AS waiting', [pid]);
+				expect(waiting).toBe(true);
+			}, { timeout: 5000 });
+			await runner.commitTransaction();
+			const response = await request;
+			expect(response.body).toMatchObject({ error: { code: 'ACCESS_DENIED' } });
+			expect(await db.getRepository(MiRoleAssignment).existsBy(membership)).toBe(alreadyAssigned);
+		} finally {
+			if (runner.isTransactionActive) await runner.rollbackTransaction();
+			await runner.release();
+			await db.destroy();
+		}
+	});
 
 	describe('signup', () => {
 		test('不正なユーザー名でアカウントが作成できない', async () => {

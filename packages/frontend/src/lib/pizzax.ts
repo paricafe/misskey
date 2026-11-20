@@ -7,7 +7,7 @@ import { customRef, ref, watch, onScopeDispose } from 'vue';
 import type { Ref } from 'vue';
 import { $i } from '@/i.js';
 import { misskeyApi } from '@/utility/misskey-api.js';
-import { get, set } from '@/utility/idb-proxy.js';
+import { get, set, update } from '@/utility/idb-proxy.js';
 import { store } from '@/store.js';
 import { TypedBroadcastChannel as BroadcastChannel } from '@/utility/typed-broadcast-channel.js';
 import { deepClone } from '@/utility/clone.js';
@@ -150,6 +150,21 @@ export class Pizzax<T extends StateDef> {
 		});
 	}
 
+	public updateDevice(updater: (state: Partial<State<T>>) => Partial<State<T>>): Promise<void> {
+		return this.addIdbSetJob(async () => {
+			let changes: Partial<State<T>> = {};
+			await update<Partial<State<T>>>(this.deviceStateKeyName, previous => {
+				changes = deepClone(updater(previous ?? {}));
+				return { ...previous, ...changes };
+			});
+			for (const key of Object.keys(changes) as (keyof T)[]) {
+				const value = changes[key]!;
+				this.r[key].value = this.s[key] = value;
+				this.pizzaxChannel.postMessage({ where: 'device', key, value });
+			}
+		});
+	}
+
 	public set<K extends keyof T>(key: K, value: T[K]['default']): Promise<void> {
 		const rawValue = deepClone(value);
 
@@ -163,9 +178,7 @@ export class Pizzax<T extends StateDef> {
 						key,
 						value: rawValue,
 					});
-					const deviceState = await get(this.deviceStateKeyName) || {};
-					deviceState[key] = rawValue;
-					await set(this.deviceStateKeyName, deviceState);
+					await update<State<T>>(this.deviceStateKeyName, previous => ({ ...previous, [key]: rawValue }) as State<T>);
 					break;
 				}
 				case 'deviceAccount': {

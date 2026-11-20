@@ -13903,6 +13903,14 @@ export interface Locale extends ILocale {
          */
         "listDrafts": string;
         /**
+         * 旧バージョンの返信・引用の下書きをエクスポート
+         */
+        "exportLegacy": string;
+        /**
+         * このブラウザに保存された旧バージョンの返信・引用の下書きをJSONファイルに保存します。複数のアカウントの下書きが含まれる場合があります。続けますか？
+         */
+        "exportLegacyConfirm": string;
+        /**
          * 投稿予約
          */
         "schedule": string;

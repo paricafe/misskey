@@ -5,7 +5,8 @@
 
 import { Inject, Injectable } from '@nestjs/common';
 import * as Redis from 'ioredis';
-import { In } from 'typeorm';
+import { In, IsNull, MoreThan } from 'typeorm';
+import type { EntityManager } from 'typeorm';
 import { ModuleRef } from '@nestjs/core';
 import type {
 	MiMeta,
@@ -134,6 +135,7 @@ export class RoleService implements OnApplicationShutdown, OnModuleInit {
 
 	public static AlreadyAssignedError = class extends Error {};
 	public static NotAssignedError = class extends Error {};
+	public static MemberEditDeniedError = class extends Error {};
 
 	constructor(
 		private moduleRef: ModuleRef,
@@ -312,10 +314,16 @@ export class RoleService implements OnApplicationShutdown, OnModuleInit {
 	public async getUserRoles(userId: MiUser['id']) {
 		const roles = await this.rolesCache.fetch(() => this.rolesRepository.findBy({}));
 		const assigns = await this.getUserAssigns(userId);
-		const assignedRoles = roles.filter(r => assigns.map(x => x.roleId).includes(r.id));
-		const user = roles.some(r => r.target === 'conditional') ? await this.cacheService.findUserById(userId) : null;
-		const matchedCondRoles = roles.filter(r => r.target === 'conditional' && this.evalCond(user!, assignedRoles, r.condFormula));
-		return [...assignedRoles, ...matchedCondRoles];
+		return this.resolveUserRoles(roles, assigns, () => this.cacheService.findUserById(userId));
+	}
+
+	private async resolveUserRoles(roles: MiRole[], assigns: MiRoleAssignment[], loadUser: () => Promise<MiUser>) {
+		const assignedIds = new Set(assigns.map(a => a.roleId));
+		const assignedRoles = roles.filter(role => assignedIds.has(role.id));
+		const conditional = roles.filter(role => role.target === 'conditional');
+		if (conditional.length === 0) return assignedRoles;
+		const user = await loadUser();
+		return [...assignedRoles, ...conditional.filter(role => this.evalCond(user, assignedRoles, role.condFormula))];
 	}
 
 	@bindThis
@@ -510,6 +518,18 @@ export class RoleService implements OnApplicationShutdown, OnModuleInit {
 		return users;
 	}
 
+	private async checkMemberEditPermission(manager: EntityManager, role: Pick<MiRole, 'canEditMembersByModerator'>, operator?: MiUser): Promise<void> {
+		if (!operator || operator.id === this.meta.rootUserId) return;
+
+		const assignments = await manager.withRepository(this.roleAssignmentsRepository).findBy([
+			{ userId: operator.id, expiresAt: IsNull() },
+			{ userId: operator.id, expiresAt: MoreThan(new Date()) },
+		]);
+		const roles = await manager.withRepository(this.rolesRepository).find();
+		const effective = await this.resolveUserRoles(roles, assignments, () => manager.withRepository(this.usersRepository).findOneByOrFail({ id: operator.id }));
+		if (!effective.some(r => r.isAdministrator || (role.canEditMembersByModerator && r.isModerator))) throw new RoleService.MemberEditDeniedError();
+	}
+
 	@bindThis
 	public async assign(userId: MiUser['id'], roleId: MiRole['id'], expiresAt: Date | null = null, moderator?: MiUser): Promise<void> {
 		const now = Date.now();
@@ -518,6 +538,7 @@ export class RoleService implements OnApplicationShutdown, OnModuleInit {
 			const roles = manager.withRepository(this.rolesRepository);
 			const assignments = manager.withRepository(this.roleAssignmentsRepository);
 			const role = await roles.findOneOrFail({ where: { id: roleId }, lock: { mode: 'pessimistic_write' } });
+			await this.checkMemberEditPermission(manager, role, moderator);
 			const existing = await assignments.findOneBy({ roleId, userId });
 			if (existing) {
 				if (!existing.expiresAt || existing.expiresAt.getTime() >= now) throw new RoleService.AlreadyAssignedError();
@@ -558,8 +579,9 @@ export class RoleService implements OnApplicationShutdown, OnModuleInit {
 		const existing = await this.rolesRepository.manager.transaction(async manager => {
 			const roles = manager.withRepository(this.rolesRepository);
 			const assignments = manager.withRepository(this.roleAssignmentsRepository);
-			const role = await roles.findOne({ select: { id: true }, where: { id: roleId }, lock: { mode: 'pessimistic_write' } });
+			const role = await roles.findOne({ select: { id: true, canEditMembersByModerator: true }, where: { id: roleId }, lock: { mode: 'pessimistic_write' } });
 			if (!role) return null;
+			await this.checkMemberEditPermission(manager, role, moderator);
 			const assignment = await assignments.findOneBy({ roleId, userId });
 			if (!assignment) return null;
 			await assignments.delete(assignment.id);

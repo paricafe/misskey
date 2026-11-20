@@ -39,7 +39,10 @@ SPDX-License-Identifier: AGPL-3.0-only
 			/>
 		</template>
 
-		<div class="_spacer">
+		<div class="_spacer _gaps">
+			<MkButton v-if="tab === 'drafts' && hasLegacyDrafts" @click="exportLegacyDrafts">
+				<i class="ti ti-download"></i> {{ i18n.ts._drafts.exportLegacy }}
+			</MkButton>
 			<MkPagination :key="tab" :paginator="tab === 'scheduled' ? scheduledPaginator : draftsPaginator" withControl>
 				<template #empty>
 					<MkResult type="empty" :text="i18n.ts._drafts.noDrafts"/>
@@ -159,6 +162,7 @@ import MkPagination from '@/components/MkPagination.vue';
 import MkModalWindow from '@/components/MkModalWindow.vue';
 import { getNoteSummary } from '@/utility/get-note-summary.js';
 import { i18n } from '@/i18n.js';
+import { miLocalStorage } from '@/local-storage.js';
 import * as os from '@/os.js';
 import { $i } from '@/i.js';
 import { misskeyApi } from '@/utility/misskey-api';
@@ -198,6 +202,30 @@ misskeyApi('notes/drafts/count').then((count) => {
 });
 
 const dialogEl = shallowRef<InstanceType<typeof MkModalWindow>>();
+
+function readLegacyDrafts(): [string, unknown][] {
+	try {
+		const drafts: unknown = JSON.parse(miLocalStorage.getItem('drafts') ?? '{}');
+		if (!drafts || typeof drafts !== 'object' || Array.isArray(drafts)) return [];
+		return Object.entries(drafts).filter(([key]) => /^(?:channel:[^:]+)?(?:reply|renote):[^:]+$/.test(key));
+	} catch {
+		return [];
+	}
+}
+
+const hasLegacyDrafts = readLegacyDrafts().length > 0;
+
+async function exportLegacyDrafts() {
+	const { canceled } = await os.confirm({ type: 'warning', text: i18n.ts._drafts.exportLegacyConfirm });
+	if (canceled) return;
+
+	const json = JSON.stringify(Object.fromEntries(readLegacyDrafts()), null, 2);
+	const link = window.document.createElement('a');
+	link.href = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+	link.download = 'misskey-legacy-drafts.json';
+	link.click();
+	window.setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+}
 
 function cancel() {
 	emit('cancel');

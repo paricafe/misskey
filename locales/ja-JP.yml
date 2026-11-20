@@ -3717,6 +3717,8 @@ _drafts:
   restoreFromDraft: "下書きから復元"
   restore: "復元"
   listDrafts: "下書き一覧"
+  exportLegacy: "旧バージョンの返信・引用の下書きをエクスポート"
+  exportLegacyConfirm: "このブラウザに保存された旧バージョンの返信・引用の下書きをJSONファイルに保存します。複数のアカウントの下書きが含まれる場合があります。続けますか？"
   schedule: "投稿予約"
   listScheduledNotes: "予約投稿一覧"
   cancelSchedule: "予約解除"

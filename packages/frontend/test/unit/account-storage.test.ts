@@ -29,6 +29,15 @@ vi.mock('@/store.js', () => ({ store: {
 		mocks.state[key] = value;
 		mocks.db.set('pizzax::base', { ...mocks.db.get('pizzax::base') as object, [key]: value });
 	},
+	updateDevice: async (updater: (state: typeof mocks.state) => Partial<typeof mocks.state>) => {
+		const state = (mocks.db.get(ACCOUNT_DEVICE_STATE_KEY) ?? {
+			...mocks.state,
+			accountTokens: Object.keys(mocks.state.accountTokens).length ? mocks.state.accountTokens : undefined,
+		}) as typeof mocks.state;
+		const changes = updater(state);
+		Object.assign(mocks.state, changes);
+		mocks.db.set(ACCOUNT_DEVICE_STATE_KEY, { ...state, ...changes });
+	},
 } }));
 vi.mock('@/preferences.js', () => ({ prefer: {
 	s: { get accounts() { return mocks.accounts; } },
@@ -144,9 +153,22 @@ test('a stale tab preserves the active login selected by a different tab', async
 	expect(JSON.parse(localStorage.getItem('account')!)).toMatchObject({ id: 'bob' });
 });
 
+test('revocation compares against the credential committed by the other tab', async () => {
+	mocks.state.accountTokens = { 'local.example/alice': 'old' };
+	mocks.db.set(ACCOUNT_DEVICE_STATE_KEY, {
+		accountTokens: { 'local.example/alice': 'new', 'local.example/bob': 'valid' },
+		accountInfos: { 'local.example/alice': { id: 'alice', name: 'New profile' } },
+	});
+	localStorage.setItem('account', JSON.stringify({ id: 'alice', token: 'new' }));
+	await leaveRevokedAccount({ id: 'alice', token: 'old' });
+	expect(await getAccountFromId('alice')).toEqual({ id: 'alice', token: 'new' });
+	expect(await getAccountFromId('bob')).toEqual({ id: 'bob', token: 'valid' });
+	expect(JSON.parse(localStorage.getItem('account')!).token).toBe('new');
+});
+
 test('a device storage write failure after revocation still opens the guest page', async () => {
 	localStorage.setItem('account', JSON.stringify({ id: 'alice', token: 'revoked' }));
-	const write = vi.spyOn(store, 'set').mockRejectedValueOnce(new Error('failed to write'));
+	const write = vi.spyOn(store, 'updateDevice').mockRejectedValueOnce(new Error('failed to write'));
 	try {
 		await leaveRevokedAccount({ id: 'alice', token: 'revoked' });
 		expect(localStorage.getItem('account')).toBeNull();

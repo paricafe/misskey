@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+export const LOCAL_ACCOUNT_STORAGE_MARKER = 'mk-local-account-storage';
 export const ACCOUNT_DEVICE_STATE_KEY = 'pizzax::base';
 
 export type StoredAccount = {
@@ -11,6 +12,10 @@ export type StoredAccount = {
 };
 
 export async function readStoredAccounts(read: (key: string) => Promise<unknown>, host: string): Promise<StoredAccount[]> {
+	return await readStoredAccountState(read, host) ?? [];
+}
+
+export async function readStoredAccountState(read: (key: string) => Promise<unknown>, host: string): Promise<StoredAccount[] | null> {
 	const state = await read(ACCOUNT_DEVICE_STATE_KEY) as { accountTokens?: Record<string, string>; accountHost?: string } | undefined;
 	if (state?.accountTokens != null) {
 		const accountHost = typeof state.accountHost === 'string' && state.accountHost.length > 0 ? state.accountHost : host;
@@ -21,7 +26,7 @@ export async function readStoredAccounts(read: (key: string) => Promise<unknown>
 	}
 
 	const legacy = await read('accounts');
-	if (!Array.isArray(legacy)) return [];
+	if (!Array.isArray(legacy)) return null;
 	return legacy.filter((account): account is StoredAccount => account != null
 		&& typeof account.id === 'string'
 		&& typeof account.token === 'string'

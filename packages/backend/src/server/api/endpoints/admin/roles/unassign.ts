@@ -82,7 +82,12 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				throw new ApiError(meta.errors.noSuchUser);
 			}
 
-			await this.roleService.unassign(user.id, role.id, me);
+			try {
+				await this.roleService.unassign(user.id, role.id, me);
+			} catch (err) {
+				if (err instanceof RoleService.MemberEditDeniedError) throw new ApiError(meta.errors.accessDenied);
+				throw err;
+			}
 		});
 	}
 }

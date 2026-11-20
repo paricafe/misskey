@@ -11,21 +11,23 @@ import type { Locale } from 'i18n';
 class SwLang {
 	public cacheName = `mk-cache-${_VERSION_}`;
 
-	public lang: Promise<string> = get('lang').then(async prelang => {
-		if (!prelang) return 'en-US';
-		return prelang;
-	});
+	public lang: Promise<string> = Promise.resolve().then(() => get<string>('lang')).then(lang => lang || 'en-US').catch(() => 'en-US');
 
 	public setLang(newLang: string): Promise<I18n<Locale>> {
 		this.lang = Promise.resolve(newLang);
-		set('lang', newLang);
+		void Promise.resolve().then(() => set('lang', newLang)).catch(() => {});
 		return this.fetchLocale();
 	}
 
 	public i18n: Promise<I18n<Locale>> | null = null;
 
 	public fetchLocale(): Promise<I18n<Locale>> {
-		return (this.i18n = this._fetch());
+		const pending = this._fetch();
+		this.i18n = pending;
+		pending.catch(() => {
+			if (this.i18n === pending) this.i18n = null;
+		});
+		return pending;
 	}
 
 	private async _fetch(): Promise<I18n<Locale>> {

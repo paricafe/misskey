@@ -137,15 +137,23 @@ describe('MfmService', () => {
 		});
 
 		test('quote-like but misskey does not recognize', () => {
-			assert.deepStrictEqual(mfmService.fromHtml('<p class="quote-inline">RE: <a href="https://example.com/notes/id">https://example.com/notes/id</a></p><p>Note Content</p>', { hasQuote: false }), 'RE: https://example.com/notes/id\n\nNote Content');
+			assert.deepStrictEqual(mfmService.fromHtml('<p class="quote-inline">RE: <a href="https://example.com/notes/id">https://example.com/notes/id</a></p><p>Note Content</p>'), 'RE: https://example.com/notes/id\n\nNote Content');
 		});
 
 		test('quote that misskey recognizes', () => {
-			assert.deepStrictEqual(mfmService.fromHtml('<p class="quote-inline">RE: <a href="https://example.com/notes/id">https://example.com/notes/id</a></p><p>Note Content</p>', { hasQuote: true }), 'Note Content');
+			assert.deepStrictEqual(mfmService.fromHtml('<p class="quote-inline">RE: <a href="https://example.com/notes/id">https://example.com/notes/id</a></p><p>Note Content</p>', { quoteUrls: ['https://example.com/notes/id'] }), 'Note Content');
+		});
+
+		test('keeps quote-inline markup containing an unrelated link', () => {
+			const target = 'https://example.com/notes/id';
+			const html = `<p class="quote-inline">RE: <a href="${target}">${target}</a> <a href="https://example.com/other">other</a></p>`;
+			const text = mfmService.fromHtml(html, { quoteUrls: [target] });
+			assert.ok(text.includes('https://example.com/other'));
+			assert.ok(text.includes(target));
 		});
 
 		test('quote (real mastodon toot)', () => {
-			assert.deepStrictEqual(mfmService.fromHtml('<p class="quote-inline">RE: <a href="https://mstdn.virtecam.net/@YTJVDCM/117512985585506708" target="_blank" rel="nofollow noopener" translate="no"><span class="invisible">https://</span><span class="ellipsis">mstdn.virtecam.net/@YTJVDCM/11</span><span class="invisible">7512985585506708</span></a></p><p>ここに引用先を挿入</p>', { hasQuote: true }), 'ここに引用先を挿入');
+			assert.deepStrictEqual(mfmService.fromHtml('<p class="quote-inline">RE: <a href="https://mstdn.virtecam.net/@YTJVDCM/117512985585506708" target="_blank" rel="nofollow noopener" translate="no"><span class="invisible">https://</span><span class="ellipsis">mstdn.virtecam.net/@YTJVDCM/11</span><span class="invisible">7512985585506708</span></a></p><p>ここに引用先を挿入</p>', { quoteUrls: ['https://mstdn.virtecam.net/@YTJVDCM/117512985585506708'] }), 'ここに引用先を挿入');
 		});
 	});
 });

@@ -10,6 +10,7 @@ import type { RegisteredUser } from './utils.js';
 
 type DeviceState = {
 	accountTokens?: Record<string, string>;
+	accountInfos?: Record<string, { id: string }>;
 	enablePreferencesAutoCloudBackup?: boolean;
 };
 
@@ -135,6 +136,100 @@ test.describe('account session persistence', () => {
 		expect(current).toMatchObject({ id: alice.id, token: alice.token });
 		expect((await deviceState(page)).accountTokens?.[key]).toBe(current?.token);
 	});
+
+	for (const action of ['remove fallback', 'sign in to Carol'] as const) {
+		test(`a delayed fallback respects another tab's action: ${action}`, async ({ page, context }) => {
+			const bob = await registerUser('bob', 'bob1234');
+			await completeAccountSetup(alice.token);
+			await signIn(page, 'alice', 'alice1234');
+			await expect(page.getByTestId('open-post-form')).toBeVisible();
+			const host = await canonicalHost(page);
+			const key = host + '/' + bob.id;
+			const state = await deviceState(page);
+			await deviceState(page, { accountTokens: { ...state.accountTokens, [key]: bob.token } });
+			const other = await context.newPage();
+			await other.goto(BASE_URL + '/favicon.ico');
+			await page.goto(BASE_URL + '/settings/security');
+			await page.evaluate(token => {
+				const fetch = window.fetch;
+				window.fetch = async function(input, init) {
+					const response = await fetch(input, init);
+					if (String(input).endsWith('/api/i') && JSON.parse(String(init?.body)).i === token) {
+						document.documentElement.dataset.fallbackPending = 'true';
+						await new Promise(resolve => window.addEventListener('resume-fallback', resolve, { once: true }));
+					}
+					return response;
+				};
+			}, bob.token);
+			await regenerateToken(page, 'alice1234');
+			await expect(page.locator('html')).toHaveAttribute('data-fallback-pending', 'true');
+			if (action === 'remove fallback') {
+				const saved = await deviceState(other);
+				delete saved.accountTokens![key];
+				await deviceState(other, { accountTokens: saved.accountTokens });
+				await page.evaluate(() => window.dispatchEvent(new Event('resume-fallback')));
+				await expect(page.getByTestId('signin')).toBeVisible();
+				expect(await signedInAccount(other)).toBeNull();
+				expect((await deviceState(other)).accountTokens).toEqual({});
+			} else {
+				const carol = await registerUser('carol', 'carol1234');
+				await completeAccountSetup(carol.token);
+				// Delay the reload broadcast until the pending fallback has completed.
+				await other.addInitScript(() => {
+					const postMessage = BroadcastChannel.prototype.postMessage;
+					BroadcastChannel.prototype.postMessage = function(value) {
+						if (this.name !== 'native:reload') postMessage.call(this, value);
+					};
+				});
+				await signIn(other, 'carol', 'carol1234');
+				await expect(other.getByTestId('open-post-form')).toBeVisible();
+				expect(await signedInAccount(page)).toMatchObject({ id: carol.id });
+				await page.evaluate(() => window.dispatchEvent(new Event('resume-fallback')));
+				await expect(page.locator('html')).not.toHaveAttribute('data-fallback-pending');
+				expect(await signedInAccount(page)).toMatchObject({ id: carol.id, token: carol.token });
+				expect((await deviceState(other)).accountTokens).toEqual({ [key]: bob.token, [host + '/' + carol.id]: carol.token });
+			}
+		});
+	}
+
+	for (const failure of ['localStorage', 'IndexedDB'] as const) {
+		test(`a failed ${failure} login write leaves the guest able to sign in again`, async ({ page }) => {
+			await completeAccountSetup(alice.token);
+			await page.addInitScript(failure => {
+				if (sessionStorage.getItem('storage-failed')) return;
+				if (failure === 'localStorage') {
+					const setItem = Storage.prototype.setItem;
+					Storage.prototype.setItem = function(key, value) {
+						if (this === localStorage && key === 'account') {
+							Storage.prototype.setItem = setItem;
+							sessionStorage.setItem('storage-failed', 'yes');
+							throw new DOMException('Device storage full', 'QuotaExceededError');
+						}
+						return setItem.call(this, key, value);
+					};
+				} else {
+					const put = IDBObjectStore.prototype.put;
+					IDBObjectStore.prototype.put = function(value, key) {
+						if (key === 'pizzax::base' && Object.keys(value.accountTokens ?? {}).length > 0) {
+							IDBObjectStore.prototype.put = put;
+							sessionStorage.setItem('storage-failed', 'yes');
+							this.transaction.abort();
+						}
+						return put.call(this, value, key);
+					};
+				}
+			}, failure);
+			await signIn(page, 'alice', 'alice1234');
+			await page.getByTestId('modal-dialog-ok').click();
+			expect(await signedInAccount(page)).toBeNull();
+			const state = await deviceState(page);
+			expect(state.accountTokens ?? {}).toEqual({});
+			expect(state.accountInfos ?? {}).toEqual({});
+			await signIn(page, 'alice', 'alice1234');
+			await expect(page.getByTestId('open-post-form')).toBeVisible();
+			expect(await signedInAccount(page)).toMatchObject({ id: alice.id });
+		});
+	}
 
 	for (const hasBackup of [true, false]) {
 		test(`regenerating a token preserves device data (backup account: ${hasBackup})`, async ({ page }) => {

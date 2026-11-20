@@ -9,6 +9,7 @@ import { WebSocket } from 'ws';
 import { describe, expect, test, vi } from 'vitest';
 import { isNativeStreamingPath, StreamingApiServerService } from './StreamingApiServerService.js';
 import type { Socket } from 'node:net';
+import type { StreamingCredential } from './AuthenticateService.js';
 
 describe('native streaming path isolation', () => {
 	test('does not claim Mastodon WebSocket upgrades', () => {
@@ -23,10 +24,11 @@ describe('native streaming shutdown', () => {
 	async function setup(init: () => Promise<void> = async () => {}, authenticate = vi.fn().mockResolvedValue([null, null]), token?: string) {
 		const redis = new EventEmitter();
 		const stream = { init: vi.fn(init), listen: vi.fn().mockResolvedValue(undefined), dispose: vi.fn() };
+		const verifyStreamingCredentials = vi.fn(async (credentials: StreamingCredential[]) => new Set(credentials.keys()));
 		const service = new StreamingApiServerService(
 			redis as never,
 			{ registerRequestByContextId: vi.fn(), create: vi.fn().mockResolvedValue(stream) } as never,
-			{ authenticate } as never,
+			{ authenticate, verifyStreamingCredentials } as never,
 			{ updateLastActiveDate: vi.fn() } as never,
 		);
 		const server = createServer();
@@ -37,7 +39,7 @@ describe('native streaming shutdown', () => {
 		if (address == null || typeof address === 'string') throw new Error('Missing test server port');
 		const client = new WebSocket(`ws://127.0.0.1:${address.port}/streaming${token ? `?i=${token}` : ''}`);
 		client.on('error', () => {});
-		return { redis, stream, service, server, client, authenticate };
+		return { redis, stream, service, server, client, authenticate, verifyStreamingCredentials };
 	}
 
 	test('closes only the revoked token and blocks events already in flight', async () => {
@@ -108,7 +110,7 @@ describe('native streaming shutdown', () => {
 		const { stream, service, server, client } = await setup(undefined, authenticate, 'token');
 		try {
 			await new Promise<void>(resolve => client.once('close', () => resolve()));
-			expect(authenticate).toHaveBeenLastCalledWith('token', { fresh: true, updateLastUsedAt: false });
+			expect(authenticate).toHaveBeenLastCalledWith('token', { fresh: true, updateLastUsedAt: false, timeoutMs: expect.any(Number) });
 			expect(stream.listen).not.toHaveBeenCalled();
 		} finally {
 			await service.detach();
@@ -121,12 +123,12 @@ describe('native streaming shutdown', () => {
 		vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
 		const valid = [{ id: 'alice' }, { id: 'token', permission: ['read:account'] }];
 		const authenticate = vi.fn().mockResolvedValue(valid);
-		const { service, server, client } = await setup(undefined, authenticate, 'token');
+		const { service, server, client, verifyStreamingCredentials } = await setup(undefined, authenticate, 'token');
 		let second: WebSocket | undefined;
-		let finishOldCheck!: (value: unknown) => void;
+		const pending = Promise.withResolvers<Set<number>>();
 		try {
 			await once(client, 'open');
-			authenticate.mockImplementationOnce(() => new Promise(resolve => { finishOldCheck = resolve; }));
+			verifyStreamingCredentials.mockReturnValueOnce(pending.promise);
 			await vi.advanceTimersByTimeAsync(10_000);
 			authenticate.mockResolvedValueOnce(valid).mockRejectedValueOnce(new Error('token removed'));
 			second = new WebSocket(client.url);
@@ -135,9 +137,10 @@ describe('native streaming shutdown', () => {
 				second!.once('open', () => reject(new Error('A revoked token completed a new handshake')));
 				second!.once('close', () => resolve());
 			});
-			expect(authenticate).toHaveBeenCalledTimes(5);
+			expect(verifyStreamingCredentials).toHaveBeenCalledOnce();
+			expect(authenticate).toHaveBeenCalledTimes(4);
 		} finally {
-			finishOldCheck?.(valid);
+			pending.resolve(new Set([0]));
 			await service.detach();
 			vi.useRealTimers();
 			client.terminate();
@@ -149,13 +152,13 @@ describe('native streaming shutdown', () => {
 	test('fails closed on periodic authorization failure without querying for each event', async () => {
 		vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
 		const authenticate = vi.fn().mockResolvedValue([{ id: 'alice' }, { id: 'token', permission: ['read:account'] }]);
-		const { redis, service, server, client } = await setup(undefined, authenticate, 'token');
+		const { redis, service, server, client, verifyStreamingCredentials } = await setup(undefined, authenticate, 'token');
 		try {
 			await once(client, 'open');
 			const calls = authenticate.mock.calls.length;
 			for (let i = 0; i < 100; i++) redis.emit('message', 'test', JSON.stringify({ channel: 'broadcast', message: { type: 'public' } }));
 			expect(authenticate).toHaveBeenCalledTimes(calls);
-			authenticate.mockRejectedValue(new Error('database unavailable'));
+			verifyStreamingCredentials.mockRejectedValue(new Error('database unavailable'));
 			const closed = once(client, 'close');
 			await vi.advanceTimersByTimeAsync(10_000);
 			await closed;
@@ -167,13 +170,13 @@ describe('native streaming shutdown', () => {
 		}
 	});
 
-	test('spreads periodic checks across the interval and bounds concurrent lookups', async () => {
+	test('batches distinct credentials while checking duplicate subscriptions once per interval', async () => {
 		vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval', 'setTimeout', 'clearTimeout'] });
 		let active = 0;
 		let peak = 0;
 		const starts = new Map<string, number>();
 		const authenticate = vi.fn().mockResolvedValue([{ id: 'alice' }, null]);
-		const { service, server, client } = await setup(undefined, authenticate, 'member-0');
+		const { service, server, client, verifyStreamingCredentials } = await setup(undefined, authenticate, 'member-0');
 		const sockets = [client];
 		try {
 			await once(client, 'open');
@@ -182,17 +185,20 @@ describe('native streaming shutdown', () => {
 				sockets.push(ws);
 				await once(ws, 'open');
 			}));
-			authenticate.mockImplementation(async (token: string) => {
-				expect(starts.has(token)).toBe(false);
-				starts.set(token, Date.now());
+			verifyStreamingCredentials.mockImplementation(async credentials => {
+				for (const { token } of credentials) {
+					expect(starts.has(token)).toBe(false);
+					starts.set(token, Date.now());
+				}
 				peak = Math.max(peak, ++active);
 				await new Promise<void>(resolve => setTimeout(resolve, 20));
 				active--;
-				return [{ id: 'alice' }, null];
+				return new Set(credentials.keys());
 			});
 			await vi.advanceTimersByTimeAsync(10_100);
 			expect(starts.size).toBe(120);
-			expect(peak).toBeLessThanOrEqual(4);
+			expect(peak).toBeLessThanOrEqual(2);
+			expect(verifyStreamingCredentials.mock.calls.length).toBeLessThanOrEqual(40);
 			expect(Math.max(...starts.values()) - Math.min(...starts.values())).toBeGreaterThan(8000);
 			expect(sockets.every(ws => ws.readyState === WebSocket.OPEN)).toBe(true);
 		} finally {
@@ -203,12 +209,12 @@ describe('native streaming shutdown', () => {
 		}
 	});
 
-	test('expires queued checks while hung queries still occupy their concurrency slots', async () => {
+	test('keeps handshakes available and expires sessions when the periodic workers stall', async () => {
 		vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval', 'setTimeout', 'clearTimeout'] });
 		const authenticate = vi.fn().mockResolvedValue([{ id: 'alice' }, null]);
-		const { service, server, client } = await setup(undefined, authenticate, 'member-0');
+		const { service, server, client, verifyStreamingCredentials } = await setup(undefined, authenticate, 'member-0');
 		const sockets = [client];
-		const blocked = Promise.withResolvers<unknown[]>();
+		const blocked = Promise.withResolvers<Set<number>>();
 		try {
 			await once(client, 'open');
 			await Promise.all(Array.from({ length: 7 }, async (_, i) => {
@@ -216,16 +222,20 @@ describe('native streaming shutdown', () => {
 				sockets.push(ws);
 				await once(ws, 'open');
 			}));
-			authenticate.mockClear().mockReturnValue(blocked.promise);
+			verifyStreamingCredentials.mockReturnValue(blocked.promise);
 			const closed = Promise.all(sockets.map(ws => once(ws, 'close')));
-			await vi.advanceTimersByTimeAsync(20_000);
+			await vi.advanceTimersByTimeAsync(9500);
+			const probe = new WebSocket(client.url.replace('member-0', 'probe'));
+			sockets.push(probe);
+			await once(probe, 'open');
+			await vi.advanceTimersByTimeAsync(10_500);
 			await closed;
-			expect(authenticate).toHaveBeenCalledTimes(4);
-			blocked.resolve([{ id: 'alice' }, null]);
+			expect(verifyStreamingCredentials).toHaveBeenCalledTimes(2);
+			blocked.resolve(new Set([0]));
 			await vi.advanceTimersByTimeAsync(0);
-			expect(authenticate).toHaveBeenCalledTimes(4);
+			expect(probe.readyState).toBe(WebSocket.OPEN);
 		} finally {
-			blocked.resolve([{ id: 'alice' }, null]);
+			blocked.resolve(new Set([0]));
 			vi.useRealTimers();
 			for (const ws of sockets) ws.terminate();
 			await service.detach();

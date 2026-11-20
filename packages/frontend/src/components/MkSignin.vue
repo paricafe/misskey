@@ -136,7 +136,7 @@ function onPasskeyDone(credential: AuthenticationResponseJSON): void {
 				return;
 			}
 			emit('login', res.signinResponse);
-			onLoginSucceeded(res.signinResponse);
+			return onLoginSucceeded(res.signinResponse);
 		}).catch(onSigninApiError);
 	} else if (userInfo.value != null) {
 		tryLogin({
@@ -361,7 +361,7 @@ function onSigninApiError(err?: any): void {
 			os.alert({
 				type: 'error',
 				title: i18n.ts.loginFailed,
-				text: JSON.stringify(err),
+				text: err instanceof Error ? err.message : JSON.stringify(err),
 			});
 		}
 	}

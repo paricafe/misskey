@@ -31,7 +31,7 @@ export class MfmService {
 		html: string,
 		options: {
 			hashtagNames?: string[],
-			hasQuote?: boolean,
+			quoteUrls?: readonly string[],
 		} = {},
 	): string {
 		html = html.replace(/<br\s?\/?>\r?\n/gi, '\n');
@@ -42,9 +42,12 @@ export class MfmService {
 
 		let text = '';
 
-		if (options.hasQuote) {
+		const quoteUrls = options.quoteUrls;
+		if (quoteUrls?.length) {
 			for (const n of doc.children[0].children) {
-				if (n.classList.contains('quote-inline') && n.querySelector('a') != null) {
+				if (!n.classList.contains('quote-inline')) continue;
+				const links = n.querySelectorAll('a');
+				if (links.length > 0 && links.every(link => quoteUrls.includes(link.attributes.href))) {
 					n.remove();
 					break;
 				}

@@ -17,35 +17,37 @@ const closeNotificationsByTags = async (tags: string[]): Promise<void> => {
 
 const iconUrl = (name: BadgeNames): string => `/static-assets/tabler-badges/${name}.png`;
 
-export async function createNotification<K extends keyof PushNotificationDataMap>(data: PushNotificationDataMap[K], token: string): Promise<void> {
+export async function createNotification<K extends keyof PushNotificationDataMap>(data: PushNotificationDataMap[K], token?: string): Promise<void> {
 	const n = await composeNotification(data, token);
 
 	if (n) {
-		return globalThis.registration.showNotification(...n);
+		const [title, options] = n;
+		if (options.tag) options.tag = `account:${data.userId}:${options.tag}`;
+		return globalThis.registration.showNotification(title, options);
 	} else {
 		console.error('Could not compose notification', data);
 		return createEmptyNotification();
 	}
 }
 
-async function composeNotification(data: PushNotificationDataMap[keyof PushNotificationDataMap], token: string): Promise<[string, NotificationOptions] | null> {
+async function composeNotification(data: PushNotificationDataMap[keyof PushNotificationDataMap], token?: string): Promise<[string, NotificationOptions] | null> {
 	const i18n = await (swLang.i18n ?? swLang.fetchLocale());
 	switch (data.type) {
 		case 'notification':
 			switch (data.body.type) {
 				case 'follow': {
-					const userDetail = await cli.request('users/show', { userId: data.body.userId }, token);
+					const userDetail = token ? await cli.request('users/show', { userId: data.body.userId }, token).catch(() => null) : null;
 					return [i18n.ts._notification.youWereFollowed, {
 						body: getUserName(data.body.user),
 						icon: data.body.user.avatarUrl ?? undefined,
 						badge: iconUrl('user-plus'),
 						data,
-						actions: userDetail.isFollowing ? [] : [
+						actions: userDetail && !userDetail.isFollowing ? [
 							{
 								action: 'follow',
 								title: i18n.ts._notification._actions.followBack,
 							},
-						],
+						] : [],
 					}];
 				}
 
