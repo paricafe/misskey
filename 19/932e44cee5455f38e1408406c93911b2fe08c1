@@ -1,0 +1,271 @@
+packages/frontend/src/local-storage.ts
+  8002ce8221349fbb 19
+packages/frontend/test/e2e/email-settings.spec.ts
+  8002ce8221349fbb 1-28
+packages/backend/src/server/api/stream/channels/chat-room.test.ts
+  8002ce8221349fbb 86,88,95-103,109-127
+packages/sw/src/scripts/create-notification.ts
+  8002ce8221349fbb 20-21,31,37
+packages/frontend/test/unit/post-form-edit.test.ts
+  8002ce8221349fbb 8,100-149
+packages/sw/src/sw.ts
+  8002ce8221349fbb 14,112-113,121,124
+packages/backend/src/core/activitypub/models/ApNoteService.ts
+  8002ce8221349fbb 126-132,190-197,276,385-391
+packages/frontend/src/accounts.ts
+  8002ce8221349fbb 11,164,169-192,209
+packages/mastodon-compat/test/oauth.test.ts
+  8002ce8221349fbb 153-173
+packages/frontend/test/e2e/utils.ts
+  8002ce8221349fbb 8,31-33
+packages/frontend/src/components/MkUrlPreview.vue
+  8002ce8221349fbb 143-147
+packages/backend/test/e2e/2fa.ts
+  8002ce8221349fbb 187-188
+packages/backend/src/server/api/endpoints/i/2fa/register.ts
+  8002ce8221349fbb 6,35,100
+packages/backend/src/server/api/stream/channels/user-list.test.ts
+  8002ce8221349fbb 1-67
+packages/backend/src/core/RoleService.ts
+  8002ce8221349fbb 218-220,517-524,526-528,531,558-568,570,572
+packages/frontend/src/pages/settings/security.vue
+  8002ce8221349fbb 70-71,115,119-122,125-138
+packages/mastodon-compat/src/routes.ts
+  8002ce8221349fbb 10,135
+packages/frontend/src/pages/admin/email-settings.vue
+  8002ce8221349fbb 130
+packages/frontend/test/e2e/account-session.spec.ts
+  8002ce8221349fbb 8,50-56,73-107,139-190
+packages/frontend/test/unit/url-preview.test.ts
+  8002ce8221349fbb 9,61,106-118
+packages/backend/src/server/api/stream/channels/user-list.ts
+  8002ce8221349fbb 27-29,62,68,76,81-82,94,106-108,122,133-134,141,157-158,165-168
+packages/misskey-js/src/autogen/types.ts
+  8002ce8221349fbb 24995
+packages/backend/src/server/api/stream/channels/chat-room.ts
+  8002ce8221349fbb 25,48-49,73,84
+packages/mastodon-compat/src/oauth.ts
+  8002ce8221349fbb 14,86-90,94,226,231-232,247,266
+packages/backend/package.json
+  8002ce8221349fbb 88
+packages/mastodon-compat/src/postgres-store.ts
+  8002ce8221349fbb 94
+packages/backend/src/server/api/StreamingApiServerService.ts
+  8002ce8221349fbb 6,24-28,43-46,158-163,238-240,242-248,251,254-274,281-287
+packages/mastodon-compat/test/postgres-store.test.ts
+  8002ce8221349fbb 55-59
+packages/backend/src/server/api/StreamingApiServerService.test.ts
+  8002ce8221349fbb 170-235
+packages/backend/src/core/activitypub/models/ApNoteService.test.ts
+  8002ce8221349fbb 14-17,66,188-194,197,508-537
+packages/frontend/test/e2e/url-preview.spec.ts
+  8002ce8221349fbb 1-43
+packages/mastodon-compat/src/store.ts
+  8002ce8221349fbb 163,218,223,228-232
+packages/frontend/test/unit/account-storage.test.ts
+  8002ce8221349fbb 8-9,11,50-51,122-156
+packages/backend/test/unit/RoleService.ts
+  8002ce8221349fbb 1120-1144
+packages/frontend/src/components/MkPostForm.vue
+  8002ce8221349fbb 255-256,965,984,990,994,1531
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8-ntes.10",
+  "base_commit_sha": "19932e44cee5455f38e1408406c93911b2fe08c1",
+  "prompts": {
+    "8002ce8221349fbb": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1f981-26cd-78e1-924b-f7714ea5d44c",
+        "model": "gpt-6.2-astra"
+      },
+      "human_author": "Natsuki-Kaede",
+      "messages": [],
+      "total_additions": 1487,
+      "total_deletions": 901,
+      "accepted_lines": 790,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "packages/backend/src/server/api/stream/channels/user-list.ts": {
+          "additions": 26,
+          "deletions": 19,
+          "accepted_lines": 24
+        },
+        "packages/backend/src/server/api/StreamingApiServerService.ts": {
+          "additions": 61,
+          "deletions": 20,
+          "accepted_lines": 57
+        },
+        "packages/frontend/src/local-storage.ts": {
+          "additions": 1,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/core/RoleService.ts": {
+          "additions": 29,
+          "deletions": 60,
+          "accepted_lines": 28
+        },
+        "packages/backend/test/unit/RoleService.ts": {
+          "additions": 27,
+          "deletions": 16,
+          "accepted_lines": 26
+        },
+        "packages/mastodon-compat/src/oauth.ts": {
+          "additions": 12,
+          "deletions": 5,
+          "accepted_lines": 12
+        },
+        "packages/frontend/src/accounts.ts": {
+          "additions": 58,
+          "deletions": 43,
+          "accepted_lines": 29
+        },
+        "packages/backend/src/server/api/stream/channels/chat-room.ts": {
+          "additions": 5,
+          "deletions": 2,
+          "accepted_lines": 5
+        },
+        "packages/backend/package.json": {
+          "additions": 1,
+          "accepted_lines": 1
+        },
+        "packages/frontend/test/e2e/utils.ts": {
+          "additions": 5,
+          "accepted_lines": 5
+        },
+        "packages/misskey-js/src/autogen/types.ts": {
+          "additions": 1,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/server/api/ws-compare-yyv_sacs/old.ts": {
+          "additions": 306,
+          "deletions": 306
+        },
+        "packages/frontend/src/pages/settings/security.vue": {
+          "additions": 22,
+          "deletions": 17,
+          "accepted_lines": 21
+        },
+        "packages/frontend/test/e2e/account-session.spec.ts": {
+          "additions": 117,
+          "deletions": 22,
+          "accepted_lines": 96
+        },
+        "packages/mastodon-compat/test/oauth.test.ts": {
+          "additions": 21,
+          "accepted_lines": 21
+        },
+        "packages/backend/src/server/api/StreamingApiServerService.test.ts": {
+          "additions": 66,
+          "accepted_lines": 66
+        },
+        "packages/frontend/test/e2e/shared.ts": {
+          "additions": 1,
+          "deletions": 1
+        },
+        "packages/mastodon-compat/src/postgres-store.ts": {
+          "additions": 1,
+          "deletions": 1,
+          "accepted_lines": 1
+        },
+        "packages/frontend/src/components/MkUrlPreview.vue": {
+          "additions": 5,
+          "deletions": 1,
+          "accepted_lines": 5
+        },
+        "packages/frontend/test/e2e/email-settings.spec.ts": {
+          "additions": 30,
+          "deletions": 2,
+          "accepted_lines": 28
+        },
+        "packages/sw/src/scripts/create-notification.ts": {
+          "additions": 4,
+          "deletions": 7,
+          "accepted_lines": 4
+        },
+        "packages/sw/src/sw.ts": {
+          "additions": 5,
+          "deletions": 3,
+          "accepted_lines": 5
+        },
+        "packages/frontend/test/unit/account-storage.test.ts": {
+          "additions": 41,
+          "deletions": 7,
+          "accepted_lines": 40
+        },
+        "packages/backend/src/core/activitypub/models/ApNoteService.test.ts": {
+          "additions": 51,
+          "deletions": 8,
+          "accepted_lines": 46
+        },
+        "packages/frontend/test/unit/post-form-edit.test.ts": {
+          "additions": 55,
+          "deletions": 2,
+          "accepted_lines": 53
+        },
+        "packages/mastodon-compat/test/postgres-store.test.ts": {
+          "additions": 5,
+          "accepted_lines": 5
+        },
+        "packages/frontend/test/e2e/url-preview.spec.ts": {
+          "additions": 45,
+          "deletions": 2,
+          "accepted_lines": 43
+        },
+        "packages/frontend/test/unit/url-preview.test.ts": {
+          "additions": 21,
+          "deletions": 4,
+          "accepted_lines": 18
+        },
+        "packages/backend/test/e2e/2fa.ts": {
+          "additions": 2,
+          "accepted_lines": 2
+        },
+        "packages/mastodon-compat/src/routes.ts": {
+          "additions": 2,
+          "deletions": 2,
+          "accepted_lines": 2
+        },
+        "packages/mastodon-compat/src/store.ts": {
+          "additions": 8,
+          "deletions": 4,
+          "accepted_lines": 8
+        },
+        "packages/backend/src/server/api/endpoints/i/2fa/register.ts": {
+          "additions": 3,
+          "accepted_lines": 3
+        },
+        "packages/frontend/src/pages/admin/email-settings.vue": {
+          "additions": 1,
+          "deletions": 1,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/server/api/stream/channels/chat-room.test.ts": {
+          "additions": 36,
+          "deletions": 3,
+          "accepted_lines": 36
+        },
+        "packages/backend/src/server/api/ws-compare-yyv_sacs/old.test.ts": {
+          "additions": 314,
+          "deletions": 314
+        },
+        "packages/backend/src/server/api/stream/channels/user-list.test.ts": {
+          "additions": 68,
+          "deletions": 1,
+          "accepted_lines": 67
+        },
+        "packages/frontend/src/components/MkPostForm.vue": {
+          "additions": 7,
+          "deletions": 5,
+          "accepted_lines": 7
+        },
+        "packages/backend/src/core/activitypub/models/ApNoteService.ts": {
+          "additions": 24,
+          "deletions": 23,
+          "accepted_lines": 23
+        }
+      }
+    }
+  }
+}
