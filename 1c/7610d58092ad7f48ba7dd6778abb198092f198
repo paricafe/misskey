@@ -1,0 +1,275 @@
+packages/frontend/test/unit/account-storage.test.ts
+  8002ce8221349fbb 32-40,156-168,171
+packages/sw/src/sw.ts
+  8002ce8221349fbb 7,15,86,107-109,111-116,121-123,125,128,130,143-147,225,237,250,260
+packages/backend/src/server/api/endpoints/admin/roles/assign.ts
+  8002ce8221349fbb 87-92
+packages/frontend/src/utility/initialize-sw.ts
+  8002ce8221349fbb 6,12-20
+packages/frontend-shared/js/stored-accounts.ts
+  8002ce8221349fbb 6,15-18,29
+packages/sw/src/scripts/lang.ts
+  8002ce8221349fbb 14,18,25-30
+packages/backend/test/unit/RoleService.ts
+  8002ce8221349fbb 1120-1132
+packages/backend/src/core/MfmService.ts
+  8002ce8221349fbb 34,45-46,48-50
+packages/frontend/src/accounts.ts
+  8002ce8221349fbb 29-31,56-81,84-97,100-101,162-172,185,194,209-214,217-222,239-242,244-246,265,325-327,329
+packages/frontend/src/lib/pizzax.ts
+  8002ce8221349fbb 10,153-167,181
+packages/backend/src/core/RoleService.ts
+  8002ce8221349fbb 8-9,138,317-326,521-530,541,582,584
+packages/backend/src/server/api/AuthenticateService.ts
+  8002ce8221349fbb 16,18-25,54,59-60,62-68,71,80,93,96,99,104,117-145
+packages/i18n/src/autogen/locale.ts
+  8002ce8221349fbb 13906-13912
+packages/frontend/src/components/MkPostForm.vue
+  8002ce8221349fbb 17
+packages/frontend/test/e2e/account-session.spec.ts
+  8002ce8221349fbb 13,140-232
+packages/backend/test/unit/StreamingCredentials.ts
+  8002ce8221349fbb 1-77
+packages/sw/src/scripts/get-account-from-id.ts
+  8002ce8221349fbb 7,16-49
+packages/backend/src/server/api/StreamingApiServerService.ts
+  8002ce8221349fbb 17,26-63,79-81,129,166,169,188,193-195,277-280,286-295,299-307
+packages/backend/src/core/activitypub/models/ApNoteService.ts
+  8002ce8221349fbb 126-154,157,218-220,226,235-237,385-390
+packages/frontend/test/e2e/push-account.spec.ts
+  8002ce8221349fbb 1-132
+packages/frontend/src/components/MkSignin.vue
+  8002ce8221349fbb 139,364
+packages/backend/src/core/activitypub/ApMfmService.ts
+  8002ce8221349fbb 26,30
+packages/backend/src/server/api/endpoints/admin/roles/unassign.ts
+  8002ce8221349fbb 85-90
+packages/backend/test/e2e/endpoints.ts
+  8002ce8221349fbb 13,31-60
+packages/backend/test/unit/MfmService.ts
+  8002ce8221349fbb 140,144,147-152,156
+packages/frontend/test/e2e/legacy-drafts.spec.ts
+  8002ce8221349fbb 1-45
+packages/sw/src/scripts/create-notification.ts
+  8002ce8221349fbb 20,24-26,33,39,45,50
+locales/ja-JP.yml
+  8002ce8221349fbb 3720-3721
+packages/backend/src/core/activitypub/models/ApNoteService.test.ts
+  8002ce8221349fbb 66,188-200,512,516-523,531-534,537,539-540,543-546,551-552,554
+packages/backend/src/server/api/StreamingApiServerService.test.ts
+  8002ce8221349fbb 12,27,31,42,113,126,128,131,140-141,143,155,161,173,179,188-192,196,200-201,212,215,217,225,227-231,233-234,236,238
+packages/frontend/src/utility/idb-proxy.ts
+  8002ce8221349fbb 9,13,31-33,46-50
+packages/frontend/src/components/MkNoteDraftsDialog.vue
+  8002ce8221349fbb 42-45,165,206-228
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8-ntes.10",
+  "base_commit_sha": "1c7610d58092ad7f48ba7dd6778abb198092f198",
+  "prompts": {
+    "8002ce8221349fbb": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1f981-26cd-78e1-924b-f7714ea5d44c",
+        "model": "gpt-6.2-astra"
+      },
+      "human_author": "Natsuki-Kaede",
+      "messages": [],
+      "total_additions": 2071,
+      "total_deletions": 1353,
+      "accepted_lines": 983,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "packages/frontend/test/e2e/legacy-drafts.spec.ts": {
+          "additions": 51,
+          "deletions": 6,
+          "accepted_lines": 45
+        },
+        "packages/backend/src/server/api/StreamingApiServerService.test.ts": {
+          "additions": 36,
+          "deletions": 26,
+          "accepted_lines": 36
+        },
+        "packages/frontend/src/components/MkSignin.vue": {
+          "additions": 2,
+          "deletions": 2,
+          "accepted_lines": 2
+        },
+        "packages/frontend/src/utility/initialize-sw.ts": {
+          "additions": 11,
+          "accepted_lines": 11
+        },
+        "packages/frontend/src/utility/idb-proxy.ts": {
+          "additions": 14,
+          "accepted_lines": 14
+        },
+        "packages/backend/src/server/api/endpoints/admin/roles/unassign.ts": {
+          "additions": 6,
+          "deletions": 1,
+          "accepted_lines": 6
+        },
+        "packages/backend/.vitest/ws-pg-zr6d_n1o/new.ts": {
+          "additions": 368,
+          "deletions": 368
+        },
+        "packages/sw/src/scripts/create-notification.ts": {
+          "additions": 8,
+          "deletions": 6,
+          "accepted_lines": 8
+        },
+        "packages/backend/.vitest/ws-pg-p092bhsk/tsconfig.json": {
+          "additions": 1,
+          "deletions": 1
+        },
+        "packages/backend/src/server/api/AuthenticateService.ts": {
+          "additions": 62,
+          "deletions": 9,
+          "accepted_lines": 59
+        },
+        "packages/sw/src/scripts/lang.ts": {
+          "additions": 8,
+          "deletions": 6,
+          "accepted_lines": 8
+        },
+        "packages/backend/src/core/MfmService.ts": {
+          "additions": 6,
+          "deletions": 3,
+          "accepted_lines": 6
+        },
+        "packages/backend/.vitest/ws-pg-zr6d_n1o/new.test.ts": {
+          "additions": 98,
+          "deletions": 98
+        },
+        "packages/backend/test/unit/StreamingCredentials.ts": {
+          "additions": 89,
+          "deletions": 12,
+          "accepted_lines": 77
+        },
+        "packages/backend/src/core/activitypub/models/ApNoteService.ts": {
+          "additions": 74,
+          "deletions": 75,
+          "accepted_lines": 48
+        },
+        "locales/ja-JP.yml": {
+          "additions": 2,
+          "accepted_lines": 2
+        },
+        "packages/frontend-shared/js/stored-accounts.ts": {
+          "additions": 6,
+          "deletions": 1,
+          "accepted_lines": 6
+        },
+        "packages/i18n/src/autogen/locale.ts": {
+          "additions": 8,
+          "accepted_lines": 8
+        },
+        "packages/frontend/test/e2e/account-session.spec.ts": {
+          "additions": 128,
+          "deletions": 33,
+          "accepted_lines": 95
+        },
+        "packages/backend/test/unit/RoleService.ts": {
+          "additions": 46,
+          "deletions": 33,
+          "accepted_lines": 13
+        },
+        "packages/backend/.vitest/ws-pg-p092bhsk/old.test.ts": {
+          "additions": 98,
+          "deletions": 98
+        },
+        "packages/sw/src/sw.ts": {
+          "additions": 27,
+          "deletions": 22,
+          "accepted_lines": 27
+        },
+        "packages/backend/src/server/api/StreamingApiServerService.ts": {
+          "additions": 78,
+          "deletions": 57,
+          "accepted_lines": 72
+        },
+        "packages/backend/src/core/activitypub/models/ApNoteService.test.ts": {
+          "additions": 42,
+          "deletions": 24,
+          "accepted_lines": 37
+        },
+        "packages/backend/.vitest/ws-pg-p092bhsk/old.ts": {
+          "additions": 347,
+          "deletions": 347
+        },
+        "packages/frontend/src/components/MkPostForm.vue": {
+          "additions": 1,
+          "deletions": 1,
+          "accepted_lines": 1
+        },
+        "packages/frontend/src/components/MkNoteDraftsDialog.vue": {
+          "additions": 30,
+          "deletions": 2,
+          "accepted_lines": 29
+        },
+        "packages/backend/test/unit/MfmService.ts": {
+          "additions": 11,
+          "deletions": 3,
+          "accepted_lines": 11
+        },
+        "packages/backend/.vitest/ws-pg-zr6d_n1o/tsconfig.json": {
+          "additions": 1,
+          "deletions": 1
+        },
+        "packages/frontend/test/unit/account-storage.test.ts": {
+          "additions": 24,
+          "deletions": 2,
+          "accepted_lines": 23
+        },
+        "packages/sw/src/scripts/get-account-from-id.ts": {
+          "additions": 48,
+          "deletions": 13,
+          "accepted_lines": 36
+        },
+        "packages/backend/src/core/RoleService.ts": {
+          "additions": 28,
+          "deletions": 6,
+          "accepted_lines": 28
+        },
+        "packages/backend/src/server/api/endpoints/admin/roles/assign.ts": {
+          "additions": 6,
+          "deletions": 1,
+          "accepted_lines": 6
+        },
+        "packages/backend/.vitest/ws-pg-zr6d_n1o/vitest.config.ts": {
+          "additions": 1,
+          "deletions": 1
+        },
+        "packages/frontend/src/accounts.ts": {
+          "additions": 92,
+          "deletions": 58,
+          "accepted_lines": 86
+        },
+        "packages/frontend/src/lib/pizzax.ts": {
+          "additions": 17,
+          "deletions": 4,
+          "accepted_lines": 17
+        },
+        "packages/frontend/test/e2e/push-account.spec.ts": {
+          "additions": 160,
+          "deletions": 28,
+          "accepted_lines": 132
+        },
+        "packages/backend/test/e2e/endpoints.ts": {
+          "additions": 33,
+          "deletions": 2,
+          "accepted_lines": 32
+        },
+        "packages/backend/src/core/activitypub/ApMfmService.ts": {
+          "additions": 2,
+          "deletions": 2,
+          "accepted_lines": 2
+        },
+        "packages/backend/.vitest/ws-pg-p092bhsk/vitest.config.ts": {
+          "additions": 1,
+          "deletions": 1
+        }
+      }
+    }
+  }
+}
