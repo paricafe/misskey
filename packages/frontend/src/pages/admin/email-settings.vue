@@ -127,7 +127,7 @@ const hasUnsavedChanges = computed(() => {
 	const current = getSettings();
 	return (Object.keys(current) as (keyof typeof current)[]).some(key => normalizeSettingValue(current[key]) !== normalizeSettingValue(savedSettings.value[key]));
 });
-const canTestEmail = computed(() => !hasUnsavedChanges.value && savedSettings.value.enableEmail && (savedSettings.value.smtpHost ?? '').trim() !== '');
+const canTestEmail = computed(() => savedSettings.value.enableEmail && !hasUnsavedChanges.value);
 
 async function testEmail() {
 	const { canceled, result: destination } = await os.inputText({

@@ -123,6 +123,13 @@ export class ApNoteService {
 		return await this.apDbResolverService.getNoteFromApId(object);
 	}
 
+	private readText(note: IPost, hasQuote: boolean): string | null {
+		if (note.source?.mediaType === 'text/x.misskeymarkdown' && typeof note.source.content === 'string') return note.source.content;
+		if (typeof note._misskey_content !== 'undefined') return note._misskey_content;
+		if (typeof note.content === 'string') return this.apMfmService.htmlToMfm(note.content, { tag: note.tag, hasQuote });
+		return null;
+	}
+
 	@bindThis
 	public async createNote(value: string | IObject, actor?: MiRemoteUser, resolver?: Resolver, silent = false): Promise<MiNote | null> {
 		// eslint-disable-next-line no-param-reassign
@@ -179,21 +186,15 @@ export class ApNoteService {
 
 		const cw = note.summary === '' ? null : note.summary;
 
-		let text: string | null = null;
-		if (note.source?.mediaType === 'text/x.misskeymarkdown' && typeof note.source.content === 'string') {
-			text = note.source.content;
-		} else if (typeof note._misskey_content !== 'undefined') {
-			text = note._misskey_content;
-		} else if (typeof note.content === 'string') {
-			text = this.apMfmService.htmlToMfm(note.content, { tag: note.tag, hasQuote: !!(note._misskey_quote ?? note.quoteUrl) });
-		}
-
 		const poll = await this.apQuestionService.extractPollFromQuestion(note, resolver).catch(() => undefined);
-
-		const hasProhibitedWords = this.noteCreateService.checkProhibitedWordsContain({ cw, text, pollChoices: poll?.choices });
-		if (hasProhibitedWords) {
-			throw new IdentifiableError('689ee33f-f97c-479a-ac49-1b9f8140af99', 'Note contains prohibited words');
-		}
+		const checkedText = (hasQuote: boolean) => {
+			const text = this.readText(note, hasQuote);
+			if (this.noteCreateService.checkProhibitedWordsContain({ cw, text, pollChoices: poll?.choices })) {
+				throw new IdentifiableError('689ee33f-f97c-479a-ac49-1b9f8140af99', 'Note contains prohibited words');
+			}
+			return text;
+		};
+		let text = checkedText(!!(note._misskey_quote ?? note.quoteUrl));
 
 		// eslint-disable-next-line no-param-reassign
 		actor ??= await this.apPersonService.resolvePerson(uri, resolver) as MiRemoteUser;
@@ -272,6 +273,7 @@ export class ApNoteService {
 				if (results.some(x => x.status === 'temperror')) {
 					throw new Error('quote resolve failed');
 				}
+				text = checkedText(false);
 			}
 		}
 
@@ -380,14 +382,13 @@ export class ApNoteService {
 
 		const cw = note.summary || null;
 
-		let text: string | null = null;
-		if (note.source?.mediaType === 'text/x.misskeymarkdown' && typeof note.source.content === 'string') {
-			text = note.source.content;
-		} else if (typeof note._misskey_content !== 'undefined') {
-			text = note._misskey_content;
-		} else if (typeof note.content === 'string') {
-			text = this.apMfmService.htmlToMfm(note.content, { tag: note.tag, hasQuote: !!(note._misskey_quote ?? note.quoteUrl) });
-		}
+		const quoteUris = [note._misskey_quote, note.quoteUrl].filter(uri => uri != null);
+		const targetId = originNote.renoteId;
+		const hasQuote = targetId != null && quoteUris.length > 0 && (
+			quoteUris.includes(`${this.config.url}/notes/${targetId}`) ||
+			await this.notesRepository.existsBy([{ id: targetId, uri: In(quoteUris) }, { id: targetId, url: In(quoteUris) }])
+		);
+		const text = this.readText(note, hasQuote);
 
 		await this.noteUpdateService.prepareUpdate(actor, originNote);
 

@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { qrcodePNGDataURI } from 'etiket/png';
 import bcrypt from 'bcryptjs';
 import * as OTPAuth from 'otpauth';
 import { Inject, Injectable } from '@nestjs/common';
@@ -31,6 +32,7 @@ export const meta = {
 		nullable: false,
 		optional: false,
 		properties: {
+			qr: { type: 'string', optional: false, nullable: false },
 			url: { type: 'string' },
 			secret: { type: 'string' },
 			label: { type: 'string' },
@@ -95,6 +97,7 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 			const url = totp.toString();
 
 			return {
+				qr: qrcodePNGDataURI(url),
 				url,
 				secret: secret.base32,
 				label: me.username,

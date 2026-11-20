@@ -215,25 +215,10 @@ export class RoleService implements OnApplicationShutdown, OnModuleInit {
 					}
 					break;
 				}
-				case 'userRoleAssigned': {
-					const cached = this.roleAssignmentByUserIdCache.get(body.userId);
-					if (cached) {
-						cached.push({
-							...body,
-							expiresAt: body.expiresAt ? new Date(body.expiresAt) : null,
-							user: null,
-							role: null,
-						});
-					}
+				case 'userRoleAssigned':
+				case 'userRoleUnassigned':
+					this.roleAssignmentByUserIdCache.delete(body.userId);
 					break;
-				}
-				case 'userRoleUnassigned': {
-					const cached = this.roleAssignmentByUserIdCache.get(body.userId);
-					if (cached) {
-						this.roleAssignmentByUserIdCache.set(body.userId, cached.filter(x => x.id !== body.id));
-					}
-					break;
-				}
 				default:
 					break;
 			}
@@ -529,35 +514,21 @@ export class RoleService implements OnApplicationShutdown, OnModuleInit {
 	public async assign(userId: MiUser['id'], roleId: MiRole['id'], expiresAt: Date | null = null, moderator?: MiUser): Promise<void> {
 		const now = Date.now();
 
-		const role = await this.rolesRepository.findOneByOrFail({ id: roleId });
-
-		const existing = await this.roleAssignmentsRepository.findOneBy({
-			roleId: roleId,
-			userId: userId,
-		});
-
-		if (existing) {
-			if (existing.expiresAt && (existing.expiresAt.getTime() < now)) {
-				await this.roleAssignmentsRepository.delete({
-					roleId: roleId,
-					userId: userId,
-				});
-			} else {
-				throw new RoleService.AlreadyAssignedError();
+		const { role, created } = await this.rolesRepository.manager.transaction(async manager => {
+			const roles = manager.withRepository(this.rolesRepository);
+			const assignments = manager.withRepository(this.roleAssignmentsRepository);
+			const role = await roles.findOneOrFail({ where: { id: roleId }, lock: { mode: 'pessimistic_write' } });
+			const existing = await assignments.findOneBy({ roleId, userId });
+			if (existing) {
+				if (!existing.expiresAt || existing.expiresAt.getTime() >= now) throw new RoleService.AlreadyAssignedError();
+				await assignments.delete(existing.id);
 			}
-		}
-
-		const created = await this.roleAssignmentsRepository.insertOne({
-			id: this.idService.gen(now),
-			expiresAt: expiresAt,
-			roleId: roleId,
-			userId: userId,
+			const created = await assignments.insertOne({ id: this.idService.gen(now), roleId, userId, expiresAt });
+			await roles.update(roleId, { lastUsedAt: new Date(now) });
+			return { role, created };
 		});
 
-		await this.rolesRepository.update(roleId, {
-			lastUsedAt: new Date(),
-		});
-
+		this.roleAssignmentByUserIdCache.delete(userId);
 		this.globalEventService.publishInternalEvent('userRoleAssigned', created);
 
 		const user = await this.usersRepository.findOneByOrFail({ id: userId });
@@ -584,23 +555,21 @@ export class RoleService implements OnApplicationShutdown, OnModuleInit {
 	public async unassign(userId: MiUser['id'], roleId: MiRole['id'], moderator?: MiUser): Promise<void> {
 		const now = new Date();
 
-		const existing = await this.roleAssignmentsRepository.findOneBy({ roleId, userId });
-		if (existing == null) {
-			throw new RoleService.NotAssignedError();
-		} else if (existing.expiresAt && (existing.expiresAt.getTime() < now.getTime())) {
-			await this.roleAssignmentsRepository.delete({
-				roleId: roleId,
-				userId: userId,
-			});
-			throw new RoleService.NotAssignedError();
-		}
-
-		await this.roleAssignmentsRepository.delete(existing.id);
-
-		await this.rolesRepository.update(roleId, {
-			lastUsedAt: now,
+		const existing = await this.rolesRepository.manager.transaction(async manager => {
+			const roles = manager.withRepository(this.rolesRepository);
+			const assignments = manager.withRepository(this.roleAssignmentsRepository);
+			const role = await roles.findOne({ select: { id: true }, where: { id: roleId }, lock: { mode: 'pessimistic_write' } });
+			if (!role) return null;
+			const assignment = await assignments.findOneBy({ roleId, userId });
+			if (!assignment) return null;
+			await assignments.delete(assignment.id);
+			if (assignment.expiresAt && assignment.expiresAt < now) return null;
+			await roles.update(roleId, { lastUsedAt: now });
+			return assignment;
 		});
+		if (!existing) throw new RoleService.NotAssignedError();
 
+		this.roleAssignmentByUserIdCache.delete(userId);
 		this.globalEventService.publishInternalEvent('userRoleUnassigned', existing);
 
 		if (moderator) {

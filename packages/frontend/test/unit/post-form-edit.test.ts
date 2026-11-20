@@ -5,6 +5,7 @@
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { cleanup, fireEvent, render, waitFor } from '@testing-library/vue';
+import { nextTick } from 'vue';
 import type * as Misskey from 'misskey-js';
 import MkPostForm from '@/components/MkPostForm.vue';
 import { misskeyApi } from '@/utility/misskey-api.js';
@@ -94,5 +95,57 @@ describe('post form editing', () => {
 		await fireEvent.update(result.getByPlaceholderText(i18n.ts.annotation), 'New warning');
 		await fireEvent.click(result.getByTestId('post-form-submit'));
 		await waitFor(() => expect(misskeyApi).toHaveBeenCalledWith('notes/update', { noteId: 'note', text: null, cw: 'New warning', fileIds: [] }, undefined));
+	});
+});
+
+describe('post form local drafts', () => {
+	afterEach(() => {
+		cleanup();
+		localStorage.clear();
+		me.id = 'author';
+	});
+
+	async function openDraft(account: string, target?: 'reply' | 'renote') {
+		me.id = account;
+		const result = render(MkPostForm, {
+			props: { ...(target ? { [target]: note() } : {}), autofocus: false, freezeAfterPosted: true },
+			global: { stubs: { MkAcct: true }, directives: { clickAnime: {}, tooltip: {} } },
+		});
+		await nextTick();
+		await nextTick();
+		return { ...result, text: result.getByTestId<HTMLTextAreaElement>('post-form-text') };
+	}
+
+	test.each(['reply', 'renote'] as const)('%s drafts are saved, restored and deleted only for their account', async target => {
+		const key = target + ':note';
+		const legacy = JSON.stringify({ [key]: { data: { text: 'old draft without an author' } } });
+		localStorage.setItem('drafts', legacy);
+		const alice = await openDraft('alice', target);
+		expect(alice.text.value).toBe('');
+		await fireEvent.update(alice.text, 'Alice draft');
+		alice.unmount();
+
+		const bob = await openDraft('bob', target);
+		expect(bob.text.value).toBe('');
+		await fireEvent.update(bob.text, 'Bob draft');
+		bob.unmount();
+
+		const again = await openDraft('alice', target);
+		expect(again.text.value).toBe('Alice draft');
+		vi.mocked(misskeyApi).mockResolvedValue({ createdNote: note() } as never);
+		await fireEvent.click(again.getByTestId('post-form-submit'));
+		await waitFor(() => expect(again.emitted().posted).toHaveLength(1));
+		again.unmount();
+
+		const posted = await openDraft('alice', target);
+		expect(posted.text.value).toBe('');
+		posted.unmount();
+		expect((await openDraft('bob', target)).text.value).toBe('Bob draft');
+		expect(localStorage.getItem('drafts')).toBe(legacy);
+	});
+
+	test('restores an existing ordinary draft by author', async () => {
+		localStorage.setItem('drafts', JSON.stringify({ 'note:alice': { data: { text: 'old ordinary draft' } } }));
+		expect((await openDraft('alice')).text.value).toBe('old ordinary draft');
 	});
 });

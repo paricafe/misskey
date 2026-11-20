@@ -8,6 +8,7 @@ import * as Misskey from 'misskey-js';
 import { apiUrl, host } from '@@/js/config.js';
 import { ACCOUNT_DEVICE_STATE_KEY, readStoredAccounts } from '@@/js/stored-accounts.js';
 import { get, del } from '@/utility/idb-proxy.js';
+import { misskeyApi } from '@/utility/misskey-api.js';
 import type { MenuItem } from '@/types/menu.js';
 import { showSuspendedDialog } from '@/utility/show-suspended-dialog.js';
 import { i18n } from '@/i18n.js';
@@ -17,7 +18,6 @@ import { unisonReload, reloadChannel } from '@/utility/unison-reload.js';
 import { prefer } from '@/preferences.js';
 import { store } from '@/store.js';
 import { $i } from '@/i.js';
-import { signout } from '@/signout.js';
 
 type AccountWithToken = Misskey.entities.MeDetailed & { token: string };
 
@@ -161,15 +161,35 @@ export async function refreshCurrentAccount() {
 	const me = $i;
 	return fetchAccount($i.token, $i.id).then(replaceCurrentAccountData).catch(async reason => {
 		if (reason === isAccountDeleted) {
-			await removeAccount(host, me.id);
-			const nextToken = Object.entries(store.s.accountTokens).find(([key]) => key.startsWith(host + '/'))?.[1];
-			if (nextToken) {
-				await login(nextToken);
-			} else {
-				await signout();
-			}
+			await leaveRevokedAccount(me);
 		}
 	});
+}
+
+export async function leaveRevokedAccount(me: Pick<AccountWithToken, 'id' | 'token'>) {
+	const current = miLocalStorage.getItemAsJson('account');
+	if (current?.token === me.token) miLocalStorage.removeItem('account');
+	try {
+		const saved = store.s.accountTokens[host + '/' + me.id];
+		if (saved == null || saved === me.token) await removeAccount(host, me.id);
+		for (const [key, token] of Object.entries(store.s.accountTokens)) {
+			if (miLocalStorage.getItem('account')) break;
+			if (!key.startsWith(host + '/')) continue;
+			const next = await misskeyApi('i', {}, token, AbortSignal.timeout(5000)).catch(() => null);
+			if (next) {
+				if (!miLocalStorage.getItem('account')) await storeLogin(next, token);
+				break;
+			}
+		}
+	} catch (error) {
+		console.error('Failed to update saved accounts after token revocation', error);
+	}
+	unisonReload(miLocalStorage.getItem('account') ? undefined : '/');
+}
+
+async function storeLogin(me: Misskey.entities.MeDetailed, token: string) {
+	await addAccount(host, me, token);
+	miLocalStorage.setItemAsJson('account', { ...me, token });
 }
 
 export async function login(token: AccountWithToken['token'], redirect?: string) {
@@ -186,12 +206,7 @@ export async function login(token: AccountWithToken['token'], redirect?: string)
 		throw reason;
 	});
 
-	miLocalStorage.setItem('account', JSON.stringify({
-		...me,
-		token,
-	}));
-
-	await addAccount(host, me, token);
+	await storeLogin(me, token);
 
 	if (redirect) {
 		reloadChannel.postMessage(null);

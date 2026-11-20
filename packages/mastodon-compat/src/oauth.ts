@@ -11,6 +11,7 @@ import { allowsScope, normalizeScopes, toNativePermissions } from './scopes.js';
 
 const OOB = 'urn:ietf:wg:oauth:2.0:oob';
 const STATE_TTL = 10 * 60 * 1000;
+const NEODB_APP_TOKEN_SECONDS = 5 * 60;
 const CODE_TTL = 5 * 60 * 1000;
 type Parameters = Record<string, unknown>;
 
@@ -82,11 +83,15 @@ async function authenticatedClient(request: FastifyRequest, body: Parameters, st
 	return client;
 }
 
-export async function getAuthorization(request: FastifyRequest, store: CompatStore): Promise<Grant | undefined> {
+export function isNeoDBRequest(request: FastifyRequest): boolean {
+	return /^neodb\//i.test(request.headers['user-agent'] ?? '');
+}
+
+export async function getAuthorization(request: FastifyRequest, store: CompatStore, now = Date.now()): Promise<Grant | undefined> {
 	const header = request.headers.authorization;
 	if (!header) return undefined;
 	const match = /^Bearer\s+(\S+)$/iu.exec(header);
-	const grant = match?.[1].startsWith('mc_') ? await store.getGrant(match[1]) : undefined;
+	const grant = match?.[1].startsWith('mc_') ? await store.getGrant(match[1], now) : undefined;
 	if (!grant) throw new OAuthError(401, 'invalid_token', 'A valid compatibility access token is required');
 	return grant;
 }
@@ -218,11 +223,13 @@ function verifyPkce(code: AuthorizationCode, body: Parameters): void {
 async function token(request: FastifyRequest, body: Parameters, deps: OAuthDependencies): Promise<Record<string, unknown>> {
 	const client = await authenticatedClient(request, body, deps.store);
 	const now = deps.now?.() ?? Date.now();
+	let expiresIn: number | undefined;
 	let issued: { token: string; grant: Grant };
 	if (body.grant_type === 'client_credentials') {
 		const requested = scopes(body.scope, ['read']);
 		requireSubset(requested, client.scopes);
-		issued = await deps.store.createGrant({ clientId: client.id, scopes: requested, kind: 'app' }, now);
+		if (isNeoDBRequest(request)) expiresIn = NEODB_APP_TOKEN_SECONDS;
+		issued = await deps.store.createGrant({ clientId: client.id, scopes: requested, kind: 'app' }, now, expiresIn ? now + expiresIn * 1000 : null);
 	} else if (body.grant_type === 'authorization_code') {
 		const raw = required(body, 'code');
 		issued = await deps.store.transaction(async () => {
@@ -237,7 +244,7 @@ async function token(request: FastifyRequest, body: Parameters, deps: OAuthDepen
 	} else {
 		throw new OAuthError(400, 'unsupported_grant_type', 'Only authorization_code and client_credentials are supported');
 	}
-	return { access_token: issued.token, token_type: 'Bearer', scope: issued.grant.scopes.join(' '), created_at: Math.floor(issued.grant.createdAt / 1000) };
+	return { access_token: issued.token, token_type: 'Bearer', scope: issued.grant.scopes.join(' '), created_at: Math.floor(issued.grant.createdAt / 1000), expires_in: expiresIn };
 }
 
 async function revoke(request: FastifyRequest, body: Parameters, deps: OAuthDependencies): Promise<Record<string, never>> {
@@ -256,7 +263,7 @@ export async function dispatchHandler(request: FastifyRequest, reply: FastifyRep
 		const route = pathname(request);
 		if (request.method === 'POST' && route === '/api/v1/apps') return reply.send(await registerApplication(await readBody(request), deps));
 		if (request.method === 'GET' && route === '/api/v1/apps/verify_credentials') {
-			const grant = await getAuthorization(request, deps.store);
+			const grant = await getAuthorization(request, deps.store, deps.now?.());
 			const client = grant && await deps.store.getClient(grant.clientId);
 			if (!client) throw new OAuthError(401, 'invalid_token', 'An application token is required');
 			return reply.send(application(client));

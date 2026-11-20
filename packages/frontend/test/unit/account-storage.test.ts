@@ -5,15 +5,16 @@
 
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { ACCOUNT_DEVICE_STATE_KEY, readStoredAccounts } from '@@/js/stored-accounts.js';
-import { initializeAccountStorage, removeAccount, login, switchAccount, refreshCurrentAccount } from '@/accounts.js';
+import { initializeAccountStorage, removeAccount, login, switchAccount, refreshCurrentAccount, leaveRevokedAccount } from '@/accounts.js';
+import { unisonReload } from '@/utility/unison-reload.js';
 import { getAccountFromId } from '@/utility/get-account-from-id.js';
+import { store } from '@/store.js';
 
 const mocks = vi.hoisted(() => ({
 	db: new Map<string, unknown>(),
 	state: { accountHost: '', accountTokens: {} as Record<string, string>, accountInfos: {} as Record<string, unknown> },
 	accounts: [] as [string, { id: string; username: string }][],
 	currentAccount: null as { id: string; token: string } | null,
-	signout: vi.fn(),
 }));
 
 vi.mock('@@/js/config.js', () => ({ host: 'local.example', apiUrl: 'https://local.example/api' }));
@@ -33,9 +34,7 @@ vi.mock('@/preferences.js', () => ({ prefer: {
 	s: { get accounts() { return mocks.accounts; } },
 	commit: (_key: string, value: typeof mocks.accounts) => { mocks.accounts = value; },
 } }));
-vi.mock('@/local-storage.js', () => ({ miLocalStorage: { setItem: vi.fn() } }));
 vi.mock('@/i.js', () => ({ get $i() { return mocks.currentAccount; } }));
-vi.mock('@/signout.js', () => ({ signout: mocks.signout }));
 vi.mock('@/i18n.js', () => ({ i18n: { ts: {} } }));
 vi.mock('@/os.js', () => ({ popup: vi.fn(() => ({ dispose: vi.fn() })), popupMenu: vi.fn(), success: vi.fn(), alert: vi.fn(), waiting: vi.fn() }));
 vi.mock('@/utility/show-suspended-dialog.js', () => ({ showSuspendedDialog: vi.fn() }));
@@ -48,7 +47,8 @@ beforeEach(() => {
 	mocks.state.accountInfos = {};
 	mocks.accounts = [];
 	mocks.currentAccount = null;
-	mocks.signout.mockClear();
+	localStorage.clear();
+	vi.mocked(unisonReload).mockClear();
 });
 
 const read = async (key: string) => mocks.db.get(key);
@@ -119,7 +119,41 @@ test('revoked current account never falls back to credentials from another host'
 	vi.stubGlobal('fetch', fetch);
 	await refreshCurrentAccount();
 	expect(fetch).toHaveBeenCalledOnce();
-	expect(mocks.signout).toHaveBeenCalledOnce();
+	expect(unisonReload).toHaveBeenCalledWith('/');
+	expect(mocks.state.accountTokens).toEqual({ 'remote.example/bob': 'remote-secret' });
+});
+
+test('rotation removes the revoked account and preserves another login and drafts', async () => {
+	mocks.state.accountTokens = { 'local.example/alice': 'revoked', 'local.example/bob': 'valid' };
+	mocks.state.accountInfos = { 'local.example/alice': { id: 'alice' } };
+	localStorage.setItem('account', JSON.stringify({ id: 'alice', token: 'revoked' }));
+	localStorage.setItem('drafts', 'saved draft');
+	vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ status: 200, json: async () => ({ id: 'bob', username: 'bob' }) }));
+	await leaveRevokedAccount({ id: 'alice', token: 'revoked' });
+	expect(mocks.state.accountTokens).toEqual({ 'local.example/bob': 'valid' });
+	expect(mocks.state.accountInfos['local.example/alice']).toBeUndefined();
+	expect(JSON.parse(localStorage.getItem('account')!)).toMatchObject({ id: 'bob', token: 'valid' });
+	expect(localStorage.getItem('drafts')).toBe('saved draft');
+});
+
+test('a stale tab preserves the active login selected by a different tab', async () => {
+	mocks.state.accountTokens = { 'local.example/alice': 'revoked', 'local.example/bob': 'valid' };
+	localStorage.setItem('account', JSON.stringify({ id: 'bob', token: 'valid' }));
+	await leaveRevokedAccount({ id: 'alice', token: 'revoked' });
+	expect(mocks.state.accountTokens).toEqual({ 'local.example/bob': 'valid' });
+	expect(JSON.parse(localStorage.getItem('account')!)).toMatchObject({ id: 'bob' });
+});
+
+test('a device storage write failure after revocation still opens the guest page', async () => {
+	localStorage.setItem('account', JSON.stringify({ id: 'alice', token: 'revoked' }));
+	const write = vi.spyOn(store, 'set').mockRejectedValueOnce(new Error('failed to write'));
+	try {
+		await leaveRevokedAccount({ id: 'alice', token: 'revoked' });
+		expect(localStorage.getItem('account')).toBeNull();
+		expect(unisonReload).toHaveBeenCalledWith('/');
+	} finally {
+		write.mockRestore();
+	}
 });
 
 test('worker reads only the persisted canonical host when served from an alias', async () => {

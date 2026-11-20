@@ -1117,22 +1117,33 @@ describe('RoleService', () => {
 		});
 	});
 
+	test('rolls back assignment changes when updating the role fails, and allows retry', async () => {
+		const role = await createRole({ name: 'test-rollback', isModerator: true });
+		const existing = await createUser();
+		const newcomer = await createUser();
+		await roleService.assign(existing.id, role.id);
+		expect(await roleService.isModerator(existing)).toBe(true);
+		expect(await roleService.isModerator(newcomer)).toBe(false);
+		const publish = vi.spyOn(app.get(GlobalEventService), 'publishInternalEvent');
+		await rolesRepository.query(`ALTER TABLE "role" ADD CONSTRAINT "test_role_update" CHECK ("name" <> 'test-rollback') NOT VALID`);
+		try {
+			await expect(roleService.unassign(existing.id, role.id)).rejects.toThrow('test_role_update');
+			await expect(roleService.assign(newcomer.id, role.id)).rejects.toThrow('test_role_update');
+			expect(await roleAssignmentsRepository.existsBy({ userId: existing.id, roleId: role.id })).toBe(true);
+			expect(await roleAssignmentsRepository.existsBy({ userId: newcomer.id, roleId: role.id })).toBe(false);
+			expect(publish).not.toHaveBeenCalled();
+		} finally {
+			await rolesRepository.query('ALTER TABLE "role" DROP CONSTRAINT "test_role_update"');
+		}
+		await roleService.unassign(existing.id, role.id);
+		await roleService.assign(newcomer.id, role.id);
+		expect(await roleService.isModerator(existing)).toBe(false);
+		expect(await roleService.isModerator(newcomer)).toBe(true);
+		expect(publish).toHaveBeenCalledWith('userRoleUnassigned', expect.objectContaining({ userId: existing.id }));
+		expect(publish).toHaveBeenCalledWith('userRoleAssigned', expect.objectContaining({ userId: newcomer.id }));
+	});
+
 	describe('assign', () => {
-		test('propagates the last-used update failure before returning', async () => {
-			const user = await createUser();
-			const role = await createRole();
-			vi.spyOn(rolesRepository, 'update').mockRejectedValueOnce(new Error('update failed'));
-			await expect(roleService.assign(user.id, role.id)).rejects.toThrow('update failed');
-		});
-
-		test('unassign awaits the last-used update', async () => {
-			const user = await createUser();
-			const role = await createRole();
-			await roleService.assign(user.id, role.id);
-			vi.spyOn(rolesRepository, 'update').mockRejectedValueOnce(new Error('update failed'));
-			await expect(roleService.unassign(user.id, role.id)).rejects.toThrow('update failed');
-		});
-
 		test('公開ロールの場合は通知される', async () => {
 			const user = await createUser();
 			const role = await createRole({

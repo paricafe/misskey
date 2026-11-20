@@ -150,6 +150,27 @@ test('client_credentials uses persisted app-only grants and Basic client authent
 	assert.equal((await f.server.inject({ method: 'POST', url: '/oauth/token', payload: { ...client, grant_type: 'refresh_token' } })).json().error, 'unsupported_grant_type');
 });
 
+test('daily NeoDB checks return short-lived app tokens and leave other clients signed in', async t => {
+	const f = await fixture(t);
+	const client = await f.app('read');
+	const payload = { ...client, grant_type: 'client_credentials' };
+	const issue = (agent: string) => f.server.inject({ method: 'POST', url: '/oauth/token', headers: { 'user-agent': agent }, payload });
+	const verify = (token: string) => f.server.inject({ method: 'GET', url: '/api/v1/apps/verify_credentials', headers: { authorization: `Bearer ${token}` } });
+	const ordinary = (await issue('another client')).json();
+	assert.equal(ordinary.expires_in, undefined);
+	for (let day = 0; day < 3; day++) {
+		const token = (await issue('NeoDB/1')).json();
+		assert.ok(token.expires_in > 0);
+		assert.equal((await verify(token.access_token)).statusCode, 200);
+		f.advance(token.expires_in * 1000);
+		assert.equal((await verify(token.access_token)).statusCode, 401);
+		f.advance(86_400_000 - token.expires_in * 1000);
+		await f.store.prune(1000 + (day + 1) * 86_400_000);
+		assert.equal(await f.store.getGrant(token.access_token, 0), undefined);
+	}
+	assert.equal((await verify(ordinary.access_token)).statusCode, 200);
+});
+
 test('revocation is client-owned, persistent and idempotent', async t => {
 	const f = await fixture(t);
 	const client = await f.app('read');

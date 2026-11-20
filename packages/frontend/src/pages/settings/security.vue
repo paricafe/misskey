@@ -67,7 +67,8 @@ import * as os from '@/os.js';
 import { misskeyApi } from '@/utility/misskey-api.js';
 import { i18n } from '@/i18n.js';
 import { cloudBackup } from '@/preferences/utility.js';
-import { signout } from '@/signout.js';
+import { leaveRevokedAccount } from '@/accounts.js';
+import { ensureSignin } from '@/i.js';
 import { store } from '@/store.js';
 import { definePage } from '@/page.js';
 import MkFeatureBanner from '@/components/MkFeatureBanner.vue';
@@ -111,26 +112,30 @@ async function change() {
 }
 
 async function regenerateToken() {
+	const me = ensureSignin();
 	const auth = await os.authenticateDialog();
 	if (auth.canceled) return;
 
-	os.waiting();
-
-	// トークンが消えるので先にバックアップを終わらせる
-	if (store.s.enablePreferencesAutoCloudBackup) {
-		try {
-			await cloudBackup();
-		} catch {
-			// nop
+	const done = os.waiting();
+	try {
+		if (store.s.enablePreferencesAutoCloudBackup) {
+			await cloudBackup(AbortSignal.timeout(5000)).catch(() => {});
 		}
+
+		await misskeyApi('i/regenerate-token', {
+			password: auth.result.password,
+			token: auth.result.token,
+		});
+		await leaveRevokedAccount(me);
+	} catch (error) {
+		os.alert({
+			type: 'error',
+			title: i18n.ts.somethingHappened,
+			text: error != null && typeof error === 'object' && 'message' in error ? String(error.message) : undefined,
+		});
+	} finally {
+		done();
 	}
-
-	await misskeyApi('i/regenerate-token', {
-		password: auth.result.password,
-		token: auth.result.token,
-	});
-
-	await signout(false);
 }
 
 const headerActions = computed(() => []);

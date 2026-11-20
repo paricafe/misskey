@@ -5,6 +5,7 @@
 
 import type { Page } from 'playwright';
 import {
+	api,
 	registerUser as registerUserWithBaseUrl,
 	resetState as resetStateWithBaseUrl,
 	signIn as signInWithBaseUrl,
@@ -26,6 +27,10 @@ export {
 } from './shared.js';
 
 export const BASE_URL = 'http://localhost:61812';
+
+export async function completeAccountSetup(token: string): Promise<void> {
+	await api(BASE_URL, 'i/registry/set', { i: token, scope: ['client', 'base'], key: 'accountSetupWizard', value: -1 });
+}
 
 export async function resetState(): Promise<void> {
 	await resetStateWithBaseUrl(BASE_URL);

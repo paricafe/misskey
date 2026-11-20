@@ -252,6 +252,8 @@ uploader.events.on('itemUploaded', ctx => {
 	uploader.removeItem(ctx.item);
 });
 
+const draftStorageKey = computed(() => replyTargetNote.value || renoteTargetNote.value ? `drafts:${$i.id}` as const : 'drafts');
+
 const draftKey = computed((): string => {
 	let key = targetChannel.value ? `channel:${targetChannel.value.id}` : '';
 
@@ -960,7 +962,7 @@ type StoredDrafts = {
 function saveDraft() {
 	if (props.instant || props.mock || props.updateMode) return;
 
-	const draftsData = JSON.parse(miLocalStorage.getItem('drafts') ?? '{}') as StoredDrafts;
+	const draftsData = JSON.parse(miLocalStorage.getItem(draftStorageKey.value) ?? '{}') as StoredDrafts;
 
 	draftsData[draftKey.value] = {
 		updatedAt: new Date().toISOString(),
@@ -979,17 +981,17 @@ function saveDraft() {
 		},
 	};
 
-	miLocalStorage.setItem('drafts', JSON.stringify(draftsData));
+	miLocalStorage.setItem(draftStorageKey.value, JSON.stringify(draftsData));
 }
 
 function deleteDraft() {
 	if (props.updateMode) return;
 
-	const draftsData = JSON.parse(miLocalStorage.getItem('drafts') ?? '{}') as StoredDrafts;
+	const draftsData = JSON.parse(miLocalStorage.getItem(draftStorageKey.value) ?? '{}') as StoredDrafts;
 
 	delete draftsData[draftKey.value];
 
-	miLocalStorage.setItem('drafts', JSON.stringify(draftsData));
+	miLocalStorage.setItem(draftStorageKey.value, JSON.stringify(draftsData));
 }
 
 async function saveServerDraft(options: {
@@ -1526,7 +1528,7 @@ onMounted(() => {
 
 	nextTick(() => {
 		if (!props.instant && !props.mention && !props.specified && !props.mock && !props.updateMode) {
-			const draft = JSON.parse(miLocalStorage.getItem('drafts') ?? '{}')[draftKey.value] as StoredDrafts[string] | undefined;
+			const draft = JSON.parse(miLocalStorage.getItem(draftStorageKey.value) ?? '{}')[draftKey.value] as StoredDrafts[string] | undefined;
 			if (draft != null) {
 				text.value = draft.data.text;
 				useCw.value = draft.data.useCw;

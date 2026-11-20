@@ -52,6 +52,11 @@ test('PostgreSQL prunes bounded batches without deleting active or unrelated sta
 		assert.equal((await store.list('idempotency', 'alice')).length, 2);
 		await store.prune(100, 2);
 		assert.equal((await store.list('idempotency', 'alice')).length, 1);
+		const expired = await store.createGrant({ clientId: client.id, scopes: ['read'], kind: 'app' }, 0, 100);
+		assert.ok(await store.getGrant(expired.token, 99));
+		assert.equal(await store.getGrant(expired.token, 100), undefined);
+		await store.prune(100);
+		assert.equal(await store.getGrant(expired.token, 0), undefined);
 		assert.ok(await store.getIdempotency('alice', 'live', 100));
 		assert.ok(await store.getGrant(token));
 		assert.deepEqual(await store.get('status', 'alice', 'note'), { sensitive: true, expiresAt: 1 });

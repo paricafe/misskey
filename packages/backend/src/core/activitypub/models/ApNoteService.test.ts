@@ -11,6 +11,10 @@ import {
 	NOTE_HISTORY_LIMIT_ERROR_ID,
 	NoteUpdateService,
 } from '@/core/NoteUpdateService.js';
+import { loadConfig } from '@/config.js';
+import { MfmService } from '@/core/MfmService.js';
+import { ApMfmService } from '@/core/activitypub/ApMfmService.js';
+import { StatusError } from '@/misc/status-error.js';
 import { ApNoteService } from './ApNoteService.js';
 
 function createService(originNoteOverrides: Record<string, unknown> = {}) {
@@ -59,6 +63,7 @@ function createService(originNoteOverrides: Record<string, unknown> = {}) {
 	};
 	const notesRepository = {
 		findOneBy: vi.fn().mockResolvedValue(originNote),
+		existsBy: vi.fn(),
 	};
 	const apMfmService = { htmlToMfm: vi.fn().mockReturnValue('edited text') };
 	const apMentionService = { extractApMentions: vi.fn().mockResolvedValue([]) };
@@ -180,11 +185,16 @@ describe(ApNoteService, () => {
 		expect(noteUpdateService.update.mock.calls[0]?.[2]).toMatchObject({ apMentions: [mentioned] });
 	});
 
-	test('passes hashtag and quote options when converting an edited ActivityPub note', async () => {
-		const { service, apMfmService } = createService();
+	test.each([
+		['stored-quote', true, true],
+		['different-quote', false, false],
+		[null, false, false],
+	] as const)('matches the edited quote URL to the stored target %s', async (renoteId, matches, hasQuote) => {
+		const { service, apMfmService, notesRepository } = createService({ renoteId });
+		notesRepository.existsBy.mockResolvedValue(matches);
 		const tag = [{ type: 'Hashtag', name: '#example' }];
 		await service.updateNote({ ...update, tag, quoteUrl: 'https://other.example/notes/quoted' } as never);
-		expect(apMfmService.htmlToMfm).toHaveBeenCalledWith(update.content, { tag, hasQuote: true });
+		expect(apMfmService.htmlToMfm).toHaveBeenCalledWith(update.content, { tag, hasQuote });
 	});
 
 	test.each([
@@ -492,6 +502,39 @@ describe(ApNoteService, () => {
 
 		expect(apImageService.resolveImage).toHaveBeenCalledOnce();
 		expect(noteUpdateService.update).not.toHaveBeenCalled();
+	});
+});
+
+describe('incoming HTML quotes', () => {
+	test.each(['resolved', 'missing', 'temporary'] as const)('handles a %s target', async outcome => {
+		const { service } = createService();
+		const actor = { id: 'remote-user', host: 'remote.example', uri: update.attributedTo };
+		const quoteUrl = 'https://other.example/notes/quoted';
+		const note = { ...update, quoteUrl, content: `<p>comment</p><span class="quote-inline">RE: <a href="${quoteUrl}">${quoteUrl}</a></span>` };
+		const create = vi.fn();
+		Object.assign(service, {
+			logger: { debug: vi.fn(), info: vi.fn() },
+			apMfmService: new ApMfmService(new MfmService(loadConfig())),
+			apMentionService: { extractApMentionObjects: () => [], extractApMentions: async () => [] },
+			apAudienceService: { parseAudience: async () => ({ visibility: 'public', visibleUsers: [] }) },
+			apQuestionService: { extractPollFromQuestion: async () => undefined },
+			noteCreateService: { create, checkProhibitedWordsContain: () => false },
+		});
+		vi.spyOn(service, 'validateNote').mockReturnValue(null);
+		const target = { id: 'quoted', userHost: 'other.example' };
+		const resolve = vi.spyOn(service, 'resolveNote');
+		if (outcome === 'resolved') resolve.mockResolvedValue(target as never);
+		else resolve.mockRejectedValue(new StatusError('remote error', outcome === 'missing' ? 404 : 503, 'remote error'));
+		const incoming = service.createNote(note as never, actor as never, { resolve: async () => note } as never);
+		if (outcome === 'temporary') {
+			await expect(incoming).rejects.toThrow('quote resolve failed');
+			expect(create).not.toHaveBeenCalled();
+		} else {
+			await incoming;
+			expect(create.mock.calls[0][1]).toMatchObject(outcome === 'resolved'
+				? { text: 'comment', renote: target }
+				: { text: expect.stringContaining(quoteUrl), renote: undefined });
+		}
 	});
 });
 

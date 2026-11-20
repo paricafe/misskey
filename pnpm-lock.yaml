@@ -458,6 +458,9 @@ importers:
       deep-email-validator:
         specifier: 0.1.27
         version: 0.1.27
+      etiket:
+        specifier: 1.1.0
+        version: 1.1.0
       fastify:
         specifier: 5.12.8
         version: 5.12.8

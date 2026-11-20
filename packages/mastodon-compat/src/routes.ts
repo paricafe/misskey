@@ -7,7 +7,7 @@ import { createHash } from 'node:crypto';
 import type { FastifyInstance, FastifyReply, FastifyRequest, HTTPMethods } from 'fastify';
 import { EntityConverter } from './entities.js';
 import { NativeClient, NativeError } from './native-client.js';
-import { getAuthorization } from './oauth.js';
+import { getAuthorization, isNeoDBRequest } from './oauth.js';
 import { allowsScope, assertScope, toNativePermissions } from './scopes.js';
 import { CompatStore, type Grant } from './store.js';
 import { array, boolean, compareIds, HttpError, integer, pageRows, pagination, string, strings } from './parameters.js';
@@ -132,7 +132,7 @@ export function registerRoutes(app: FastifyInstance, deps: RouteDependencies): R
 	for (const version of [1, 2] as const) add('GET', `/api/v${version}/instance`, undefined, async c => {
 		const vary = c.reply.getHeader('Vary');
 		if (vary !== '*') c.reply.header('Vary', vary ? `${vary}, User-Agent` : 'User-Agent');
-		const versionStyle = /^neodb\//i.test(c.request.headers['user-agent'] ?? '') ? 'neodb' : 'compatible';
+		const versionStyle = isNeoDBRequest(c.request) ? 'neodb' : 'compatible';
 		return entities.instance(await meta(), await native.call('stats', {}), version, versionStyle);
 	}, true);
 	add('GET', '/api/v1/instance/rules', undefined, async () => array((await meta()).serverRules).map((text, index) => ({ id: String(index + 1), text, hint: '' })), true);

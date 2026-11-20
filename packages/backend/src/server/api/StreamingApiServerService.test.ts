@@ -167,6 +167,72 @@ describe('native streaming shutdown', () => {
 		}
 	});
 
+	test('spreads periodic checks across the interval and bounds concurrent lookups', async () => {
+		vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval', 'setTimeout', 'clearTimeout'] });
+		let active = 0;
+		let peak = 0;
+		const starts = new Map<string, number>();
+		const authenticate = vi.fn().mockResolvedValue([{ id: 'alice' }, null]);
+		const { service, server, client } = await setup(undefined, authenticate, 'member-0');
+		const sockets = [client];
+		try {
+			await once(client, 'open');
+			await Promise.all(Array.from({ length: 120 }, async (_, i) => {
+				const ws = new WebSocket(client.url.replace('member-0', `member-${i}`));
+				sockets.push(ws);
+				await once(ws, 'open');
+			}));
+			authenticate.mockImplementation(async (token: string) => {
+				expect(starts.has(token)).toBe(false);
+				starts.set(token, Date.now());
+				peak = Math.max(peak, ++active);
+				await new Promise<void>(resolve => setTimeout(resolve, 20));
+				active--;
+				return [{ id: 'alice' }, null];
+			});
+			await vi.advanceTimersByTimeAsync(10_100);
+			expect(starts.size).toBe(120);
+			expect(peak).toBeLessThanOrEqual(4);
+			expect(Math.max(...starts.values()) - Math.min(...starts.values())).toBeGreaterThan(8000);
+			expect(sockets.every(ws => ws.readyState === WebSocket.OPEN)).toBe(true);
+		} finally {
+			vi.useRealTimers();
+			for (const ws of sockets) ws.terminate();
+			await service.detach();
+			await new Promise<void>(resolve => server.close(() => resolve()));
+		}
+	});
+
+	test('expires queued checks while hung queries still occupy their concurrency slots', async () => {
+		vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval', 'setTimeout', 'clearTimeout'] });
+		const authenticate = vi.fn().mockResolvedValue([{ id: 'alice' }, null]);
+		const { service, server, client } = await setup(undefined, authenticate, 'member-0');
+		const sockets = [client];
+		const blocked = Promise.withResolvers<unknown[]>();
+		try {
+			await once(client, 'open');
+			await Promise.all(Array.from({ length: 7 }, async (_, i) => {
+				const ws = new WebSocket(client.url.replace('member-0', `member-${i + 1}`));
+				sockets.push(ws);
+				await once(ws, 'open');
+			}));
+			authenticate.mockClear().mockReturnValue(blocked.promise);
+			const closed = Promise.all(sockets.map(ws => once(ws, 'close')));
+			await vi.advanceTimersByTimeAsync(20_000);
+			await closed;
+			expect(authenticate).toHaveBeenCalledTimes(4);
+			blocked.resolve([{ id: 'alice' }, null]);
+			await vi.advanceTimersByTimeAsync(0);
+			expect(authenticate).toHaveBeenCalledTimes(4);
+		} finally {
+			blocked.resolve([{ id: 'alice' }, null]);
+			vi.useRealTimers();
+			for (const ws of sockets) ws.terminate();
+			await service.detach();
+			await new Promise<void>(resolve => server.close(() => resolve()));
+		}
+	});
+
 	test('closes connected clients and removes listeners before resolving detach', async () => {
 		const { redis, stream, service, server, client } = await setup();
 		try {

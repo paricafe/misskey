@@ -184,6 +184,8 @@ describe('2要素認証', () => {
 			password,
 		}, alice);
 		assert.strictEqual(registerResponse.status, 200);
+		assert.match(registerResponse.body.qr, /^data:image\/png;base64,iVBOR/);
+		assert.strictEqual(OTPAuth.URI.parse(registerResponse.body.url).secret.base32, registerResponse.body.secret);
 		assert.notEqual(registerResponse.body.url, undefined);
 		assert.notEqual(registerResponse.body.secret, undefined);
 		assert.strictEqual(registerResponse.body.label, username);

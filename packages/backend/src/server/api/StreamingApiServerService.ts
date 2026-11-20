@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { createHash } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
 import * as Redis from 'ioredis';
 import * as WebSocket from 'ws';
@@ -20,6 +21,11 @@ import type * as http from 'node:http';
 import type { Duplex } from 'node:stream';
 import type { EventEmitter } from 'node:events';
 
+const AUTHORIZATION_INTERVAL = 10_000;
+const AUTHORIZATION_BUCKETS = 40;
+const MAX_CONCURRENT_AUTHORIZATION_CHECKS = 4;
+type Authorization = [MiLocalUser | null, MiAccessToken | null];
+
 export function isNativeStreamingPath(url: string): boolean {
 	try {
 		return new URL(url, 'http://localhost').pathname === '/streaming';
@@ -34,8 +40,10 @@ export class StreamingApiServerService {
 	#connections = new Map<WebSocket.WebSocket, number>();
 	#cleanConnectionsIntervalId: NodeJS.Timeout | null = null;
 	#authorizationIntervalId: NodeJS.Timeout | null = null;
-	#authorizations = new Map<WebSocket.WebSocket, () => Promise<void>>();
-	#authorizationChecks = new Map<string, Promise<[MiLocalUser | null, MiAccessToken | null]>>();
+	#authorizationBuckets = Array.from({ length: AUTHORIZATION_BUCKETS }, () => new Set<() => Promise<void>>());
+	#authorizationChecks = new Map<string, Promise<Authorization>>();
+	#authorizationQueue = new Set<() => void>();
+	#activeAuthorizationChecks = 0;
 	#server?: http.Server;
 	#upgradeListener?: (request: http.IncomingMessage, socket: Duplex, head: Buffer) => void;
 	#redisListener?: (channel: string, data: string) => void;
@@ -147,7 +155,12 @@ export class StreamingApiServerService {
 				this.#wss.handleUpgrade(request, socket, head, (ws) => {
 					connection = ws;
 					adopted = true;
-					if (user) this.#authorizations.set(ws, authorize);
+					if (user && token) {
+						const bucketIndex = createHash('sha256').update(token).digest().readUInt32BE() % AUTHORIZATION_BUCKETS;
+						const bucket = this.#authorizationBuckets[bucketIndex];
+						bucket.add(authorize);
+						ws.once('close', () => bucket.delete(authorize));
+					}
 					this.#wss.emit('connection', ws, request, {
 						stream, user, app, ev,
 					});
@@ -202,7 +215,6 @@ export class StreamingApiServerService {
 				ev.removeAllListeners();
 				stream.dispose();
 				this.#connections.delete(connection);
-				this.#authorizations.delete(connection);
 				if (user) this.onUserDisconnected(user);
 			});
 
@@ -223,27 +235,56 @@ export class StreamingApiServerService {
 				}
 			}
 		}, 1000 * 60);
+		const bucketDuration = AUTHORIZATION_INTERVAL / AUTHORIZATION_BUCKETS;
+		const started = performance.now();
+		let processedTicks = 0;
 		this.#authorizationIntervalId = setInterval(() => {
-			for (const authorize of this.#authorizations.values()) void authorize();
-		}, 10_000);
+			const elapsedTicks = Math.floor((performance.now() - started) / bucketDuration);
+			const dueTicks = Math.max(processedTicks + 1, elapsedTicks);
+			for (let tick = Math.max(processedTicks, dueTicks - AUTHORIZATION_BUCKETS); tick < dueTicks; tick++) {
+				for (const authorize of this.#authorizationBuckets[tick % AUTHORIZATION_BUCKETS]) void authorize();
+			}
+			processedTicks = dueTicks;
+		}, bucketDuration);
 	}
 
-	private authenticateFresh(token: string, reusePending: boolean): Promise<[MiLocalUser | null, MiAccessToken | null]> {
+	private authenticateFresh(token: string, reusePending: boolean): Promise<Authorization> {
 		const pending = reusePending ? this.#authorizationChecks.get(token) : undefined;
 		if (pending) return pending;
-		let timeout: NodeJS.Timeout;
-		const check = Promise.race([
-			this.authenticateService.authenticate(token, { fresh: true, updateLastUsedAt: false }),
-			new Promise<never>((_, reject) => {
-				timeout = setTimeout(() => reject(new AuthenticationError('Authorization check timed out')), 10_000);
-				timeout.unref();
-			}),
-		]).finally(() => {
-			clearTimeout(timeout);
+
+		const check = new Promise<Authorization>((resolve, reject) => {
+			const run = () => {
+				this.#activeAuthorizationChecks++;
+				this.authenticateService.authenticate(token, { fresh: true, updateLastUsedAt: false })
+					.then(resolve, reject)
+					.finally(() => {
+						clearTimeout(timeout);
+						// A timed-out query still occupies a database connection until it settles.
+						this.#activeAuthorizationChecks--;
+						this.runNextAuthorizationCheck();
+					});
+			};
+			const timeout = setTimeout(() => {
+				this.#authorizationQueue.delete(run);
+				reject(new AuthenticationError('Authorization check timed out'));
+			}, AUTHORIZATION_INTERVAL);
+			timeout.unref();
+			this.#authorizationQueue.add(run);
+			this.runNextAuthorizationCheck();
+		}).finally(() => {
 			if (this.#authorizationChecks.get(token) === check) this.#authorizationChecks.delete(token);
 		});
 		if (reusePending) this.#authorizationChecks.set(token, check);
 		return check;
+	}
+
+	private runNextAuthorizationCheck(): void {
+		if (this.#activeAuthorizationChecks >= MAX_CONCURRENT_AUTHORIZATION_CHECKS) return;
+		const next = this.#authorizationQueue.values().next();
+		if (!next.done) {
+			this.#authorizationQueue.delete(next.value);
+			next.value();
+		}
 	}
 
 	@bindThis

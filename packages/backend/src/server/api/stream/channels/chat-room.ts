@@ -22,6 +22,7 @@ export class ChatRoomChannel extends Channel {
 	private roomId: string;
 	private disposed = false;
 	private permissionExpiresAt = 0;
+	private retryPermissionAt = 0;
 	private permissionCheck: Promise<boolean> | null = null;
 	private permissionIntervalId: NodeJS.Timeout | null = null;
 
@@ -44,7 +45,8 @@ export class ChatRoomChannel extends Channel {
 
 		this.roomId = params.roomId;
 		this.subscriber.on(`chatRoomMembership:${this.roomId}:${this.user.id}`, this.onInternalEvent);
-		if (!(await this.checkPermission()) || this.disposed) return false;
+		await this.checkPermission();
+		if (this.disposed) return false;
 
 		this.subscriber.on(`chatRoomStream:${this.roomId}`, this.onEvent);
 		this.permissionIntervalId = setInterval(() => { void this.checkPermission(); }, 10_000);
@@ -68,6 +70,7 @@ export class ChatRoomChannel extends Channel {
 		if (this.disposed || !this.user) return Promise.resolve(false);
 		if (this.permissionCheck) return this.permissionCheck;
 		if (Date.now() < this.permissionExpiresAt) return Promise.resolve(true);
+		if (Date.now() < this.retryPermissionAt) return Promise.resolve(false);
 		this.permissionCheck = (async () => {
 			try {
 				const room = await this.chatRoomsRepository.findOneBy({ id: this.roomId });
@@ -78,7 +81,7 @@ export class ChatRoomChannel extends Channel {
 				this.permissionExpiresAt = Date.now() + 10_000;
 				return !this.disposed;
 			} catch {
-				this.connection.disconnectChannel(this.id);
+				this.retryPermissionAt = Date.now() + 1000;
 				return false;
 			} finally {
 				this.permissionCheck = null;

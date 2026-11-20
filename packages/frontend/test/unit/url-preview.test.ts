@@ -6,6 +6,7 @@
 import { describe, test, assert, afterEach } from 'vitest';
 import { render, cleanup, type RenderResult } from '@testing-library/vue';
 import type { SummalyResult } from '@misskey-dev/summaly';
+import { preferState } from '../setup.unit.js';
 import { components } from '@/components/index.js';
 import { directives } from '@/directives/index.js';
 import MkUrlPreview from '@/components/MkUrlPreview.vue';
@@ -57,6 +58,7 @@ describe('MkUrlPreview', () => {
 	};
 
 	afterEach(() => {
+		delete preferState.expandUrlPreviewAutomatically;
 		fetchMock.resetMocks();
 		cleanup();
 	});
@@ -99,6 +101,21 @@ describe('MkUrlPreview', () => {
 			iframe?.sandbox.toString(),
 			'allow-popups allow-popups-to-escape-sandbox allow-scripts allow-storage-access-by-user-activation allow-same-origin',
 		);
+	});
+
+	test.each([false, true])('automatic player expansion respects sensitive=%s', async sensitive => {
+		preferState.expandUrlPreviewAutomatically = true;
+		const preview = await renderPreviewBy({
+			url: 'https://example.local',
+			sensitive,
+			player: { url: 'https://example.local/player', width: 400, height: 200, allow: [] },
+		});
+		assert.strictEqual(preview.container.querySelector('iframe') === null, sensitive);
+		if (sensitive) {
+			preview.getAllByRole('button')[0].click();
+			await Promise.resolve();
+			assert.exists(preview.container.querySelector('iframe'));
+		}
 	});
 
 	test('Having a player with `allow` field should set permissions', async () => {

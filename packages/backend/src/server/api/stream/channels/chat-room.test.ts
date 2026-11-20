@@ -83,15 +83,48 @@ describe('chat room streaming authorization', () => {
 		}
 	});
 
-	test('fails closed when the permission refresh fails', async () => {
+	test('pauses reads and deliveries until permission can be checked again', async () => {
 		vi.useFakeTimers();
-		const { channel, subscriber, sendMessageToWs, permission } = setup();
+		const { channel, subscriber, sendMessageToWs, permission, readRoomChatMessage } = setup();
 		try {
 			await channel.init({ roomId: 'room' });
 			permission.mockRejectedValue(new Error('database unavailable'));
 			await vi.advanceTimersByTimeAsync(10_000);
 			subscriber.emit('chatRoomStream:room', message);
 			expect(sendMessageToWs).not.toHaveBeenCalled();
+			await channel.onMessage('read', {});
+			expect(readRoomChatMessage).not.toHaveBeenCalled();
+			expect(permission).toHaveBeenCalledTimes(2);
+			permission.mockResolvedValue(true);
+			await vi.advanceTimersByTimeAsync(10_000);
+			subscriber.emit('chatRoomStream:room', message);
+			await channel.onMessage('read', {});
+			expect(sendMessageToWs).toHaveBeenCalledOnce();
+			expect(readRoomChatMessage).toHaveBeenCalledOnce();
+		} finally {
+			channel.dispose();
+		}
+	});
+
+	test('recovers an initial lookup outage and stops on a confirmed leave during the outage', async () => {
+		vi.useFakeTimers();
+		const { channel, subscriber, sendMessageToWs, permission } = setup();
+		try {
+			permission.mockRejectedValueOnce(new Error('database unavailable'));
+			expect(await channel.init({ roomId: 'room' })).toBe(true);
+			subscriber.emit('chatRoomStream:room', message);
+			await Promise.resolve();
+			expect(sendMessageToWs).not.toHaveBeenCalled();
+			await vi.advanceTimersByTimeAsync(10_000);
+			subscriber.emit('chatRoomStream:room', message);
+			await Promise.resolve();
+			expect(sendMessageToWs).toHaveBeenCalledOnce();
+			permission.mockRejectedValueOnce(new Error('database unavailable'));
+			await vi.advanceTimersByTimeAsync(10_000);
+			subscriber.emit('chatRoomMembership:room:alice', left);
+			await vi.advanceTimersByTimeAsync(10_000);
+			subscriber.emit('chatRoomStream:room', message);
+			expect(sendMessageToWs).toHaveBeenCalledOnce();
 			expect(subscriber.listenerCount('chatRoomMembership:room:alice')).toBe(0);
 		} finally {
 			channel.dispose();

@@ -24,7 +24,9 @@ export class UserListChannel extends Channel {
 	private listId: string;
 	private membershipsMap: Record<string, Pick<MiUserListMembership, 'withReplies'> | undefined> = {};
 	private listUsersFetchCount = 0;
-	private isListDeleted = false;
+	private disposed = false;
+	private retryTimer?: NodeJS.Timeout;
+	private retryDelay = 1000;
 	private withFiles: boolean;
 	private withRenotes: boolean;
 
@@ -57,14 +59,13 @@ export class UserListChannel extends Channel {
 				userId: this.user!.id,
 			},
 		});
-		if (!listExist) return false;
+		if (!listExist || this.disposed) return false;
 
 		this.subscriber.on(`userListStream:${this.listId}`, this.onListEvent);
 
 		this.subscriber.on('notesStream', this.onNote);
 
-		// 初回。以降はイベントを受けたときだけ読み直す
-		this.updateListUsers();
+		void this.updateListUsers();
 
 		return true;
 	}
@@ -72,16 +73,13 @@ export class UserListChannel extends Channel {
 	@bindThis
 	private onListEvent(data: GlobalEvents['userList']['payload']) {
 		if (data.type === 'internalListDeleted') {
-			// リストが削除されたら、以降のノートを配信しない
-			this.isListDeleted = true;
-			this.listUsersFetchCount++;
-			this.membershipsMap = {};
+			this.connection.disconnectChannel(this.id);
 			return;
 		}
 
-		// 所属の読み直しは、メンバーシップの変更時に必ず発行される internalMembershipUpdated だけをきっかけにする
 		if (data.type === 'internalMembershipUpdated') {
-			this.updateListUsers();
+			delete this.membershipsMap[data.body.userId];
+			void this.updateListUsers();
 			return;
 		}
 
@@ -93,6 +91,7 @@ export class UserListChannel extends Channel {
 
 	@bindThis
 	private async updateListUsers() {
+		clearTimeout(this.retryTimer);
 		const fetchCount = ++this.listUsersFetchCount;
 
 		let memberships: Pick<MiUserListMembership, 'userId' | 'withReplies'>[];
@@ -104,7 +103,9 @@ export class UserListChannel extends Channel {
 				select: { userId: true, withReplies: true },
 			});
 		} catch {
-			// 取得に失敗した場合は何もしない
+			if (fetchCount !== this.listUsersFetchCount) return;
+			this.retryTimer = setTimeout(() => { void this.updateListUsers(); }, this.retryDelay);
+			this.retryDelay = Math.min(this.retryDelay * 2, 10_000);
 			return;
 		}
 
@@ -118,6 +119,7 @@ export class UserListChannel extends Channel {
 			};
 		}
 		this.membershipsMap = membershipsMap;
+		this.retryDelay = 1000;
 	}
 
 	@bindThis
@@ -128,14 +130,15 @@ export class UserListChannel extends Channel {
 
 		if (this.withFiles && (note.fileIds == null || note.fileIds.length === 0)) return;
 
-		if (!Object.hasOwn(this.membershipsMap, note.userId)) return;
+		const membership = this.membershipsMap[note.userId];
+		if (!membership) return;
 
 		if (!this.isNoteVisibleForMe(note)) return;
 
 		if (note.reply) {
 			const reply = note.reply;
 			if (reply.userId !== this.user!.id && !isMe && reply.userId !== note.userId) {
-				if (!this.membershipsMap[note.userId]?.withReplies) return;
+				if (!membership.withReplies) return;
 				if (!this.isNoteVisibleForMe(reply)) return;
 			}
 		}
@@ -151,14 +154,18 @@ export class UserListChannel extends Channel {
 
 		const packed = await this.noteEntityService.withMyRenoteReaction(note, this.user?.id ?? null);
 
-		// 処理中にリストが削除されていれば送らない
-		if (this.isListDeleted) return;
+		const current = this.membershipsMap[note.userId];
+		if (!current || current.withReplies !== membership.withReplies) return;
 
 		this.send('note', packed);
 	}
 
 	@bindThis
 	public dispose() {
+		this.disposed = true;
+		this.listUsersFetchCount++;
+		this.membershipsMap = {};
+		clearTimeout(this.retryTimer);
 		this.subscriber.off(`userListStream:${this.listId}`, this.onListEvent);
 		this.subscriber.off('notesStream', this.onNote);
 	}

@@ -91,7 +91,7 @@ class PostgresAdapter implements StoreAdapter {
 		await this.transaction(async () => {
 			await this.query(`DELETE FROM "mastodon_compat_entry" e USING (
 				SELECT "namespace", "owner", "key" FROM "mastodon_compat_entry"
-				WHERE "namespace" IN ('codes', 'operations', 'kv:idempotency') AND "expiresAt" <= $1
+				WHERE "namespace" IN ('codes', 'operations', 'kv:idempotency', 'grants') AND "expiresAt" <= $1
 				ORDER BY "expiresAt", "namespace", "owner", "key" LIMIT $2
 			) expired WHERE e."namespace" = expired."namespace" AND e."owner" = expired."owner" AND e."key" = expired."key"`, [now, limit]);
 		});

@@ -6,7 +6,6 @@
 import type { BadgeNames, PushNotificationDataMap } from '@/types.js';
 import { char2fileName } from '@/scripts/twemoji-base.js';
 import { cli } from '@/scripts/operations.js';
-import { getAccountFromId } from '@/scripts/get-account-from-id.js';
 import { swLang } from '@/scripts/lang.js';
 import { getUserName } from '@/scripts/get-user-name.js';
 
@@ -18,8 +17,8 @@ const closeNotificationsByTags = async (tags: string[]): Promise<void> => {
 
 const iconUrl = (name: BadgeNames): string => `/static-assets/tabler-badges/${name}.png`;
 
-export async function createNotification<K extends keyof PushNotificationDataMap>(data: PushNotificationDataMap[K]): Promise<void> {
-	const n = await composeNotification(data);
+export async function createNotification<K extends keyof PushNotificationDataMap>(data: PushNotificationDataMap[K], token: string): Promise<void> {
+	const n = await composeNotification(data, token);
 
 	if (n) {
 		return globalThis.registration.showNotification(...n);
@@ -29,15 +28,13 @@ export async function createNotification<K extends keyof PushNotificationDataMap
 	}
 }
 
-async function composeNotification(data: PushNotificationDataMap[keyof PushNotificationDataMap]): Promise<[string, NotificationOptions] | null> {
+async function composeNotification(data: PushNotificationDataMap[keyof PushNotificationDataMap], token: string): Promise<[string, NotificationOptions] | null> {
 	const i18n = await (swLang.i18n ?? swLang.fetchLocale());
 	switch (data.type) {
 		case 'notification':
 			switch (data.body.type) {
 				case 'follow': {
-					const account = await getAccountFromId(data.userId);
-					if (!account) return null;
-					const userDetail = await cli.request('users/show', { userId: data.body.userId }, account.token);
+					const userDetail = await cli.request('users/show', { userId: data.body.userId }, token);
 					return [i18n.ts._notification.youWereFollowed, {
 						body: getUserName(data.body.user),
 						icon: data.body.user.avatarUrl ?? undefined,

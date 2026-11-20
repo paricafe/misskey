@@ -11,7 +11,7 @@ import type { Locale } from 'i18n';
 import { createEmptyNotification, createNotification } from '@/scripts/create-notification.js';
 import { swLang } from '@/scripts/lang.js';
 import * as swos from '@/scripts/operations.js';
-import { getAccounts } from '@/scripts/get-account-from-id.js';
+import { getAccountFromId, getAccounts } from '@/scripts/get-account-from-id.js';
 
 async function respondToNavigation(request: Request): Promise<Response> {
 	const controller = new AbortController();
@@ -109,6 +109,8 @@ globalThis.addEventListener('push', ev => {
 		type: 'window',
 	}).then(async () => {
 		const data: PushNotificationDataMap[keyof PushNotificationDataMap] = ev.data?.json();
+		const account = await getAccountFromId(data.userId);
+		if (!account) return;
 
 		switch (data.type) {
 			case 'notification':
@@ -116,10 +118,10 @@ globalThis.addEventListener('push', ev => {
 			case 'newChatMessage':
 				if (Date.now() - data.dateTime > 1000 * 60 * 60 * 24) break;
 
-				return createNotification(data);
+				return createNotification(data, account.token);
 			case 'readAllNotifications':
 				await globalThis.registration.getNotifications()
-					.then(notifications => notifications.forEach(n => n.tag !== 'read_notification' && n.close()));
+					.then(notifications => notifications.forEach(n => n.data?.userId === data.userId && n.close()));
 				break;
 		}
 

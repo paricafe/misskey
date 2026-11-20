@@ -160,7 +160,7 @@ class MemoryAdapter implements StoreAdapter {
 		await this.locked(() => {
 			let removed = 0;
 			for (const [key, entry] of this.data()) {
-				if (['codes', 'operations', 'kv:idempotency'].includes(entry.namespace) && entry.expiresAt != null && entry.expiresAt <= now) {
+				if (['codes', 'operations', 'kv:idempotency', 'grants'].includes(entry.namespace) && entry.expiresAt != null && entry.expiresAt <= now) {
 					this.data().delete(key);
 					if (++removed >= limit) break;
 				}
@@ -215,17 +215,21 @@ export class CompatStore {
 
 	async deleteCode(raw: string): Promise<boolean> { return this.adapter.delete('codes', '', hashCredential(raw)); }
 
-	async createGrant(input: Omit<Grant, 'tokenHash' | 'createdAt'>, now = Date.now()): Promise<{ token: string; grant: Grant }> {
+	async createGrant(input: Omit<Grant, 'tokenHash' | 'createdAt'>, now = Date.now(), expiresAt: number | null = null): Promise<{ token: string; grant: Grant }> {
 		return this.transaction(async () => {
 			if (!await this.getClient(input.clientId)) throw new Error('Unknown compatibility client');
 			const token = randomCredential();
 			const grant = { ...input, tokenHash: hashCredential(token), createdAt: now };
-			await this.adapter.put({ namespace: 'grants', owner: '', key: grant.tokenHash, value: grant, expiresAt: null }, true);
+			await this.adapter.put({ namespace: 'grants', owner: '', key: grant.tokenHash, value: grant, expiresAt }, true);
 			return { token, grant };
 		});
 	}
 
-	async getGrant(token: string): Promise<Grant | undefined> { return (await this.adapter.get('grants', '', hashCredential(token)))?.value as Grant | undefined; }
+	async getGrant(token: string, now = Date.now()): Promise<Grant | undefined> {
+		const entry = await this.adapter.get('grants', '', hashCredential(token));
+		if (!entry || (entry.expiresAt != null && entry.expiresAt <= now)) return undefined;
+		return entry.value as Grant;
+	}
 
 	async revokeGrant(token: string, clientId: string): Promise<boolean> {
 		return this.transaction(async () => {

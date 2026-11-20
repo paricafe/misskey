@@ -140,7 +140,11 @@ const icon = computed(() => summalyResult.value?.icon ?? null);
 const sitename = computed(() => summalyResult.value?.sitename ?? null);
 const sensitive = computed(() => summalyResult.value?.sensitive ?? false);
 const player = computed(() => summalyResult.value?.player ?? { url: null, width: null, height: null });
-const playerEnabled = ref(prefer.s.expandUrlPreviewAutomatically);
+const playerChoice = ref<boolean | null>(null);
+const playerEnabled = computed({
+	get: () => playerChoice.value ?? (prefer.s.expandUrlPreviewAutomatically && !sensitive.value),
+	set: (enabled: boolean) => { playerChoice.value = enabled; },
+});
 const tweetId = ref<string | null>(null);
 const tweetExpanded = ref(props.detail);
 const embedId = `embed${Math.random().toString().replace(/\D/, '')}`;
