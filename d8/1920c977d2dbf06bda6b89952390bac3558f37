@@ -1,0 +1,59 @@
+packages/mastodon-compat/test/entities.test.ts
+  4e98740baee727a0 204-212
+packages/mastodon-compat/test/routes.test.ts
+  8456b45942779734 83
+packages/mastodon-compat/src/routes.ts
+  8456b45942779734 132
+packages/mastodon-compat/src/entities.ts
+  8456b45942779734 215
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8-ntes.10",
+  "base_commit_sha": "d81920c977d2dbf06bda6b89952390bac3558f37",
+  "prompts": {
+    "4e98740baee727a0": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1f972-f9ce-7790-8b51-d56e5387279b",
+        "model": "gpt-6.2-sol"
+      },
+      "human_author": "Natsuki-Kaede",
+      "messages": [],
+      "total_additions": 9,
+      "total_deletions": 0,
+      "accepted_lines": 9,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "packages/mastodon-compat/test/entities.test.ts": {
+          "additions": 9,
+          "accepted_lines": 9
+        }
+      }
+    },
+    "8456b45942779734": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1f96b-a5e9-7461-b10b-5c0515fd88d7",
+        "model": "gpt-6.2-sol"
+      },
+      "human_author": null,
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 4,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "packages/mastodon-compat/src/entities.ts": {
+          "accepted_lines": 2
+        },
+        "packages/mastodon-compat/test/routes.test.ts": {
+          "accepted_lines": 1
+        },
+        "packages/mastodon-compat/src/routes.ts": {
+          "accepted_lines": 1
+        }
+      }
+    }
+  }
+}
