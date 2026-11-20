@@ -440,6 +440,16 @@ export class DriveService {
 			ext ?? info.type.ext,
 		);
 
+		const folder = folderId
+			? await this.driveFoldersRepository.findOneBy({
+				id: folderId,
+				userId: user ? user.id : IsNull(),
+			})
+			: null;
+		if (folderId && folder == null) {
+			throw new IdentifiableError('b9adda75-abe9-4c6d-bf12-b5575833960d', 'No such folder.');
+		}
+
 		if (user && !force) {
 			const matched = await this.driveFilesRepository.findOneBy({
 				md5: info.md5,
@@ -497,21 +507,6 @@ export class DriveService {
 			}
 		}
 
-		const fetchFolder = async () => {
-			if (!folderId) {
-				return null;
-			}
-
-			const driveFolder = await this.driveFoldersRepository.findOneBy({
-				id: folderId,
-				userId: user ? user.id : IsNull(),
-			});
-
-			if (driveFolder == null) throw new Error('folder-not-found');
-
-			return driveFolder;
-		};
-
 		const properties: {
 			width?: number;
 			height?: number;
@@ -527,8 +522,6 @@ export class DriveService {
 		}
 
 		const profile = user ? await this.userProfilesRepository.findOneBy({ userId: user.id }) : null;
-
-		const folder = await fetchFolder();
 
 		let file = new MiDriveFile();
 		file.id = this.idService.gen();

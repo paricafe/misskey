@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { dirname } from 'node:path';
+import { basename, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execa } from 'execa';
 
@@ -20,6 +20,15 @@ let persistentChildProcessFailed = false;
 /** @type {Promise<void> | null} */
 let shutdownPromise = null;
 
+function resolvePnpmCommandLine() {
+	const execPath = process.env.npm_execpath;
+	if (execPath != null && basename(execPath).toLowerCase().startsWith('pnpm')) {
+		const command = /\.[cm]?js$/i.test(execPath) ? [process.execPath, execPath] : [execPath];
+		return command.map(argument => `"${argument}"`).join(' ');
+	}
+	return `"${process.env.ComSpec ?? 'cmd.exe'}" /d /c pnpm`;
+}
+
 /**
  * @param {string} command
  * @param {string[]} args
@@ -31,9 +40,7 @@ function spawnChildProcess(command, args, options) {
 	const shouldForceColor = (process.stdout.isTTY || process.stderr.isTTY)
 		&& process.env.FORCE_COLOR == null
 		&& process.env.NO_COLOR == null;
-	const pnpmPath = _dirname + '/../node_modules/pnpm/bin/pnpm.mjs';
-	const windowsCommand = [process.execPath, pnpmPath, ...args]
-		.map(argument => `"${argument}"`)
+	const windowsCommand = [resolvePnpmCommandLine(), ...args.map(argument => `"${argument}"`)]
 		.join(' ');
 	const executable = isWindows && command === 'pnpm' ? process.env.ComSpec ?? 'cmd.exe' : command;
 	const executableArgs = isWindows && command === 'pnpm'

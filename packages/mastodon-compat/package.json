@@ -15,9 +15,9 @@
 		"test": "pnpm build && node --test dist/test/*.test.js"
 	},
 	"dependencies": {
-		"@fastify/cors": "11.3.1",
-		"@fastify/multipart": "10.1.4",
-		"fastify": "5.12.7",
+		"@fastify/cors": "11.4.2",
+		"@fastify/multipart": "10.1.8",
+		"fastify": "5.12.8",
 		"mfm-js": "0.28.0",
 		"pg": "8.23.1",
 		"ws": "8.22.0"

@@ -287,9 +287,11 @@ interface UploadOptions {
 	path?: string | URL;
 	name?: string;
 	blob?: Blob;
+	folderId?: string;
+	force?: boolean;
 }
 
-export const uploadFile = async (user?: UserToken, { path, name, blob }: UploadOptions = {}): Promise<{
+export const uploadFile = async (user?: UserToken, { path, name, blob, folderId, force }: UploadOptions = {}): Promise<{
 	status: number,
 	headers: Headers,
 	body: misskey.entities.DriveFile | null
@@ -307,9 +309,12 @@ export const uploadFile = async (user?: UserToken, { path, name, blob }: UploadO
 		basename(absPath.toString()),
 	);
 
-	formData.append('force', 'true');
+	formData.append('force', (force ?? true) ? 'true' : 'false');
 	if (name) {
 		formData.append('name', name);
+	}
+	if (folderId) {
+		formData.append('folderId', folderId);
 	}
 
 	const headers: Record<string, string> = {};

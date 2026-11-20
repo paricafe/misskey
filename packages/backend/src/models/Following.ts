@@ -57,6 +57,12 @@ export class MiFollowing {
 	})
 	public notify: 'normal' | null;
 
+	@Column('varchar', {
+		length: 512, nullable: true,
+		comment: 'id of Follow Activity.',
+	})
+	public requestId: string | null;
+
 	@Index()
 	@Column('varchar', {
 		length: 128, nullable: true,

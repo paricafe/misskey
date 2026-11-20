@@ -878,8 +878,12 @@ export class NoteCreateService implements OnApplicationShutdown {
 
 					if (!muted) {
 						nm.push(data.reply.userId, 'reply');
-						this.globalEventService.publishMainStream(data.reply.userId, 'reply', noteObj);
-						this.webhookService.enqueueUserWebhook(data.reply.userId, 'reply', { note: noteObj });
+
+						const packedForReplyUser = await this.noteEntityService.pack(note, { id: data.reply.userId }, { detail: true });
+						if (!packedForReplyUser.isHidden) {
+							this.globalEventService.publishMainStream(data.reply.userId, 'reply', packedForReplyUser);
+							this.webhookService.enqueueUserWebhook(data.reply.userId, 'reply', { note: packedForReplyUser });
+						}
 					}
 				}
 			}
@@ -899,8 +903,11 @@ export class NoteCreateService implements OnApplicationShutdown {
 					}
 
 					if (muted !== null && user.id !== data.renote.userId) {
-						this.globalEventService.publishMainStream(data.renote.userId, 'renote', noteObj);
-						this.webhookService.enqueueUserWebhook(data.renote.userId, 'renote', { note: noteObj });
+						const packedForRenoteUser = await this.noteEntityService.pack(note, { id: data.renote.userId }, { detail: true });
+						if (!packedForRenoteUser.isHidden) {
+							this.globalEventService.publishMainStream(data.renote.userId, 'renote', packedForRenoteUser);
+							this.webhookService.enqueueUserWebhook(data.renote.userId, 'renote', { note: packedForRenoteUser });
+						}
 					}
 				}
 			}

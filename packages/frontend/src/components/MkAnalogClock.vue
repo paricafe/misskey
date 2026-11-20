@@ -33,7 +33,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 
 	<line
 		ref="sLine"
-		:class="[$style.s, { [$style.animate]: !disableSAnimate && sAnimation !== 'none', [$style.elastic]: sAnimation === 'elastic', [$style.easeOut]: sAnimation === 'easeOut' }]"
+		:class="$style.s"
 		:x1="5 - (0 * (sHandLengthRatio * handsTailLength))"
 		:y1="5 + (1 * (sHandLengthRatio * handsTailLength))"
 		:x2="5 + (0 * ((sHandLengthRatio * 5) - handsPadding))"
@@ -124,7 +124,6 @@ const texts = computed(() => {
 	return angles;
 });
 
-let enabled = true;
 const majorGraduationColor = ref<string>();
 const sHandColor = ref<string>();
 const mHandColor = ref<string>();
@@ -136,9 +135,26 @@ const s = ref<number>(0);
 const hAngle = ref<number>(0);
 const mAngle = ref<number>(0);
 const sAngle = ref<number>(0);
-const disableSAnimate = ref(false);
-let sOneRound = false;
-const sLine = ref<SVGPathElement>();
+const sLine = ref<SVGLineElement>();
+let sHandAnimation: Animation | null = null;
+
+const sAnimationTimings = {
+	elastic: { duration: 200, easing: 'cubic-bezier(.4,2.08,.55,.44)' },
+	easeOut: { duration: 700, easing: 'cubic-bezier(0,.7,.3,1)' },
+} as const satisfies Record<string, KeyframeAnimationOptions>;
+
+function animateSecondHand(from: number, to: number) {
+	if (props.sAnimation === 'none' || sLine.value == null) return;
+
+	let delta = to - from;
+	if (delta < -Math.PI) delta += Math.PI * 2;
+
+	sHandAnimation?.cancel();
+	sHandAnimation = sLine.value.animate([
+		{ transform: `rotateZ(${from}rad)` },
+		{ transform: `rotateZ(${from + delta}rad)` },
+	], sAnimationTimings[props.sAnimation]);
+}
 
 function tick() {
 	const now = props.now();
@@ -154,25 +170,11 @@ function tick() {
 	}
 	hAngle.value = Math.PI * (h.value % (props.twentyfour ? 24 : 12) + (m.value + s.value / 60) / 60) / (props.twentyfour ? 12 : 6);
 	mAngle.value = Math.PI * (m.value + s.value / 60) / 30;
-	if (sOneRound && sLine.value) {
-		sAngle.value = Math.PI * 60 / 30;
-		defaultIdlingRenderScheduler.delete(tick);
-		sLine.value.addEventListener('transitionend', () => {
-			disableSAnimate.value = true;
-			requestAnimationFrame(() => {
-				sAngle.value = 0;
-				requestAnimationFrame(() => {
-					disableSAnimate.value = false;
-					if (enabled) {
-						defaultIdlingRenderScheduler.add(tick);
-					}
-				});
-			});
-		}, { once: true });
-	} else {
-		sAngle.value = Math.PI * s.value / 30;
+	const previousSAngle = sAngle.value;
+	sAngle.value = Math.PI * s.value / 30;
+	if (previousS !== s.value) {
+		animateSecondHand(previousSAngle, sAngle.value);
 	}
-	sOneRound = s.value === 59;
 }
 
 tick();
@@ -196,8 +198,8 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
-	enabled = false;
 	defaultIdlingRenderScheduler.delete(tick);
+	sHandAnimation?.cancel();
 	themeManager.off('themeChanged', calcColors);
 });
 </script>
@@ -210,13 +212,5 @@ onBeforeUnmount(() => {
 .s {
 	will-change: transform;
 	transform-origin: 50% 50%;
-
-	&.animate.elastic {
-		transition: transform .2s cubic-bezier(.4,2.08,.55,.44);
-	}
-
-	&.animate.easeOut {
-		transition: transform .7s cubic-bezier(0,.7,.3,1);
-	}
 }
 </style>
