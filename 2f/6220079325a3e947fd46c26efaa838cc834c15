@@ -1,0 +1,90 @@
+packages/backend/src/core/PushNotificationService.test.ts
+  8002ce8221349fbb 1-44
+packages/frontend/test/e2e/account-session.spec.ts
+  8002ce8221349fbb 8,236-270,272-289
+packages/backend/src/server/api/endpoints/i/regenerate-token.ts
+  8002ce8221349fbb 12,25-33,60-68
+packages/sw/src/sw.ts
+  8002ce8221349fbb 108,111-127,129-135
+packages/misskey-js/src/autogen/types.ts
+  8002ce8221349fbb 27419-27423
+packages/frontend/test/e2e/push-account.spec.ts
+  8002ce8221349fbb 8,10,50,54,100-102,110,124,132-166
+packages/backend/src/server/api/StreamingApiServerService.ts
+  8002ce8221349fbb 27-28,291-301,305-308,316-317,319-322
+packages/frontend/src/pages/settings/security.vue
+  8002ce8221349fbb 67,115-135,148,151
+packages/backend/src/server/api/StreamingApiServerService.test.ts
+  8002ce8221349fbb 152-153,163-166,176-192,194,258-260
+packages/backend/src/core/PushNotificationService.ts
+  8002ce8221349fbb 16,62-64,77-85,157
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8-ntes.10",
+  "base_commit_sha": "2f6220079325a3e947fd46c26efaa838cc834c15",
+  "prompts": {
+    "8002ce8221349fbb": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1f981-26cd-78e1-924b-f7714ea5d44c",
+        "model": "gpt-6.2-astra"
+      },
+      "human_author": "Natsuki-Kaede",
+      "messages": [],
+      "total_additions": 309,
+      "total_deletions": 103,
+      "accepted_lines": 287,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "packages/backend/src/server/api/StreamingApiServerService.ts": {
+          "additions": 23,
+          "deletions": 6,
+          "accepted_lines": 23
+        },
+        "packages/misskey-js/src/autogen/types.ts": {
+          "additions": 5,
+          "accepted_lines": 5
+        },
+        "packages/backend/src/core/PushNotificationService.test.ts": {
+          "additions": 44,
+          "accepted_lines": 44
+        },
+        "packages/sw/src/sw.ts": {
+          "additions": 26,
+          "deletions": 21,
+          "accepted_lines": 25
+        },
+        "packages/backend/src/core/PushNotificationService.ts": {
+          "additions": 14,
+          "accepted_lines": 14
+        },
+        "packages/frontend/src/pages/settings/security.vue": {
+          "additions": 24,
+          "deletions": 1,
+          "accepted_lines": 24
+        },
+        "packages/frontend/test/e2e/account-session.spec.ts": {
+          "additions": 73,
+          "deletions": 53,
+          "accepted_lines": 55
+        },
+        "packages/backend/src/server/api/StreamingApiServerService.test.ts": {
+          "additions": 33,
+          "deletions": 4,
+          "accepted_lines": 33
+        },
+        "packages/backend/src/server/api/endpoints/i/regenerate-token.ts": {
+          "additions": 22,
+          "deletions": 8,
+          "accepted_lines": 19
+        },
+        "packages/frontend/test/e2e/push-account.spec.ts": {
+          "additions": 45,
+          "deletions": 10,
+          "accepted_lines": 45
+        }
+      }
+    }
+  }
+}
