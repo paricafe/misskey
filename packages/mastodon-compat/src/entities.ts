@@ -212,7 +212,7 @@ export class EntityConverter {
 		};
 	}
 
-	instance(meta: Json, stats: Json = {}, version: 1 | 2 = 2): Json {
+	instance(meta: Json, stats: Json = {}, version: 1 | 2 = 2, versionStyle: 'compatible' | 'neodb' = 'compatible'): Json {
 		const streaming = new URL('/api/v1/streaming', this.publicUrl);
 		streaming.protocol = streaming.protocol === 'https:' ? 'wss:' : 'ws:';
 		const image = this.safeUrl(meta.bannerUrl) ?? this.safeUrl(meta.iconUrl) ?? new URL('/favicon.ico', this.publicUrl).toString();
@@ -229,9 +229,13 @@ export class EntityConverter {
 			},
 			polls: { max_options: 10, max_characters_per_option: 50, min_expiration: 300, max_expiration: 2629746 },
 		};
+		const nativeVersion = text(meta.version, 'unknown');
+		const neodbVersion = nativeVersion && !/\(compatible;|sharkey|firefish|pixelfed|friendica|mitra|neodb\//i.test(nativeVersion) ? nativeVersion : 'unknown';
 		const common = {
 			title: text(meta.name, this.host),
-			version: `4.3.0 (compatible; Misskey ${text(meta.version, 'unknown')})`,
+			version: versionStyle === 'neodb'
+				? `4.3.0+misskey.${neodbVersion}`
+				: `4.3.0 (compatible; Misskey ${nativeVersion})`,
 			description: text(meta.description),
 			languages: Array.isArray(meta.langs) ? meta.langs.filter((lang: unknown) => typeof lang === 'string') : [],
 			configuration,

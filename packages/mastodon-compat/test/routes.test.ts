@@ -80,8 +80,28 @@ async function fixture(t: TestContext, options: { store?: CompatStore; handler?:
 	const bearer = await token();
 	const request = (method: 'GET' | 'POST' | 'PUT' | 'DELETE', url: string, payload?: Json, accessToken = bearer, key?: string) => app.inject({ method, url, payload, headers: { authorization: `Bearer ${accessToken}`, ...(key ? { 'idempotency-key': key } : {}) } });
 	t.after(async () => { await app.close(); if (!options.store) await store.close(); });
-	return { store, calls, notes, followers, notifications, pinned, bookmarks, muted, token, request };
+	return { app, store, calls, notes, followers, notifications, pinned, bookmarks, muted, token, request };
 }
+
+test('both instance endpoints vary the version by the NeoDB user agent', async t => {
+	const { app } = await fixture(t, { handler: async endpoint => {
+		if (endpoint === 'meta') return response({ version: '2026.11.0-pari.0' });
+		if (endpoint === 'stats') return response({});
+	} });
+	for (const version of [1, 2]) {
+		for (const [userAgent, expected] of [
+			['NeoDB/1.0 (+https://books.test)', '4.3.0+misskey.2026.11.0-pari.0'],
+			['neodb/1.0', '4.3.0+misskey.2026.11.0-pari.0'],
+			['ExampleClient/1.0', '4.3.0 (compatible; Misskey 2026.11.0-pari.0)'],
+			['ExampleClient NeoDB/1.0', '4.3.0 (compatible; Misskey 2026.11.0-pari.0)'],
+		]) {
+			const result = await app.inject({ method: 'GET', url: `/api/v${version}/instance`, headers: { 'user-agent': userAgent } });
+			assert.equal(result.statusCode, 200, result.body);
+			assert.equal(result.json().version, expected);
+			assert.match(String(result.headers.vary), /(?:^|,\s*)User-Agent(?:,|$)/i);
+		}
+	}
+});
 
 test('timeline pages batch metadata and authors with bounded state reads and fresh request state', async t => {
 	let active = 0, peak = 0;

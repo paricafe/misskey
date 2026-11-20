@@ -129,7 +129,12 @@ export function registerRoutes(app: FastifyInstance, deps: RouteDependencies): R
 	const tag = (name: string) => ({ name, url: `${publicUrl}/tags/${encodeURIComponent(name)}`, history: [] });
 	const list = (item: Json) => ({ id: item.id, title: item.name, replies_policy: 'list', exclusive: false });
 	const meta = () => native.call<Json>('meta', { detail: true });
-	for (const version of [1, 2] as const) add('GET', `/api/v${version}/instance`, undefined, async () => entities.instance(await meta(), await native.call('stats', {}), version), true);
+	for (const version of [1, 2] as const) add('GET', `/api/v${version}/instance`, undefined, async c => {
+		const vary = c.reply.getHeader('Vary');
+		if (vary !== '*') c.reply.header('Vary', vary ? `${vary}, User-Agent` : 'User-Agent');
+		const versionStyle = /^neodb\//i.test(c.request.headers['user-agent'] ?? '') ? 'neodb' : 'compatible';
+		return entities.instance(await meta(), await native.call('stats', {}), version, versionStyle);
+	}, true);
 	add('GET', '/api/v1/instance/rules', undefined, async () => array((await meta()).serverRules).map((text, index) => ({ id: String(index + 1), text, hint: '' })), true);
 	add('GET', '/api/v1/custom_emojis', undefined, async () => array((await native.call<Json>('emojis', {})).emojis).map(item => ({ shortcode: item.name, url: item.url, static_url: item.url, visible_in_picker: true, category: item.category ?? '' })), true);
 	if (!app.hasRoute({ method: 'GET', url: '/api/v1/instance/peers' })) add('GET', '/api/v1/instance/peers', undefined, async c => (await c.call<Json[]>('federation/instances', { limit: 100 })).map(item => item.host), true);

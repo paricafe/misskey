@@ -201,3 +201,12 @@ test('provides both instance entity versions with complete collection fields', (
 	assertNoUndefined(first);
 	assertNoUndefined(second);
 });
+
+test('formats the instance version for standard clients and NeoDB', () => {
+	const meta = { version: '2026.11.0-pari.0' };
+	assert.equal(entities.instance(meta).version, '4.3.0 (compatible; Misskey 2026.11.0-pari.0)');
+	assert.equal(entities.instance(meta, {}, 2, 'neodb').version, '4.3.0+misskey.2026.11.0-pari.0');
+	for (const version of [undefined, '', '(compatible;', 'Sharkey', 'Firefish', 'Pixelfed', 'Friendica', 'Mitra', 'neodb/1']) {
+		assert.equal(entities.instance({ version }, {}, 2, 'neodb').version, '4.3.0+misskey.unknown');
+	}
+});
