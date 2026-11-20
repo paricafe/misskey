@@ -1,0 +1,680 @@
+scripts/dev.mjs
+  4e98740baee727a0 6,23-31,43
+packages/frontend/test/unit/sparkle.test.ts
+  4e98740baee727a0 12,30,34-46,68,82-83,85,90,92,98,103-106,126,135,140
+packages/backend/test/unit/misc/hpagent-proxy.ts
+  4e98740baee727a0 1-47
+packages/misskey-reversi/package.json
+  4e98740baee727a0 28-29
+packages/frontend/src/components/MkDrive.folder.vue
+  4e98740baee727a0 240-248
+packages/backend/src/server/api/stream/channels/user-list.ts
+  4e98740baee727a0 9,26-27,62,66,73-93,96-109,111-112,137-139,152,154-157,162
+renovate.json5
+  4e98740baee727a0 18-21,27-28
+packages/backend/test/unit/UserFollowingService.ts
+  4e98740baee727a0 9-11,16-20,48,100-257
+packages/frontend-shared/package.json
+  4e98740baee727a0 14-17,31
+packages/frontend/src/pages/flash/flash.vue
+  4e98740baee727a0 14,64,69,210-213,225-226,319
+packages/backend/src/misc/hpagent-proxy.ts
+  4e98740baee727a0 1-43
+.github/workflows/changelog-check.yml
+  4e98740baee727a0 25-27
+packages/frontend/src/utility/drive.ts
+  4e98740baee727a0 110-115
+packages/icons-subsetter/package.json
+  4e98740baee727a0 16-17
+packages/misskey-js/package.json
+  4e98740baee727a0 4,42-44,50
+packages/backend/src/core/DriveService.ts
+  4e98740baee727a0 443-452
+packages/frontend/src/components/MkSignupDialog.form.vue
+  4e98740baee727a0 32,137-138,175-178,198-199,203-204,207,214-226,230-233,240-241,245-246,256,284
+.github/workflows/request-release-review.yml
+  4e98740baee727a0 9-13,24-28
+packages/backend/src/core/UserFollowingService.ts
+  4e98740baee727a0 145-151,215,232,243,382,387,525-529,531-532,539,569-572,574,700-709,711-712
+packages/backend/src/core/activitypub/models/ApNoteService.ts
+  4e98740baee727a0 20,81,225,231-238,258
+packages/backend/test/utils.ts
+  4e98740baee727a0 290-291,294,312,316-317
+packages-private/changelog-checker/package.json
+  4e98740baee727a0 16,22
+.github/workflows/labeler.yml
+  4e98740baee727a0 8-9,19-70
+.github/workflows/backend-diagnostics.comment.yml
+  4e98740baee727a0 29-31
+packages-private/diagnostics-shared/package.json
+  4e98740baee727a0 21
+packages/frontend/src/pages/explore.users.vue
+  4e98740baee727a0 146,155
+locales/ja-JP.yml
+  4e98740baee727a0 361,1020,1587
+.devcontainer/devcontainer.json
+  4e98740baee727a0 7
+packages/backend/src/core/UserListService.ts
+  4e98740baee727a0 9,75,77,104,121,141-184,186-243
+packages/frontend/src/components/MkAsUi.vue
+  4e98740baee727a0 9-10,52-53,57-58,66
+packages/backend/rolldown.config.ts
+  4e98740baee727a0 16-19
+packages/backend/src/server/api/endpoints/users/lists/delete.ts
+  4e98740baee727a0 10,44-45,58
+.github/workflows/get-api-diff.yml
+  4e98740baee727a0 51,53
+packages/backend/src/core/HttpRequestService.ts
+  4e98740baee727a0 17,161-162,164,171,176,183
+packages/frontend/src/widgets/WidgetAiscriptApp.vue
+  4e98740baee727a0 11,22,63,69-70,78-79
+packages/frontend/src/components/MkUrlPreview.vue
+  4e98740baee727a0 143
+packages/backend/src/core/UserBlockingService.ts
+  4e98740baee727a0 15,24,48,70-71,134
+packages/frontend/src/aiscript/ui.ts
+  4e98740baee727a0 6-7,12-13,25,156-157,161,168,172,201,448,459,518-553,556-562,565-583,592-597,599,603-619,626,629-633,637-638,651-652,658,662,702
+packages/frontend/src/preferences/def.ts
+  4e98740baee727a0 346-348
+packages/frontend/src/components/MkDrive.vue
+  4e98740baee727a0 467-475,479-481
+packages/frontend/src/pages/settings/security.vue
+  4e98740baee727a0 69-71,117-128,132-133
+packages/backend/src/server/api/endpoints/admin/unset-user-banner.ts
+  4e98740baee727a0 11-13,39-41,65-77
+packages/mastodon-compat/package.json
+  4e98740baee727a0 18-20
+packages/frontend-embed/package.json
+  4e98740baee727a0 24,28,37-41,43,46,49,51
+packages/backend/src/core/activitypub/ApRendererService.ts
+  4e98740baee727a0 15,235-237
+packages/frontend/src/directives/click-anime.ts
+  4e98740baee727a0 11-17,29-30,34-35,47-48
+packages/backend/src/server/ActivityPubServerService.ts
+  4e98740baee727a0 870
+packages/i18n/src/autogen/locale.ts
+  4e98740baee727a0 1448-1450,4083-4086,6305-6308
+packages/backend/src/server/web/ClientServerService.ts
+  4e98740baee727a0 821
+.devcontainer/install-toolchain.sh
+  4e98740baee727a0 1-13
+.github/workflows/packages-private.yml
+  4e98740baee727a0 50-52
+packages/frontend/src/pages/antenna-timeline.vue
+  4e98740baee727a0 24,31,52-77,85-88
+packages/frontend/src/pages/settings/preferences.vue
+  4e98740baee727a0 773-780,956
+packages/frontend/src/components/MkReactionEffect.vue
+  4e98740baee727a0 8,15,30,35,37-56
+packages/frontend/src/signout.ts
+  4e98740baee727a0 15,18-20
+packages/frontend/src/components/MkSparkle.vue
+  4e98740baee727a0 13-14,27,34-36,47-68,97-98,153
+.github/workflows/test-backend.yml
+  4e98740baee727a0 183
+packages-private/diagnostics-frontend/package.json
+  4e98740baee727a0 20,22
+packages/backend/src/core/GlobalEventService.ts
+  4e98740baee727a0 157-159
+packages/frontend/src/pages/scratchpad.vue
+  4e98740baee727a0 17,20,34-36,42,58,86,88,111,120,129-131,180-182,184-187,193-194
+packages/frontend/src/components/MkButton.vue
+  4e98740baee727a0 117-133
+packages/frontend/test/unit/aiscript/ui.test.ts
+  4e98740baee727a0 8,10,28,33,37-39,53,56,60,62,138,142,224,273,325,365,405,446,485,526,566,610,678,713,736,780,822-856,858-901,903-917
+.github/workflows/validate-api-json.yml
+  4e98740baee727a0 40
+.github/workflows/check-misskey-js-autogen.yml
+  4e98740baee727a0 44,46
+packages/backend/src/server/api/endpoints/admin/unset-user-avatar.ts
+  4e98740baee727a0 11-13,39-41,65-77
+packages/frontend/test/unit/lightbox.test.ts
+  4e98740baee727a0 1-283
+packages/frontend/src/components/MkPlusOneEffect.vue
+  4e98740baee727a0 8,13,28,33,35-54
+packages/frontend-builder/package.json
+  4e98740baee727a0 15-17,23-24
+packages/misskey-bubble-game/package.json
+  4e98740baee727a0 30-31
+packages/frontend/src/components/MkLightbox.item.vue
+  4e98740baee727a0 67-68,77,241-242,549,599-628,635,637,739,802,816-819,901-902,904,906-907,914,919
+packages/misskey-js/generator/package.json
+  4e98740baee727a0 12-13
+packages/backend/migration/1794917481157-following-request-id.js
+  4e98740baee727a0 1-23
+packages/backend/src/core/NoteCreateService.ts
+  4e98740baee727a0 881-886,906-910
+packages/sw/package.json
+  4e98740baee727a0 18-19
+packages/frontend/package.json
+  4e98740baee727a0 26,30,44,46,56,63,70,75-76,81,92-93,109-113,115,117,123-124,128-129,132-135,139-140,142,145
+packages/backend/src/core/AccountMoveService.ts
+  4e98740baee727a0 12,29,66,211
+packages/frontend/src/components/MkAnalogClock.vue
+  4e98740baee727a0 36,138-157,173-176,202
+packages/backend/package.json
+  4e98740baee727a0 36,53-54,56,58-59,64-67,70-74,79,88,104-105,114-115,117,124,128,130,135,138,142,147-148,170-172,180,183-185
+packages/frontend/src/components/MkDigitalClock.vue
+  4e98740baee727a0 9,11,13,19,38-40,43-51,53,62,69
+package.json
+  4e98740baee727a0 9,61,67-68
+packages/backend/src/models/Following.ts
+  4e98740baee727a0 60-65
+CHANGELOG.md
+  4e98740baee727a0 1,4,7-12,16-21
+packages/i18n/package.json
+  4e98740baee727a0 32-33
+packages-private/diagnostics-backend/package.json
+  4e98740baee727a0 24
+packages/backend/src/server/api/endpoints/drive/files/create.ts
+  4e98740baee727a0 72-77,137
+packages/backend/test/e2e/drive.ts
+  4e98740baee727a0 10,56-65
+packages/backend/src/core/activitypub/ApInboxService.ts
+  4e98740baee727a0 341-344
+packages/frontend/src/directives/anim.ts
+  4e98740baee727a0 10-17
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8-ntes.10",
+  "base_commit_sha": "96518ca05b8bf1cfb13a36ee8cb8256a5b54fc8f",
+  "prompts": {
+    "4e98740baee727a0": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1f972-f9ce-7790-8b51-d56e5387279b",
+        "model": "gpt-6.2-sol"
+      },
+      "human_author": "Natsuki-Kaede",
+      "messages": [],
+      "total_additions": 1837,
+      "total_deletions": 697,
+      "accepted_lines": 1832,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "packages/frontend/test/unit/aiscript/ui.test.ts": {
+          "additions": 125,
+          "deletions": 30,
+          "accepted_lines": 125
+        },
+        "packages/frontend/src/directives/click-anime.ts": {
+          "additions": 13,
+          "deletions": 7,
+          "accepted_lines": 13
+        },
+        "packages/backend/src/core/UserBlockingService.ts": {
+          "additions": 6,
+          "deletions": 23,
+          "accepted_lines": 6
+        },
+        "packages/frontend-embed/package.json": {
+          "additions": 11,
+          "deletions": 11,
+          "accepted_lines": 11
+        },
+        ".github/workflows/packages-private.yml": {
+          "additions": 3,
+          "accepted_lines": 3
+        },
+        "packages/frontend/test/unit/sparkle.test.ts": {
+          "additions": 34,
+          "deletions": 10,
+          "accepted_lines": 29
+        },
+        "packages/misskey-js/generator/package.json": {
+          "additions": 2,
+          "deletions": 2,
+          "accepted_lines": 2
+        },
+        "packages/mastodon-compat/test/entities.test.ts": {
+          "deletions": 9
+        },
+        "packages/backend/src/misc/hpagent-proxy.ts": {
+          "additions": 43,
+          "accepted_lines": 43
+        },
+        ".github/workflows/api-misskey-js.yml": {
+          "deletions": 1
+        },
+        "packages/backend/src/server/api/stream/channels/user-list.ts": {
+          "additions": 54,
+          "deletions": 17,
+          "accepted_lines": 54
+        },
+        "packages/backend/rolldown.config.ts": {
+          "additions": 4,
+          "accepted_lines": 4
+        },
+        "CHANGELOG.md": {
+          "additions": 14,
+          "deletions": 3,
+          "accepted_lines": 14
+        },
+        "locales/ja-JP.yml": {
+          "additions": 3,
+          "accepted_lines": 3
+        },
+        "packages/frontend/src/utility/drive.ts": {
+          "additions": 6,
+          "accepted_lines": 6
+        },
+        ".github/workflows/backend-diagnostics.comment.yml": {
+          "additions": 3,
+          "accepted_lines": 3
+        },
+        "packages/backend/src/server/api/endpoints/admin/unset-user-avatar.ts": {
+          "additions": 19,
+          "accepted_lines": 19
+        },
+        "packages/icons-subsetter/package.json": {
+          "additions": 2,
+          "deletions": 2,
+          "accepted_lines": 2
+        },
+        ".github/workflows/validate-api-json.yml": {
+          "additions": 1,
+          "deletions": 1,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/server/api/endpoints/admin/unset-user-banner.ts": {
+          "additions": 19,
+          "accepted_lines": 19
+        },
+        "packages/backend/src/core/DriveService.ts": {
+          "additions": 10,
+          "deletions": 17,
+          "accepted_lines": 10
+        },
+        ".github/workflows/labeler.yml": {
+          "additions": 54,
+          "accepted_lines": 54
+        },
+        "packages/frontend/package.json": {
+          "additions": 31,
+          "deletions": 31,
+          "accepted_lines": 31
+        },
+        ".github/workflows/test-backend.yml": {
+          "additions": 1,
+          "deletions": 4,
+          "accepted_lines": 1
+        },
+        "packages/frontend/src/pages/flash/flash.vue": {
+          "additions": 10,
+          "deletions": 9,
+          "accepted_lines": 10
+        },
+        "packages/frontend/src/components/MkAsUi.vue": {
+          "additions": 7,
+          "deletions": 20,
+          "accepted_lines": 7
+        },
+        "packages/frontend/src/components/MkUrlPreview.vue": {
+          "additions": 1,
+          "deletions": 1,
+          "accepted_lines": 1
+        },
+        "packages/frontend/src/components/MkDrive.folder.vue": {
+          "additions": 9,
+          "deletions": 1,
+          "accepted_lines": 9
+        },
+        "package.json": {
+          "additions": 4,
+          "deletions": 4,
+          "accepted_lines": 4
+        },
+        ".github/workflows/get-api-diff.yml": {
+          "additions": 2,
+          "deletions": 2,
+          "accepted_lines": 2
+        },
+        "packages/backend/test/e2e/drive.ts": {
+          "additions": 13,
+          "deletions": 1,
+          "accepted_lines": 13
+        },
+        "packages/i18n/src/autogen/locale.ts": {
+          "additions": 12,
+          "accepted_lines": 12
+        },
+        "packages/backend/src/core/NoteCreateService.ts": {
+          "additions": 11,
+          "deletions": 4,
+          "accepted_lines": 11
+        },
+        "packages/backend/src/core/HttpRequestService.ts": {
+          "additions": 7,
+          "deletions": 4,
+          "accepted_lines": 7
+        },
+        "packages/mastodon-compat/src/entities.ts": {
+          "additions": 2,
+          "deletions": 6,
+          "accepted_lines": 2
+        },
+        "packages/frontend/src/aiscript/ui.ts": {
+          "additions": 114,
+          "deletions": 51,
+          "accepted_lines": 114
+        },
+        "packages/frontend-builder/package.json": {
+          "additions": 5,
+          "deletions": 5,
+          "accepted_lines": 5
+        },
+        "packages/frontend/src/signout.ts": {
+          "additions": 4,
+          "deletions": 2,
+          "accepted_lines": 4
+        },
+        "packages/frontend/src/components/MkPlusOneEffect.vue": {
+          "additions": 24,
+          "deletions": 16,
+          "accepted_lines": 24
+        },
+        "packages-private/diagnostics-backend/package.json": {
+          "additions": 1,
+          "deletions": 1,
+          "accepted_lines": 1
+        },
+        "packages/misskey-js/package.json": {
+          "additions": 5,
+          "deletions": 5,
+          "accepted_lines": 5
+        },
+        "packages/frontend-shared/package.json": {
+          "additions": 5,
+          "deletions": 5,
+          "accepted_lines": 5
+        },
+        "packages/frontend/src/components/MkAnalogClock.vue": {
+          "additions": 26,
+          "deletions": 32,
+          "accepted_lines": 26
+        },
+        "packages/backend/src/server/api/endpoints/drive/files/create.ts": {
+          "additions": 7,
+          "accepted_lines": 7
+        },
+        ".github/workflows/lint.yml": {
+          "deletions": 4
+        },
+        "packages/frontend/src/components/MkDrive.vue": {
+          "additions": 12,
+          "deletions": 1,
+          "accepted_lines": 12
+        },
+        "packages/backend/src/server/api/endpoints/users/lists/delete.ts": {
+          "additions": 4,
+          "accepted_lines": 4
+        },
+        "packages/frontend/src/pages/explore.users.vue": {
+          "additions": 2,
+          "deletions": 2,
+          "accepted_lines": 2
+        },
+        "packages/backend/test/unit/misc/hpagent-proxy.ts": {
+          "additions": 47,
+          "accepted_lines": 47
+        },
+        "packages/mastodon-compat/test/routes.test.ts": {
+          "additions": 1,
+          "deletions": 21,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/core/UserListService.ts": {
+          "additions": 108,
+          "deletions": 13,
+          "accepted_lines": 108
+        },
+        "packages/frontend/src/pages/antenna-timeline.vue": {
+          "additions": 32,
+          "accepted_lines": 32
+        },
+        "packages-private/diagnostics-shared/package.json": {
+          "additions": 1,
+          "deletions": 1,
+          "accepted_lines": 1
+        },
+        "packages/mastodon-compat/src/routes.ts": {
+          "additions": 1,
+          "deletions": 6,
+          "accepted_lines": 1
+        },
+        ".github/workflows/check-misskey-js-autogen.yml": {
+          "additions": 2,
+          "deletions": 2,
+          "accepted_lines": 2
+        },
+        ".github/workflows/changelog-check.yml": {
+          "additions": 3,
+          "accepted_lines": 3
+        },
+        "packages/frontend/src/components/MkButton.vue": {
+          "additions": 17,
+          "deletions": 13,
+          "accepted_lines": 17
+        },
+        "packages/frontend/src/pages/settings/preferences.vue": {
+          "additions": 9,
+          "accepted_lines": 9
+        },
+        "packages/frontend/src/pages/scratchpad.vue": {
+          "additions": 24,
+          "deletions": 25,
+          "accepted_lines": 24
+        },
+        "packages/sw/package.json": {
+          "additions": 2,
+          "deletions": 2,
+          "accepted_lines": 2
+        },
+        "packages/backend/src/core/activitypub/models/ApNoteService.ts": {
+          "additions": 12,
+          "deletions": 1,
+          "accepted_lines": 12
+        },
+        ".github/workflows/request-release-review.yml": {
+          "additions": 10,
+          "deletions": 1,
+          "accepted_lines": 10
+        },
+        "packages/backend/src/core/activitypub/ApRendererService.ts": {
+          "additions": 6,
+          "accepted_lines": 6
+        },
+        "packages/backend/test/unit/UserFollowingService.ts": {
+          "additions": 169,
+          "deletions": 3,
+          "accepted_lines": 169
+        },
+        "packages/backend/migration/1794917481157-following-request-id.js": {
+          "additions": 23,
+          "accepted_lines": 23
+        },
+        "packages/frontend/src/components/MkSignupDialog.form.vue": {
+          "additions": 37,
+          "deletions": 13,
+          "accepted_lines": 37
+        },
+        "packages/mastodon-compat/package.json": {
+          "additions": 3,
+          "deletions": 3,
+          "accepted_lines": 3
+        },
+        "packages-private/changelog-checker/package.json": {
+          "additions": 2,
+          "deletions": 2,
+          "accepted_lines": 2
+        },
+        "packages/backend/package.json": {
+          "additions": 37,
+          "deletions": 37,
+          "accepted_lines": 37
+        },
+        "packages/misskey-bubble-game/package.json": {
+          "additions": 2,
+          "deletions": 2,
+          "accepted_lines": 2
+        },
+        "packages/frontend/src/preferences/def.ts": {
+          "additions": 3,
+          "accepted_lines": 3
+        },
+        "packages/backend/src/models/Following.ts": {
+          "additions": 6,
+          "accepted_lines": 6
+        },
+        "packages/frontend/src/pages/settings/security.vue": {
+          "additions": 17,
+          "deletions": 1,
+          "accepted_lines": 17
+        },
+        "packages/backend/src/core/activitypub/ApInboxService.ts": {
+          "additions": 4,
+          "accepted_lines": 4
+        },
+        "packages/backend/src/core/AccountMoveService.ts": {
+          "additions": 4,
+          "deletions": 42,
+          "accepted_lines": 4
+        },
+        "packages/backend/src/server/web/ClientServerService.ts": {
+          "additions": 1,
+          "accepted_lines": 1
+        },
+        "scripts/dev.mjs": {
+          "additions": 11,
+          "deletions": 4,
+          "accepted_lines": 11
+        },
+        "packages/backend/test/utils.ts": {
+          "additions": 7,
+          "deletions": 2,
+          "accepted_lines": 7
+        },
+        "packages-private/diagnostics-frontend/package.json": {
+          "additions": 2,
+          "deletions": 2,
+          "accepted_lines": 2
+        },
+        "renovate.json5": {
+          "additions": 6,
+          "deletions": 12,
+          "accepted_lines": 6
+        },
+        "packages/backend/src/core/UserFollowingService.ts": {
+          "additions": 38,
+          "deletions": 18,
+          "accepted_lines": 38
+        },
+        "packages/frontend/src/directives/anim.ts": {
+          "additions": 8,
+          "deletions": 10,
+          "accepted_lines": 8
+        },
+        "packages/backend/src/server/ActivityPubServerService.ts": {
+          "additions": 1,
+          "deletions": 1,
+          "accepted_lines": 1
+        },
+        "packages/frontend/src/components/MkDigitalClock.vue": {
+          "additions": 19,
+          "deletions": 18,
+          "accepted_lines": 19
+        },
+        "packages/frontend/test/unit/lightbox.test.ts": {
+          "additions": 283,
+          "accepted_lines": 283
+        },
+        "packages/frontend/src/components/MkLightbox.item.vue": {
+          "additions": 51,
+          "deletions": 6,
+          "accepted_lines": 51
+        },
+        "packages/backend/scripts/generate_api_json.js": {
+          "deletions": 2
+        },
+        ".devcontainer/init.sh": {
+          "deletions": 1
+        },
+        ".devcontainer/devcontainer.json": {
+          "additions": 1,
+          "deletions": 8,
+          "accepted_lines": 1
+        },
+        "packages/i18n/package.json": {
+          "additions": 2,
+          "deletions": 2,
+          "accepted_lines": 2
+        },
+        "packages/frontend/src/widgets/WidgetAiscriptApp.vue": {
+          "additions": 7,
+          "deletions": 7,
+          "accepted_lines": 7
+        },
+        "packages/backend/src/core/GlobalEventService.ts": {
+          "additions": 3,
+          "accepted_lines": 3
+        },
+        "packages/frontend/src/components/MkSparkle.vue": {
+          "additions": 31,
+          "deletions": 27,
+          "accepted_lines": 31
+        },
+        ".devcontainer/install-toolchain.sh": {
+          "additions": 13,
+          "accepted_lines": 13
+        },
+        ".github/workflows/locale.yml": {
+          "deletions": 1
+        },
+        "packages/frontend/src/components/MkReactionEffect.vue": {
+          "additions": 24,
+          "deletions": 15,
+          "accepted_lines": 24
+        },
+        "packages/misskey-reversi/package.json": {
+          "additions": 2,
+          "deletions": 2,
+          "accepted_lines": 2
+        },
+        "packages/frontend/src/style.scss": {
+          "deletions": 27
+        }
+      }
+    },
+    "8456b45942779734": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1f96b-a5e9-7461-b10b-5c0515fd88d7",
+        "model": "gpt-6.2-sol"
+      },
+      "human_author": "Natsuki-Kaede",
+      "messages": [],
+      "total_additions": 43,
+      "total_deletions": 5,
+      "accepted_lines": 0,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "packages/mastodon-compat/test/routes.test.ts": {
+          "additions": 21,
+          "deletions": 1
+        },
+        "packages/mastodon-compat/test/entities.test.ts": {
+          "additions": 9
+        },
+        "packages/mastodon-compat/src/routes.ts": {
+          "additions": 6,
+          "deletions": 1
+        },
+        "packages/mastodon-compat/src/entities.ts": {
+          "additions": 7,
+          "deletions": 3
+        }
+      }
+    }
+  }
+}
