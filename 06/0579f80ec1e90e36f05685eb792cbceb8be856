@@ -1,0 +1,47 @@
+packages/frontend/src/components/MkPostForm.vue
+  8002ce8221349fbb 208,211,216,450-454,526-528,1060,1062,1067,1077,1083-1084,1112-1114,1665-1669
+packages/frontend/test/unit/post-form-edit.test.ts
+  8002ce8221349fbb 151-208
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8-ntes.10",
+  "base_commit_sha": "060579f80ec1e90e36f05685eb792cbceb8be856",
+  "prompts": {
+    "8002ce8221349fbb": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1f981-26cd-78e1-924b-f7714ea5d44c",
+        "model": "gpt-6.2-astra"
+      },
+      "human_author": "Natsuki-Kaede",
+      "messages": [],
+      "total_additions": 105,
+      "total_deletions": 52,
+      "accepted_lines": 92,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "packages/backend/src/core/GlobalEventService.ts": {
+          "additions": 4,
+          "deletions": 13,
+          "accepted_lines": 4
+        },
+        "packages/frontend/src/components/MkPostForm.vue": {
+          "additions": 38,
+          "deletions": 33,
+          "accepted_lines": 26
+        },
+        "packages/frontend/test/unit/post-form-edit.test.ts": {
+          "additions": 59,
+          "deletions": 1,
+          "accepted_lines": 58
+        },
+        "packages/backend/test/unit/CredentialRevocation.ts": {
+          "additions": 4,
+          "deletions": 5,
+          "accepted_lines": 4
+        }
+      }
+    }
+  }
+}
