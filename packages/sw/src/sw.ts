@@ -4,7 +4,7 @@
  */
 
 import * as Misskey from 'misskey-js';
-import { LOCAL_ACCOUNT_STORAGE_MARKER } from '@@/js/stored-accounts.js';
+import { IDB_ACCOUNT_STORAGE_MARKER, LOCAL_ACCOUNT_STORAGE_MARKER } from '@@/js/stored-accounts.js';
 import { FETCH_TIMEOUT_MS } from '@/const.js';
 import type { PushNotificationDataMap } from '@/types.js';
 import type { I18n } from '@@/js/i18n.js';
@@ -83,7 +83,7 @@ globalThis.addEventListener('activate', ev => {
 		caches.keys()
 			.then(cacheNames => Promise.all(
 				cacheNames
-					.filter(v => v !== swLang.cacheName && v !== LOCAL_ACCOUNT_STORAGE_MARKER)
+					.filter(v => v !== swLang.cacheName && v !== LOCAL_ACCOUNT_STORAGE_MARKER && v !== IDB_ACCOUNT_STORAGE_MARKER)
 					.map(name => caches.delete(name)),
 			))
 			.then(() => globalThis.clients.claim()),
@@ -145,7 +145,8 @@ globalThis.addEventListener('notificationclick', (ev: ServiceWorkerGlobalScopeEv
 		const data: PushNotificationDataMap[keyof PushNotificationDataMap] = notification.data ?? {};
 		const { userId: loginId } = data;
 		let client: WindowClient | null = null;
-		if (notification.tag === 'misskey-activity') {
+		const account = loginId ? await confirmPushAccount(loginId) : null;
+		if (notification.tag === 'misskey-activity' || (loginId && !account)) {
 			await swos.openClient('push', '/').then(client => client?.focus());
 			notification.close();
 			return;
@@ -167,16 +168,14 @@ globalThis.addEventListener('notificationclick', (ev: ServiceWorkerGlobalScopeEv
 						if ('note' in data.body) await swos.api('notes/create', loginId, { renoteId: data.body.note.id });
 						break;
 					case 'accept':
-						switch (data.body.type) {
-							case 'receiveFollowRequest':
-								await swos.api('following/requests/accept', loginId, { userId: data.body.userId });
-								break;
-						}
-						break;
 					case 'reject':
 						switch (data.body.type) {
 							case 'receiveFollowRequest':
-								await swos.api('following/requests/reject', loginId, { userId: data.body.userId });
+								if (account && account.token) {
+									await swos.api(action === 'accept' ? 'following/requests/accept' : 'following/requests/reject', loginId, { userId: data.body.userId });
+								} else {
+									client = await swos.openClient('push', '/my/follow-requests', loginId);
+								}
 								break;
 						}
 						break;
@@ -252,7 +251,7 @@ globalThis.addEventListener('message', (ev: ServiceWorkerGlobalScopeEventMap['me
 			case 'clear':
 				await caches.keys()
 					.then(cacheNames => Promise.all(
-						cacheNames.filter(name => name !== LOCAL_ACCOUNT_STORAGE_MARKER).map(name => caches.delete(name)),
+						cacheNames.filter(name => name !== LOCAL_ACCOUNT_STORAGE_MARKER && name !== IDB_ACCOUNT_STORAGE_MARKER).map(name => caches.delete(name)),
 					));
 				return;
 		}

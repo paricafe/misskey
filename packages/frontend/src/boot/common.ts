@@ -109,13 +109,16 @@ export async function common(createVue: () => Promise<App<Element>>) {
 	if (loginId) {
 		const target = getUrlWithoutLoginId(window.location.href);
 
-		if (!$i || $i.id !== loginId) {
-			const account = await getAccountFromId(loginId);
-			if (account) {
-				await login(account.token, target);
+		const account = await getAccountFromId(loginId).catch(() => undefined);
+		if (!account) {
+			if (target !== window.location.origin + '/') {
+				window.location.replace('/');
+				return { isClientUpdated, lastVersion };
 			}
+		} else if ($i?.token !== account.token) {
+			await login(account.token, target);
+			return { isClientUpdated, lastVersion };
 		}
-
 		window.history.replaceState({ misskey: 'loginId' }, '', target);
 	}
 

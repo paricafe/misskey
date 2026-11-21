@@ -12,6 +12,7 @@ import { store } from '@/store.js';
 
 const mocks = vi.hoisted(() => ({
 	db: new Map<string, unknown>(),
+	fallback: false,
 	state: { accountHost: '', accountTokens: {} as Record<string, string>, accountInfos: {} as Record<string, unknown> },
 	accounts: [] as [string, { id: string; username: string }][],
 	currentAccount: null as { id: string; token: string } | null,
@@ -19,7 +20,8 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@@/js/config.js', () => ({ host: 'local.example', apiUrl: 'https://local.example/api' }));
 vi.mock('@/utility/idb-proxy.js', () => ({
-	get: async (key: string) => mocks.db.get(key),
+	usesAccountFallback: () => mocks.fallback,
+	get: async (key: string) => mocks.fallback ? JSON.parse(localStorage.getItem('idbfallback::' + key) ?? 'null') : mocks.db.get(key),
 	del: async (key: string) => { mocks.db.delete(key); },
 }));
 vi.mock('@/store.js', () => ({ store: {
@@ -30,6 +32,12 @@ vi.mock('@/store.js', () => ({ store: {
 		mocks.db.set('pizzax::base', { ...mocks.db.get('pizzax::base') as object, [key]: value });
 	},
 	updateDevice: async (updater: (state: typeof mocks.state) => Partial<typeof mocks.state>) => {
+		if (mocks.fallback) {
+			const key = 'idbfallback::' + ACCOUNT_DEVICE_STATE_KEY;
+			const previous = JSON.parse(localStorage.getItem(key) ?? '{}');
+			localStorage.setItem(key, JSON.stringify({ ...previous, ...updater(previous) }));
+			return;
+		}
 		const state = (mocks.db.get(ACCOUNT_DEVICE_STATE_KEY) ?? {
 			...mocks.state,
 			accountTokens: Object.keys(mocks.state.accountTokens).length ? mocks.state.accountTokens : undefined,
@@ -51,6 +59,7 @@ vi.mock('@/utility/unison-reload.js', () => ({ unisonReload: vi.fn(), reloadChan
 
 beforeEach(() => {
 	mocks.db.clear();
+	mocks.fallback = false;
 	mocks.state.accountHost = '';
 	mocks.state.accountTokens = {};
 	mocks.state.accountInfos = {};
@@ -197,4 +206,48 @@ test('initialization records the page canonical host for a worker on an alias', 
 	await initializeAccountStorage();
 	expect(mocks.state.accountHost).toBe('local.example');
 	expect(await readStoredAccounts(read, 'alias.example')).toEqual([{ id: 'alice', token: 'canonical-token' }]);
+});
+
+test.each(['remove', 'revoke old', 'sign in again'] as const)('recovers an account change from fallback storage: %s', async action => {
+	const alice = 'local.example/alice';
+	const bob = 'local.example/bob';
+	mocks.db.set(ACCOUNT_DEVICE_STATE_KEY, { accountTokens: { [alice]: 'current', [bob]: 'valid' } });
+	mocks.fallback = true;
+	if (action === 'remove') await removeAccount('local.example', 'alice');
+	if (action === 'revoke old') await leaveRevokedAccount({ id: 'alice', token: 'old' });
+	if (action === 'sign in again') {
+		vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ status: 200, json: async () => ({ id: 'alice', username: 'alice' }) }));
+		await login('new');
+	}
+
+	mocks.fallback = false;
+	await initializeAccountStorage();
+	const token = { remove: undefined, 'revoke old': 'current', 'sign in again': 'new' }[action];
+	expect((await getAccountFromId('alice'))?.token).toBe(token);
+	expect((await getAccountFromId('bob'))?.token).toBe('valid');
+	expect(JSON.parse(localStorage.getItem('idbfallback::' + ACCOUNT_DEVICE_STATE_KEY)!)).toEqual({});
+});
+
+test('a failed reconciliation retains the fallback changes for the next read', async () => {
+	mocks.db.set(ACCOUNT_DEVICE_STATE_KEY, { accountTokens: { 'local.example/alice': 'revoked' } });
+	mocks.fallback = true;
+	await removeAccount('local.example', 'alice');
+	mocks.fallback = false;
+	const write = vi.spyOn(store, 'updateDevice').mockRejectedValueOnce(new Error('database unavailable'));
+	try {
+		await expect(getAccountFromId('alice')).rejects.toThrow('database unavailable');
+		expect(await getAccountFromId('alice')).toBeUndefined();
+	} finally {
+		write.mockRestore();
+	}
+});
+
+test('an unversioned fallback snapshot cannot resurrect a credential missing from IndexedDB', async () => {
+	mocks.db.set(ACCOUNT_DEVICE_STATE_KEY, { accountTokens: { 'local.example/bob': 'valid' } });
+	localStorage.setItem('idbfallback::' + ACCOUNT_DEVICE_STATE_KEY, JSON.stringify({
+		accountTokens: { 'local.example/alice': 'old', 'local.example/bob': 'valid' },
+	}));
+	await initializeAccountStorage();
+	expect(await getAccountFromId('alice')).toBeUndefined();
+	expect((await getAccountFromId('bob'))?.token).toBe('valid');
 });

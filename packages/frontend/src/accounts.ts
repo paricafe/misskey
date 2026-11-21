@@ -7,7 +7,9 @@ import { defineAsyncComponent, ref } from 'vue';
 import * as Misskey from 'misskey-js';
 import { apiUrl, host } from '@@/js/config.js';
 import { ACCOUNT_DEVICE_STATE_KEY, readStoredAccounts } from '@@/js/stored-accounts.js';
-import { get, del } from '@/utility/idb-proxy.js';
+import { withAccountLock } from '@/utility/account-storage.js';
+import { getAccountFromId } from '@/utility/get-account-from-id.js';
+import { get, del, usesAccountFallback } from '@/utility/idb-proxy.js';
 import { misskeyApi } from '@/utility/misskey-api.js';
 import type { MenuItem } from '@/types/menu.js';
 import { showSuspendedDialog } from '@/utility/show-suspended-dialog.js';
@@ -23,15 +25,17 @@ type AccountWithToken = Misskey.entities.MeDetailed & { token: string };
 
 export async function initializeAccountStorage() {
 	await store.ready;
-	const state = await get(ACCOUNT_DEVICE_STATE_KEY);
-	if (state?.accountTokens == null) {
-		const accounts = await readStoredAccounts(get, host);
-		await store.updateDevice(current => current.accountTokens == null ? {
-			accountTokens: Object.fromEntries(accounts.map(account => [host + '/' + account.id, account.token])),
-		} : {});
-	}
-	if (state?.accountHost !== host) await store.set('accountHost', host);
-	await del('accounts');
+	await withAccountLock(async () => {
+		const state = await get(ACCOUNT_DEVICE_STATE_KEY);
+		if (state?.accountTokens == null) {
+			const accounts = await readStoredAccounts(get, host);
+			await store.updateDevice(current => current.accountTokens == null ? {
+				accountTokens: Object.fromEntries(accounts.map(account => [host + '/' + account.id, account.token])),
+			} : {});
+		}
+		if (state?.accountHost !== host) await store.set('accountHost', host);
+		await del('accounts');
+	}, true);
 }
 
 export async function getAccounts(): Promise<{
@@ -41,8 +45,9 @@ export async function getAccounts(): Promise<{
 	user?: Misskey.entities.MeDetailed | null;
 	token: string | null;
 }[]> {
-	const tokens = store.s.accountTokens;
-	const accountInfos = store.s.accountInfos;
+	const state = await withAccountLock(() => get(ACCOUNT_DEVICE_STATE_KEY));
+	const tokens = state?.accountTokens ?? {};
+	const accountInfos = state?.accountInfos ?? {};
 	const accounts = prefer.s.accounts;
 	return accounts.map(([host, user]) => ({
 		host,
@@ -51,10 +56,6 @@ export async function getAccounts(): Promise<{
 		user: accountInfos[host + '/' + user.id],
 		token: tokens[host + '/' + user.id] ?? null,
 	}));
-}
-
-function withAccountLock<T>(operation: () => Promise<T>): Promise<T> {
-	return navigator.locks ? navigator.locks.request('misskey:accounts', operation) : operation();
 }
 
 async function addAccount(host: string, user: Misskey.entities.MeDetailed, token: string, activate = false) {
@@ -66,10 +67,15 @@ async function addAccount(host: string, user: Misskey.entities.MeDetailed, token
 		try {
 			if (activate) miLocalStorage.setItemAsJson('account', { ...user, token });
 			if (!known) prefer.commit('accounts', [...accounts, [host, { id: user.id, username: user.username }]]);
-			await store.updateDevice(current => ({
-				accountTokens: { ...current.accountTokens, [key]: token },
-				accountInfos: { ...current.accountInfos, [key]: user },
-			}));
+			await store.updateDevice(current => {
+				const removed = { ...current.removedAccountTokens };
+				delete removed[key];
+				return {
+					accountTokens: { ...current.accountTokens, [key]: token },
+					accountInfos: { ...current.accountInfos, [key]: user },
+					...(usesAccountFallback() ? { removedAccountTokens: removed } : {}),
+				};
+			});
 		} catch (error) {
 			if (activate && miLocalStorage.getItemAsJson('account')?.token === token) {
 				if (previous == null) miLocalStorage.removeItem('account');
@@ -92,9 +98,15 @@ async function forgetAccount(host: string, id: string, expectedToken?: string) {
 		delete accountTokens[key];
 		delete accountInfos[key];
 		removed = true;
-		return { accountTokens, accountInfos };
+		return {
+			accountTokens,
+			accountInfos,
+			...(usesAccountFallback() ? { removedAccountTokens: { ...current.removedAccountTokens, [key]: expectedToken ?? null } } : {}),
+		};
 	});
-	if (removed) prefer.commit('accounts', prefer.s.accounts.filter(x => x[0] !== host || x[1].id !== id));
+	if (removed) {
+		prefer.commit('accounts', prefer.s.accounts.filter(x => x[0] !== host || x[1].id !== id));
+	}
 }
 
 export async function removeAccount(host: string, id: string) {
@@ -210,7 +222,7 @@ export async function leaveRevokedAccount(me: Pick<AccountWithToken, 'id' | 'tok
 			if (miLocalStorage.getItemAsJson('account')?.token === me.token) miLocalStorage.removeItem('account');
 			await forgetAccount(host, me.id, me.token);
 		});
-		const candidates = await readStoredAccounts(get, host);
+		const candidates = await withAccountLock(() => readStoredAccounts(get, host));
 		for (const { id, token } of candidates) {
 			if (miLocalStorage.getItem('account')) break;
 			const next = await misskeyApi('i', {}, token, AbortSignal.timeout(5000)).catch(() => null);
@@ -256,7 +268,7 @@ export async function login(token: AccountWithToken['token'], redirect?: string)
 
 export async function switchAccount(accountHost: string, id: string) {
 	if (accountHost !== host) throw new Error('Cannot sign in to an account from another host');
-	const token = store.s.accountTokens[accountHost + '/' + id];
+	const token = (await getAccountFromId(id))?.token;
 	if (token) {
 		login(token);
 	} else {

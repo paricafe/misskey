@@ -88,6 +88,39 @@ test.describe('account session persistence', () => {
 		expect((await deviceState(page)).accountTokens?.[host + '/' + alice.id]).toBe(alice.token);
 	});
 
+	test('a deep link for a removed account opens home in the remaining session', async ({ page }) => {
+		await completeAccountSetup(alice.token);
+		await signIn(page, 'alice', 'alice1234');
+		await expect(page.getByTestId('open-post-form')).toBeVisible();
+		await page.goto(BASE_URL + '/share?text=another-account-draft&loginId=removed');
+		await expect(page).toHaveURL(BASE_URL + '/');
+		await expect(page.getByTestId('open-post-form')).toBeVisible();
+		await expect(page.getByTestId('post-form-text')).toHaveCount(0);
+		expect(await signedInAccount(page)).toMatchObject({ id: alice.id });
+	});
+
+	test('signing out while IndexedDB and cache writes are unavailable survives recovery', async ({ page, context }) => {
+		await completeAccountSetup(alice.token);
+		await signIn(page, 'alice', 'alice1234');
+		await expect(page.getByTestId('open-post-form')).toBeVisible();
+		const key = await canonicalHost(page) + '/' + alice.id;
+		expect((await deviceState(page)).accountTokens?.[key]).toBe(alice.token);
+		await page.addInitScript(() => {
+			Object.defineProperty(window, 'indexedDB', { value: undefined });
+			CacheStorage.prototype.open = async () => { throw new DOMException('Cache unavailable', 'SecurityError'); };
+		});
+		await page.goto(BASE_URL + '/settings');
+		await page.getByRole('button', { name: /Sign Out$/ }).click();
+		await page.getByTestId('modal-dialog-ok').click();
+		await expect(page.getByTestId('signin')).toBeVisible();
+		const recovered = await context.newPage();
+		await recovered.goto(BASE_URL + '/my/follow-requests?loginId=' + alice.id);
+		await expect(recovered).toHaveURL(BASE_URL + '/');
+		await expect(recovered.getByTestId('signin')).toBeVisible();
+		expect((await deviceState(recovered)).accountTokens).toEqual({});
+		expect(await signedInAccount(recovered)).toBeNull();
+	});
+
 	test('reauthentication replaces an existing stale saved token', async ({ page }) => {
 		await signIn(page, 'alice', 'alice1234');
 		await closeUserSetupDialog(page);
@@ -212,8 +245,9 @@ test.describe('account session persistence', () => {
 				const state = await deviceState(page);
 				await deviceState(page, { accountTokens: { ...state.accountTokens, [host + '/' + alice.id]: alice.token } });
 				await page.goto(`${BASE_URL}/?loginId=${alice.id}`);
-				await expect.poll(() => signedInAccount(page)).toMatchObject({ id: alice.id });
+				await expect(page).toHaveURL(BASE_URL + '/');
 				await expect(page.getByTestId('open-post-form')).toBeVisible();
+				expect(await signedInAccount(page)).toMatchObject({ id: alice.id });
 			}
 			await page.evaluate(() => localStorage.setItem('scratchpad', 'local unsaved text'));
 			await page.goto(`${BASE_URL}/settings/security`);

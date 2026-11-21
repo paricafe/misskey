@@ -10,7 +10,6 @@ import {
 	del as idel,
 	clear as iclear,
 } from 'idb-keyval';
-import { LOCAL_ACCOUNT_STORAGE_MARKER } from '@@/js/stored-accounts.js';
 import { miLocalStorage } from '@/local-storage.js';
 
 const PREFIX = 'idbfallback::';
@@ -28,9 +27,8 @@ if (idbAvailable) {
 	console.error('indexedDB is unavailable. It will use localStorage.');
 }
 
-if (!idbAvailable && 'caches' in window) {
-	// A worker must confirm accounts with the page when its IndexedDB may be stale.
-	await window.caches.open(LOCAL_ACCOUNT_STORAGE_MARKER).catch(() => {});
+export function usesAccountFallback(): boolean {
+	return !idbAvailable;
 }
 
 export async function get(key: string) {

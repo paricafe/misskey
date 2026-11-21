@@ -4,9 +4,18 @@
  */
 
 import { get } from 'idb-keyval';
-import { LOCAL_ACCOUNT_STORAGE_MARKER, readStoredAccounts, readStoredAccountState } from '@@/js/stored-accounts.js';
+import { IDB_ACCOUNT_STORAGE_MARKER, LOCAL_ACCOUNT_STORAGE_MARKER, readStoredAccounts, readStoredAccountState } from '@@/js/stored-accounts.js';
+
+async function canReadAccountsFromIndexedDB() {
+	try {
+		return await caches.has(IDB_ACCOUNT_STORAGE_MARKER) && !await caches.has(LOCAL_ACCOUNT_STORAGE_MARKER);
+	} catch {
+		return false;
+	}
+}
 
 export async function getAccounts() {
+	if (!await canReadAccountsFromIndexedDB()) return [];
 	return readStoredAccounts(get, globalThis.location.host);
 }
 
@@ -24,7 +33,7 @@ function withPushDeadline<T>(promise: Promise<T>): Promise<T | null> {
 
 export async function confirmPushAccount(id: string): Promise<{ token?: string } | false | null> {
 	try {
-		if (!await caches.has(LOCAL_ACCOUNT_STORAGE_MARKER)) {
+		if (await canReadAccountsFromIndexedDB()) {
 			const readState = () => readStoredAccountState(get, globalThis.location.host);
 			const accounts = await withPushDeadline(readState().catch(readState));
 			if (accounts) return accounts.find(account => account.id === id) ?? false;

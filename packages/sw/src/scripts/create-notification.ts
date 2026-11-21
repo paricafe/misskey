@@ -160,7 +160,7 @@ async function composeNotification(data: PushNotificationDataMap[keyof PushNotif
 						icon: data.body.user.avatarUrl ?? undefined,
 						badge: iconUrl('user-plus'),
 						data,
-						actions: [
+						actions: token ? [
 							{
 								action: 'accept',
 								title: i18n.ts.accept,
@@ -169,7 +169,7 @@ async function composeNotification(data: PushNotificationDataMap[keyof PushNotif
 								action: 'reject',
 								title: i18n.ts.reject,
 							},
-						],
+						] : [{ action: 'showFollowRequests', title: i18n.ts.followRequests }],
 					}];
 
 				case 'followRequestAccepted':

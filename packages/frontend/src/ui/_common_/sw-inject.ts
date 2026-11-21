@@ -19,11 +19,10 @@ export function swInject() {
 
 		if (ev.data.type !== 'order') return;
 
-		if (ev.data.loginId && ev.data.loginId !== $i?.id) {
-			return getAccountFromId(ev.data.loginId).then(account => {
-				if (!account) return;
-				return login(account.token, ev.data.url);
-			});
+		if (ev.data.loginId) {
+			const account = await getAccountFromId(ev.data.loginId).catch(() => undefined);
+			if (!account) return mainRouter.pushByPath('/');
+			if (account.token !== $i?.token) return login(account.token, ev.data.url);
 		}
 
 		switch (ev.data.order) {

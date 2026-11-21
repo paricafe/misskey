@@ -32,11 +32,12 @@ async function pushFixture(page: Page) {
 			registration: ServiceWorkerRegistration;
 			ExtendableEvent: { prototype: { waitUntil(promise: Promise<unknown>): void } };
 		};
-		const log = { completed: 0, shown: [] as { title: string; tag?: string; body?: string; data?: unknown }[] };
+		const log = { completed: 0, shown: [] as { title: string; tag?: string; body?: string; data?: unknown; actions?: string[] }[] };
 		const show = scope.registration.showNotification.bind(scope.registration);
 		scope.registration.showNotification = async (title, options) => {
 			await show(title, options);
-			log.shown.push({ title, tag: options?.tag, body: options?.body, data: options?.data });
+			const actions = (options as { actions?: { action: string }[] } | undefined)?.actions;
+			log.shown.push({ title, tag: options?.tag, body: options?.body, data: options?.data, ...(actions && { actions: actions.map(a => a.action) }) });
 		};
 		const proto = scope.ExtendableEvent.prototype;
 		const waitUntil = proto.waitUntil;
@@ -47,11 +48,11 @@ async function pushFixture(page: Page) {
 	});
 	return {
 		worker,
-		deliver: async (userId: string | undefined, text: string, type = 'newChatMessage', dateTime = Date.now()) => {
+		deliver: async (userId: string | undefined, text: string, type = 'newChatMessage', dateTime = Date.now(), body: object = { fromUserId: 'sender', fromUser: { username: 'sender' }, text }) => {
 			const completed = await log.evaluate(state => state.completed);
 			await cdp.send('ServiceWorker.deliverPushMessage', {
 				origin: BASE_URL, registrationId: registrationId!,
-				data: JSON.stringify({ userId, type, dateTime, body: { fromUserId: 'sender', fromUser: { username: 'sender' }, text } }),
+				data: JSON.stringify({ userId, type, dateTime, body }),
 			});
 			await expect.poll(() => log.evaluate(state => state.completed)).toBeGreaterThan(completed);
 		},
@@ -59,20 +60,20 @@ async function pushFixture(page: Page) {
 	};
 }
 
-async function setAccounts(page: Page, accountTokens: Record<string, string>) {
-	await page.evaluate(async accountTokens => {
+async function setAccounts(page: Page, accountTokens: Record<string, string>, accountHost = 'local.test') {
+	await page.evaluate(async ({ accountTokens, accountHost }) => {
 		await new Promise<void>((resolve, reject) => {
 			const open = indexedDB.open('keyval-store');
 			open.onsuccess = () => {
 				const db = open.result;
 				const tx = db.transaction('keyval', 'readwrite');
-				tx.objectStore('keyval').put({ accountHost: 'local.test', accountTokens }, 'pizzax::base');
+				tx.objectStore('keyval').put({ accountHost, accountTokens }, 'pizzax::base');
 				tx.oncomplete = () => { db.close(); resolve(); };
 				tx.onabort = () => reject(tx.error);
 			};
 			open.onerror = () => reject(open.error);
 		});
-	}, accountTokens);
+	}, { accountTokens, accountHost });
 }
 
 test('pushes from one sender replace only the same recipient, including after a temporary database error', async ({ page }) => {
@@ -98,6 +99,60 @@ test('pushes from one sender replace only the same recipient, including after a 
 });
 
 const generic = { title: new URL(BASE_URL).host, tag: 'misskey-activity', body: undefined, data: undefined };
+const followRequest = { type: 'receiveFollowRequest', userId: 'sender', user: { username: 'sender', host: null } };
+
+test('a late push and a click on an old notification respect a removed recipient after storage recovery', async ({ page }) => {
+	await resetState();
+	const bob = await registerUser('bob', 'pass', true);
+	await completeAccountSetup(bob.token);
+	await signIn(page, 'bob', 'pass');
+	await expect(page.getByTestId('open-post-form')).toBeVisible();
+	const f = await pushFixture(page);
+	const host = new URL(BASE_URL).host;
+	await setAccounts(page, { [host + '/' + bob.id]: bob.token, [host + '/removed']: 'old' }, host);
+	const reply = { type: 'reply', user: { username: 'sender', host: null }, note: { id: 'old-note', text: 'old reply' } };
+	await f.deliver('removed', '', 'notification', Date.now(), reply);
+	expect((await f.shown())[0].actions).toEqual(['reply']);
+	await page.evaluate(host => {
+		localStorage.setItem('idbfallback::pizzax::base', JSON.stringify({
+			partialAccountState: true,
+			removedAccountTokens: { [host + '/removed']: null },
+		}));
+	}, host);
+	await page.goto(BASE_URL + '/settings');
+	await expect(page.getByRole('button', { name: /Sign Out$/ })).toBeVisible();
+	await f.deliver('removed', 'late private reply');
+	expect((await f.shown())[1]).toEqual(generic);
+	await f.worker.evaluate(async () => {
+		const scope = globalThis as unknown as {
+			registration: ServiceWorkerRegistration;
+			NotificationEvent: new (type: string, init: { notification: Notification; action: string }) => Event;
+			WindowClient: { prototype: { focus(): Promise<unknown> } };
+		};
+		const notifications = await scope.registration.getNotifications();
+		const notification = notifications.find(n => n.data?.userId === 'removed');
+		if (!notification) throw new Error('Earlier notification not found');
+		// A synthetic click does not grant Chromium permission to focus the OS window.
+		scope.WindowClient.prototype.focus = async function () { return this; };
+		await new Promise<void>((resolve, reject) => {
+			const event = new scope.NotificationEvent('notificationclick', { notification, action: 'reply' });
+			Object.defineProperty(event, 'waitUntil', { value: (work: Promise<void>) => work.then(resolve, reject) });
+			globalThis.dispatchEvent(event);
+		});
+	});
+	await expect(page).toHaveURL(BASE_URL + '/');
+	await expect(page.getByTestId('post-form-text')).toHaveCount(0);
+	await f.deliver(bob.id, 'still signed in');
+	expect((await f.shown())[2].title).toBe('sender: still signed in');
+});
+
+test('a worker with a saved credential offers follow request approval', async ({ page }) => {
+	const f = await pushFixture(page);
+	await setAccounts(page, { 'local.test/a': 'a' });
+	await expect.poll(() => page.evaluate(() => caches.has('mk-indexeddb-account-storage'))).toBe(true);
+	await f.deliver('a', '', 'notification', Date.now(), followRequest);
+	expect((await f.shown())[0].actions).toEqual(['accept', 'reject']);
+});
 
 test('an explicitly empty account store shows a content-free alert for late pushes', async ({ page }) => {
 	const f = await pushFixture(page);
@@ -119,9 +174,11 @@ test('localStorage accounts can receive pushes and an offline worker without a w
 	});
 	await f.deliver('a', 'confirmed');
 	expect(await f.shown()).toMatchObject([{ title: 'sender: confirmed' }]);
+	await f.deliver('a', '', 'notification', Date.now(), followRequest);
+	expect((await f.shown())[1].actions).toEqual(['showFollowRequests']);
 	await page.evaluate(() => localStorage.setItem('idbfallback::pizzax::base', JSON.stringify({ accountTokens: {} })));
 	await f.deliver('a', 'removed');
-	expect((await f.shown())[1]).toEqual(generic);
+	expect((await f.shown())[2]).toEqual(generic);
 	await f.worker.evaluate(() => {
 		// CDP needs a live network transport to deliver the push. The offline worker has no clients or fetch.
 		const scope = globalThis as unknown as { clients: { matchAll: () => Promise<unknown[]> } };
@@ -129,7 +186,7 @@ test('localStorage accounts can receive pushes and an offline worker without a w
 		globalThis.fetch = async () => { throw new TypeError('offline'); };
 	});
 	await f.deliver('a', 'private message');
-	expect((await f.shown())[2]).toEqual(generic);
+	expect((await f.shown())[3]).toEqual(generic);
 });
 
 test('read receipts only clear notifications belonging to the confirmed account', async ({ page }) => {

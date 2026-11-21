@@ -4,6 +4,7 @@
  */
 
 export const LOCAL_ACCOUNT_STORAGE_MARKER = 'mk-local-account-storage';
+export const IDB_ACCOUNT_STORAGE_MARKER = 'mk-indexeddb-account-storage';
 export const ACCOUNT_DEVICE_STATE_KEY = 'pizzax::base';
 
 export type StoredAccount = {
