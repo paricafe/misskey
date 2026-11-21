@@ -100,7 +100,7 @@ describe('鍵解除時のフォローリクエスト承認', () => {
 
 describe('Undo / Reject が元の Follow アクティビティの ID を参照する', () => {
 	const LOCAL_URL = 'https://local.example';
-	const REMOTE_FOLLOW_ID = 'https://remote.example/follows/1';
+	const REMOTE_FOLLOW_ID = 'https://remote.example/follows/' + 'a'.repeat(1024);
 
 	let service: UserFollowingService;
 	const users = mockDeep<UsersRepository>();
@@ -111,6 +111,8 @@ describe('Undo / Reject が元の Follow アクティビティの ID を参照�
 	const queue = mockDeep<QueueService>();
 	const cache = mockDeep<CacheService>();
 	const blocking = mockDeep<UserBlockingService>();
+	const profiles = mockDeep<UserProfilesRepository>();
+	const idService = mockDeep<IdService>();
 
 	const localUser = {
 		id: 'local', host: null, uri: null, inbox: null, sharedInbox: null, movedToUri: null,
@@ -134,12 +136,16 @@ describe('Undo / Reject が元の Follow アクティビティの ID を参照�
 		mockReset(queue);
 		mockReset(cache);
 		mockReset(blocking);
+		mockReset(profiles);
+		mockReset(idService);
 
 		const module = await Test.createTestingModule({
 			providers: [
 				UserFollowingService,
 				ApRendererService,
 				{ provide: DI.config, useValue: { url: LOCAL_URL } as Config },
+				{ provide: DI.userProfilesRepository, useValue: profiles },
+				{ provide: IdService, useValue: idService },
 				{ provide: DI.meta, useValue: { enableStatsForFederatedInstances: false } as MiMeta },
 				{ provide: DI.usersRepository, useValue: users },
 				{ provide: DI.followRequestsRepository, useValue: requests },
@@ -163,9 +169,25 @@ describe('Undo / Reject が元の Follow アクティビティの ID を参照�
 		users.findOneByOrFail.mockResolvedValue({ movedToUri: null } as MiUser);
 		followings.insert.mockResolvedValue({} as never);
 		cache.userProfileCache.fetch.mockResolvedValue({ followedMessage: null } as never);
+		profiles.findOneByOrFail.mockResolvedValue({} as Awaited<ReturnType<UserProfilesRepository['findOneByOrFail']>>);
+		idService.parse.mockReturnValue({ date: new Date() } as ReturnType<IdService['parse']>);
 	});
 
 	describe('フォロー関係の成立', () => {
+		test.each([false, true])('preserves a long remote Follow ID through acceptance (locked: %s)', async locked => {
+			const receiver = { ...localUser, isLocked: locked };
+			users.findOneByOrFail.mockResolvedValueOnce(remoteUser).mockResolvedValueOnce(receiver);
+			await service.follow(remoteUser, receiver, { requestId: REMOTE_FOLLOW_ID });
+			if (locked) {
+				expect(requests.insertOne).toHaveBeenCalledWith(expect.objectContaining({ requestId: REMOTE_FOLLOW_ID }));
+				expect(followings.insert).not.toHaveBeenCalled();
+				requests.findOneBy.mockResolvedValue({ id: 'req1', requestId: REMOTE_FOLLOW_ID } as MiFollowRequest);
+				await service.acceptFollowRequest(receiver, remoteUser);
+			}
+			expect(followings.insert).toHaveBeenCalledWith(expect.objectContaining({ requestId: REMOTE_FOLLOW_ID }));
+			expect(lastDelivered()?.object.id).toBe(REMOTE_FOLLOW_ID);
+		});
+
 		test('ローカル → リモートのフォローリクエストが承認されたとき、送信した Follow の ID を保存する', async () => {
 			requests.findOneBy.mockResolvedValue({ id: 'req1', requestId: null, withReplies: false } as MiFollowRequest);
 

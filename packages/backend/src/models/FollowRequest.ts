@@ -39,8 +39,8 @@ export class MiFollowRequest {
 	@JoinColumn()
 	public follower: MiUser | null;
 
-	@Column('varchar', {
-		length: 128, nullable: true,
+	@Column('text', {
+		nullable: true,
 		comment: 'id of Follow Activity.',
 	})
 	public requestId: string | null;
