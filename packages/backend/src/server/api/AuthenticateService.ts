@@ -12,6 +12,7 @@ import { MemoryKVCache } from '@/misc/cache.js';
 import type { MiApp } from '@/models/App.js';
 import { CacheService } from '@/core/CacheService.js';
 import { isNativeUserToken } from '@/misc/token.js';
+import { readFromPrimary } from '@/misc/read-from-primary.js';
 import { bindThis } from '@/decorators.js';
 import type { EntityManager } from 'typeorm';
 
@@ -62,14 +63,18 @@ export class AuthenticateService implements OnApplicationShutdown {
 		return this.lookup(token, options);
 	}
 
+	@bindThis
+	public findLocalUserByNativeToken(token: string, manager = this.usersRepository.manager): Promise<MiLocalUser | null> {
+		return readFromPrimary(manager, primary => primary.withRepository(this.usersRepository).findOneBy({ token }) as Promise<MiLocalUser | null>);
+	}
+
 	private async lookup(token: string, options: AuthenticationOptions, manager?: EntityManager): Promise<[MiLocalUser, MiAccessToken | null]> {
 		const users = manager?.withRepository(this.usersRepository) ?? this.usersRepository;
 		const tokens = manager?.withRepository(this.accessTokensRepository) ?? this.accessTokensRepository;
 		const apps = manager?.withRepository(this.appsRepository) ?? this.appsRepository;
 
 		if (isNativeUserToken(token)) {
-			const findUser = () => users.findOneBy({ token }) as Promise<MiLocalUser | null>;
-			const user = await (options.fresh ? findUser() : this.cacheService.localUserByNativeTokenCache.fetch(token, findUser));
+			const user = await this.findLocalUserByNativeToken(token, manager);
 
 			if (user == null) {
 				throw new AuthenticationError('user not found');
@@ -77,13 +82,13 @@ export class AuthenticateService implements OnApplicationShutdown {
 
 			return [user, null];
 		} else {
-			const accessToken = await tokens.findOne({
+			const accessToken = await readFromPrimary(tokens.manager, primary => primary.withRepository(tokens).findOne({
 				where: [{
 					hash: token.toLowerCase(),
 				}, {
 					token: token,
 				}],
-			});
+			}));
 
 			if (accessToken == null) {
 				throw new AuthenticationError('invalid signature');

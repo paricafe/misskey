@@ -6,9 +6,8 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { Endpoint } from '@/server/api/endpoint-base.js';
 import type { AccessTokensRepository } from '@/models/_.js';
-import type { MiAccessToken } from '@/models/AccessToken.js';
 import { DI } from '@/di-symbols.js';
-import { GlobalEventService } from '@/core/GlobalEventService.js';
+import { CredentialRevocationService } from '@/core/CredentialRevocationService.js';
 import { ApiError } from '../../error.js';
 
 export const meta = {
@@ -55,29 +54,26 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 		@Inject(DI.accessTokensRepository)
 		private accessTokensRepository: AccessTokensRepository,
 
-		private globalEventService: GlobalEventService,
+		private revocations: CredentialRevocationService,
 	) {
 		super(meta, paramDef, async (ps, me, token) => {
 			if (me == null) {
 				throw new ApiError(meta.errors.credentialRequired);
 			}
 
-			let target: MiAccessToken | null = null;
-			if ('tokenId' in ps) {
-				target = await this.accessTokensRepository.findOneBy({ id: ps.tokenId, userId: me.id });
-			} else {
-				if (ps.token == null || ps.token === '') return;
-				target = await this.accessTokensRepository.findOneBy({ token: ps.token, userId: me.id });
-			}
-
-			if (target == null) return;
-
-			if (token != null && token.id !== target.id) {
-				throw new ApiError(meta.errors.permissionDenied);
-			}
-
-			await this.accessTokensRepository.delete({ id: target.id });
-			await this.globalEventService.publishInternalEvent('accessTokenRevoked', { id: target.id, userId: target.userId });
+			if (!('tokenId' in ps) && !ps.token) return;
+			const where = 'tokenId' in ps ? { id: ps.tokenId, userId: me.id } : { token: ps.token!, userId: me.id };
+			await this.accessTokensRepository.manager.transaction(async manager => {
+				if (token != null) {
+					const target = await manager.withRepository(this.accessTokensRepository).findOne({ where, select: { id: true }, lock: { mode: 'pessimistic_write' } });
+					if (!target) return;
+					if (token.id !== target.id) throw new ApiError(meta.errors.permissionDenied);
+					await this.revocations.deleteAccessTokens(manager, { id: target.id, userId: me.id });
+				} else {
+					await this.revocations.deleteAccessTokens(manager, where);
+				}
+			});
+			void this.revocations.dispatch();
 		});
 	}
 }

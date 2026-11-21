@@ -7,39 +7,41 @@ import { describe, expect, test, vi } from 'vitest';
 import RevokeTokenEndpoint from './endpoints/i/revoke-token.js';
 
 function setup() {
-	const tokens = { findOneBy: vi.fn().mockResolvedValue({ id: 'target', userId: 'alice' }), delete: vi.fn().mockResolvedValue({ affected: 1 }) };
-	const events = { publishInternalEvent: vi.fn() };
-	return { endpoint: new RevokeTokenEndpoint(tokens as never, events as never), tokens, events };
+	const findOne = vi.fn().mockResolvedValue({ id: 'target' });
+	const manager = { withRepository: () => ({ findOne }) };
+	const tokens = { manager: { transaction: async (run: (tx: unknown) => Promise<void>) => run(manager) } };
+	const outbox = { deleteAccessTokens: vi.fn(), dispatch: vi.fn() };
+	return { endpoint: new RevokeTokenEndpoint(tokens as never, outbox as never), outbox, manager };
 }
 
 describe('access token revocation events', () => {
-	test('publishes the owner and token ID after the token is deleted', async () => {
-		const { endpoint, tokens, events } = setup();
+	test('queues a deletion for the owner and asks the dispatcher to send it after commit', async () => {
+		const { endpoint, outbox, manager } = setup();
 		await endpoint.exec({ tokenId: 'target' }, { id: 'alice' } as never, null);
-		expect(tokens.delete).toHaveBeenCalledExactlyOnceWith({ id: 'target' });
-		expect(events.publishInternalEvent).toHaveBeenCalledExactlyOnceWith('accessTokenRevoked', { id: 'target', userId: 'alice' });
-		expect(tokens.delete.mock.invocationCallOrder[0]).toBeLessThan(events.publishInternalEvent.mock.invocationCallOrder[0]);
+		expect(outbox.deleteAccessTokens).toHaveBeenCalledExactlyOnceWith(manager, { id: 'target', userId: 'alice' });
+		expect(outbox.dispatch).toHaveBeenCalledOnce();
+		expect(outbox.deleteAccessTokens.mock.invocationCallOrder[0]).toBeLessThan(outbox.dispatch.mock.invocationCallOrder[0]);
 	});
 
-	test('does not revoke another app token or announce an unsuccessful deletion', async () => {
-		const { endpoint, tokens, events } = setup();
+	test.each([null, ''])('prefers tokenId when both tokenId and an empty token (%s) are present', async token => {
+		const { endpoint, outbox, manager } = setup();
+		await endpoint.exec({ tokenId: 'target', token }, { id: 'alice' } as never, null);
+		expect(outbox.deleteAccessTokens).toHaveBeenCalledWith(manager, { id: 'target', userId: 'alice' });
+	});
+
+	test('does not revoke another app token or dispatch a rolled-back change', async () => {
+		const { endpoint, outbox } = setup();
 		await expect(endpoint.exec({ tokenId: 'target' }, { id: 'alice' } as never, { id: 'other' } as never)).rejects.toMatchObject({ code: 'PERMISSION_DENIED' });
-		expect(tokens.delete).not.toHaveBeenCalled();
-		tokens.delete.mockRejectedValue(new Error('database unavailable'));
+		expect(outbox.deleteAccessTokens).not.toHaveBeenCalled();
+		outbox.deleteAccessTokens.mockRejectedValue(new Error('database unavailable'));
 		await expect(endpoint.exec({ tokenId: 'target' }, { id: 'alice' } as never, null)).rejects.toThrow('database unavailable');
-		expect(events.publishInternalEvent).not.toHaveBeenCalled();
+		expect(outbox.dispatch).not.toHaveBeenCalled();
 	});
 
-	test('does not finish before the revocation is published to other workers', async () => {
-		const { endpoint, events } = setup();
-		let publish!: () => void;
-		events.publishInternalEvent.mockImplementation(() => new Promise<void>(resolve => { publish = resolve; }));
-		let finished = false;
-		const request = endpoint.exec({ tokenId: 'target' }, { id: 'alice' } as never, null).then(() => { finished = true; });
-		await vi.waitFor(() => expect(events.publishInternalEvent).toHaveBeenCalledOnce());
-		expect(finished).toBe(false);
-		publish();
-		await request;
-		expect(finished).toBe(true);
+	test('returns success after commit while the event publisher is unavailable', async () => {
+		const { endpoint, outbox } = setup();
+		outbox.dispatch.mockReturnValue(new Promise<void>(() => {}));
+		await endpoint.exec({ tokenId: 'target' }, { id: 'alice' } as never, null);
+		expect(outbox.dispatch).toHaveBeenCalledOnce();
 	});
 });

@@ -31,6 +31,7 @@ import { DriveService } from './DriveService.js';
 import { EmailService } from './EmailService.js';
 import { FederatedInstanceService } from './FederatedInstanceService.js';
 import { FetchInstanceMetadataService } from './FetchInstanceMetadataService.js';
+import { CredentialRevocationService } from './CredentialRevocationService.js';
 import { GlobalEventService } from './GlobalEventService.js';
 import { HashtagService } from './HashtagService.js';
 import { HttpRequestService } from './HttpRequestService.js';
@@ -332,6 +333,7 @@ const $ApQuestionService: Provider = { provide: 'ApQuestionService', useExisting
 		EmailService,
 		FederatedInstanceService,
 		FetchInstanceMetadataService,
+		CredentialRevocationService,
 		GlobalEventService,
 		HashtagService,
 		HttpRequestService,
@@ -636,6 +638,7 @@ const $ApQuestionService: Provider = { provide: 'ApQuestionService', useExisting
 		EmailService,
 		FederatedInstanceService,
 		FetchInstanceMetadataService,
+		CredentialRevocationService,
 		GlobalEventService,
 		HashtagService,
 		HttpRequestService,

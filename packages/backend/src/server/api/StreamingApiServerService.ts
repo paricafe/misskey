@@ -10,6 +10,7 @@ import * as WebSocket from 'ws';
 import { ContextIdFactory, ModuleRef } from '@nestjs/core';
 import { DI } from '@/di-symbols.js';
 import type { MiAccessToken } from '@/models/_.js';
+import { nativeTokenFingerprint } from '@/misc/token.js';
 import { bindThis } from '@/decorators.js';
 import type { MiLocalUser } from '@/models/User.js';
 import { UserService } from '@/core/UserService.js';
@@ -158,9 +159,11 @@ export class StreamingApiServerService {
 				if (connection) connection.terminate();
 				else socket.destroy();
 			};
+			const tokenHash = user && !app && token ? nativeTokenFingerprint(token) : null;
 			if (user) ev.on(`authorization:${user.id}`, (event: GlobalEvents['internal']['payload']) => {
 				if ((event.type === 'accessTokenRevoked' && event.body.id === app?.id)
-					|| (event.type === 'userTokenRegenerated' && event.body.oldToken === token)
+					|| (event.type === 'userTokenRegenerated' && tokenHash != null && ('oldTokenHash' in event.body
+						? event.body.oldTokenHash === tokenHash : event.body.oldToken === token))
 					|| (event.type === 'userChangeSuspendedState' && event.body.id === user.id && event.body.isSuspended)
 					|| (event.type === 'userChangeDeletedState' && event.body.id === user.id && event.body.isDeleted)) invalidate();
 			});

@@ -10,6 +10,7 @@ import { ModuleRef } from '@nestjs/core';
 import type { AuthenticationResponseJSON } from '@simplewebauthn/server';
 import type { Config } from '@/config.js';
 import type { InstancesRepository, AccessTokensRepository } from '@/models/_.js';
+import { CredentialRevocationService } from '@/core/CredentialRevocationService.js';
 import { DI } from '@/di-symbols.js';
 import { UserEntityService } from '@/core/entities/UserEntityService.js';
 import { bindThis } from '@/decorators.js';
@@ -34,6 +35,7 @@ export class ApiServerService {
 		@Inject(DI.accessTokensRepository)
 		private accessTokensRepository: AccessTokensRepository,
 
+		private credentialRevocationService: CredentialRevocationService,
 		private userEntityService: UserEntityService,
 		private apiCallService: ApiCallService,
 		private signupApiService: SignupApiService,
@@ -44,6 +46,7 @@ export class ApiServerService {
 
 	@bindThis
 	public createServer(fastify: FastifyInstance, options: FastifyPluginOptions, done: (err?: Error) => void) {
+		this.credentialRevocationService.start();
 		fastify.register(cors, {
 			origin: '*',
 		});

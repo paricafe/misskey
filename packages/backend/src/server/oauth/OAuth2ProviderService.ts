@@ -25,10 +25,10 @@ import { HttpRequestService } from '@/core/HttpRequestService.js';
 import type { Config } from '@/config.js';
 import { DI } from '@/di-symbols.js';
 import { bindThis } from '@/decorators.js';
-import type { AccessTokensRepository, UsersRepository } from '@/models/_.js';
+import type { AccessTokensRepository } from '@/models/_.js';
 import { IdService } from '@/core/IdService.js';
-import { CacheService } from '@/core/CacheService.js';
-import { GlobalEventService } from '@/core/GlobalEventService.js';
+import { AuthenticateService } from '@/server/api/AuthenticateService.js';
+import { CredentialRevocationService } from '@/core/CredentialRevocationService.js';
 import type { MiLocalUser } from '@/models/User.js';
 import { MemoryKVCache } from '@/misc/cache.js';
 import { LoggerService } from '@/core/LoggerService.js';
@@ -356,12 +356,10 @@ export class OAuth2ProviderService implements OnApplicationShutdown {
 		private config: Config,
 		@Inject(DI.accessTokensRepository)
 		private accessTokensRepository: AccessTokensRepository,
-		@Inject(DI.usersRepository)
-		private usersRepository: UsersRepository,
 		private idService: IdService,
 		private httpRequestService: HttpRequestService,
-		private cacheService: CacheService,
-		private globalEventService: GlobalEventService,
+		private authenticateService: AuthenticateService,
+		private revocations: CredentialRevocationService,
 		private htmlTemplateService: HtmlTemplateService,
 		loggerService: LoggerService,
 	) {
@@ -439,8 +437,7 @@ export class OAuth2ProviderService implements OnApplicationShutdown {
 	}
 
 	async #findUserByLoginToken(loginToken: string): Promise<MiLocalUser> {
-		const user = await this.cacheService.localUserByNativeTokenCache.fetch(loginToken,
-			() => this.usersRepository.findOneBy({ token: loginToken }) as Promise<MiLocalUser | null>);
+		const user = await this.authenticateService.findLocalUserByNativeToken(loginToken);
 		if (!user) {
 			throw new InvalidRequestError('No such user');
 		}
@@ -458,13 +455,8 @@ export class OAuth2ProviderService implements OnApplicationShutdown {
 	}
 
 	async #revokeToken(token: string): Promise<void> {
-		const deleted = await this.accessTokensRepository.createQueryBuilder().delete()
-			.where({ token })
-			.returning(['id', 'userId'])
-			.execute();
-		for (const row of deleted.raw as { id: string; userId: string }[]) {
-			await this.globalEventService.publishInternalEvent('accessTokenRevoked', row);
-		}
+		await this.accessTokensRepository.manager.transaction(manager => this.revocations.deleteAccessTokens(manager, { token }));
+		void this.revocations.dispatch();
 	}
 
 	public generateRFC8414() {

@@ -7,8 +7,9 @@ import bcrypt from 'bcryptjs';
 import { Inject, Injectable } from '@nestjs/common';
 import { Endpoint } from '@/server/api/endpoint-base.js';
 import type { UsersRepository, UserProfilesRepository } from '@/models/_.js';
-import { generateNativeUserToken } from '@/misc/token.js';
-import { GlobalEventService } from '@/core/GlobalEventService.js';
+import { generateNativeUserToken, nativeTokenFingerprint } from '@/misc/token.js';
+import { CredentialRevocationService } from '@/core/CredentialRevocationService.js';
+import { MiCredentialRevocation } from '@/models/CredentialRevocation.js';
 import { MiSwSubscription } from '@/models/SwSubscription.js';
 import { DI } from '@/di-symbols.js';
 
@@ -44,7 +45,7 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 		@Inject(DI.userProfilesRepository)
 		private userProfilesRepository: UserProfilesRepository,
 
-		private globalEventService: GlobalEventService,
+		private revocations: CredentialRevocationService,
 	) {
 		super(meta, paramDef, async (ps, me) => {
 			const profile = await this.userProfilesRepository.findOneByOrFail({ userId: me.id });
@@ -57,7 +58,7 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 
 			const newToken = generateNativeUserToken();
 
-			const oldToken = await this.usersRepository.manager.transaction(async manager => {
+			await this.usersRepository.manager.transaction(async manager => {
 				const users = manager.withRepository(this.usersRepository);
 				const user = await users.findOneOrFail({ where: { id: me.id }, select: { token: true }, lock: { mode: 'pessimistic_write' } });
 				await users.update(me.id, { token: newToken });
@@ -65,11 +66,10 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 					const { endpoint, auth, publickey } = ps.pushSubscription;
 					await manager.delete(MiSwSubscription, { userId: me.id, endpoint, auth, publickey });
 				}
-				return user.token!;
+				await manager.insert(MiCredentialRevocation, { userId: me.id, event: 'userTokenRegenerated', credentialId: nativeTokenFingerprint(user.token!) });
 			});
 
-			await this.globalEventService.publishInternalEvent('userTokenRegenerated', { id: me.id, oldToken, newToken });
-			this.globalEventService.publishMainStream(me.id, 'myTokenRegenerated');
+			void this.revocations.dispatch();
 		});
 	}
 }

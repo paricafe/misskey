@@ -28,7 +28,6 @@ type PariRemoteUserDecorationsCacheType = {
 @Injectable()
 export class CacheService implements OnApplicationShutdown {
 	public userByIdCache: MemoryKVCache<MiUser>;
-	public localUserByNativeTokenCache: MemoryKVCache<MiLocalUser | null>;
 	public localUserByIdCache: MemoryKVCache<MiLocalUser>;
 	public uriPersonCache: MemoryKVCache<MiUser | null>;
 	public userProfileCache: RedisKVCache<MiUserProfile>;
@@ -72,7 +71,6 @@ export class CacheService implements OnApplicationShutdown {
 		private httpRequestService: HttpRequestService,
 	) {
 		this.userByIdCache = new MemoryKVCache<MiUser>(1000 * 60 * 5);
-		this.localUserByNativeTokenCache = new MemoryKVCache<MiLocalUser | null>(1000 * 60 * 5);
 		this.localUserByIdCache = new MemoryKVCache<MiLocalUser>(1000 * 60 * 5);
 		this.uriPersonCache = new MemoryKVCache<MiUser | null>(1000 * 60 * 5);
 
@@ -219,16 +217,9 @@ export class CacheService implements OnApplicationShutdown {
 							}
 						}
 						if (this.userEntityService.isLocalUser(user)) {
-							this.localUserByNativeTokenCache.set(user.token!, user);
 							this.localUserByIdCache.set(user.id, user);
 						}
 					}
-					break;
-				}
-				case 'userTokenRegenerated': {
-					const user = await this.usersRepository.findOneByOrFail({ id: body.id }) as MiLocalUser;
-					this.localUserByNativeTokenCache.delete(body.oldToken);
-					this.localUserByNativeTokenCache.set(body.newToken, user);
 					break;
 				}
 				case 'follow': {
@@ -254,7 +245,6 @@ export class CacheService implements OnApplicationShutdown {
 	public dispose(): void {
 		this.redisForSub.off('message', this.onMessage);
 		this.userByIdCache.dispose();
-		this.localUserByNativeTokenCache.dispose();
 		this.localUserByIdCache.dispose();
 		this.uriPersonCache.dispose();
 		this.userProfileCache.dispose();

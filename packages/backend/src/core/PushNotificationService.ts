@@ -3,17 +3,15 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { Inject, Injectable, OnApplicationShutdown } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import push from 'web-push';
-import * as Redis from 'ioredis';
 import { DI } from '@/di-symbols.js';
 import type { Config } from '@/config.js';
 import type { Packed } from '@/misc/json-schema.js';
 import { getNoteSummary } from '@/misc/get-note-summary.js';
-import type { MiMeta, MiSwSubscription, SwSubscriptionsRepository } from '@/models/_.js';
+import type { MiMeta, SwSubscriptionsRepository } from '@/models/_.js';
 import { bindThis } from '@/decorators.js';
-import { RedisKVCache } from '@/misc/cache.js';
-import type { GlobalEvents } from '@/core/GlobalEventService.js';
+import { readFromPrimary } from '@/misc/read-from-primary.js';
 import { HttpRequestService } from '@/core/HttpRequestService.js';
 
 type PushNotificationsTypes = {
@@ -46,9 +44,7 @@ function truncateBody<T extends keyof PushNotificationsTypes>(type: T, body: Pus
 }
 
 @Injectable()
-export class PushNotificationService implements OnApplicationShutdown {
-	private subscriptionsCache: RedisKVCache<MiSwSubscription[]>;
-
+export class PushNotificationService {
 	constructor(
 		@Inject(DI.config)
 		private config: Config,
@@ -56,33 +52,11 @@ export class PushNotificationService implements OnApplicationShutdown {
 		@Inject(DI.meta)
 		private meta: MiMeta,
 
-		@Inject(DI.redis)
-		private redisClient: Redis.Redis,
-
-		@Inject(DI.redisForSub)
-		private redisForSub: Redis.Redis,
-
 		@Inject(DI.swSubscriptionsRepository)
 		private swSubscriptionsRepository: SwSubscriptionsRepository,
 
 		private httpRequestService: HttpRequestService,
 	) {
-		this.subscriptionsCache = new RedisKVCache<MiSwSubscription[]>(this.redisClient, 'userSwSubscriptions', {
-			lifetime: 1000 * 60 * 60 * 1,
-			memoryCacheLifetime: 1000 * 60 * 3,
-			fetcher: (key) => this.swSubscriptionsRepository.findBy({ userId: key }),
-			toRedisConverter: (value) => JSON.stringify(value),
-			fromRedisConverter: (value) => JSON.parse(value),
-		});
-		this.redisForSub.on('message', this.onMessage);
-	}
-
-	@bindThis
-	private async onMessage(_: string, data: string) {
-		const event = JSON.parse(data);
-		if (event.channel !== 'internal') return;
-		const message = event.message as GlobalEvents['internal']['payload'];
-		if (message.type === 'userTokenRegenerated') await this.subscriptionsCache.delete(message.body.id);
 	}
 
 	@bindThis
@@ -108,7 +82,7 @@ export class PushNotificationService implements OnApplicationShutdown {
 			this.meta.swPublicKey,
 			this.meta.swPrivateKey);
 
-		const subscriptions = await this.subscriptionsCache.fetch(userId);
+		const subscriptions = await readFromPrimary(this.swSubscriptionsRepository.manager, primary => primary.withRepository(this.swSubscriptionsRepository).findBy({ userId }));
 
 		for (const subscription of subscriptions) {
 			if ([
@@ -132,34 +106,16 @@ export class PushNotificationService implements OnApplicationShutdown {
 				dateTime: Date.now(),
 			}), {
 				agent: this.httpRequestService.getAgentForHttps(new URL(subscription.endpoint)),
-			}).catch((err: any) => {
+			}).catch(async (err: any) => {
 				if (err.statusCode === 410 || err.statusCode === 404) {
-					this.swSubscriptionsRepository.delete({
+					await this.swSubscriptionsRepository.delete({
 						userId: userId,
 						endpoint: subscription.endpoint,
 						auth: subscription.auth,
 						publickey: subscription.publickey,
-					}).then(() => {
-						this.refreshCache(userId);
 					});
 				}
 			});
 		}
-	}
-
-	@bindThis
-	public refreshCache(userId: string): void {
-		this.subscriptionsCache.refresh(userId);
-	}
-
-	@bindThis
-	public dispose(): void {
-		this.redisForSub.off('message', this.onMessage);
-		this.subscriptionsCache.dispose();
-	}
-
-	@bindThis
-	public onApplicationShutdown(signal?: string | undefined): void {
-		this.dispose();
 	}
 }

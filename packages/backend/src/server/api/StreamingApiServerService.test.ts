@@ -6,6 +6,7 @@
 import { EventEmitter, once } from 'node:events';
 import { createServer } from 'node:http';
 import { WebSocket } from 'ws';
+import { nativeTokenFingerprint } from '@/misc/token.js';
 import { describe, expect, test, vi } from 'vitest';
 import { isNativeStreamingPath, StreamingApiServerService } from './StreamingApiServerService.js';
 import type { Socket } from 'node:net';
@@ -60,6 +61,37 @@ describe('native streaming shutdown', () => {
 			await service.detach();
 			client.terminate();
 			second?.terminate();
+			await new Promise<void>(resolve => server.close(() => resolve()));
+		}
+	});
+
+	test('ignores duplicate and delayed rotations for different native credentials on the same account', async () => {
+		const authenticate = vi.fn().mockResolvedValue([{ id: 'alice' }, null]);
+		const { redis, service, server, client } = await setup(undefined, authenticate, 'first');
+		const others: WebSocket[] = [];
+		try {
+			await once(client, 'open');
+			for (const token of ['second', 'current']) {
+				const ws = new WebSocket(client.url.replace('first', token));
+				others.push(ws);
+				await once(ws, 'open');
+			}
+			const revoke = (token: string) => redis.emit('message', 'test', JSON.stringify({
+				channel: 'internal', message: { type: 'userTokenRegenerated', body: { id: 'alice', oldTokenHash: nativeTokenFingerprint(token) } },
+			}));
+			const closed = once(others[0], 'close');
+			revoke('second');
+			revoke('second');
+			await closed;
+			expect(client.readyState).toBe(WebSocket.OPEN);
+			const firstClosed = once(client, 'close');
+			revoke('first');
+			await firstClosed;
+			expect(others[1].readyState).toBe(WebSocket.OPEN);
+		} finally {
+			await service.detach();
+			client.terminate();
+			for (const ws of others) ws.terminate();
 			await new Promise<void>(resolve => server.close(() => resolve()));
 		}
 	});

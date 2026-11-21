@@ -8,7 +8,6 @@ import ms from 'ms';
 import type { SwSubscriptionsRepository } from '@/models/_.js';
 import { Endpoint } from '@/server/api/endpoint-base.js';
 import { DI } from '@/di-symbols.js';
-import { PushNotificationService } from '@/core/PushNotificationService.js';
 
 export const meta = {
 	tags: ['account'],
@@ -38,24 +37,14 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 	constructor(
 		@Inject(DI.swSubscriptionsRepository)
 		private swSubscriptionsRepository: SwSubscriptionsRepository,
-
-		private pushNotificationService: PushNotificationService,
 	) {
 		super(meta, paramDef, async (ps, me) => {
-			const subscriptions = await this.swSubscriptionsRepository.findBy({
+			await this.swSubscriptionsRepository.delete({
 				...(me ? { userId: me.id } : {}),
 				endpoint: ps.endpoint,
 				auth: ps.auth,
 				publickey: ps.publickey,
 			});
-
-			if (subscriptions.length === 0) return;
-
-			await this.swSubscriptionsRepository.delete(subscriptions.map(s => s.id));
-
-			for (const userId of new Set(subscriptions.map(s => s.userId))) {
-				this.pushNotificationService.refreshCache(userId);
-			}
 		});
 	}
 }

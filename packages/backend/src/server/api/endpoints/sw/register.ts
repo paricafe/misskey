@@ -110,8 +110,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				sendReadMessage: ps.sendReadMessage,
 			});
 
-			this.pushNotificationService.refreshCache(me.id);
-
 			return {
 				state: 'subscribed' as const,
 				key: this.serverSettings.swPublicKey,
