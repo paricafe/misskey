@@ -1,0 +1,184 @@
+packages/backend/src/models/FollowRequest.ts
+  8002ce8221349fbb 42-43
+packages/backend/migration/1795196226271-FollowActivityIdText.js
+  8002ce8221349fbb 1-18
+packages/backend/test/unit/UserFollowingService.ts
+  8002ce8221349fbb 103,114-115,139-140,147-148,172-173,177-190
+packages/backend/src/models/Following.ts
+  8002ce8221349fbb 60-61
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8-ntes.10",
+  "base_commit_sha": "ed826a228020b611797af009571fcaaf9a07cd8f",
+  "prompts": {
+    "8002ce8221349fbb": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1f981-26cd-78e1-924b-f7714ea5d44c",
+        "model": "gpt-6.2-astra"
+      },
+      "human_author": "Natsuki-Kaede",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1520,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "packages/backend/src/core/PushNotificationService.ts": {
+          "accepted_lines": 7
+        },
+        "packages/backend/src/core/CoreModule.ts": {
+          "accepted_lines": 3
+        },
+        "locales/ja-JP.yml": {
+          "accepted_lines": 1
+        },
+        "packages/backend/src/server/api/StreamingApiServerService.ts": {
+          "accepted_lines": 4
+        },
+        "packages/frontend/test/unit/post-form-edit.test.ts": {
+          "accepted_lines": 243
+        },
+        "packages/backend/src/server/api/endpoints/sw/unregister.ts": {
+          "accepted_lines": 1
+        },
+        "packages/frontend/src/components/MkNoteDraftsDialog.vue": {
+          "accepted_lines": 9
+        },
+        "packages/sw/src/scripts/get-account-from-id.ts": {
+          "accepted_lines": 11
+        },
+        "packages/frontend/test/e2e/push-account.spec.ts": {
+          "accepted_lines": 67
+        },
+        "packages/frontend/src/components/MkPostForm.vue": {
+          "accepted_lines": 337
+        },
+        "packages/i18n/src/autogen/locale.ts": {
+          "accepted_lines": 4
+        },
+        "packages/frontend/test/unit/autocomplete.test.ts": {
+          "accepted_lines": 33
+        },
+        "packages/backend/src/models/Following.ts": {
+          "accepted_lines": 2
+        },
+        "packages/backend/src/server/api/ApiServerService.ts": {
+          "accepted_lines": 3
+        },
+        "packages/backend/src/server/api/endpoints/i/regenerate-token.ts": {
+          "accepted_lines": 7
+        },
+        "packages/backend/migration/1795196263875-CredentialRevocation.js": {
+          "accepted_lines": 23
+        },
+        "packages/backend/src/server/api/AuthenticateService.test.ts": {
+          "accepted_lines": 7
+        },
+        "packages/backend/src/server/oauth/OAuth2ProviderService.ts": {
+          "accepted_lines": 8
+        },
+        "packages/frontend/src/utility/paginator.ts": {
+          "accepted_lines": 6
+        },
+        "packages/frontend/test/unit/antenna-timeline.test.ts": {
+          "accepted_lines": 30
+        },
+        "packages/sw/src/scripts/create-notification.ts": {
+          "accepted_lines": 2
+        },
+        "packages/frontend/src/utility/get-account-from-id.ts": {
+          "accepted_lines": 2
+        },
+        "packages/backend/src/misc/token.ts": {
+          "accepted_lines": 3
+        },
+        "packages/backend/src/core/GlobalEventService.ts": {
+          "accepted_lines": 24
+        },
+        "packages/frontend/src/boot/common.ts": {
+          "accepted_lines": 8
+        },
+        "packages/backend/src/server/api/TokenRevocation.test.ts": {
+          "accepted_lines": 26
+        },
+        "packages/frontend/src/utility/autocomplete.ts": {
+          "accepted_lines": 3
+        },
+        "packages/frontend/src/signout.ts": {
+          "accepted_lines": 23
+        },
+        "packages/backend/src/core/CredentialRevocationService.ts": {
+          "accepted_lines": 69
+        },
+        "packages/frontend/src/utility/idb-proxy.ts": {
+          "accepted_lines": 2
+        },
+        "packages/frontend/src/utility/account-storage.ts": {
+          "accepted_lines": 104
+        },
+        "packages/backend/src/server/api/endpoints/i/revoke-token.ts": {
+          "accepted_lines": 15
+        },
+        "packages/frontend/src/store.ts": {
+          "accepted_lines": 4
+        },
+        "packages/backend/src/models/CredentialRevocation.ts": {
+          "accepted_lines": 22
+        },
+        "packages/frontend-shared/js/stored-accounts.ts": {
+          "accepted_lines": 1
+        },
+        "packages/frontend/src/components/MkPostFormAttaches.vue": {
+          "accepted_lines": 4
+        },
+        "packages/backend/src/server/api/AuthenticateService.ts": {
+          "accepted_lines": 9
+        },
+        "packages/backend/src/models/FollowRequest.ts": {
+          "accepted_lines": 2
+        },
+        "packages/frontend/src/accounts.ts": {
+          "accepted_lines": 36
+        },
+        "packages/backend/test/unit/UserFollowingService.ts": {
+          "accepted_lines": 23
+        },
+        "packages/backend/migration/1795196226271-FollowActivityIdText.js": {
+          "accepted_lines": 18
+        },
+        "packages/frontend/src/pages/antenna-timeline.vue": {
+          "accepted_lines": 1
+        },
+        "packages/backend/src/misc/read-from-primary.ts": {
+          "accepted_lines": 16
+        },
+        "packages/frontend/test/e2e/account-session.spec.ts": {
+          "accepted_lines": 35
+        },
+        "packages/backend/src/postgres.ts": {
+          "accepted_lines": 2
+        },
+        "packages/sw/src/sw.ts": {
+          "accepted_lines": 10
+        },
+        "packages/backend/src/core/PushNotificationService.test.ts": {
+          "accepted_lines": 4
+        },
+        "packages/frontend/test/unit/note-drafts-dialog.test.ts": {
+          "accepted_lines": 53
+        },
+        "packages/frontend/src/ui/_common_/sw-inject.ts": {
+          "accepted_lines": 4
+        },
+        "packages/backend/test/unit/CredentialRevocation.ts": {
+          "accepted_lines": 135
+        },
+        "packages/frontend/test/unit/account-storage.test.ts": {
+          "accepted_lines": 54
+        }
+      }
+    }
+  }
+}
