@@ -1,0 +1,280 @@
+.github/workflows/test-backend.yml
+  8002ce8221349fbb 159,184-185
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8-ntes.10",
+  "base_commit_sha": "a77f0da18de5bdfc8fa710108d22b86c2ab3686e",
+  "prompts": {
+    "8002ce8221349fbb": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1f981-26cd-78e1-924b-f7714ea5d44c",
+        "model": "gpt-6.2-astra"
+      },
+      "human_author": "Natsuki-Kaede",
+      "messages": [],
+      "total_additions": 1664,
+      "total_deletions": 662,
+      "accepted_lines": 1523,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "packages/backend/src/server/api/endpoints/i/regenerate-token.ts": {
+          "additions": 7,
+          "deletions": 7,
+          "accepted_lines": 7
+        },
+        "packages/backend/src/server/api/AuthenticateService.test.ts": {
+          "additions": 7,
+          "deletions": 7,
+          "accepted_lines": 7
+        },
+        "packages/frontend/src/utility/account-storage.ts": {
+          "additions": 141,
+          "deletions": 37,
+          "accepted_lines": 104
+        },
+        "packages/frontend/test/unit/account-storage.test.ts": {
+          "additions": 55,
+          "deletions": 2,
+          "accepted_lines": 54
+        },
+        "packages/frontend/test/e2e/push-account.spec.ts": {
+          "additions": 76,
+          "deletions": 19,
+          "accepted_lines": 67
+        },
+        "packages/frontend/src/pages/antenna-timeline.vue": {
+          "additions": 1,
+          "deletions": 1,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/core/CoreModule.ts": {
+          "additions": 3,
+          "accepted_lines": 3
+        },
+        "locales/ja-JP.yml": {
+          "additions": 1,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/core/CredentialRevocationService.ts": {
+          "additions": 69,
+          "accepted_lines": 69
+        },
+        "packages/backend/src/models/CredentialRevocation.ts": {
+          "additions": 22,
+          "accepted_lines": 22
+        },
+        "packages/frontend/src/boot/common.ts": {
+          "additions": 9,
+          "deletions": 6,
+          "accepted_lines": 8
+        },
+        "packages/frontend/src/utility/get-account-from-id.ts": {
+          "additions": 2,
+          "deletions": 1,
+          "accepted_lines": 2
+        },
+        "packages/backend/src/server/api/TokenRevocation.test.ts": {
+          "additions": 26,
+          "deletions": 24,
+          "accepted_lines": 26
+        },
+        "packages/backend/src/server/api/endpoints/sw/unregister.ts": {
+          "additions": 1,
+          "deletions": 12,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/models/Following.ts": {
+          "additions": 2,
+          "deletions": 2,
+          "accepted_lines": 2
+        },
+        "packages/frontend/src/utility/paginator.ts": {
+          "additions": 6,
+          "deletions": 3,
+          "accepted_lines": 6
+        },
+        "packages/backend/src/server/api/AuthenticateService.ts": {
+          "additions": 9,
+          "deletions": 4,
+          "accepted_lines": 9
+        },
+        "packages/backend/src/core/CacheService.ts": {
+          "deletions": 10
+        },
+        "packages/frontend-shared/js/stored-accounts.ts": {
+          "additions": 1,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/server/api/endpoints/sw/update-registration.ts": {
+          "deletions": 5
+        },
+        "packages/backend/src/core/PushNotificationService.ts": {
+          "additions": 7,
+          "deletions": 51,
+          "accepted_lines": 7
+        },
+        "packages/backend/test/unit/CredentialRevocation.ts": {
+          "additions": 136,
+          "deletions": 1,
+          "accepted_lines": 135
+        },
+        "packages/backend/src/core/GlobalEventService.ts": {
+          "additions": 28,
+          "deletions": 8,
+          "accepted_lines": 24
+        },
+        "packages/backend/src/server/oauth/OAuth2ProviderService.ts": {
+          "additions": 8,
+          "deletions": 16,
+          "accepted_lines": 8
+        },
+        "packages/frontend/src/ui/_common_/sw-inject.ts": {
+          "additions": 4,
+          "deletions": 5,
+          "accepted_lines": 4
+        },
+        "packages/frontend/test/unit/antenna-timeline.test.ts": {
+          "additions": 30,
+          "accepted_lines": 30
+        },
+        "packages/backend/src/server/api/ApiServerService.ts": {
+          "additions": 3,
+          "accepted_lines": 3
+        },
+        "packages/frontend/src/components/MkPostForm.vue": {
+          "additions": 401,
+          "deletions": 289,
+          "accepted_lines": 337
+        },
+        "packages/sw/src/scripts/create-notification.ts": {
+          "additions": 2,
+          "deletions": 2,
+          "accepted_lines": 2
+        },
+        "packages/frontend/test/e2e/account-session.spec.ts": {
+          "additions": 35,
+          "deletions": 1,
+          "accepted_lines": 35
+        },
+        "packages/frontend/src/accounts.ts": {
+          "additions": 40,
+          "deletions": 28,
+          "accepted_lines": 36
+        },
+        "packages/backend/test/unit/UserFollowingService.ts": {
+          "additions": 23,
+          "deletions": 1,
+          "accepted_lines": 23
+        },
+        "packages/frontend/test/unit/note-drafts-dialog.test.ts": {
+          "additions": 53,
+          "accepted_lines": 53
+        },
+        "packages/frontend/src/utility/autocomplete.ts": {
+          "additions": 4,
+          "deletions": 4,
+          "accepted_lines": 3
+        },
+        "packages/sw/src/scripts/get-account-from-id.ts": {
+          "additions": 12,
+          "deletions": 3,
+          "accepted_lines": 11
+        },
+        "packages/frontend/src/store.ts": {
+          "additions": 4,
+          "accepted_lines": 4
+        },
+        "packages/frontend/src/components/MkNoteDraftsDialog.vue": {
+          "additions": 9,
+          "deletions": 6,
+          "accepted_lines": 9
+        },
+        "packages/frontend/src/signout.ts": {
+          "additions": 29,
+          "deletions": 28,
+          "accepted_lines": 23
+        },
+        "packages/frontend/src/utility/idb-proxy.ts": {
+          "additions": 2,
+          "deletions": 4,
+          "accepted_lines": 2
+        },
+        "packages/backend/src/server/api/StreamingApiServerService.ts": {
+          "additions": 4,
+          "deletions": 1,
+          "accepted_lines": 4
+        },
+        "packages/sw/src/sw.ts": {
+          "additions": 10,
+          "deletions": 11,
+          "accepted_lines": 10
+        },
+        "packages/backend/src/server/api/endpoints/sw/register.ts": {
+          "deletions": 2
+        },
+        "packages/backend/src/server/api/endpoints/i/revoke-token.ts": {
+          "additions": 16,
+          "deletions": 20,
+          "accepted_lines": 15
+        },
+        "packages/i18n/src/autogen/locale.ts": {
+          "additions": 4,
+          "accepted_lines": 4
+        },
+        "packages/backend/migration/1795196226271-FollowActivityIdText.js": {
+          "additions": 18,
+          "accepted_lines": 18
+        },
+        "packages/backend/src/misc/token.ts": {
+          "additions": 3,
+          "accepted_lines": 3
+        },
+        ".github/workflows/test-backend.yml": {
+          "additions": 3,
+          "deletions": 1,
+          "accepted_lines": 3
+        },
+        "packages/frontend/test/unit/post-form-edit.test.ts": {
+          "additions": 253,
+          "deletions": 20,
+          "accepted_lines": 243
+        },
+        "packages/frontend/src/components/MkPostFormAttaches.vue": {
+          "additions": 4,
+          "deletions": 2,
+          "accepted_lines": 4
+        },
+        "packages/frontend/test/unit/autocomplete.test.ts": {
+          "additions": 33,
+          "deletions": 1,
+          "accepted_lines": 33
+        },
+        "packages/backend/src/core/PushNotificationService.test.ts": {
+          "additions": 4,
+          "deletions": 14,
+          "accepted_lines": 4
+        },
+        "packages/backend/src/misc/read-from-primary.ts": {
+          "additions": 16,
+          "accepted_lines": 16
+        },
+        "packages/backend/src/postgres.ts": {
+          "additions": 2,
+          "accepted_lines": 2
+        },
+        "packages/backend/src/models/FollowRequest.ts": {
+          "additions": 2,
+          "deletions": 2,
+          "accepted_lines": 2
+        },
+        "packages/backend/migration/1795196263875-CredentialRevocation.js": {
+          "additions": 24,
+          "deletions": 1,
+          "accepted_lines": 23
+        }
+      }
+    }
+  }
+}
