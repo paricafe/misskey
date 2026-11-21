@@ -68,7 +68,7 @@ async function chooseAntenna(ev: PointerEvent): Promise<void> {
 			icon: 'ti ti-plus',
 			text: i18n.ts.createNew,
 			action: () => {
-				router.push('/my/antennas');
+				router.push('/my/antennas/create');
 			},
 		},
 	];
