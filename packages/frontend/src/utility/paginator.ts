@@ -97,6 +97,7 @@ export class Paginator<
 	public canSearch = false;
 	public error = ref(false);
 	private endpoint: Endpoint;
+	private token?: string;
 	private limit: number;
 	private params: E['req'] | (() => E['req']);
 	public computedParams: ComputedRef<E['req'] | null | undefined> | null;
@@ -119,6 +120,7 @@ export class Paginator<
 	public order: Ref<'newest' | 'oldest'>;
 
 	constructor(endpoint: Endpoint, props: {
+		token?: string;
 		limit?: number;
 		params?: E['req'] | (() => E['req']);
 		computedParams?: ComputedRef<E['req'] | null | undefined>;
@@ -141,6 +143,7 @@ export class Paginator<
 		searchParamName?: keyof E['req'];
 	}) {
 		this.endpoint = endpoint;
+		this.token = props.token;
 		this.useShallowRef = (props.useShallowRef ?? false) as SRef;
 		if (this.useShallowRef) {
 			this.items = shallowRef<T[]>([]);
@@ -218,7 +221,7 @@ export class Paginator<
 			} : {}),
 		};
 
-		const apiRes = (await misskeyApi(this.endpoint, data, undefined, this.requestController.signal).catch(() => null)) as T[] | null;
+		const apiRes = (await misskeyApi(this.endpoint, data, this.token, this.requestController.signal).catch(() => null)) as T[] | null;
 
 		if (generation !== this.requestGeneration) return;
 
@@ -278,7 +281,7 @@ export class Paginator<
 			}),
 		};
 
-		const apiRes = (await misskeyApi<T[]>(this.endpoint, data, undefined, this.requestController.signal).catch(_ => {
+		const apiRes = (await misskeyApi<T[]>(this.endpoint, data, this.token, this.requestController.signal).catch(_ => {
 			return null;
 		})) as T[] | null;
 
@@ -343,7 +346,7 @@ export class Paginator<
 			}),
 		};
 
-		const apiRes = (await misskeyApi<T[]>(this.endpoint, data, undefined, this.requestController.signal).catch(_ => {
+		const apiRes = (await misskeyApi<T[]>(this.endpoint, data, this.token, this.requestController.signal).catch(_ => {
 			return null;
 		})) as T[] | null;
 

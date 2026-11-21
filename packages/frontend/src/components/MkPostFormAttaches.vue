@@ -56,6 +56,7 @@ import { isPreviewable, getType } from '@/utility/lightbox.js';
 
 const props = defineProps<{
 	modelValue: Misskey.entities.DriveFile[];
+	disableDriveChanges?: boolean;
 	detachMediaFn?: (id: string) => void;
 }>();
 
@@ -155,7 +156,7 @@ function showFileMenu(file: Misskey.entities.DriveFile, ev: PointerEvent | Keybo
 
 	const menuItems: MenuItem[] = [];
 
-	menuItems.push({
+	if (!props.disableDriveChanges) menuItems.push({
 		text: i18n.ts.renameFile,
 		icon: 'ti ti-forms',
 		action: () => { rename(file); },
@@ -201,7 +202,8 @@ function showFileMenu(file: Misskey.entities.DriveFile, ev: PointerEvent | Keybo
 		text: i18n.ts.attachCancel,
 		icon: 'ti ti-circle-x',
 		action: () => { detachMedia(file.id); },
-	}, {
+	});
+	if (!props.disableDriveChanges) menuItems.push({
 		text: i18n.ts.deleteFile,
 		icon: 'ti ti-trash',
 		danger: true,

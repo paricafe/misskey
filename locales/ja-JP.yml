@@ -2813,6 +2813,7 @@ _visibility:
   disableFederationDescription: "他サーバーへの配信を行いません"
 
 _postForm:
+  switchAccountToAttachFiles: "ファイルを追加・編集するには、この投稿のアカウントにログインを切り替えてください。"
   quitInspiteOfThereAreUnuploadedFilesConfirm: "アップロードされていないファイルがありますが、破棄してフォームを閉じますか？"
   uploaderTip: "ファイルはまだアップロードされていません。ファイルのメニューから、リネームや画像のクロップ、ウォーターマークの付与、圧縮の有無などを設定できます。ファイルはノート投稿時に自動でアップロードされます。"
   replyPlaceholder: "このノートに返信..."

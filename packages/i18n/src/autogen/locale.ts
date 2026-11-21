@@ -10684,6 +10684,10 @@ export interface Locale extends ILocale {
     };
     "_postForm": {
         /**
+         * ファイルを追加・編集するには、この投稿のアカウントにログインを切り替えてください。
+         */
+        "switchAccountToAttachFiles": string;
+        /**
          * アップロードされていないファイルがありますが、破棄してフォームを閉じますか？
          */
         "quitInspiteOfThereAreUnuploadedFilesConfirm": string;

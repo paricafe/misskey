@@ -203,7 +203,7 @@ export class Autocomplete {
 				y: _y,
 			}, {
 				done: (res) => {
-					this.complete(res);
+					if (this.suggestion?.close === dispose) this.complete(res);
 				},
 			});
 
@@ -211,14 +211,14 @@ export class Autocomplete {
 				q: _q,
 				x: _x,
 				y: _y,
-				close: () => dispose(),
+				close: dispose,
 			};
 
 			this.opening = false;
 		}
 	}
 
-	private close() {
+	public close() {
 		if (this.suggestion == null) return;
 
 		this.suggestion.close();
