@@ -1,0 +1,33 @@
+packages/backend/test/unit/CredentialRevocation.ts
+  8002ce8221349fbb 73,75-77
+packages/backend/src/core/GlobalEventService.ts
+  8002ce8221349fbb 389-391,393
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8-ntes.10",
+  "base_commit_sha": "383bf433930ab263aceb3b41cc43c0da40f8d290",
+  "prompts": {
+    "8002ce8221349fbb": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1f981-26cd-78e1-924b-f7714ea5d44c",
+        "model": "gpt-6.2-astra"
+      },
+      "human_author": "Natsuki-Kaede",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 8,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "packages/backend/src/core/GlobalEventService.ts": {
+          "accepted_lines": 4
+        },
+        "packages/backend/test/unit/CredentialRevocation.ts": {
+          "accepted_lines": 4
+        }
+      }
+    }
+  }
+}
