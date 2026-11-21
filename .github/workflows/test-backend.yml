@@ -156,7 +156,7 @@ jobs:
 
     services:
       postgres:
-        image: postgres:18
+        image: groonga/pgroonga:4.1.0-debian-18
         ports:
           - 54312:5432
         env:
@@ -181,6 +181,8 @@ jobs:
         run: cp .github/misskey/test.yml .config
       - name: Build
         run: pnpm build-pre && pnpm --filter backend... build
+      - name: Enable PGroonga in the migration database
+        run: psql -h 127.0.0.1 -p 54312 -U postgres -d test-misskey -v ON_ERROR_STOP=1 -c "CREATE EXTENSION IF NOT EXISTS pgroonga"
       - name: Run migrations
         run: MISSKEY_CONFIG_YML=test.yml pnpm --filter backend migrate
       - name: Check no migrations are remaining
