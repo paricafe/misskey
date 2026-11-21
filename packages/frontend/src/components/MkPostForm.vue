@@ -205,21 +205,18 @@ let draftGeneration = 0;
 let pendingVisibleUserIds: string[] = [];
 const posting = ref(false);
 const posted = ref(false);
-const text = ref(props.initialText ?? '');
+const text = ref('');
 const files = ref(props.initialFiles ?? []);
 const poll = ref<PollEditorModelValue | null>(null);
-const useCw = ref<boolean>(!!props.initialCw);
+const useCw = ref(false);
 const showPreview = ref(store.s.showPreview);
 watch(showPreview, () => store.set('showPreview', showPreview.value));
 const showAddMfmFunction = ref(prefer.s.enableQuickAddMfmFunction);
 watch(showAddMfmFunction, () => prefer.commit('enableQuickAddMfmFunction', showAddMfmFunction.value));
-const cw = ref<string | null>(props.initialCw ?? null);
+const cw = ref<string | null>(null);
 const localOnly = ref(props.initialLocalOnly ?? (prefer.s.rememberNoteVisibility ? store.s.localOnly : prefer.s.defaultNoteLocalOnly));
 const visibility = ref(props.initialVisibility ?? (prefer.s.rememberNoteVisibility ? store.s.visibility : prefer.s.defaultNoteVisibility));
 const visibleUsers = ref<Misskey.entities.UserLite[]>([]);
-if (props.initialVisibleUsers) {
-	props.initialVisibleUsers.forEach(u => pushVisibleUser(u));
-}
 const reactionAcceptance = ref(store.s.reactionAcceptance);
 const scheduledAt = ref<number | null>(null);
 const draghover = ref(false);
@@ -450,6 +447,11 @@ function getVisibleUserIds() {
 }
 
 function initializeContext() {
+	text.value = props.initialText ?? '';
+	cw.value = props.initialCw ?? null;
+	useCw.value = !!props.initialCw;
+	props.initialVisibleUsers.forEach(pushVisibleUser);
+
 	if (props.mention) {
 		text.value = props.mention.host ? `@${props.mention.username}@${toASCII(props.mention.host)}` : `@${props.mention.username}`;
 		text.value += ' ';
@@ -521,8 +523,9 @@ function initializeContext() {
 initializeContext();
 
 let draftReady = false;
-watch([text, useCw, cw, poll, files, visibility, localOnly, quoteId, reactionAcceptance, scheduledAt, visibleUsers, serverDraftId], () => {
-	if (draftReady) saveDraft();
+const recipientIds = computed(() => getVisibleUserIds().sort().join(','));
+watch([() => author.value.id, text, useCw, cw, poll, files, visibility, localOnly, quoteId, reactionAcceptance, scheduledAt, recipientIds, serverDraftId], ([id], [previousId]) => {
+	if (draftReady && id === previousId) saveDraft();
 }, { deep: true });
 
 function MFMWindow() {
@@ -1054,15 +1057,14 @@ function saveDraft() {
 	miLocalStorage.setItem(draftStorageKey.value, JSON.stringify(draftsData));
 }
 
-function restoreDraft() {
+function readLocalDraft(): StoredDrafts[string] | undefined {
 	if (!usesLocalDrafts()) return;
-	const draft = JSON.parse(miLocalStorage.getItem(draftStorageKey.value) ?? '{}')[draftKey.value] as StoredDrafts[string] | undefined;
-	if (draft) applyDraft(draft.data);
+	return JSON.parse(miLocalStorage.getItem(draftStorageKey.value) ?? '{}')[draftKey.value];
 }
 
 function getSessionDraft() {
 	return {
-		data: getDraftData(),
+		data: usesLocalDrafts() ? null : getDraftData(),
 		reply: replyTargetNote.value,
 		renote: renoteTargetNote.value,
 		channel: targetChannel.value,
@@ -1072,13 +1074,15 @@ function getSessionDraft() {
 }
 
 const sessionDrafts = new Map<string, ReturnType<typeof getSessionDraft>>();
+let prefilledDraft: { key: string; updatedAt?: string } | undefined;
 
 async function chooseAuthor(account: Misskey.entities.MeDetailed) {
 	if (account.id === author.value.id || posting.value || posted.value || props.updateMode) return;
 	const generation = draftGeneration;
 	if (!await canClose() || generation !== draftGeneration || posting.value || posted.value) return;
+	if (prefilledDraft?.key === draftKey.value && readLocalDraft()?.updatedAt === prefilledDraft.updatedAt) saveDraft();
+	prefilledDraft = undefined;
 	sessionDrafts.set(author.value.id, getSessionDraft());
-	saveDraft();
 	resetAuthor(account);
 }
 
@@ -1105,12 +1109,9 @@ function resetAuthor(account: Misskey.entities.MeDetailed) {
 	targetChannel.value = session ? session.channel : props.channel;
 	alternateHashtags.value = session?.hashtags ?? '';
 	alternateWithHashtags.value = session?.withHashtags ?? false;
-	if (session) {
-		applyDraft(session.data);
-	} else {
-		initializeContext();
-		restoreDraft();
-	}
+	const data = session?.data ?? readLocalDraft()?.data;
+	if (data) applyDraft(data);
+	else initializeContext();
 }
 
 function deleteDraft(storageKey: 'drafts' | `drafts:${string}`, key: string) {
@@ -1661,7 +1662,11 @@ onMounted(() => {
 	if (hashtagsInputEl.value) hashtagAutocomplete = new Autocomplete(hashtagsInputEl.value, hashtags);
 
 	nextTick(() => {
-		restoreDraft();
+		const draft = readLocalDraft();
+		if (draft) applyDraft(draft.data);
+		if (usesLocalDrafts() && (props.initialNote || props.initialFiles?.length)) {
+			prefilledDraft = { key: draftKey.value, updatedAt: draft?.updatedAt };
+		}
 
 		if (props.initialNote) {
 			const init = props.initialNote;

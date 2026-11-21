@@ -148,6 +148,64 @@ describe('post form local drafts', () => {
 		await nextTick();
 	}
 
+	test.each([undefined, 'reply', 'renote'] as const)('respects another tab editing and removing a %s draft', async target => {
+		const draft = await openDraft('author', target);
+		const storage = target ? 'drafts:author' : 'drafts';
+		const key = target ? target + ':note' : 'note:author';
+		await fireEvent.update(draft.text, 'Original text');
+		await choose(draft, 'bob');
+		const saved = JSON.parse(localStorage.getItem(storage)!);
+		saved[key].data.text = 'Edited in another tab';
+		localStorage.setItem(storage, JSON.stringify(saved));
+		await choose(draft, 'author');
+		expect(draft.text.value).toBe('Edited in another tab');
+
+		await choose(draft, 'bob');
+		delete saved[key];
+		localStorage.setItem(storage, JSON.stringify(saved));
+		await choose(draft, 'author');
+		expect(draft.text.value).toBe('');
+		await choose(draft, 'bob');
+		expect(JSON.parse(localStorage.getItem(storage)!)[key]).toBeUndefined();
+	});
+
+	test('switching the author of a share starts with the supplied text and recipients', async () => {
+		const draft = await openDraft('author', undefined, {
+			instant: true, initialText: 'https://example.org/shared', initialCw: 'Warning',
+			initialVisibility: 'specified', initialVisibleUsers: [note().user],
+		});
+		await fireEvent.update(draft.text, 'First author edits');
+		await choose(draft, 'bob');
+		expect(draft.text.value).toBe('https://example.org/shared');
+		expect(draft.getByPlaceholderText<HTMLTextAreaElement>(i18n.ts.annotation).value).toBe('Warning');
+		vi.mocked(misskeyApi).mockResolvedValue({ createdNote: note() } as never);
+		await fireEvent.click(draft.getByTestId('post-form-submit'));
+		await waitFor(() => expect(misskeyApi).toHaveBeenCalledWith('notes/create',
+			expect.objectContaining({ visibleUserIds: ['author'], text: 'https://example.org/shared' }), 'bob-token'));
+	});
+
+	test('preserves an untouched redraft for its original author', async () => {
+		const draft = await openDraft('author', undefined, { initialNote: note({ text: 'Deleted note' }) });
+		await choose(draft, 'bob');
+		expect(draft.text.value).toBe('');
+		await choose(draft, 'author');
+		expect(draft.text.value).toBe('Deleted note');
+	});
+
+	test('loading recipient profiles does not recreate a deleted private reply draft', async () => {
+		const user = { ...note().user, id: 'recipient', username: 'recipient' };
+		const deferred = Promise.withResolvers<Misskey.entities.UserLite[]>();
+		vi.mocked(misskeyApi).mockReturnValue(deferred.promise as never);
+		const draft = await openDraft('author', 'reply', { reply: note({ visibility: 'specified', visibleUserIds: [user.id] }) });
+		await fireEvent.update(draft.text, 'Private reply');
+		await choose(draft, 'bob');
+		localStorage.removeItem('drafts:author');
+		await choose(draft, 'author');
+		deferred.resolve([user]);
+		await waitFor(() => expect(draft.container.querySelector('mk-acct-stub')).toBeTruthy());
+		expect(localStorage.getItem('drafts:author')).toBeNull();
+	});
+
 	test.each([
 		{ instant: true, initialText: 'shared content' },
 		{ mention: note().user },
