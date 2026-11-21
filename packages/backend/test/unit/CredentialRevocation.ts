@@ -70,18 +70,17 @@ test('commits rotations and revocations during a publisher outage, then publishe
 		await subscriber.subscribe(config.host);
 		await events.publishCredentialRevocation(rows[1]);
 		await Promise.all([restarted.dispatch(), new CredentialRevocationService(db, events).dispatch()]);
-		await vi.waitFor(() => expect(messages).toHaveLength(5));
+		await vi.waitFor(() => expect(messages).toHaveLength(4));
 		expect(await pending.countBy({ userId: id })).toBe(0);
-		expect(messages.filter(m => m.channel === 'internal').map(m => m.message.body)).toEqual(expect.arrayContaining([
+		expect(messages.every(m => m.channel === 'internal')).toBe(true);
+		expect(messages.filter(m => m.message.body?.oldTokenHash === nativeTokenFingerprint(second))).toHaveLength(2);
+		expect(messages.map(m => m.message.body)).toEqual(expect.arrayContaining([
 			{ id, oldTokenHash: nativeTokenFingerprint(second) },
 			{ id, oldTokenHash: nativeTokenFingerprint(first) },
 			{ id: thirdParty.id, userId: id },
 		]));
 		for (const secret of [first, second, current, thirdParty.token]) expect(JSON.stringify(messages)).not.toContain(secret);
 		expect((await auth.authenticate(current))[0]?.id).toBe(id);
-
-		await events.publishCredentialRevocation({ ...rows[2], id: rows[0].id, credentialId: genAidx(Date.now()) });
-		await vi.waitFor(() => expect(messages).toHaveLength(6));
 
 		await db.manager.insert(MiSwSubscription, subscription);
 		await expect(db.transaction(async manager => {

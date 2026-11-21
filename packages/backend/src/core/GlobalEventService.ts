@@ -386,20 +386,11 @@ export class GlobalEventService {
 	@bindThis
 	public async publishCredentialRevocation(row: MiCredentialRevocation): Promise<void> {
 		if (this.redisForPub.status !== 'ready') throw new Error('Revocation publisher disconnected');
-		const rotation = row.event === 'userTokenRegenerated';
-		const body = rotation ? { id: row.userId, oldTokenHash: row.credentialId } : { id: row.credentialId, userId: row.userId };
-		const messages = [JSON.stringify({ channel: 'internal', message: { type: row.event, body } })];
-		if (rotation) messages.push(JSON.stringify({ channel: `mainStream:${row.userId}`, message: { type: 'myTokenRegenerated', body: null } }));
-		// Redis may have accepted the publish before the database could acknowledge it.
-		const command = new Redis.Command('eval', [`
-			if redis.call('EXISTS', KEYS[1]) == 1 then return 1 end
-			if redis.call('PUBLISH', ARGV[1], ARGV[2]) == 0 then return 0 end
-			if ARGV[3] then redis.call('PUBLISH', ARGV[1], ARGV[3]) end
-			redis.call('SET', KEYS[1], '1', 'EX', 86400)
-			return 1
-		`, 1, `credentialRevocation:${this.config.host}:${row.id}:${row.event}:${row.userId}:${row.credentialId}`, this.config.host, ...messages]);
+		const body = row.event === 'userTokenRegenerated' ? { id: row.userId, oldTokenHash: row.credentialId } : { id: row.credentialId, userId: row.userId };
+		const message = JSON.stringify({ channel: 'internal', message: { type: row.event, body } });
+		const command = new Redis.Command('publish', [this.config.host, message]);
 		command.setTimeout(1000);
-		if (await this.redisForPub.sendCommand(command) !== 1) throw new Error('No revocation subscribers');
+		if (await this.redisForPub.sendCommand(command) === 0) throw new Error('No revocation subscribers');
 	}
 
 	@bindThis
