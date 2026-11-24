@@ -1,0 +1,47 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8-ntes.10",
+  "base_commit_sha": "49acfb29ada2c2ca8901c9e2f68781ee657fcecb",
+  "prompts": {
+    "e068ecd3139af0a3": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a20b8e-8cb3-79c3-85c6-0afad67b6e95",
+        "model": "gpt-6.2-astra"
+      },
+      "human_author": "Natsuki-Kaede",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 142,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "packages/mastodon-compat/src/features.ts": {
+          "accepted_lines": 6
+        },
+        "packages/backend/src/queue/processors/ImportNotesProcessorService.ts": {
+          "accepted_lines": 11
+        },
+        "packages/backend/src/queue/processors/ImportNotesProcessorService.test.ts": {
+          "accepted_lines": 23
+        },
+        "packages/mastodon-compat/src/notifications-v2.ts": {
+          "accepted_lines": 18
+        },
+        "packages/frontend/src/pages/page.vue": {
+          "accepted_lines": 15
+        },
+        "packages/mastodon-compat/test/postgres-store.test.ts": {
+          "accepted_lines": 40
+        },
+        "packages/mastodon-compat/test/media-search.test.ts": {
+          "accepted_lines": 11
+        },
+        "packages/mastodon-compat/test/notifications-v2.test.ts": {
+          "accepted_lines": 18
+        }
+      }
+    }
+  }
+}
