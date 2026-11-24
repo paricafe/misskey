@@ -72,7 +72,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 	</MkInfo>
 	<MkInfo v-if="hasNotSpecifiedMentions && !updateMode" warn :class="$style.hasNotSpecifiedMentions">{{ i18n.ts.notSpecifiedMentionWarning }} - <button class="_textButton" @click="addMissingMention()">{{ i18n.ts.add }}</button></MkInfo>
 	<div v-show="useCw" :class="$style.cwOuter">
-		<textarea ref="cwInputEl" v-model="cw" :class="$style.cw" :placeholder="i18n.ts.annotation" @keydown="onKeydown"></textarea>
+		<textarea ref="cwInputEl" v-model="cw" :class="$style.cw" :placeholder="i18n.ts.annotation" :disabled="posting || posted" @keydown="onKeydown" @keyup="onKeyup" @compositionend="onCompositionEnd"></textarea>
 		<div v-if="maxCwTextLength - cwTextLength < 20" :class="['_acrylic', $style.cwTextCount, { [$style.cwTextOver]: cwTextLength > maxCwTextLength }]">{{ maxCwTextLength - cwTextLength }}</div>
 	</div>
 	<div :class="[$style.textOuter, { [$style.withCw]: useCw }]">
@@ -80,7 +80,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 		<textarea ref="textareaEl" v-model="text" :class="[$style.text]" :disabled="posting || posted" :readonly="textAreaReadOnly" :placeholder="placeholder" data-testid="post-form-text" @keydown="onKeydown" @keyup="onKeyup" @paste="onPaste" @compositionupdate="onCompositionUpdate" @compositionend="onCompositionEnd"></textarea>
 		<div v-if="maxTextLength - textLength < 100" :class="['_acrylic', $style.textCount, { [$style.textOver]: textLength > maxTextLength }]">{{ maxTextLength - textLength }}</div>
 	</div>
-	<input v-show="withHashtags" ref="hashtagsInputEl" v-model="hashtags" :class="$style.hashtags" :placeholder="i18n.ts.hashtags" list="hashtags">
+	<input v-show="!updateMode && withHashtags" ref="hashtagsInputEl" v-model="hashtags" :class="$style.hashtags" :placeholder="i18n.ts.hashtags" list="hashtags">
 	<XPostFormAttaches v-model="files" @detach="detachFile" @changeSensitive="updateFileSensitive" @changeName="updateFileName"/>
 	<div v-if="uploader.items.value.length > 0" style="padding: 12px;">
 		<MkTip k="postFormUploader">
@@ -88,7 +88,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 		</MkTip>
 		<MkUploaderItems :items="uploader.items.value" @showMenu="(item, ev) => showPerUploadItemMenu(item, ev)" @showMenuViaContextmenu="(item, ev) => showPerUploadItemMenuViaContextmenu(item, ev)"/>
 	</div>
-	<MkPollEditor v-if="poll" v-model="poll" @destroyed="poll = null"/>
+	<MkPollEditor v-if="poll && !updateMode" v-model="poll" @destroyed="poll = null"/>
 	<MkNotePreview v-if="showPreview" :class="$style.preview" :text="text" :files="files" :poll="poll ?? undefined" :useCw="useCw" :cw="cw" :user="postAccount ?? $i"/>
 	<div v-if="showingOptions" style="padding: 8px 16px;">
 	</div>
@@ -96,9 +96,9 @@ SPDX-License-Identifier: AGPL-3.0-only
 		<div :class="$style.footerLeft">
 			<button v-tooltip="i18n.ts.attachFile + ' (' + i18n.ts.upload + ')'" class="_button" :class="$style.footerButton" @click="chooseFileFromPc"><i class="ti ti-photo-plus"></i></button>
 			<button v-tooltip="i18n.ts.attachFile + ' (' + i18n.ts.fromDrive + ')'" class="_button" :class="$style.footerButton" @click="chooseFileFromDrive"><i class="ti ti-cloud-download"></i></button>
-			<button v-tooltip="i18n.ts.poll" class="_button" :class="[$style.footerButton, { [$style.footerButtonActive]: poll }]" @click="togglePoll"><i class="ti ti-chart-arrows"></i></button>
+			<button v-tooltip="i18n.ts.poll" class="_button" :class="[$style.footerButton, { [$style.footerButtonActive]: poll }]" :disabled="updateMode" @click="togglePoll"><i class="ti ti-chart-arrows"></i></button>
 			<button v-tooltip="i18n.ts.useCw" class="_button" :class="[$style.footerButton, { [$style.footerButtonActive]: useCw }]" @click="useCw = !useCw"><i class="ti ti-eye-off"></i></button>
-			<button v-tooltip="i18n.ts.hashtags" class="_button" :class="[$style.footerButton, { [$style.footerButtonActive]: withHashtags }]" @click="withHashtags = !withHashtags"><i class="ti ti-hash"></i></button>
+			<button v-tooltip="i18n.ts.hashtags" class="_button" :class="[$style.footerButton, { [$style.footerButtonActive]: withHashtags }]" :disabled="updateMode" @click="withHashtags = !withHashtags"><i class="ti ti-hash"></i></button>
 			<button v-tooltip="i18n.ts.mention" class="_button" :class="$style.footerButton" @click="insertMention"><i class="ti ti-at"></i></button>
 			<button v-tooltip="i18n.ts.emoji" :class="['_button', $style.footerButton]" @click="insertEmoji"><i class="ti ti-mood-happy"></i></button>
 			<button v-if="showAddMfmFunction" v-tooltip="i18n.ts.addMfmFunction" :class="['_button', $style.footerButton]" @click="insertMfmFunction"><i class="ti ti-palette"></i></button>
@@ -230,7 +230,7 @@ const replyTargetNote: ShallowRef<PostFormProps['reply'] | null> = shallowRef(pr
 const targetChannel = shallowRef(props.channel);
 
 const serverDraftId = ref<string | null>(null);
-const postFormActions = getPluginHandlers('post_form_action');
+const postFormActions = computed(() => getPluginHandlers('post_form_action'));
 
 const enableMFMCheatsheet = ref(prefer.s.enableMFMCheatsheet);
 const enableUndoClearPostForm = ref(prefer.s.enableUndoClearPostForm);
@@ -315,7 +315,7 @@ const cwTextLength = computed((): number => {
 const maxCwTextLength = 100;
 
 const canPost = computed((): boolean => {
-	return !props.mock && !posting.value && !posted.value && !uploader.uploading.value && (uploader.items.value.length === 0 || uploader.readyForUpload.value) &&
+	return !props.mock && (!props.updateMode || props.initialNote != null) && !posting.value && !posted.value && !uploader.uploading.value && (uploader.items.value.length === 0 || uploader.readyForUpload.value) &&
 		(
 			1 <= textLength.value ||
 			1 <= files.value.length ||
@@ -340,8 +340,8 @@ const canSaveAsServerDraft = computed((): boolean => {
 	return canPost.value && (textLength.value > 0 || files.value.length > 0 || poll.value != null);
 });
 
-const withHashtags = store.model('postFormWithHashtags');
-const hashtags = store.model('postFormHashtags');
+const withHashtags = props.updateMode ? ref(false) : store.model('postFormWithHashtags');
+const hashtags = props.updateMode ? ref('') : store.model('postFormHashtags');
 
 const textHistory = ref<string[]>([]);
 const currentHistoryIndex = ref(-1);
@@ -710,15 +710,15 @@ function showOtherSettings() {
 		props: {
 			textLength: textLength,
 		},
-	}, { type: 'divider' }, {
+	}, ...(!props.updateMode ? [{ type: 'divider' as const }, {
 		icon: reactionAcceptanceIcon,
 		text: i18n.ts.reactionAcceptance,
 		caption: reactionAcceptanceCaption,
 		action: () => {
 			toggleReactionAcceptance();
 		},
-	}, { type: 'divider' }, {
-		type: 'button',
+	}, { type: 'divider' as const }, {
+		type: 'button' as const,
 		text: i18n.ts._drafts.saveToDraft,
 		icon: 'ti ti-cloud-upload',
 		action: async () => {
@@ -730,7 +730,7 @@ function showOtherSettings() {
 			}
 			saveServerDraft();
 		},
-	}, ...(!props.updateMode && $i.policies.scheduledNoteLimit > 0 ? [{
+	}] : []), ...(!props.updateMode && $i.policies.scheduledNoteLimit > 0 ? [{
 		icon: 'ti ti-calendar-time',
 		text: i18n.ts.schedulePost + '...',
 		action: () => {
@@ -1061,7 +1061,7 @@ async function post(ev?: PointerEvent) {
 
 	if (props.mock) return;
 
-	if (visibility.value === 'public' && (
+	if (!props.updateMode && visibility.value === 'public' && (
 		(useCw.value && cw.value != null && cw.value.trim() !== '' && isAnnoying(cw.value)) ||
 		((!useCw.value || cw.value == null || cw.value.trim() === '') && text.value != null && text.value.trim() !== '' && isAnnoying(text.value))
 	)) {
@@ -1159,7 +1159,7 @@ async function post(ev?: PointerEvent) {
 			noteId: props.initialNote!.id,
 			text: postData.text,
 			cw: postData.cw,
-			fileIds: files.value.map(file => file.id),
+			fileIds: postData.fileIds ?? [],
 		}, token)
 		: misskeyApi('notes/create', postData, token);
 	request.then((res) => {
@@ -1197,50 +1197,52 @@ async function post(ev?: PointerEvent) {
 			posting.value = false;
 			postAccount.value = null;
 
-			incNotesCount();
-			if (notesCount === 1) {
-				claimAchievement('notes1');
-			}
+			if (!props.updateMode) {
+				incNotesCount();
+				if (notesCount === 1) {
+					claimAchievement('notes1');
+				}
 
-			const text = postData.text ?? '';
-			const lowerCase = text.toLowerCase();
-			if ((lowerCase.includes('love') || lowerCase.includes('❤')) && lowerCase.includes('misskey')) {
-				claimAchievement('iLoveMisskey');
-			}
-			if ([
-				'https://youtu.be/Efrlqw8ytg4',
-				'https://www.youtube.com/watch?v=Efrlqw8ytg4',
-				'https://m.youtube.com/watch?v=Efrlqw8ytg4',
+				const text = postData.text ?? '';
+				const lowerCase = text.toLowerCase();
+				if ((lowerCase.includes('love') || lowerCase.includes('❤')) && lowerCase.includes('misskey')) {
+					claimAchievement('iLoveMisskey');
+				}
+				if ([
+					'https://youtu.be/Efrlqw8ytg4',
+					'https://www.youtube.com/watch?v=Efrlqw8ytg4',
+					'https://m.youtube.com/watch?v=Efrlqw8ytg4',
 
-				'https://youtu.be/XVCwzwxdHuA',
-				'https://www.youtube.com/watch?v=XVCwzwxdHuA',
-				'https://m.youtube.com/watch?v=XVCwzwxdHuA',
+					'https://youtu.be/XVCwzwxdHuA',
+					'https://www.youtube.com/watch?v=XVCwzwxdHuA',
+					'https://m.youtube.com/watch?v=XVCwzwxdHuA',
 
-				'https://open.spotify.com/track/3Cuj0mZrlLoXx9nydNi7RB',
-				'https://open.spotify.com/track/7anfcaNPQWlWCwyCHmZqNy',
-				'https://open.spotify.com/track/5Odr16TvEN4my22K9nbH7l',
-				'https://open.spotify.com/album/5bOlxyl4igOrp2DwVQxBco',
-			].some(url => text.includes(url))) {
-				claimAchievement('brainDiver');
-			}
+					'https://open.spotify.com/track/3Cuj0mZrlLoXx9nydNi7RB',
+					'https://open.spotify.com/track/7anfcaNPQWlWCwyCHmZqNy',
+					'https://open.spotify.com/track/5Odr16TvEN4my22K9nbH7l',
+					'https://open.spotify.com/album/5bOlxyl4igOrp2DwVQxBco',
+				].some(url => text.includes(url))) {
+					claimAchievement('brainDiver');
+				}
 
-			if (renoteTargetNote.value && (renoteTargetNote.value.userId === $i.id) && text.length > 0) {
-				claimAchievement('selfQuote');
-			}
+				if (renoteTargetNote.value && (renoteTargetNote.value.userId === $i.id) && text.length > 0) {
+					claimAchievement('selfQuote');
+				}
 
-			const date = new Date();
-			const h = date.getHours();
-			const m = date.getMinutes();
-			const s = date.getSeconds();
-			if (h >= 0 && h <= 3) {
-				claimAchievement('postedAtLateNight');
-			}
-			if (m === 0 && s === 0) {
-				claimAchievement('postedAt0min0sec');
-			}
+				const date = new Date();
+				const h = date.getHours();
+				const m = date.getMinutes();
+				const s = date.getSeconds();
+				if (h >= 0 && h <= 3) {
+					claimAchievement('postedAtLateNight');
+				}
+				if (m === 0 && s === 0) {
+					claimAchievement('postedAt0min0sec');
+				}
 
-			if (serverDraftId.value != null) {
-				misskeyApi('notes/drafts/delete', { draftId: serverDraftId.value });
+				if (serverDraftId.value != null) {
+					misskeyApi('notes/drafts/delete', { draftId: serverDraftId.value });
+				}
 			}
 		});
 	}).catch(err => {
@@ -1271,10 +1273,13 @@ function insertMention() {
 	});
 }
 
+let emojiPickerRequestId = 0;
+
 async function insertEmoji(ev: PointerEvent) {
-	textAreaReadOnly.value = true;
 	const target = ev.currentTarget ?? ev.target;
 	if (target == null) return;
+	const requestId = ++emojiPickerRequestId;
+	textAreaReadOnly.value = true;
 
 	let pos = textareaEl.value?.selectionStart ?? 0;
 	let posEnd = textareaEl.value?.selectionEnd ?? text.value.length;
@@ -1293,9 +1298,10 @@ async function insertEmoji(ev: PointerEvent) {
 		};
 	};
 
-	emojiPicker.show(
+	Promise.resolve(emojiPicker.show(
 		target as HTMLElement,
 		(emoji) => {
+			if (requestId !== emojiPickerRequestId) return;
 			const textBefore = text.value.substring(0, pos);
 			const textAfter = text.value.substring(posEnd);
 
@@ -1309,16 +1315,22 @@ async function insertEmoji(ev: PointerEvent) {
 			pos = newPos;
 			posEnd = newPos;
 		},
-		() => {
+		(superseded = false) => {
+			if (requestId !== emojiPickerRequestId) return;
 			textAreaReadOnly.value = false;
+			if (superseded) return;
 			nextTick(() => {
+				if (requestId !== emojiPickerRequestId) return;
 				if (textareaEl.value) {
 					textareaEl.value.focus();
 					textareaEl.value.setSelectionRange(pos, posEnd);
 				}
 			});
 		},
-	);
+	)).catch(() => {
+		if (requestId !== emojiPickerRequestId) return;
+		textAreaReadOnly.value = false;
+	});
 }
 
 async function insertMfmFunction(ev: PointerEvent) {
@@ -1350,7 +1362,7 @@ async function insertMfmFunction(ev: PointerEvent) {
 }
 
 function showActions(ev: PointerEvent) {
-	os.popupMenu(postFormActions.map(action => ({
+	os.popupMenu(postFormActions.value.map(action => ({
 		text: action.title,
 		action: () => {
 			action.handler({

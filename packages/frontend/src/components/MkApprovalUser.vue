@@ -4,7 +4,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 -->
 
 <template>
-<MkFolder :expanded="false">
+<MkFolder :defaultOpen="false" @opened="onOpened">
 	<template #icon><i class="ti ti-user-check"></i></template>
 	<template #label>{{ i18n.ts.user }}: {{ user.username }}</template>
 
@@ -24,8 +24,8 @@ SPDX-License-Identifier: AGPL-3.0-only
 			</div>
 		</div>
 		<div :class="$style.buttons">
-			<MkButton inline success @click="approveAccount()">{{ i18n.ts.approveAccount }}</MkButton>
-			<MkButton inline danger @click="deleteAccount()">{{ i18n.ts.denyAccount }}</MkButton>
+			<MkButton inline success :disabled="processing" @click="approveAccount()">{{ i18n.ts.approveAccount }}</MkButton>
+			<MkButton inline danger :disabled="processing" @click="deleteAccount()">{{ i18n.ts.denyAccount }}</MkButton>
 		</div>
 	</div>
 </MkFolder>
@@ -46,43 +46,63 @@ const props = defineProps<{
 
 const reason = ref<string | null>(null);
 const email = ref<string | null>(null);
+const processing = ref(false);
+let reasonLoaded = false;
 
-function getReason() {
-	return misskeyApi('admin/show-user', {
+function onOpened() {
+	if (reasonLoaded) return;
+	reasonLoaded = true;
+	misskeyApi('admin/show-user', {
 		userId: props.user.id,
 	}).then(info => {
 		reason.value = info.signupReason;
 		email.value = info.email;
+	}).catch(() => {
+		reasonLoaded = false;
 	});
 }
 
-getReason();
 const emits = defineEmits<{
 	(event: 'deleted', value: string): void;
 }>();
 
 async function deleteAccount() {
+	if (processing.value) return;
 	const confirm = await os.confirm({
 		type: 'warning',
 		text: i18n.ts.deleteAccountConfirm,
 	});
 	if (confirm.canceled) return;
 
-	await os.apiWithDialog('admin/decline-user', {
-		userId: props.user.id,
-	});
-	emits('deleted', props.user.id);
+	processing.value = true;
+	try {
+		await os.apiWithDialog('admin/decline-user', {
+			userId: props.user.id,
+		});
+		emits('deleted', props.user.id);
+	} finally {
+		processing.value = false;
+	}
 }
 
 async function approveAccount() {
+	if (processing.value) return;
 	const confirm = await os.confirm({
 		type: 'warning',
 		title: i18n.ts.registerApproveConfirm as string,
 		text: i18n.ts.registerApproveConfirmDescription as string,
 	});
 	if (confirm.canceled) return;
-	await misskeyApi('admin/approve-user', { userId: props.user.id });
-	emits('deleted', props.user.id);
+
+	processing.value = true;
+	try {
+		await os.apiWithDialog('admin/approve-user', {
+			userId: props.user.id,
+		});
+		emits('deleted', props.user.id);
+	} finally {
+		processing.value = false;
+	}
 }
 </script>
 

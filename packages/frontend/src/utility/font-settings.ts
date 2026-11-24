@@ -79,8 +79,11 @@ export function getDefaultFontSettings() {
 
 	watch(fontFace, (newVal) => {
 		const optionsList = getFontOptionsList(newVal);
-		if (optionsList.length !== 0) {
-			fontFaceType.value = optionsList.find((v) => v.default)?.id ?? '';
+		const nextType = optionsList.length !== 0
+			? (optionsList.find((v) => v.default)?.id ?? '')
+			: '';
+		if (fontFaceType.value !== nextType) {
+			fontFaceType.value = nextType;
 		} else {
 			setDefaultFont();
 		}

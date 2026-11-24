@@ -12,7 +12,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 
 		<div class="_gaps_s">
 			<SearchMarker :keywords="['data']">
-				<template #label><SearchLabel><i class="ti ti-package"></i> {{ i18n.ts._dataRequest.lable }}</SearchLabel></template>
+				<template #label><SearchLabel><i class="ti ti-package"></i> {{ i18n.ts._dataRequest.label }}</SearchLabel></template>
 				<MkFolder>
 					<template #icon><i class="ti ti-download"></i></template>
 					<template #label>{{ i18n.ts._dataRequest.title }}</template>
@@ -33,7 +33,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 						<template #icon><i class="ti ti-download"></i></template>
 						<MkButton primary :class="$style.button" inline @click="exportNotes()"><i class="ti ti-download"></i> {{ i18n.ts.export }}</MkButton>
 					</MkFolder>
-					<MkFolder v-if="$i && $i.policies.canImportNotes" :defaultOpen="true">
+					<MkFolder v-if="$i && !$i.movedTo && $i.policies.canImportNotes" :defaultOpen="true">
 						<template #label>{{ i18n.ts.import }}</template>
 						<template #icon><i class="ti ti-upload"></i></template>
 						<MkRadios v-model="noteType" :options="noteTypeOptions" style="padding-bottom: 8px;" small>

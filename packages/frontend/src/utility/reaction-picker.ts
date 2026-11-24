@@ -11,6 +11,7 @@ import { prefer } from '@/preferences.js';
 
 class ReactionPicker {
 	private reactionsRef = ref<string[]>([]);
+	private pendingShowId = 0;
 
 	constructor() {
 	}
@@ -30,7 +31,16 @@ class ReactionPicker {
 		onClosed?: () => void,
 	): void | Promise<void> {
 		const MkEmojiPickerDialog = getEmojiPicker();
-		if (!MkEmojiPickerDialog) return loadEmojiPicker().then(() => { this.show(anchorElement, targetNote, onChosen, onClosed); });
+		if (!MkEmojiPickerDialog) {
+			const showId = ++this.pendingShowId;
+			return loadEmojiPicker().then(() => {
+				if (showId !== this.pendingShowId) {
+					onClosed?.();
+					return;
+				}
+				this.show(anchorElement, targetNote, onChosen, onClosed);
+			});
+		}
 		const anchorRef = shallowRef(anchorElement);
 		const targetNoteRef = ref(targetNote);
 

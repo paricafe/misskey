@@ -295,4 +295,37 @@ describe('MkVirtualList', () => {
 		expect(observers.every(observer => observer.disconnected)).toBe(true);
 		assertReleased();
 	});
+
+	test('does not push scrollTop back down when prepending items while scrolling to top', async () => {
+		const { app, items } = mountList(200);
+		try {
+			scrollContainer.scrollTop = 500;
+			scrollContainer.dispatchEvent(new Event('scroll'));
+			await flush();
+			items.value = [{ id: 'new-1' }, { id: 'new-2' }, ...items.value];
+			scrollContainer.scrollTop = 0;
+			await flush();
+			expect(scrollContainer.scrollTop).toBe(0);
+		} finally {
+			app.unmount();
+		}
+	});
+
+	test('ignores zero-sized measurements while hidden', async () => {
+		const { app } = mountList(200);
+		try {
+			await flush();
+			const beforeCount = renderedIds().length;
+			const first = scrollContainer.querySelector<HTMLElement>('[data-virtual-item="note-0"]')!;
+			const rectSpy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
+				x: 0, y: 0, top: 0, bottom: 0, left: 0, right: 0, width: 0, height: 0, toJSON: () => ({}),
+			} as DOMRect);
+			observers.at(-1)!.notify(first);
+			await flush();
+			rectSpy.mockRestore();
+			expect(renderedIds().length).toBe(beforeCount);
+		} finally {
+			app.unmount();
+		}
+	});
 });

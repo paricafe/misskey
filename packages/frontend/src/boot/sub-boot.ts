@@ -12,7 +12,9 @@ import { preloadInteractiveComponents } from '@/utility/interactive-components.j
 
 export async function subBoot() {
 	const { isClientUpdated } = await common(async () => {
-		if ($i) await preloadInteractiveComponents();
+		if ($i && window.location.pathname.startsWith('/share')) {
+			await preloadInteractiveComponents().catch(() => {});
+		}
 		return createApp(UiMinimum);
 	});
 

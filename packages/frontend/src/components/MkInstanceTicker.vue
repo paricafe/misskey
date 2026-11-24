@@ -4,7 +4,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 -->
 
 <template>
-<div :class="$style.root" :style="themeColorStyle" @click.stop="showInstanceTickerWindow">
+<div :class="$style.root" :style="[themeColorStyle, { cursor: prefer.s.clickToShowInstanceTickerWindow ? 'pointer' : 'default' }]" @click.stop="showInstanceTickerWindow">
 	<img v-if="faviconUrl" :class="$style.icon" :src="faviconUrl"/>
 	<div :class="$style.name">{{ instanceName }}</div>
 </div>
@@ -16,6 +16,7 @@ import { instanceName as localInstanceName } from '@@/js/config.js';
 import type { CSSProperties } from 'vue';
 import { instance as localInstance } from '@/instance.js';
 import * as os from '@/os.js';
+import { prefer } from '@/preferences.js';
 import { getProxiedImageUrlNullable } from '@/utility/media-proxy.js';
 
 const props = defineProps<{
@@ -51,6 +52,7 @@ const themeColorStyle = computed<CSSProperties>(() => {
 });
 
 function showInstanceTickerWindow() {
+	if (!prefer.s.clickToShowInstanceTickerWindow) return;
 	if (props.host) {
 		os.pageWindow(`/instance-info/${props.host}`);
 	} else {

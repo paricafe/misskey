@@ -7,8 +7,8 @@ SPDX-License-Identifier: AGPL-3.0-only
 <MkPagination :paginator="paginator" :direction="direction" :autoLoad="autoLoad" :pullToRefresh="pullToRefresh" :withControl="withControl" :forceDisableInfiniteScroll="forceDisableInfiniteScroll" :class="$style.pagination">
 	<template #empty><MkResult type="empty" :text="i18n.ts.noNotes"/></template>
 
-	<template #default="{ items: notes }">
-		<MkVirtualList v-slot="{ item: note, index: i }" :items="[...notes]" :gap="noGap ? 0 : 16" :class="[$style.root, { [$style.noGap]: noGap }]">
+	<template #default>
+		<MkVirtualList v-slot="{ item: note, index: i }" :items="virtualItems" :gap="noGap ? 0 : 16" :class="[$style.root, { [$style.noGap]: noGap }]">
 				<div
 					v-if="i > 0 && isSeparatorNeeded(paginator.items.value[i - 1].createdAt, note.createdAt)"
 					:data-scroll-anchor="note.id"
@@ -38,7 +38,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 
 <script lang="ts" setup generic="T extends IPaginator<Misskey.entities.Note>">
 import * as Misskey from 'misskey-js';
-import { provide } from 'vue';
+import { computed, provide } from 'vue';
 import type { MkPaginationOptions } from '@/components/MkPagination.vue';
 import type { IPaginator } from '@/utility/paginator.js';
 import MkNote from '@/components/MkNote.vue';
@@ -61,6 +61,7 @@ const props = withDefaults(defineProps<MkPaginationOptions & {
 	forceDisableInfiniteScroll: false,
 });
 
+const virtualItems = computed(() => [...props.paginator.items.value]);
 provide(DI.noteViewStateCache, useNoteViewStateCache(props.paginator.items));
 
 useGlobalEvent('noteDeleted', (noteId) => {

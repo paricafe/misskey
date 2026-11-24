@@ -8,14 +8,14 @@ import type { Ref } from 'vue';
 import type * as Misskey from 'misskey-js';
 import type { NoteViewState } from '@/composables/use-note.js';
 
-export function useNoteViewStateCache(notes: Readonly<Ref<Misskey.entities.Note[]>>): Map<Misskey.entities.Note, NoteViewState> {
-	const cache = new Map<Misskey.entities.Note, NoteViewState>();
-	watch(() => [...notes.value], items => {
-		const retained = new Set(items);
-		for (const [note, state] of cache) {
-			if (retained.has(note)) continue;
+export function useNoteViewStateCache(notes: Readonly<Ref<Misskey.entities.Note[]>>): Map<string, NoteViewState> {
+	const cache = new Map<string, NoteViewState>();
+	watch(() => notes.value.map(note => note.id), ids => {
+		const retained = new Set(ids);
+		for (const [id, state] of cache) {
+			if (retained.has(id)) continue;
 			state.capture.dispose();
-			cache.delete(note);
+			cache.delete(id);
 		}
 	}, { flush: 'post' });
 	onUnmounted(() => {

@@ -137,6 +137,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 			</div>
 			<footer :class="$style.noteFooter">
 				<div :class="$style.noteFooterInfo">
+					<span v-if="appearNote.updatedAt" style="margin-right: 0.5em;" :title="i18n.ts.edited"><i class="ti ti-pencil"></i></span>
 					<MkA :to="notePage(appearNote)">
 						<MkTime :time="appearNote.createdAt" mode="detail" colored/>
 					</MkA>
@@ -379,10 +380,10 @@ async function refreshReplies(): Promise<void> {
 async function loadReplies(): Promise<void> {
 	try {
 		await refreshReplies();
+		repliesLoaded.value = true;
 	} catch {
 		repliesRefreshScheduler.invalidate();
 	} finally {
-		repliesLoaded.value = true;
 		repliesRefreshScheduler.activate();
 	}
 }

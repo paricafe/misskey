@@ -9,6 +9,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 		<b
 			:class="{
 				[$style.logGreen]: [
+					'approve',
 					'createRole',
 					'addCustomEmoji',
 					'createGlobalAnnouncement',
@@ -27,7 +28,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 				].includes(log.type),
 				[$style.logRed]: [
 					'suspend',
-					'approve',
 					'decline',
 					'deleteRole',
 					'deleteGlobalAnnouncement',
@@ -93,6 +93,8 @@ SPDX-License-Identifier: AGPL-3.0-only
 		<i v-if="log.type === 'updateServerSettings'" class="ti ti-settings"></i>
 		<i v-else-if="log.type === 'updateUserNote'" class="ti ti-pencil"></i>
 		<i v-else-if="log.type === 'suspend'" class="ti ti-user-x"></i>
+		<i v-else-if="log.type === 'approve'" class="ti ti-user-check"></i>
+		<i v-else-if="log.type === 'decline'" class="ti ti-user-x"></i>
 		<i v-else-if="log.type === 'unsuspend'" class="ti ti-user-check"></i>
 		<i v-else-if="log.type === 'resetPassword'" class="ti ti-key"></i>
 		<i v-else-if="log.type === 'assignRole'" class="ti ti-user-plus"></i>
@@ -160,6 +162,9 @@ SPDX-License-Identifier: AGPL-3.0-only
 		</template>
 		<template v-else-if="log.type === 'approve'">
 			<div>{{ i18n.ts.user }}: <MkA :to="`/admin/user/${log.info.userId}`" class="_link">@{{ log.info.userUsername }}{{ log.info.userHost ? '@' + log.info.userHost : '' }}</MkA></div>
+		</template>
+		<template v-else-if="log.type === 'decline'">
+			<div>{{ i18n.ts.user }}: @{{ log.info.userUsername }}{{ log.info.userHost ? '@' + log.info.userHost : '' }}</div>
 		</template>
 		<template v-else-if="log.type === 'unsuspend'">
 			<div>{{ i18n.ts.user }}: <MkA :to="`/admin/user/${log.info.userId}`" class="_link">@{{ log.info.userUsername }}{{ log.info.userHost ? '@' + log.info.userHost : '' }}</MkA></div>

@@ -78,8 +78,10 @@ SPDX-License-Identifier: AGPL-3.0-only
 					<MkSwitch v-model="alwaysCollapseRenotes">{{ i18n.ts.alwaysCollapseRenotes }}</MkSwitch>
 				</MkPreferenceContainer>
 				<MkPreferenceContainer k="collapseEverything">
-					<MkSwitch v-model="collapseEverything"><template #label>{{ i18n.ts.collapseEverything }}</template></MkSwitch>
-					<template #caption><i class="ti ti-alert-triangle" style="color: var(--MI_THEME-warn);"></i>{{ i18n.ts.collapseEverythingDescription }}</template>
+					<MkSwitch v-model="collapseEverything">
+						<template #label>{{ i18n.ts.collapseEverything }}</template>
+						<template #caption><i class="ti ti-alert-triangle" style="color: var(--MI_THEME-warn);"></i>{{ i18n.ts.collapseEverythingDescription }}</template>
+					</MkSwitch>
 				</MkPreferenceContainer>
 				<MkPreferenceContainer k="disableReactionsViewer">
 					<MkSwitch v-model="disableReactionsViewer">{{ i18n.ts.disableReactionsViewer }}</MkSwitch>

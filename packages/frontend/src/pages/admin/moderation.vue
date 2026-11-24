@@ -233,6 +233,8 @@ function onChange_approvalRequiredForSignup(value: boolean) {
 		approvalRequiredForSignup: value,
 	}).then(() => {
 		fetchInstance(true);
+	}).catch(() => {
+		approvalRequiredForSignup.value = !value;
 	});
 }
 

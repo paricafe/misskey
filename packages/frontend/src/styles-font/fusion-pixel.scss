@@ -3,40 +3,16 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-@font-face {
-  font-family: "fusion-pixel-8";
-  font-display: swap;
-  src: url("/static-assets/fonts/fusion-pixel/fusion-pixel-8px-proportional-ja.woff2") format("woff2"),
-		url("/static-assets/fonts/fusion-pixel/fusion-pixel-8px-proportional-ko.woff2") format("woff2"),
-		url("/static-assets/fonts/fusion-pixel/fusion-pixel-8px-proportional-latin.woff2") format("woff2"),
-		url("/static-assets/fonts/fusion-pixel/fusion-pixel-8px-proportional-zh_hans.woff2") format("woff2"),
-		url("/static-assets/fonts/fusion-pixel/fusion-pixel-8px-proportional-zh_hant.woff2") format("woff2");
-}
-@font-face {
-  font-family: "fusion-pixel-10";
-  font-display: swap;
-  src: url("/static-assets/fonts/fusion-pixel/fusion-pixel-10px-proportional-ja.woff2") format("woff2"),
-		url("/static-assets/fonts/fusion-pixel/fusion-pixel-10px-proportional-ko.woff2") format("woff2"),
-		url("/static-assets/fonts/fusion-pixel/fusion-pixel-10px-proportional-latin.woff2") format("woff2"),
-		url("/static-assets/fonts/fusion-pixel/fusion-pixel-10px-proportional-zh_hans.woff2") format("woff2"),
-		url("/static-assets/fonts/fusion-pixel/fusion-pixel-10px-proportional-zh_hant.woff2") format("woff2");
-}
-@font-face {
-  font-family: "fusion-pixel-12";
-  font-display: swap;
-  src: url("/static-assets/fonts/fusion-pixel/fusion-pixel-12px-proportional-ja.woff2") format("woff2"),
-		url("/static-assets/fonts/fusion-pixel/fusion-pixel-12px-proportional-ko.woff2") format("woff2"),
-		url("/static-assets/fonts/fusion-pixel/fusion-pixel-12px-proportional-latin.woff2") format("woff2"),
-		url("/static-assets/fonts/fusion-pixel/fusion-pixel-12px-proportional-zh_hans.woff2") format("woff2"),
-		url("/static-assets/fonts/fusion-pixel/fusion-pixel-12px-proportional-zh_hant.woff2") format("woff2");
-}
+@each $size in (8, 10, 12) {
+	@each $lang in (latin, zh_hans, zh_hant, ja, ko) {
+		@font-face {
+			font-family: "fusion-pixel-#{$size}-#{$lang}";
+			font-display: swap;
+			src: url("/static-assets/fonts/fusion-pixel/fusion-pixel-#{$size}px-proportional-#{$lang}.woff2") format("woff2");
+		}
+	}
 
-html.default-font-fusion-pixel_8 {
-	font-family: 'fusion-pixel-8', Arial, sans-serif;
-}
-html.default-font-fusion-pixel_10 {
-	font-family: 'fusion-pixel-10', Arial, sans-serif;
-}
-html.default-font-fusion-pixel_12 {
-	font-family: 'fusion-pixel-12', Arial, sans-serif;
+	html.default-font-fusion-pixel_#{$size} {
+		font-family: "fusion-pixel-#{$size}-latin", "fusion-pixel-#{$size}-zh_hans", "fusion-pixel-#{$size}-zh_hant", "fusion-pixel-#{$size}-ja", "fusion-pixel-#{$size}-ko", Arial, sans-serif;
+	}
 }

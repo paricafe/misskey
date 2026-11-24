@@ -8,6 +8,8 @@ import { cleanup, fireEvent, render, waitFor } from '@testing-library/vue';
 import type * as Misskey from 'misskey-js';
 import MkPostForm from '@/components/MkPostForm.vue';
 import { misskeyApi } from '@/utility/misskey-api.js';
+import { incNotesCount } from '@/i.js';
+import { claimAchievement } from '@/utility/achievements.js';
 import { i18n } from '@/i18n.js';
 
 const { me } = vi.hoisted(() => ({ me: { id: 'author', username: 'author', host: null, avatarUrl: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', policies: { scheduledNoteLimit: 10 }, isSilenced: false } }));
@@ -94,5 +96,19 @@ describe('post form editing', () => {
 		await fireEvent.update(result.getByPlaceholderText(i18n.ts.annotation), 'New warning');
 		await fireEvent.click(result.getByTestId('post-form-submit'));
 		await waitFor(() => expect(misskeyApi).toHaveBeenCalledWith('notes/update', { noteId: 'note', text: null, cw: 'New warning', fileIds: [] }, undefined));
+	});
+
+	test('disables poll/hashtag controls and skips new-note side effects in edit mode', async () => {
+		vi.mocked(incNotesCount).mockClear();
+		vi.mocked(claimAchievement).mockClear();
+		const result = await form(note());
+		for (const icon of ['ti-chart-arrows', 'ti-hash']) {
+			expect(result.container.querySelector(`.${icon}`)?.closest('button')?.disabled).toBe(true);
+		}
+		await fireEvent.update(result.getByTestId('post-form-text'), 'I love Misskey');
+		await fireEvent.click(result.getByTestId('post-form-submit'));
+		await waitFor(() => expect(misskeyApi).toHaveBeenCalledWith('notes/update', { noteId: 'note', text: 'I love Misskey', cw: null, fileIds: [] }, undefined));
+		expect(incNotesCount).not.toHaveBeenCalled();
+		expect(claimAchievement).not.toHaveBeenCalled();
 	});
 });

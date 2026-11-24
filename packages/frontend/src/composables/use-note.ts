@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { ref, computed, shallowReactive, inject, provide, onBeforeUnmount } from 'vue';
+import { ref, computed, shallowReactive, inject, provide, onBeforeUnmount, watch } from 'vue';
 import type { Ref } from 'vue';
 import * as mfm from 'mfm-js';
 import * as Misskey from 'misskey-js';
@@ -79,6 +79,7 @@ export type NoteViewState = {
 	renoteCollapsed: boolean;
 	muted: WordMuteResult | 'sensitiveMute' | false;
 	translation: Ref<Misskey.entities.NotesTranslateResponse | null>;
+	translationVersion: Ref<string | null>;
 	translating: Ref<boolean>;
 	pollResults: Map<string, Ref<boolean>>;
 };
@@ -126,7 +127,7 @@ export function useNote(
 
 	const providedCache = inject(DI.noteViewStateCache, null);
 	const viewStateCache = options.onChildrenChanged ? null : providedCache;
-	const savedState = viewStateCache?.get(props.note);
+	const savedState = viewStateCache?.get(props.note.id);
 	let rawNote = savedState?.note ?? deepClone(props.note);
 	let hideByPlugin = savedState?.hideByPlugin ?? false;
 	const noteViewInterruptors = savedState ? [] : getPluginHandlers('note_view_interruptor');
@@ -170,6 +171,12 @@ export function useNote(
 	const isDeleted = ref(false);
 	const translating = savedState?.translating ?? ref(false);
 	const translation = savedState?.translation ?? ref<Misskey.entities.NotesTranslateResponse | null>(null);
+	const translationVersion = savedState?.translationVersion ?? ref<string | null>(null);
+	const getTranslationVersion = () => JSON.stringify([appearNote.updatedAt ?? null, appearNote.text ?? null, appearNote.cw ?? null]);
+	if (translation.value != null && translationVersion.value !== getTranslationVersion()) {
+		translation.value = null;
+		translationVersion.value = null;
+	}
 	const pollResults = savedState?.pollResults ?? new Map<string, Ref<boolean>>();
 	provide(DI.notePollResults, pollResults);
 
@@ -191,8 +198,27 @@ export function useNote(
 		))),
 	);
 
+	watch(() => props.note, (nextNote) => {
+		if (nextNote.id !== rawNote.id) return;
+		const nextAppear = getAppearNote(nextNote) ?? nextNote;
+		if (nextAppear.id !== appearNote.id) return;
+		appearNote.text = nextAppear.text;
+		appearNote.cw = nextAppear.cw;
+		appearNote.updatedAt = nextAppear.updatedAt;
+		appearNote.files = nextAppear.files;
+		appearNote.fileIds = nextAppear.fileIds;
+		appearNote.emojis = nextAppear.emojis;
+		appearNote.mentions = nextAppear.mentions;
+		appearNote.tags = nextAppear.tags;
+	});
+
+	watch(() => [appearNote.text, appearNote.cw, appearNote.updatedAt], () => {
+		translation.value = null;
+		translationVersion.value = null;
+	});
+
 	if (viewStateCache) {
-		const save = () => viewStateCache.set(props.note, {
+		const save = () => viewStateCache.set(rawNote.id, {
 			note: rawNote,
 			capture,
 			hideByPlugin,
@@ -201,6 +227,7 @@ export function useNote(
 			renoteCollapsed: renoteCollapsed.value,
 			muted: muted.value,
 			translation,
+			translationVersion,
 			translating,
 			pollResults,
 		});
@@ -294,6 +321,13 @@ export function useNote(
 
 		if (typeof arg === 'string') {
 			const emoji = arg;
+			if (prefer.s.confirmOnReact) {
+				const confirm = await os.confirm({
+					type: 'question',
+					text: i18n.tsx.reactAreYouSure({ emoji: emoji.replace('@.', '') }),
+				});
+				if (confirm.canceled) return;
+			}
 			sound.playMisskeySfx('reaction');
 			if (props.mock) return;
 			misskeyApi('notes/reactions/create', {
@@ -301,7 +335,7 @@ export function useNote(
 				reaction: emoji,
 			}).then(() => {
 				noteEvents.emit(`reacted:${appearNote.id}`, { userId: $i!.id, reaction: emoji });
-			});
+			}).catch(() => {});
 			const rippleTarget = els.likeButton ?? els.reactButton;
 			if (rippleTarget != null && rippleTarget.value != null && prefer.s.animation) {
 				const rect = rippleTarget.value.getBoundingClientRect();
@@ -489,11 +523,16 @@ export function useNote(
 		if (props.mock || !canTranslate.value || translating.value || translation.value != null) return;
 		collapsed.value = false;
 		translating.value = true;
+		const requestVersion = getTranslationVersion();
 		try {
-			translation.value = await misskeyApi('notes/translate', {
+			const result = await misskeyApi('notes/translate', {
 				noteId: appearNote.id,
 				targetLang: miLocalStorage.getItem('lang') ?? navigator.language,
 			});
+			if (getTranslationVersion() === requestVersion) {
+				translation.value = result;
+				translationVersion.value = requestVersion;
+			}
 		} catch {
 			os.alert({
 				type: 'error',

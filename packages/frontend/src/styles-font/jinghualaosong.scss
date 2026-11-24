@@ -3,7 +3,8 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+@import url("https://chinese-fonts-cdn.deno.dev/packages/jhlst/dist/京華老宋体v2_002/result.css");
+
 html.default-font-jinghualaosong {
-	@import url("https://chinese-fonts-cdn.deno.dev/packages/jhlst/dist/京華老宋体v2_002/result.css");
-	font-family: "KingHwa_OldSong", "Times New Roman", Times, serif
+	font-family: "KingHwa_OldSong", "Times New Roman", Times, serif;
 }

@@ -79,10 +79,13 @@ let scrollContainer: HTMLElement | null = null;
 let observer: ResizeObserver | null = null;
 let frame: number | null = null;
 let active = false;
+let activated = false;
 
 function updateViewport() {
 	if (!rootEl.value || !active) return;
-	const top = rootEl.value.getBoundingClientRect().top;
+	const rect = rootEl.value.getBoundingClientRect();
+	if (rect.width === 0 && rect.height === 0) return;
+	const top = rect.top;
 	const containerTop = scrollContainer ? scrollContainer.getBoundingClientRect().top + scrollContainer.clientTop : 0;
 	viewport.value = { top: containerTop - top, height: scrollContainer?.clientHeight ?? window.innerHeight };
 }
@@ -96,6 +99,7 @@ function scheduleViewport() {
 }
 
 function changeLayout(change: () => boolean | void) {
+	updateViewport();
 	const top = viewport.value.top;
 	const anchor = top > 0 ? layout.anchor(top) : null;
 	if (change() === false) return;
@@ -179,12 +183,18 @@ function start() {
 	active = true;
 	scrollContainer = getScrollContainer(rootEl.value.parentElement);
 	observer = new ResizeObserver(entries => {
+		if (!rootEl.value) return;
+		const rootRect = rootEl.value.getBoundingClientRect();
+		if (rootRect.width === 0 && rootRect.height === 0) return;
 		changeLayout(() => {
 			let changed = false;
 			for (const entry of entries) {
 				const el = entry.target as HTMLElement;
 				const id = el.dataset.virtualItem;
-				if (id) changed = layout.measure(id, el.getBoundingClientRect().height) || changed;
+				if (!id) continue;
+				const rect = el.getBoundingClientRect();
+				if (rect.width === 0 && rect.height === 0) continue;
+				changed = layout.measure(id, rect.height) || changed;
 			}
 			return changed;
 		});
@@ -208,10 +218,24 @@ function stop() {
 	frame = null;
 }
 
-onMounted(start);
-onActivated(() => nextTick(start));
-onDeactivated(stop);
-onBeforeUnmount(stop);
+onMounted(() => {
+	activated = true;
+	start();
+});
+onActivated(() => {
+	activated = true;
+	nextTick(() => {
+		if (activated) start();
+	});
+});
+onDeactivated(() => {
+	activated = false;
+	stop();
+});
+onBeforeUnmount(() => {
+	activated = false;
+	stop();
+});
 </script>
 
 <style lang="scss" module>

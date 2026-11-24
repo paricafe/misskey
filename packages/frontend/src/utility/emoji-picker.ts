@@ -10,6 +10,7 @@ import { prefer } from '@/preferences.js';
 
 class EmojiPicker {
 	private emojisRef = ref<string[]>([]);
+	private pendingShowId = 0;
 
 	constructor() {
 	}
@@ -25,10 +26,19 @@ class EmojiPicker {
 	public show(
 		anchorElement: HTMLElement,
 		onChosen?: (emoji: string) => void,
-		onClosed?: () => void,
+		onClosed?: (superseded?: boolean) => void,
 	): void | Promise<void> {
 		const MkEmojiPickerDialog = getEmojiPicker();
-		if (!MkEmojiPickerDialog) return loadEmojiPicker().then(() => { this.show(anchorElement, onChosen, onClosed); });
+		if (!MkEmojiPickerDialog) {
+			const showId = ++this.pendingShowId;
+			return loadEmojiPicker().then(() => {
+				if (showId !== this.pendingShowId) {
+					onClosed?.(true);
+					return;
+				}
+				this.show(anchorElement, onChosen, onClosed);
+			});
+		}
 		const anchorRef = shallowRef(anchorElement);
 
 		const { dispose } = popup(MkEmojiPickerDialog, {
@@ -41,7 +51,7 @@ class EmojiPicker {
 				if (onChosen) onChosen(emoji);
 			},
 			closed: () => {
-				if (onClosed) onClosed();
+				if (onClosed) onClosed(false);
 				dispose();
 			},
 		});

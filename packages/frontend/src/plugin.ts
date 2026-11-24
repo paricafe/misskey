@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { ref } from 'vue';
+import { ref, shallowRef } from 'vue';
 import { compareVersions } from 'compare-versions';
 import { isSafeMode } from '@@/js/config.js';
 import * as Misskey from 'misskey-js';
@@ -109,7 +109,20 @@ export async function authorizePlugin(plugin: Plugin) {
 	if (Object.hasOwn(store.s.pluginTokens, plugin.installId)) return;
 
 	const token = await new Promise<string>((res, rej) => {
-		let dispose: () => void;
+		let dispose: (() => void) | undefined;
+		let closed = false;
+		let submitted = false;
+		let settled = false;
+		const resolve = (value: string) => {
+			if (settled) return;
+			settled = true;
+			res(value);
+		};
+		const reject = (err: unknown) => {
+			if (settled) return;
+			settled = true;
+			rej(err);
+		};
 		os.popupAsyncWithDialog(import('@/components/MkTokenGenerateWindow.vue').then(x => x.default), {
 			title: i18n.ts.tokenRequested,
 			information: i18n.ts.pluginTokenRequestedDescription,
@@ -117,16 +130,30 @@ export async function authorizePlugin(plugin: Plugin) {
 			initialPermissions: plugin.permissions as typeof Misskey.permissions[number][],
 		}, {
 			done: async result => {
-				const { name, permissions } = result;
-				const { token } = await misskeyApi('miauth/gen-token', {
-					session: null,
-					name: name,
-					permission: permissions,
-				});
-				res(token);
+				submitted = true;
+				try {
+					const { name, permissions } = result;
+					const { token } = await misskeyApi('miauth/gen-token', {
+						session: null,
+						name: name,
+						permission: permissions,
+					});
+					resolve(token);
+				} catch (err) {
+					reject(err);
+				}
 			},
-			closed: () => dispose(),
-		}).then(d => dispose = d.dispose, err => rej(err));
+			closed: () => {
+				closed = true;
+				dispose?.();
+				if (!submitted) {
+					reject(new Error('Plugin authorization canceled'));
+				}
+			},
+		}).then(d => {
+			dispose = d.dispose;
+			if (closed) dispose();
+		}, err => reject(err));
 	});
 
 	store.set('pluginTokens', {
@@ -226,7 +253,7 @@ type PluginHandler<K extends keyof HandlerDef> = {
 	ctx: HandlerDef[K];
 };
 
-let pluginHandlers: PluginHandler<keyof HandlerDef>[] = [];
+const pluginHandlers = shallowRef<PluginHandler<keyof HandlerDef>[]>([]);
 
 function addPluginHandler<K extends keyof HandlerDef>(installId: Plugin['installId'], type: K, ctx: PluginHandler<K>['ctx']) {
 	pluginLogs.value.get(installId)!.push({
@@ -234,7 +261,7 @@ function addPluginHandler<K extends keyof HandlerDef>(installId: Plugin['install
 		isSystem: true,
 		message: `Handler registered: ${type}`,
 	});
-	pluginHandlers.push({ pluginInstallId: installId, type, ctx });
+	pluginHandlers.value = [...pluginHandlers.value, { pluginInstallId: installId, type, ctx }];
 }
 
 export async function launchPlugins(): Promise<void> {
@@ -332,7 +359,7 @@ export function abortPlugin(plugin: Plugin, clearLogs = true): void {
 	pluginContext.abort();
 	pluginContexts.delete(plugin.installId);
 	if (clearLogs) pluginLogs.value.delete(plugin.installId);
-	pluginHandlers = pluginHandlers.filter(x => x.pluginInstallId !== plugin.installId);
+	pluginHandlers.value = pluginHandlers.value.filter(x => x.pluginInstallId !== plugin.installId);
 }
 
 export function reloadPlugin(plugin: Plugin): void {
@@ -474,5 +501,5 @@ async function createPluginEnv(opts: { plugin: Plugin; storageKey: string }): Pr
 }
 
 export function getPluginHandlers<K extends keyof HandlerDef>(type: K): HandlerDef[K][] {
-	return pluginHandlers.filter((x): x is PluginHandler<K> => x.type === type).map(x => x.ctx);
+	return pluginHandlers.value.filter((x): x is PluginHandler<K> => x.type === type).map(x => x.ctx);
 }

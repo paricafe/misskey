@@ -145,6 +145,7 @@ const shouldDisableSubmitting = computed((): boolean => {
 		instance.enableTurnstile && !turnstileResponse.value ||
 		instance.enableTestcaptcha && !testcaptchaResponse.value ||
 		instance.emailRequiredForSignup && emailState.value !== 'ok' ||
+		instance.approvalRequiredForSignup && reason.value.trim() === '' ||
 		instance.disableRegistration && invitationCode.value === '' ||
 		usernameState.value !== 'ok' ||
 		passwordRetypeState.value !== 'match';
@@ -287,7 +288,7 @@ async function onSubmit(): Promise<void> {
 	const signupPayload: Misskey.entities.SignupRequest = {
 		username: username.value,
 		password: password.value,
-		emailAddress: email.value,
+		...(email.value.trim() !== '' ? { emailAddress: email.value.trim() } : {}),
 		invitationCode: invitationCode.value,
 		reason: reason.value,
 		'hcaptcha-response': hCaptchaResponse.value,
@@ -303,10 +304,7 @@ async function onSubmit(): Promise<void> {
 			'Content-Type': 'application/json',
 		},
 		body: JSON.stringify(signupPayload),
-	}).catch(() => {
-		onSignupApiError();
-		return null;
-	});
+	}).catch(() => null);
 
 	if (res && res.ok) {
 		if (instance.approvalRequiredForSignup && !instance.emailRequiredForSignup) {

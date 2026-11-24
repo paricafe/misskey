@@ -98,7 +98,7 @@ const customPaths = [
 	'autoSpacingDescription',
 	'clickToShowInstanceTickerWindow',
 	'defaultLike',
-	'_dataRequest.lable',
+	'_dataRequest.label',
 	'_dataRequest.title',
 	'_dataRequest.warn',
 	'_dataRequest.text',

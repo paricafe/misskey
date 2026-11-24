@@ -362,18 +362,54 @@ test('retains note capture and translation across remount, then disposes entries
 	expect(remounted.$appearNote.reactionCount).toBe(1);
 	expect(remounted.appearNote.text).toBe('hidden update');
 	expect(remounted.translation).toBe(firstView.translation);
-	expect(remounted.translation.value).toEqual(translation);
+	expect(remounted.translation.value).toBeNull();
 	expect(remounted.translating.value).toBe(false);
 	expect(remounted.showContent.value).toBe(true);
 	visible.value = false;
 	await nextTick();
 	notes.value = [second];
 	await nextTick();
-	expect(cache.has(first)).toBe(false);
+	expect(cache.has(first.id)).toBe(false);
 	expect(noteEvents.listenerCount(`reacted:${first.id}`)).toBe(0);
 	expect(noteEvents.listenerCount(`reacted:${second.id}`)).toBe(1);
 	app.unmount();
 	mountedApps.splice(mountedApps.indexOf(app), 1);
 	expect(cache.size).toBe(0);
 	expect(noteEvents.listenerCount(`reacted:${second.id}`)).toBe(0);
+});
+
+test('keeps note capture alive and syncs edited text when a cached note is replaced by a new object with the same id', async () => {
+	const original = editableNote('same-id-edit');
+	const notes = shallowRef([original]);
+	let view!: ReturnType<typeof useNote>;
+	let cache!: ReturnType<typeof useNoteViewStateCache>;
+	const item = defineComponent({
+		props: { note: { type: Object as () => Misskey.entities.Note, required: true } },
+		setup(props) {
+			view = useNote(props);
+			return () => h('div', view.appearNote.text ?? '');
+		},
+	});
+	const app = createApp(defineComponent({
+		setup() {
+			cache = useNoteViewStateCache(notes);
+			provide(DI.noteViewStateCache, cache);
+			return () => h(item, { key: notes.value[0].id, note: notes.value[0] });
+		},
+	}));
+	app.mount(document.createElement('div'));
+	mountedApps.push(app);
+
+	const edited: Misskey.entities.Note = { ...original, text: 'edited via prop', updatedAt: '2026-01-02T00:00:00.000Z' };
+	notes.value = [edited];
+	await nextTick();
+
+	expect(cache.has(original.id)).toBe(true);
+	expect(view.appearNote.text).toBe('edited via prop');
+	expect(noteEvents.listenerCount(`reacted:${original.id}`)).toBe(1);
+	noteEvents.emit(`reacted:${original.id}`, { userId: 'other', reaction: '❤️' });
+	expect(view.$appearNote.reactionCount).toBe(1);
+
+	app.unmount();
+	mountedApps.splice(mountedApps.indexOf(app), 1);
 });

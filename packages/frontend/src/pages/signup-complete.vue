@@ -43,13 +43,16 @@ function submit() {
 
 	misskeyApi('signup-pending', {
 		code: props.code,
-	}).then(res => {
+	}).then(async res => {
 		if (res.pendingApproval) {
-			return os.alert({
+			submitting.value = false;
+			await os.alert({
 				type: 'success',
 				title: i18n.ts._signup.almostThere,
 				text: i18n.ts._signup.approvalPending,
 			});
+			window.location.href = '/';
+			return;
 		}
 		return login(res.i, '/');
 	}).catch(() => {

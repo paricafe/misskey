@@ -142,3 +142,22 @@ test('initialization records the page canonical host for a worker on an alias', 
 	expect(mocks.state.accountHost).toBe('local.example');
 	expect(await readStoredAccounts(read, 'alias.example')).toEqual([{ id: 'alice', token: 'canonical-token' }]);
 });
+
+test('merges missing legacy tokens for known accounts before deleting legacy key', async () => {
+	mocks.accounts = [
+		['local.example', { id: 'alice', username: 'alice' }],
+		['local.example', { id: 'bob', username: 'bob' }],
+	];
+	mocks.state.accountTokens = { 'local.example/alice': 'alice-new' };
+	mocks.db.set(ACCOUNT_DEVICE_STATE_KEY, { accountTokens: mocks.state.accountTokens });
+	mocks.db.set('accounts', [
+		{ id: 'alice', token: 'alice-old' },
+		{ id: 'bob', token: 'bob-legacy' },
+	]);
+	await initializeAccountStorage();
+	expect(mocks.state.accountTokens).toEqual({
+		'local.example/alice': 'alice-new',
+		'local.example/bob': 'bob-legacy',
+	});
+	expect(mocks.db.has('accounts')).toBe(false);
+});

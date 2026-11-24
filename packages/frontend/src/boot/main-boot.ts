@@ -33,7 +33,7 @@ import { preloadInteractiveComponents } from '@/utility/interactive-components.j
 
 export async function mainBoot() {
 	const { isClientUpdated, lastVersion } = await common(async () => {
-		const interactiveReady = $i ? preloadInteractiveComponents() : Promise.resolve();
+		const interactiveReady = $i ? preloadInteractiveComponents().catch(() => {}) : Promise.resolve();
 		let uiStyle = ui;
 		const searchParams = new URLSearchParams(window.location.search);
 
@@ -44,7 +44,7 @@ export async function mainBoot() {
 
 		if (searchParams.has('ui')) uiStyle = searchParams.get('ui');
 		const timelineReady = $i && uiStyle !== 'deck' && ['/', '/timeline'].includes(window.location.pathname)
-			? import('@/pages/timeline.vue')
+			? import('@/pages/timeline.vue').catch(() => {})
 			: Promise.resolve();
 
 		let rootComponent: Component;

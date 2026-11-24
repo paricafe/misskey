@@ -284,8 +284,8 @@ onUnmounted(() => {
 .linkNote {
 	margin-top: 5px;
 	padding: 16px;
-	border: solid 1px var(--renote);
-	border-radius: var(--radius-sm);
+	border: solid 1px var(--MI_THEME-renote);
+	border-radius: var(--MI-radius-sm, 8px);
 	overflow: clip;
 }
 

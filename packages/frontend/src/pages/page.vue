@@ -96,7 +96,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 </template>
 
 <script lang="ts" setup>
-import { computed, watch, ref, defineAsyncComponent, markRaw } from 'vue';
+import { computed, watch, ref, defineAsyncComponent, markRaw, onActivated, onDeactivated, onUnmounted } from 'vue';
 import * as Misskey from 'misskey-js';
 import { url } from '@@/js/config.js';
 import type { MenuItem } from '@/types/menu.js';
@@ -120,7 +120,7 @@ import { getStaticImageUrl } from '@/utility/media-proxy.js';
 import { copyToClipboard } from '@/utility/copy-to-clipboard.js';
 import { useRouter } from '@/router.js';
 import { prefer } from '@/preferences.js';
-import { getPluginHandlers } from '@/plugin.js';
+import { getPluginHandlers, pluginsReady } from '@/plugin.js';
 import { Paginator } from '@/utility/paginator.js';
 
 const router = useRouter();
@@ -140,24 +140,73 @@ const otherPostsPaginator = markRaw(new Paginator('users/pages', {
 }));
 const path = computed(() => props.username + '/' + props.pageName);
 
+let fetchGeneration = 0;
+let isFetching = false;
+let needsRefetchOnActivate = false;
+
+onDeactivated(() => {
+	if (isFetching) {
+		needsRefetchOnActivate = true;
+		isFetching = false;
+	}
+	fetchGeneration++;
+});
+
+onActivated(() => {
+	if (needsRefetchOnActivate) {
+		needsRefetchOnActivate = false;
+		fetchPage();
+	}
+});
+
+onUnmounted(() => {
+	isFetching = false;
+	needsRefetchOnActivate = false;
+	fetchGeneration++;
+});
+
+function waitForPluginsReady(): Promise<void> {
+	if (pluginsReady.value) return Promise.resolve();
+	return new Promise<void>(resolve => {
+		const stop = watch(pluginsReady, ready => {
+			if (ready) {
+				stop();
+				resolve();
+			}
+		}, { immediate: true });
+	});
+}
+
 function fetchPage() {
+	const generation = ++fetchGeneration;
+	isFetching = true;
+	needsRefetchOnActivate = false;
 	page.value = null;
+	error.value = null;
 	misskeyApi('pages/show', {
 		name: props.pageName,
 		username: props.username,
 	}).then(async _page => {
-		page.value = _page;
+		if (generation !== fetchGeneration) return;
+		await waitForPluginsReady();
+		if (generation !== fetchGeneration) return;
 
+		let result = _page;
 		const pageViewInterruptors = getPluginHandlers('page_view_interruptor');
 		if (pageViewInterruptors.length > 0) {
-			let result = deepClone(_page);
+			result = deepClone(_page);
 			for (const interruptor of pageViewInterruptors) {
+				if (generation !== fetchGeneration) return;
 				result = await interruptor.handler(result);
 			}
-			page.value = result;
+			if (generation !== fetchGeneration) return;
 		}
+		page.value = result;
+		isFetching = false;
 	}).catch(err => {
+		if (generation !== fetchGeneration) return;
 		error.value = err;
+		isFetching = false;
 	});
 }
 

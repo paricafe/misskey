@@ -54,7 +54,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 		<MkAvatar :class="[$style.avatar, prefer.s.useStickyIcons ? $style.useSticky : null]" :user="appearNote.user" :link="!mock" :preview="!mock"/>
 		<div :class="$style.main">
 			<MkNoteHeader :note="appearNote" :mini="true"/>
-			<div :class="[{ [$style.noteClickToOpen]: prefer.s.noteClickToOpen }]" @click.stop="prefer.s.noteClickToOpen ? noteClickToOpen(appearNote.id, $event) : undefined">
+			<div :class="[{ [$style.noteClickToOpen]: !props.mock && prefer.s.noteClickToOpen }]" @click.stop="prefer.s.noteClickToOpen ? noteClickToOpen(appearNote.id, $event) : undefined">
 				<div style="container-type: inline-size;">
 					<p v-if="appearNote.cw != null" :class="$style.cw">
 						<Mfm
@@ -68,7 +68,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 						/>
 						<MkCwButton v-model="showContent" :text="appearNote.text" :renote="appearNote.renote" :files="appearNote.files" :poll="appearNote.poll" style="margin: 4px 0;" @click.stop/>
 					</p>
-					<div v-if="appearNote.cw == null || showContent" :class="[{ [$style.contentCollapsed]: collapsed }]">
+					<div v-if="appearNote.cw == null || showContent" :class="[{ [$style.contentCollapsed]: isLong && collapsed }]">
 						<div :class="$style.text">
 							<span v-if="appearNote.isHidden" style="opacity: 0.5">({{ i18n.ts.private }})</span>
 							<MkA v-if="appearNote.replyId" :class="$style.replyIcon" :to="`/notes/${appearNote.replyId}`"><i class="ti ti-arrow-back-up"></i></MkA>
@@ -337,6 +337,7 @@ function emitUpdReaction(emoji: string, delta: number) {
 }
 
 function noteClickToOpen(id: string, ev: MouseEvent) {
+	if (props.mock) return;
 	if (ev.target instanceof Element && ev.target.closest('a, button, [role="button"], input, textarea, summary, label') != null) return;
 	const selection = window.document.getSelection();
 	if (selection?.toString().length === 0) {

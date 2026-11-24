@@ -6,7 +6,7 @@
 import { defineAsyncComponent, ref } from 'vue';
 import * as Misskey from 'misskey-js';
 import { apiUrl, host } from '@@/js/config.js';
-import { ACCOUNT_DEVICE_STATE_KEY, readStoredAccounts } from '@@/js/stored-accounts.js';
+import { ACCOUNT_DEVICE_STATE_KEY, readLegacyStoredAccounts } from '@@/js/stored-accounts.js';
 import { get, del } from '@/utility/idb-proxy.js';
 import type { MenuItem } from '@/types/menu.js';
 import { showSuspendedDialog } from '@/utility/show-suspended-dialog.js';
@@ -24,10 +24,15 @@ type AccountWithToken = Misskey.entities.MeDetailed & { token: string };
 export async function initializeAccountStorage() {
 	await store.ready;
 	const state = await get(ACCOUNT_DEVICE_STATE_KEY);
-	if (state?.accountTokens == null) {
-		const accounts = await readStoredAccounts(get, host);
+	const legacyAccounts = await readLegacyStoredAccounts(get, host);
+	const knownIds = new Set(prefer.s.accounts.filter(([accountHost]) => accountHost === host).map(([, user]) => user.id));
+	const missingLegacyEntries = legacyAccounts
+		.filter(account => state?.accountTokens == null || knownIds.has(account.id))
+		.map(account => [host + '/' + account.id, account.token] as const)
+		.filter(([key]) => !Object.hasOwn(store.s.accountTokens, key));
+	if (state?.accountTokens == null || missingLegacyEntries.length > 0) {
 		await store.set('accountTokens', {
-			...Object.fromEntries(accounts.map(account => [host + '/' + account.id, account.token])),
+			...Object.fromEntries(missingLegacyEntries),
 			...store.s.accountTokens,
 		});
 	}
