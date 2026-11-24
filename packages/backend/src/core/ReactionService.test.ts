@@ -74,9 +74,9 @@ describe('ReactionService conditional writes', () => {
 	test('keeps native replacement behavior by default', async () => {
 		const { service, repository, buffering } = createService();
 		repository.insert.mockRejectedValueOnce(duplicate());
-		const remove = vi.spyOn(service, 'delete').mockResolvedValueOnce(undefined);
 		await service.create(actor, note, '❤');
-		expect(remove).toHaveBeenCalledWith(actor, note);
+		expect(repository.delete).toHaveBeenCalledWith('original-reaction');
+		expect(buffering.delete).toHaveBeenCalledWith('note', 'actor', '👍');
 		expect(repository.insert).toHaveBeenCalledTimes(2);
 		expect(buffering.create).toHaveBeenCalledWith('note', 'actor', '❤');
 	});

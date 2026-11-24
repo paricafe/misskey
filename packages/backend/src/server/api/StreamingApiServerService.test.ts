@@ -8,6 +8,7 @@ import { createServer } from 'node:http';
 import { WebSocket } from 'ws';
 import { describe, expect, test, vi } from 'vitest';
 import { isNativeStreamingPath, StreamingApiServerService } from './StreamingApiServerService.js';
+import { AuthenticationError } from './AuthenticateService.js';
 import type { Socket } from 'node:net';
 
 describe('native streaming path isolation', () => {
@@ -146,23 +147,49 @@ describe('native streaming shutdown', () => {
 		}
 	});
 
-	test('fails closed on periodic authorization failure without querying for each event', async () => {
+	test('tolerates a transient periodic auth error, closes after 3 consecutive errors, and closes immediately on AuthenticationError without querying per event', async () => {
 		vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
-		const authenticate = vi.fn().mockResolvedValue([{ id: 'alice' }, { id: 'token', permission: ['read:account'] }]);
+		const valid = [{ id: 'alice' }, { id: 'token', permission: ['read:account'] }];
+		const authenticate = vi.fn().mockResolvedValue(valid);
 		const { redis, service, server, client } = await setup(undefined, authenticate, 'token');
+		let second: WebSocket | undefined;
 		try {
 			await once(client, 'open');
 			const calls = authenticate.mock.calls.length;
 			for (let i = 0; i < 100; i++) redis.emit('message', 'test', JSON.stringify({ channel: 'broadcast', message: { type: 'public' } }));
 			expect(authenticate).toHaveBeenCalledTimes(calls);
+
+			// Single transient DB error recovers on next check
+			authenticate.mockRejectedValueOnce(new Error('database unavailable')).mockResolvedValueOnce(valid);
+			await vi.advanceTimersByTimeAsync(10_000);
+			expect(client.readyState).toBe(WebSocket.OPEN);
+			await vi.advanceTimersByTimeAsync(10_000);
+			expect(client.readyState).toBe(WebSocket.OPEN);
+
+			// 3 consecutive transient DB errors close the connection
 			authenticate.mockRejectedValue(new Error('database unavailable'));
 			const closed = once(client, 'close');
 			await vi.advanceTimersByTimeAsync(10_000);
+			expect(client.readyState).toBe(WebSocket.OPEN);
+			await vi.advanceTimersByTimeAsync(10_000);
+			expect(client.readyState).toBe(WebSocket.OPEN);
+			await vi.advanceTimersByTimeAsync(10_000);
 			await closed;
+
+			// Explicit AuthenticationError closes immediately on the first periodic check
+			authenticate.mockResolvedValue(valid);
+			second = new WebSocket(client.url);
+			second.on('error', () => {});
+			await once(second, 'open');
+			authenticate.mockRejectedValueOnce(new AuthenticationError('invalid token'));
+			const authClosed = once(second, 'close');
+			await vi.advanceTimersByTimeAsync(10_000);
+			await authClosed;
 		} finally {
 			await service.detach();
 			vi.useRealTimers();
 			client.terminate();
+			second?.terminate();
 			await new Promise<void>(resolve => server.close(() => resolve()));
 		}
 	});

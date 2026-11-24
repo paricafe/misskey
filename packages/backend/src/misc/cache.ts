@@ -126,6 +126,7 @@ export class RedisSingleCache<T> {
 	private readonly toRedisConverter: (value: T) => string;
 	private readonly fromRedisConverter: (value: string) => T | undefined;
 	private pendingFetch: Promise<T> | undefined;
+	private version = 0;
 
 	constructor(
 		private redisClient: Redis.Redis,
@@ -147,6 +148,8 @@ export class RedisSingleCache<T> {
 
 	@bindThis
 	public async set(value: T): Promise<void> {
+		this.version++;
+		this.pendingFetch = undefined;
 		this.memoryCache.set(value);
 		if (this.lifetime === Infinity) {
 			await this.redisClient.set(
@@ -167,11 +170,12 @@ export class RedisSingleCache<T> {
 		const memoryCached = this.memoryCache.get();
 		if (memoryCached !== undefined) return memoryCached;
 
+		const version = this.version;
 		const cached = await this.redisClient.get(`singlecache:${this.name}`);
 		if (cached == null) return undefined;
 
 		const value = this.fromRedisConverter(cached);
-		if (value !== undefined) {
+		if (value !== undefined && this.version === version) {
 			this.memoryCache.set(value);
 		}
 
@@ -180,6 +184,8 @@ export class RedisSingleCache<T> {
 
 	@bindThis
 	public async delete(): Promise<void> {
+		this.version++;
+		this.pendingFetch = undefined;
 		this.memoryCache.delete();
 		await this.redisClient.del(`singlecache:${this.name}`);
 	}
@@ -195,6 +201,7 @@ export class RedisSingleCache<T> {
 			return this.pendingFetch;
 		}
 
+		const version = this.version;
 		const pendingFetch = (async () => {
 			const cachedValue = await this.get();
 			if (cachedValue !== undefined) {
@@ -202,7 +209,9 @@ export class RedisSingleCache<T> {
 			}
 
 			const value = await this.fetcher();
-			await this.set(value);
+			if (this.version === version) {
+				await this.set(value);
+			}
 			return value;
 		})();
 		this.pendingFetch = pendingFetch;
@@ -218,6 +227,8 @@ export class RedisSingleCache<T> {
 
 	@bindThis
 	public async refresh() {
+		this.version++;
+		this.pendingFetch = undefined;
 		const value = await this.fetcher();
 		await this.set(value);
 	}

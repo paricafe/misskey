@@ -45,6 +45,17 @@ export type SearchOpts = {
 const INITIAL_SEARCH_WINDOW_MS = 1000 * 60 * 60 * 24;
 const SEARCH_WINDOW_GROWTH = 4;
 const EARLIEST_SEARCH_WINDOW_TIME = Date.UTC(2000, 0, 1);
+const MAX_PGROONGA_SEARCH_BATCHES = 50;
+
+function isPgroongaQuerySyntaxError(err: unknown): boolean {
+	if (err == null || typeof err !== 'object') return false;
+	const message = 'message' in err && typeof err.message === 'string' ? err.message : '';
+	const driverCode = 'driverError' in err && err.driverError != null && typeof err.driverError === 'object' && 'code' in err.driverError
+		? String(err.driverError.code)
+		: ('code' in err ? String(err.code) : '');
+	if (driverCode === '42601') return true;
+	return /pgroonga/i.test(message) && /syntax|parse|unclosed|invalid/i.test(message);
+}
 
 export type SearchPagination = {
 	untilId?: MiNote['id'];
@@ -281,45 +292,53 @@ export class SearchService {
 		const floor = Math.max(opts.rangeStartAt ?? EARLIEST_SEARCH_WINDOW_TIME, EARLIEST_SEARCH_WINDOW_TIME);
 		const ceiling = opts.rangeEndAt ?? Date.now();
 		let span = INITIAL_SEARCH_WINDOW_MS;
+		let batches = 0;
 
-		while (true) {
-			const farTime = ascending ? edge + span : edge - span;
-			const far = (ascending ? farTime >= ceiling : farTime <= floor) ? undefined : this.idService.gen(farTime);
+		try {
+			while (batches < MAX_PGROONGA_SEARCH_BATCHES) {
+				const farTime = ascending ? edge + span : edge - span;
+				const far = (ascending ? farTime >= ceiling : farTime <= floor) ? undefined : this.idService.gen(farTime);
 
-			while (true) {
-				const batchMatches = matches.clone();
-				if (cursor != null) {
-					batchMatches.andWhere(`note.id ${ascending ? '>' : '<'} :searchCursor`, { searchCursor: cursor });
+				while (batches < MAX_PGROONGA_SEARCH_BATCHES) {
+					batches++;
+					const batchMatches = matches.clone();
+					if (cursor != null) {
+						batchMatches.andWhere(`note.id ${ascending ? '>' : '<'} :searchCursor`, { searchCursor: cursor });
+					}
+					if (far != null) {
+						batchMatches.andWhere(`note.id ${ascending ? '<=' : '>='} :searchWindow`, { searchWindow: far });
+					}
+
+					const candidates = await this.notesRepository.manager.createQueryBuilder()
+						.addCommonTableExpression(batchMatches, 'matched_note', { materialized: true })
+						.select('matched_note.id', 'id')
+						.from('matched_note', 'matched_note')
+						.orderBy('matched_note.id', ascending ? 'ASC' : 'DESC')
+						.limit(batchSize)
+						.getRawMany<{ id: MiNote['id'] }>();
+
+					if (candidates.length > 0) {
+						const batch = await query.clone()
+							.andWhere('note.id IN (:...searchResultIds)', { searchResultIds: candidates.map(note => note.id) })
+							.limit(pagination.limit - notes.length)
+							.getMany();
+						notes.push(...batch);
+						if (notes.length >= pagination.limit) return notes;
+					}
+
+					if (candidates.length < batchSize) break;
+					cursor = candidates[candidates.length - 1].id;
 				}
-				if (far != null) {
-					batchMatches.andWhere(`note.id ${ascending ? '<=' : '>='} :searchWindow`, { searchWindow: far });
-				}
 
-				const candidates = await this.notesRepository.manager.createQueryBuilder()
-					.addCommonTableExpression(batchMatches, 'matched_note', { materialized: true })
-					.select('matched_note.id', 'id')
-					.from('matched_note', 'matched_note')
-					.orderBy('matched_note.id', ascending ? 'ASC' : 'DESC')
-					.limit(batchSize)
-					.getRawMany<{ id: MiNote['id'] }>();
-
-				if (candidates.length > 0) {
-					const batch = await query.clone()
-						.andWhere('note.id IN (:...searchResultIds)', { searchResultIds: candidates.map(note => note.id) })
-						.limit(pagination.limit - notes.length)
-						.getMany();
-					notes.push(...batch);
-					if (notes.length >= pagination.limit) return notes;
-				}
-
-				if (candidates.length < batchSize) break;
-				cursor = candidates[candidates.length - 1].id;
+				if (far == null) return notes;
+				cursor = far;
+				edge = farTime;
+				span *= SEARCH_WINDOW_GROWTH;
 			}
-
-			if (far == null) return notes;
-			cursor = far;
-			edge = farTime;
-			span *= SEARCH_WINDOW_GROWTH;
+			return notes;
+		} catch (err) {
+			if (isPgroongaQuerySyntaxError(err)) return [];
+			throw err;
 		}
 	}
 

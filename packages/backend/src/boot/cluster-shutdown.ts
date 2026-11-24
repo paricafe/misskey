@@ -27,6 +27,12 @@ export async function shutdownClusterWorkers(): Promise<void> {
 
 export function forceStopClusterWorkers(): void {
 	for (const worker of Object.values(cluster.workers ?? {})) {
-		if (worker && !worker.isDead()) worker.process.kill('SIGKILL');
+		if (worker && !worker.isDead()) {
+			try {
+				worker.process.kill('SIGKILL');
+			} catch {
+				// Worker may have already exited.
+			}
+		}
 	}
 }

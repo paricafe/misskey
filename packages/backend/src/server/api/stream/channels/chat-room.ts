@@ -47,7 +47,7 @@ export class ChatRoomChannel extends Channel {
 		if (!(await this.checkPermission()) || this.disposed) return false;
 
 		this.subscriber.on(`chatRoomStream:${this.roomId}`, this.onEvent);
-		this.permissionIntervalId = setInterval(() => { void this.checkPermission(); }, 10_000);
+		this.permissionIntervalId = setInterval(() => { void this.checkPermission(true); }, 10_000);
 
 		return true;
 	}
@@ -64,12 +64,19 @@ export class ChatRoomChannel extends Channel {
 		this.connection.disconnectChannel(this.id);
 	}
 
-	private checkPermission(): Promise<boolean> {
+	private checkPermission(force = false): Promise<boolean> {
 		if (this.disposed || !this.user) return Promise.resolve(false);
 		if (this.permissionCheck) return this.permissionCheck;
-		if (Date.now() < this.permissionExpiresAt) return Promise.resolve(true);
+		if (!force && Date.now() < this.permissionExpiresAt) return Promise.resolve(true);
 		this.permissionCheck = (async () => {
 			try {
+				if (typeof this.chatService.getChatAvailability === 'function') {
+					const availability = await this.chatService.getChatAvailability(this.user!.id);
+					if (!availability.read) {
+						this.connection.disconnectChannel(this.id);
+						return false;
+					}
+				}
 				const room = await this.chatRoomsRepository.findOneBy({ id: this.roomId });
 				if (!room || !(await this.chatService.hasPermissionToViewRoomTimeline(this.user!.id, room))) {
 					this.connection.disconnectChannel(this.id);

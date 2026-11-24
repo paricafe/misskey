@@ -168,7 +168,11 @@ export class ServerService implements OnApplicationShutdown {
 				store,
 				maxFileSize: this.config.maxFileSize,
 				transport: async request => {
-					const result = await fastify.inject({ method: 'POST', url: new URL(request.url).pathname, headers: request.headers, payload: Buffer.from(request.body), remoteAddress: request.context?.ip });
+					if (request.context?.signal?.aborted) throw request.context.signal.reason ?? new Error('The native request was aborted');
+					const payload = typeof request.body === 'string'
+						? request.body
+						: Buffer.from(request.body.buffer, request.body.byteOffset, request.body.byteLength);
+					const result = await fastify.inject({ method: 'POST', url: new URL(request.url).pathname, headers: request.headers, payload, remoteAddress: request.context?.ip });
 					return { status: result.statusCode, body: result.body, headers: Object.fromEntries(Object.entries(result.headers).filter((entry): entry is [string, string] => typeof entry[1] === 'string')) };
 				},
 			});
@@ -281,9 +285,8 @@ export class ServerService implements OnApplicationShutdown {
 
 			if (cluster.isWorker) {
 				process.send!('listenFailed');
-			} else {
-				process.exit(1);
 			}
+			process.exit(1);
 		};
 
 		try {

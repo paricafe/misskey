@@ -60,6 +60,21 @@ const decodeCustomEmojiRegexp = /^:([\p{Letter}\p{Number}\p{Mark}_+-]+)(?:@([\w.
 
 @Injectable()
 export class ReactionService {
+	private readonly pendingMutations = new Map<string, Promise<unknown>>();
+
+	private runSerialized<T>(noteId: MiNote['id'], userId: MiUser['id'], task: () => Promise<T>): Promise<T> {
+		const key = `${noteId}:${userId}`;
+		const prev = this.pendingMutations.get(key) ?? Promise.resolve();
+		const next = prev.catch(() => undefined).then(task);
+		const tracked = next.then(() => undefined, () => undefined).finally(() => {
+			if (this.pendingMutations.get(key) === tracked) {
+				this.pendingMutations.delete(key);
+			}
+		});
+		this.pendingMutations.set(key, tracked);
+		return next;
+	}
+
 	constructor(
 		@Inject(DI.meta)
 		private meta: MiMeta,
@@ -98,6 +113,10 @@ export class ReactionService {
 
 	@bindThis
 	public async create(user: { id: MiUser['id']; host: MiUser['host']; isBot: MiUser['isBot'] }, note: MiNote, _reaction?: string | null, options: { replaceExisting?: boolean } = {}) {
+		return this.runSerialized(note.id, user.id, () => this.createLocked(user, note, _reaction, options));
+	}
+
+	private async createLocked(user: { id: MiUser['id']; host: MiUser['host']; isBot: MiUser['isBot'] }, note: MiNote, _reaction?: string | null, options: { replaceExisting?: boolean } = {}) {
 		if (note.userId !== user.id) {
 			const blocked = await this.userBlockingService.checkBlocked(note.userId, user.id);
 			if (blocked) {
@@ -183,7 +202,7 @@ export class ReactionService {
 				});
 
 				if (exists.reaction !== reaction && options.replaceExisting !== false) {
-					await this.delete(user, note);
+					await this.deleteLocked(user, note);
 					await this.noteReactionsRepository.insert(record);
 				} else {
 					throw new IdentifiableError('51c42bb4-931a-456b-bff7-e5a8a70dd298');
@@ -289,6 +308,10 @@ export class ReactionService {
 
 	@bindThis
 	public async delete(user: { id: MiUser['id']; host: MiUser['host']; isBot: MiUser['isBot']; }, note: MiNote, expectedReaction?: string) {
+		return this.runSerialized(note.id, user.id, () => this.deleteLocked(user, note, expectedReaction));
+	}
+
+	private async deleteLocked(user: { id: MiUser['id']; host: MiUser['host']; isBot: MiUser['isBot']; }, note: MiNote, expectedReaction?: string) {
 		const exist = await this.noteReactionsRepository.findOneBy({
 			noteId: note.id,
 			userId: user.id,

@@ -101,7 +101,7 @@ export class StreamingApiServerService {
 				return;
 			}
 
-			if (user?.isSuspended || user?.isDeleted) {
+			if (user?.isSuspended || user?.isDeleted || user?.approved === false) {
 				socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
 				socket.destroy();
 				return;
@@ -120,15 +120,19 @@ export class StreamingApiServerService {
 					|| (event.type === 'userChangeSuspendedState' && event.body.id === user.id && event.body.isSuspended)
 					|| (event.type === 'userChangeDeletedState' && event.body.id === user.id && event.body.isDeleted)) invalidate();
 			});
+			let authFailureCount = 0;
 			const authorize = async (reusePending = true) => {
 				if (!user || !token || invalidated || this.#detaching) return;
 				try {
 					const [currentUser, currentApp] = await this.authenticateFresh(token, reusePending);
-					if (currentUser?.id !== user.id || currentUser.isSuspended || currentUser.isDeleted
+					authFailureCount = 0;
+					if (currentUser?.id !== user.id || currentUser.isSuspended || currentUser.isDeleted || currentUser.approved === false
 						|| currentApp?.id !== app?.id
 						|| (app && app.permission.some(permission => !currentApp?.permission.includes(permission)))) invalidate();
-				} catch {
-					invalidate();
+				} catch (err) {
+					if (err instanceof AuthenticationError || !reusePending || ++authFailureCount >= 3) {
+						invalidate();
+					}
 				}
 			};
 

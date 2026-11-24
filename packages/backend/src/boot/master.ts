@@ -178,7 +178,9 @@ function spawnWorker(): Promise<void> {
 		onRestart: (workerId, delayMs) => bootLogger.error(`Worker ${workerId} exited; restarting in ${delayMs}ms.`),
 		onFatal: error => {
 			bootLogger.error(error);
-			process.exit(1);
+			void Promise.allSettled([shutdownApplications(), shutdownClusterWorkers()]).finally(() => {
+				process.exit(1);
+			});
 		},
 	});
 }

@@ -10,6 +10,7 @@ export class ChannelEventBus {
 
 	public createSubscriber(): EventEmitter {
 		const subscriber = new EventEmitter();
+		subscriber.setMaxListeners(0);
 		subscriber.on('newListener', (channel: string | symbol) => {
 			if (channel === 'newListener' || channel === 'removeListener') return;
 			let connections = this.subscribers.get(channel);

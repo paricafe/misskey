@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { randomUUID } from 'node:crypto';
 import * as Redis from 'ioredis';
 
 const RENEW_LOCK_SCRIPT = `
@@ -45,7 +46,7 @@ export async function acquireDistributedLock(
 	retryInterval: number,
 ): Promise<DistributedLock> {
 	const lockKey = `lock:${name}`;
-	const identifier = Math.random().toString(36).slice(2);
+	const identifier = randomUUID();
 
 	let retries = 0;
 	while (retries < maxRetries) {

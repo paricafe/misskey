@@ -263,6 +263,7 @@ export class CacheService implements OnApplicationShutdown {
 		this.userBlockedCache.dispose();
 		this.renoteMutingsCache.dispose();
 		this.userFollowingsCache.dispose();
+		this.pariRemoteUserDecorationsCache.dispose();
 	}
 
 	@bindThis

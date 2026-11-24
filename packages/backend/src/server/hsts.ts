@@ -10,8 +10,9 @@ export function makeHstsHook(host: string, preload: boolean = false): onRequestH
         return (request, reply, done) => {
             if (
                 (request.host === host || request.hostname === host) &&
-                (request.headers['x-forwarded-proto'] ?? request.protocol) === 'http') {
-                reply.redirect(`https://${request.hostname}${request.url}`, 301);
+                request.protocol === 'http') {
+                const redirectHost = request.host || request.hostname;
+                reply.redirect(`https://${redirectHost}${request.url}`, 301);
             } else {
                 reply.header('strict-transport-security', 'max-age=31536000; includeSubDomains; preload');
             }
