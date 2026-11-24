@@ -1,0 +1,92 @@
+packages/backend/src/queue/processors/ImportNotesProcessorService.test.ts
+  e068ecd3139af0a3 101-147
+packages/backend/src/core/DeleteAccountService.ts
+  e068ecd3139af0a3 60,86-97,102,110
+packages/frontend/src/pages/page.vue
+  e068ecd3139af0a3 144-145,148-151,156-157,163-164,182-183,185,205,209
+packages/mastodon-compat/test/postgres-store.test.ts
+  e068ecd3139af0a3 13-17,266-300
+packages/mastodon-compat/test/media-search.test.ts
+  e068ecd3139af0a3 199,204-213
+packages/mastodon-compat/test/notifications-v2.test.ts
+  e068ecd3139af0a3 210-227
+packages/mastodon-compat/src/features.ts
+  e068ecd3139af0a3 121-123,131-133
+packages/mastodon-compat/src/notifications-v2.ts
+  e068ecd3139af0a3 120-122,124,127-130,133,138-145,150
+packages/backend/src/core/SearchService.ts
+  e068ecd3139af0a3 361,371,395-397,403,405-408,429,440-442
+packages/backend/src/queue/processors/ImportNotesProcessorService.ts
+  e068ecd3139af0a3 411-418,450-452
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8-ntes.10",
+  "base_commit_sha": "785b9d143f3f7d3fcb536d53dcb7f969e36a45ef",
+  "prompts": {
+    "e068ecd3139af0a3": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a20b8e-8cb3-79c3-85c6-0afad67b6e95",
+        "model": "gpt-6.2-astra"
+      },
+      "human_author": "Natsuki-Kaede",
+      "messages": [],
+      "total_additions": 199,
+      "total_deletions": 25,
+      "accepted_lines": 199,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "packages/mastodon-compat/src/features.ts": {
+          "additions": 6,
+          "deletions": 2,
+          "accepted_lines": 6
+        },
+        "packages/mastodon-compat/src/media-search.ts": {
+          "deletions": 1
+        },
+        "packages/backend/src/queue/processors/ImportNotesProcessorService.test.ts": {
+          "additions": 47,
+          "accepted_lines": 47
+        },
+        "packages/frontend/src/pages/page.vue": {
+          "additions": 15,
+          "deletions": 1,
+          "accepted_lines": 15
+        },
+        "packages/mastodon-compat/test/postgres-store.test.ts": {
+          "additions": 41,
+          "accepted_lines": 41
+        },
+        "packages/backend/src/core/SearchService.ts": {
+          "additions": 14,
+          "deletions": 6,
+          "accepted_lines": 14
+        },
+        "packages/mastodon-compat/test/media-search.test.ts": {
+          "additions": 14,
+          "accepted_lines": 14
+        },
+        "packages/mastodon-compat/test/notifications-v2.test.ts": {
+          "additions": 18,
+          "accepted_lines": 18
+        },
+        "packages/backend/src/queue/processors/ImportNotesProcessorService.ts": {
+          "additions": 11,
+          "deletions": 3,
+          "accepted_lines": 11
+        },
+        "packages/backend/src/core/DeleteAccountService.ts": {
+          "additions": 15,
+          "deletions": 5,
+          "accepted_lines": 15
+        },
+        "packages/mastodon-compat/src/notifications-v2.ts": {
+          "additions": 18,
+          "deletions": 7,
+          "accepted_lines": 18
+        }
+      }
+    }
+  }
+}
