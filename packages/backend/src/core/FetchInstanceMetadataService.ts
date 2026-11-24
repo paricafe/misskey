@@ -7,7 +7,7 @@ import { URL } from 'node:url';
 import { Inject, Injectable } from '@nestjs/common';
 import tinycolor from 'tinycolor2';
 import * as Redis from 'ioredis';
-import * as htmlParser from 'node-html-parser';
+import type * as htmlParser from 'node-html-parser';
 import type { MiInstance } from '@/models/Instance.js';
 import type Logger from '@/logger.js';
 import { DI } from '@/di-symbols.js';
@@ -17,6 +17,7 @@ import { bindThis } from '@/decorators.js';
 import { FederatedInstanceService } from '@/core/FederatedInstanceService.js';
 import { acquireDistributedLock, DistributedLockNotAcquiredError } from '@/misc/distributed-lock.js';
 import type { DistributedLock } from '@/misc/distributed-lock.js';
+import { parseUntrustedHtml } from '@/misc/parse-untrusted-html.js';
 
 type NodeInfo = {
 	openRegistrations?: unknown;
@@ -179,7 +180,7 @@ export class FetchInstanceMetadataService {
 
 		const html = await this.httpRequestService.getHtml(url);
 
-		const doc = htmlParser.parse(html);
+		const doc = parseUntrustedHtml(html);
 
 		return doc;
 	}

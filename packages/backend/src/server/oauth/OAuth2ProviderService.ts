@@ -5,7 +5,7 @@
 
 import dns from 'node:dns/promises';
 import { Inject, Injectable, OnApplicationShutdown } from '@nestjs/common';
-import * as htmlParser from 'node-html-parser';
+import type * as htmlParser from 'node-html-parser';
 import httpLinkHeader from 'http-link-header';
 import ipaddr from 'ipaddr.js';
 import fastifyCors from '@fastify/cors';
@@ -34,6 +34,7 @@ import { MemoryKVCache } from '@/misc/cache.js';
 import { LoggerService } from '@/core/LoggerService.js';
 import Logger from '@/logger.js';
 import { StatusError } from '@/misc/status-error.js';
+import { parseUntrustedHtml, UNTRUSTED_HTML_MAX_LENGTH } from '@/misc/parse-untrusted-html.js';
 import { HtmlTemplateService } from '@/server/web/HtmlTemplateService.js';
 import { OAuthPage } from '@/server/web/views/oauth.js';
 import type { FastifyInstance, FastifyReply } from 'fastify';
@@ -146,7 +147,9 @@ function parseMicroformats(doc: htmlParser.HTMLElement, baseUrl: string, id: str
 
 async function discoverClientInformation(logger: Logger, httpRequestService: HttpRequestService, id: string): Promise<ClientInformation> {
 	try {
-		const res = await httpRequestService.send(id);
+		const res = await httpRequestService.send(id, {
+			size: UNTRUSTED_HTML_MAX_LENGTH,
+		});
 
 		const redirectUris: string[] = [];
 		let name = id;
@@ -189,7 +192,7 @@ async function discoverClientInformation(logger: Logger, httpRequestService: Htt
 			}
 		} else {
 			const text = await res.text();
-			const doc = htmlParser.parse(`<div>${text}</div>`);
+			const doc = parseUntrustedHtml(`<div>${text}</div>`);
 
 			redirectUris.push(...[...doc.querySelectorAll('link[rel=redirect_uri][href]')].map(el => el.attributes.href));
 
