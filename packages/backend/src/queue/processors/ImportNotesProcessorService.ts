@@ -33,6 +33,23 @@ const MAX_ZIP_ENTRY_SIZE = 256 * 1024 * 1024;
 const MAX_ZIP_TOTAL_SIZE = 2 * 1024 * 1024 * 1024;
 const MAX_IMPORT_NOTES = 50_000;
 const MAX_IMPORT_REPLY_DEPTH = 200;
+const MAX_IMPORT_ATTACHMENTS_PER_NOTE = 16;
+const ALLOWED_IMPORT_VISIBILITIES = new Set(['public', 'home', 'followers']);
+
+function isHttpUrl(value: unknown): value is string {
+	if (typeof value !== 'string') return false;
+	try {
+		const parsed = new URL(value);
+		return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+	} catch {
+		return false;
+	}
+}
+
+function safeImportDate(value: unknown): Date {
+	const d = value instanceof Date ? value : new Date(value as string | number);
+	return Number.isNaN(d.getTime()) ? new Date() : d;
+}
 
 const FACEBOOK_POSTS_PATH = 'your_activity_across_facebook/posts/your_posts__check_ins__photos_and_videos_1.json';
 const FACEBOOK_MEDIA_DIR = 'your_activity_across_facebook/posts/media/';
@@ -103,48 +120,54 @@ export class ImportNotesProcessorService {
 
 	@bindThis
 	private async recreateChain(idFieldPath: string[], replyFieldPath: string[], arr: any[], includeOrphans: boolean): Promise<any[]> {
-		type NotesMap = {
-			[id: string]: any;
-		};
 		const notesTree: any[] = [];
-		const noteById: NotesMap = {};
-		const notesWaitingForParent: NotesMap = {};
+		const noteById = new Map<string, any>();
+		const notesWaitingForParent = new Map<string, any[]>();
 
 		for await (const note of arr) {
-			const noteId = idFieldPath.reduce(
-				(obj, step) => obj[step],
+			const rawNoteId = idFieldPath.reduce(
+				(obj, step) => obj?.[step],
 				note,
 			);
+			if (rawNoteId == null) continue;
+			const noteId = String(rawNoteId);
 
-			noteById[noteId] = note;
+			noteById.set(noteId, note);
 			note.childNotes = [];
 
-			const children = notesWaitingForParent[noteId];
+			const children = notesWaitingForParent.get(noteId);
 			if (children) {
 				note.childNotes.push(...children);
-				delete notesWaitingForParent[noteId];
+				notesWaitingForParent.delete(noteId);
 			}
 
-			const noteReplyId = replyFieldPath.reduce(
-				(obj, step) => obj[step],
+			const rawReplyId = replyFieldPath.reduce(
+				(obj, step) => obj?.[step],
 				note,
 			);
-			if (noteReplyId == null) {
+			const noteReplyId = rawReplyId == null ? null : String(rawReplyId);
+			if (noteReplyId == null || noteReplyId === noteId) {
 				notesTree.push(note);
 				continue;
 			}
 
-			const parent = noteById[noteReplyId];
+			const parent = noteById.get(noteReplyId);
 			if (parent) {
 				parent.childNotes.push(note);
 			} else {
-				notesWaitingForParent[noteReplyId] ||= [];
-				notesWaitingForParent[noteReplyId].push(note);
+				const waiting = notesWaitingForParent.get(noteReplyId);
+				if (waiting) {
+					waiting.push(note);
+				} else {
+					notesWaitingForParent.set(noteReplyId, [note]);
+				}
 			}
 		}
 
 		if (includeOrphans) {
-			notesTree.push(...Object.values(notesWaitingForParent).flat(1));
+			for (const orphans of notesWaitingForParent.values()) {
+				notesTree.push(...orphans);
+			}
 		}
 
 		return notesTree;
@@ -242,19 +265,18 @@ export class ImportNotesProcessorService {
 			this.logger.info(`Temp dir is ${path}`);
 
 			const destPath = path + '/twitter.zip';
-
-			try {
-				await fsp.writeFile(destPath, '', 'binary');
-				await this.downloadUrl(file.url, destPath);
-			} catch (e) {
-				if (e instanceof Error || typeof e === 'string') {
-					this.logger.error(e);
-				}
-				throw e;
-			}
-
 			const outputPath = path + '/twitter';
 			try {
+				try {
+					await fsp.writeFile(destPath, '', 'binary');
+					await this.downloadUrl(file.url, destPath);
+				} catch (e) {
+					if (e instanceof Error || typeof e === 'string') {
+						this.logger.error(e);
+					}
+					throw e;
+				}
+
 				this.logger.succ(`Unzipping to ${outputPath}`);
 				await this.extractZip(destPath, outputPath, name => name === 'data/tweets.js');
 
@@ -263,7 +285,7 @@ export class ImportNotesProcessorService {
 				const tweets = unprocessedTweets.map(e => e.tweet);
 				const processedTweets = await this.recreateChain(['id_str'], ['in_reply_to_status_id_str'], tweets, false);
 				this.assertImportSize(processedTweets);
-				this.queueService.createImportTweetsToDbJob(job.data.user, processedTweets, null);
+				await this.queueService.createImportTweetsToDbJob({ id: job.data.user.id }, processedTweets, null);
 			} finally {
 				cleanup();
 			}
@@ -273,31 +295,32 @@ export class ImportNotesProcessorService {
 			this.logger.info(`Temp dir is ${path}`);
 
 			const destPath = path + '/facebook.zip';
-
-			try {
-				await fsp.writeFile(destPath, '', 'binary');
-				await this.downloadUrl(file.url, destPath);
-			} catch (e) {
-				if (e instanceof Error || typeof e === 'string') {
-					this.logger.error(e);
-				}
-				throw e;
-			}
-
 			const outputPath = path + '/facebook';
 			try {
+				try {
+					await fsp.writeFile(destPath, '', 'binary');
+					await this.downloadUrl(file.url, destPath);
+				} catch (e) {
+					if (e instanceof Error || typeof e === 'string') {
+						this.logger.error(e);
+					}
+					throw e;
+				}
+
 				this.logger.succ(`Unzipping to ${outputPath}`);
 				await this.extractZip(destPath, outputPath, name => name === FACEBOOK_POSTS_PATH || name.startsWith(FACEBOOK_MEDIA_DIR));
 				const postsJson = await fsp.readFile(`${outputPath}/${FACEBOOK_POSTS_PATH}`, 'utf-8');
 				const posts = JSON.parse(postsJson);
 				this.assertImportSize(posts);
-				const facebookFolder = await this.driveFoldersRepository.findOneBy({ name: 'Facebook', userId: job.data.user.id, parentId: folder?.id });
+				let facebookFolder = await this.driveFoldersRepository.findOneBy({ name: 'Facebook', userId: job.data.user.id, parentId: folder?.id });
 				if (facebookFolder == null && folder) {
 					await this.driveFoldersRepository.insert({ id: this.idService.gen(), name: 'Facebook', userId: job.data.user.id, parentId: folder.id });
-					const createdFolder = await this.driveFoldersRepository.findOneBy({ name: 'Facebook', userId: job.data.user.id, parentId: folder.id });
-					if (createdFolder) await this.uploadFiles(outputPath + '/your_activity_across_facebook/posts/media', user, createdFolder.id);
+					facebookFolder = await this.driveFoldersRepository.findOneBy({ name: 'Facebook', userId: job.data.user.id, parentId: folder.id });
 				}
-				this.queueService.createImportFBToDbJob(job.data.user, posts);
+				if (facebookFolder && fs.existsSync(outputPath + '/your_activity_across_facebook/posts/media')) {
+					await this.uploadFiles(outputPath + '/your_activity_across_facebook/posts/media', user, facebookFolder.id);
+				}
+				await this.queueService.createImportFBToDbJob({ id: job.data.user.id }, posts);
 			} finally {
 				cleanup();
 			}
@@ -307,19 +330,18 @@ export class ImportNotesProcessorService {
 			this.logger.info(`Temp dir is ${path}`);
 
 			const destPath = path + '/unknown.zip';
-
-			try {
-				await fsp.writeFile(destPath, '', 'binary');
-				await this.downloadUrl(file.url, destPath);
-			} catch (e) {
-				if (e instanceof Error || typeof e === 'string') {
-					this.logger.error(e);
-				}
-				throw e;
-			}
-
 			const outputPath = path + '/unknown';
 			try {
+				try {
+					await fsp.writeFile(destPath, '', 'binary');
+					await this.downloadUrl(file.url, destPath);
+				} catch (e) {
+					if (e instanceof Error || typeof e === 'string') {
+						this.logger.error(e);
+					}
+					throw e;
+				}
+
 				this.logger.succ(`Unzipping to ${outputPath}`);
 				const entryNames = await this.extractZip(destPath, outputPath, name =>
 					name === INSTAGRAM_POSTS_PATH || name.startsWith(INSTAGRAM_MEDIA_DIR) ||
@@ -330,23 +352,25 @@ export class ImportNotesProcessorService {
 					const postsJson = await fsp.readFile(`${outputPath}/${INSTAGRAM_POSTS_PATH}`, 'utf-8');
 					const posts = JSON.parse(postsJson);
 					this.assertImportSize(posts);
-					const igFolder = await this.driveFoldersRepository.findOneBy({ name: 'Instagram', userId: job.data.user.id, parentId: folder?.id });
+					let igFolder = await this.driveFoldersRepository.findOneBy({ name: 'Instagram', userId: job.data.user.id, parentId: folder?.id });
 					if (igFolder == null && folder) {
 						await this.driveFoldersRepository.insert({ id: this.idService.gen(), name: 'Instagram', userId: job.data.user.id, parentId: folder.id });
-						const createdFolder = await this.driveFoldersRepository.findOneBy({ name: 'Instagram', userId: job.data.user.id, parentId: folder.id });
-						if (createdFolder) await this.uploadFiles(outputPath + '/media/posts', user, createdFolder.id);
+						igFolder = await this.driveFoldersRepository.findOneBy({ name: 'Instagram', userId: job.data.user.id, parentId: folder.id });
 					}
-					this.queueService.createImportIGToDbJob(job.data.user, posts);
+					if (igFolder && fs.existsSync(outputPath + '/media/posts')) {
+						await this.uploadFiles(outputPath + '/media/posts', user, igFolder.id);
+					}
+					await this.queueService.createImportIGToDbJob({ id: job.data.user.id }, posts);
 				} else if (isOutbox) {
 					const actorJson = await fsp.readFile(outputPath + '/actor.json', 'utf-8');
 					const actor = JSON.parse(actorJson);
-					const isPleroma = actor['@context'].some((v: any) => typeof v === 'string' && v.match(/litepub(.*)/));
+					const isPleroma = Array.isArray(actor['@context']) && actor['@context'].some((v: any) => typeof v === 'string' && v.match(/litepub(.*)/));
 					if (isPleroma) {
 						const outboxJson = await fsp.readFile(outputPath + '/outbox.json', 'utf-8');
 						const outbox = JSON.parse(outboxJson);
 						const processedToots = await this.recreateChain(['object', 'id'], ['object', 'inReplyTo'], outbox.orderedItems.filter((x: any) => x.type === 'Create' && x.object.type === 'Note'), true);
 						this.assertImportSize(processedToots);
-						this.queueService.createImportPleroToDbJob(job.data.user, processedToots, null);
+						await this.queueService.createImportPleroToDbJob({ id: job.data.user.id }, processedToots, null);
 					} else {
 						const outboxJson = await fsp.readFile(outputPath + '/outbox.json', 'utf-8');
 						const outbox = JSON.parse(outboxJson);
@@ -360,7 +384,7 @@ export class ImportNotesProcessorService {
 						}
 						const processedToots = await this.recreateChain(['object', 'id'], ['object', 'inReplyTo'], outbox.orderedItems.filter((x: any) => x.type === 'Create' && x.object.type === 'Note'), true);
 						this.assertImportSize(processedToots);
-						this.queueService.createImportMastoToDbJob(job.data.user, processedToots, null);
+						await this.queueService.createImportMastoToDbJob({ id: job.data.user.id }, processedToots, null);
 					}
 				}
 			} finally {
@@ -372,21 +396,32 @@ export class ImportNotesProcessorService {
 			this.logger.info(`Temp dir is ${path}`);
 
 			try {
-				await fsp.writeFile(path, '', 'utf-8');
-				await this.downloadUrl(file.url, path);
-			} catch (e) {
-				if (e instanceof Error || typeof e === 'string') {
-					this.logger.error(e);
+				try {
+					await fsp.writeFile(path, '', 'utf-8');
+					await this.downloadUrl(file.url, path);
+				} catch (e) {
+					if (e instanceof Error || typeof e === 'string') {
+						this.logger.error(e);
+					}
+					throw e;
 				}
-				throw e;
-			}
 
-			const notesJson = await fsp.readFile(path, 'utf-8');
-			const notes = JSON.parse(notesJson);
-			const processedNotes = await this.recreateChain(['id'], ['replyId'], notes, false);
-			this.assertImportSize(processedNotes);
-			this.queueService.createImportKeyNotesToDbJob(job.data.user, processedNotes, null);
-			cleanup();
+				const notesJson = await fsp.readFile(path, 'utf-8');
+				const parsedNotes = JSON.parse(notesJson);
+				let notes: any[];
+				if (Array.isArray(parsedNotes)) {
+					notes = parsedNotes;
+				} else if (parsedNotes != null && typeof parsedNotes === 'object' && Array.isArray(parsedNotes.notes)) {
+					notes = parsedNotes.notes;
+				} else {
+					throw new Error('Malformed Misskey notes archive: expected an array or an object with a notes array');
+				}
+				const processedNotes = await this.recreateChain(['id'], ['replyId'], notes, false);
+				this.assertImportSize(processedNotes);
+				await this.queueService.createImportKeyNotesToDbJob({ id: job.data.user.id }, processedNotes, null);
+			} finally {
+				cleanup();
+			}
 		}
 
 		this.logger.succ('Import jobs created');
@@ -408,7 +443,23 @@ export class ImportNotesProcessorService {
 		if (folder == null) return;
 
 		const files: MiDriveFile[] = [];
-		const date = new Date(note.createdAt);
+		const date = safeImportDate(note.createdAt);
+		let visibility: 'public' | 'home' | 'followers';
+		if (note.visibility === 'specified') {
+			this.logger.warn(`Skipping imported specified note ${note.id ?? ''}: recipient identities cannot be verified from archive`);
+			if (Array.isArray(note.childNotes) && note.childNotes.length > 0) {
+				await this.queueService.createImportKeyNotesToDbJob({ id: user.id }, note.childNotes, null);
+			}
+			return;
+		} else if (note.visibility == null) {
+			visibility = 'home';
+		} else if (ALLOWED_IMPORT_VISIBILITIES.has(note.visibility)) {
+			visibility = note.visibility;
+		} else {
+			this.logger.warn(`Skipping imported note ${note.id ?? ''}: unsupported visibility ${String(note.visibility)}`);
+			return;
+		}
+		const localOnly = Boolean(note.localOnly);
 
 		if (note.files && this.isIterable(note.files)) {
 			let keyFolder = await this.driveFoldersRepository.findOneBy({ name: 'Misskey', userId: job.data.user.id, parentId: folder.id });
@@ -418,35 +469,40 @@ export class ImportNotesProcessorService {
 			}
 
 			for await (const file of note.files) {
+				if (files.length >= MAX_IMPORT_ATTACHMENTS_PER_NOTE) break;
+				if (!isHttpUrl(file?.url)) continue;
 				const [filePath, cleanup] = await createTemp();
-				const slashdex = file.url.lastIndexOf('/');
-				const name = file.url.substring(slashdex + 1);
+				try {
+					const slashdex = file.url.lastIndexOf('/');
+					const name = file.url.substring(slashdex + 1);
 
-				const exists = await this.driveFilesRepository.findOneBy({ name: name, userId: user.id }) ?? await this.driveFilesRepository.findOneBy({ name: name, userId: user.id, folderId: keyFolder?.id });
+					const exists = await this.driveFilesRepository.findOneBy({ name: name, userId: user.id }) ?? await this.driveFilesRepository.findOneBy({ name: name, userId: user.id, folderId: keyFolder?.id });
 
-				if (!exists) {
-					try {
-						await this.downloadUrl(file.url, filePath);
-					} catch (e) {
-						this.logger.error(e instanceof Error ? e : new Error(e as string));
+					if (!exists) {
+						try {
+							await this.downloadUrl(file.url, filePath);
+						} catch (e) {
+							this.logger.error(e instanceof Error ? e : new Error(e as string));
+							continue;
+						}
+						const driveFile = await this.driveService.addFile({
+							user: user,
+							path: filePath,
+							name: name,
+							folderId: keyFolder?.id,
+						});
+						files.push(driveFile);
+					} else {
+						files.push(exists);
 					}
-					const driveFile = await this.driveService.addFile({
-						user: user,
-						path: filePath,
-						name: name,
-						folderId: keyFolder?.id,
-					});
-					files.push(driveFile);
-				} else {
-					files.push(exists);
+				} finally {
+					cleanup();
 				}
-
-				cleanup();
 			}
 		}
 
-		const createdNote = await this.noteCreateService.import(user, { createdAt: date, reply: parentNote, text: note.text, apMentions: new Array(0), visibility: note.visibility, localOnly: note.localOnly, files: files, cw: note.cw });
-		if (note.childNotes) this.queueService.createImportKeyNotesToDbJob(user, note.childNotes, createdNote.id);
+		const createdNote = await this.noteCreateService.import(user, { createdAt: date, reply: parentNote, text: note.text, apMentions: new Array(0), visibility, localOnly, files: files, cw: note.cw });
+		if (note.childNotes) await this.queueService.createImportKeyNotesToDbJob({ id: user.id }, note.childNotes, createdNote.id);
 	}
 
 	@bindThis
@@ -505,7 +561,7 @@ export class ImportNotesProcessorService {
 		}
 
 		const createdNote = await this.noteCreateService.import(user, { createdAt: date, text: text, files: files, visibility: visibility, apMentions: new Array(0), cw: toot.object.sensitive ? toot.object.summary : null, reply: reply });
-		if (toot.childNotes) this.queueService.createImportMastoToDbJob(user, toot.childNotes, createdNote.id);
+		if (toot.childNotes) await this.queueService.createImportMastoToDbJob({ id: user.id }, toot.childNotes, createdNote.id);
 	}
 
 	@bindThis
@@ -564,38 +620,43 @@ export class ImportNotesProcessorService {
 			}
 
 			for await (const file of post.object.attachment) {
+				if (files.length >= MAX_IMPORT_ATTACHMENTS_PER_NOTE) break;
+				if (!isHttpUrl(file?.url)) continue;
 				const slashdex = file.url.lastIndexOf('/');
 				const filename = file.url.substring(slashdex + 1);
 				const hash = crypto.createHash('md5').update(file.url).digest('base64url');
 				const name = `${hash}-${filename}`;
 				const [filePath, cleanup] = await createTemp();
 
-				const exists = await this.driveFilesRepository.findOneBy({ name: name, userId: user.id }) ?? await this.driveFilesRepository.findOneBy({ name: name, userId: user.id, folderId: pleroFolder?.id });
+				try {
+					const exists = await this.driveFilesRepository.findOneBy({ name: name, userId: user.id }) ?? await this.driveFilesRepository.findOneBy({ name: name, userId: user.id, folderId: pleroFolder?.id });
 
-				if (!exists) {
-					try {
-						await this.downloadUrl(file.url, filePath);
-					} catch (e) {
-						this.logger.error(e instanceof Error ? e : new Error(e as string));
+					if (!exists) {
+						try {
+							await this.downloadUrl(file.url, filePath);
+						} catch (e) {
+							this.logger.error(e instanceof Error ? e : new Error(e as string));
+							continue;
+						}
+						const driveFile = await this.driveService.addFile({
+							user: user,
+							path: filePath,
+							name: name,
+							comment: file.name,
+							folderId: pleroFolder?.id,
+						});
+						files.push(driveFile);
+					} else {
+						files.push(exists);
 					}
-					const driveFile = await this.driveService.addFile({
-						user: user,
-						path: filePath,
-						name: name,
-						comment: file.name,
-						folderId: pleroFolder?.id,
-					});
-					files.push(driveFile);
-				} else {
-					files.push(exists);
+				} finally {
+					cleanup();
 				}
-
-				cleanup();
 			}
 		}
 
 		const createdNote = await this.noteCreateService.import(user, { createdAt: date, text: text, files: files, visibility, apMentions: new Array(0), cw: post.object.sensitive ? post.object.summary : null, reply: reply });
-		if (post.childNotes) this.queueService.createImportPleroToDbJob(user, post.childNotes, createdNote.id);
+		if (post.childNotes) await this.queueService.createImportPleroToDbJob({ id: user.id }, post.childNotes, createdNote.id);
 	}
 
 	@bindThis
@@ -673,7 +734,7 @@ export class ImportNotesProcessorService {
 		}
 
 		try {
-			const date = new Date(tweet.created_at);
+			const date = safeImportDate(tweet.created_at);
 			const decodedText = tweet.full_text.replaceAll('&gt;', '>').replaceAll('&lt;', '<').replaceAll('&amp;', '&');
 			const textReplaceURLs = tweet.entities.urls && tweet.entities.urls.length > 0 ? await replaceTwitterUrls(decodedText, tweet.entities.urls) : decodedText;
 			const text = tweet.entities.user_mentions && tweet.entities.user_mentions.length > 0 ? await replaceTwitterMentions(textReplaceURLs, tweet.entities.user_mentions) : textReplaceURLs;
@@ -687,63 +748,73 @@ export class ImportNotesProcessorService {
 				}
 
 				for await (const file of tweet.extended_entities.media) {
-					if (file.video_info) {
+					if (files.length >= MAX_IMPORT_ATTACHMENTS_PER_NOTE) break;
+					if (file.video_info && Array.isArray(file.video_info.variants)) {
+						const videos = file.video_info.variants.filter((x: any) => x?.content_type === 'video/mp4' && isHttpUrl(x.url));
+						const targetVideoUrl = videos[0]?.url;
+						if (!targetVideoUrl) continue;
+
 						const [filePath, cleanup] = await createTemp();
-						const slashdex = file.video_info.variants[0].url.lastIndexOf('/');
-						const name = file.video_info.variants[0].url.substring(slashdex + 1);
+						try {
+							const slashdex = targetVideoUrl.lastIndexOf('/');
+							const name = targetVideoUrl.substring(slashdex + 1);
 
-						const exists = await this.driveFilesRepository.findOneBy({ name: name, userId: user.id }) ?? await this.driveFilesRepository.findOneBy({ name: name, userId: user.id, folderId: twitFolder?.id });
+							const exists = await this.driveFilesRepository.findOneBy({ name: name, userId: user.id }) ?? await this.driveFilesRepository.findOneBy({ name: name, userId: user.id, folderId: twitFolder?.id });
 
-						const videos = file.video_info.variants.filter((x: any) => x.content_type === 'video/mp4');
-
-						if (!exists) {
-							try {
-								await this.downloadService.downloadUrl(videos[0].url, filePath);
-							} catch (e) {
-								this.logger.error(e instanceof Error ? e : new Error(e as string));
+							if (!exists) {
+								try {
+									await this.downloadUrl(targetVideoUrl, filePath);
+								} catch (e) {
+									this.logger.error(e instanceof Error ? e : new Error(e as string));
+									continue;
+								}
+								const driveFile = await this.driveService.addFile({
+									user: user,
+									path: filePath,
+									name: name,
+									folderId: twitFolder?.id,
+								});
+								files.push(driveFile);
+							} else {
+								files.push(exists);
 							}
-							const driveFile = await this.driveService.addFile({
-								user: user,
-								path: filePath,
-								name: name,
-								folderId: twitFolder?.id,
-							});
-							files.push(driveFile);
-						} else {
-							files.push(exists);
+						} finally {
+							cleanup();
 						}
-
-						cleanup();
-					} else if (file.media_url_https) {
+					} else if (isHttpUrl(file.media_url_https)) {
 						const [filePath, cleanup] = await createTemp();
-						const slashdex = file.media_url_https.lastIndexOf('/');
-						const name = file.media_url_https.substring(slashdex + 1);
+						try {
+							const slashdex = file.media_url_https.lastIndexOf('/');
+							const name = file.media_url_https.substring(slashdex + 1);
 
-						const exists = await this.driveFilesRepository.findOneBy({ name: name, userId: user.id });
+							const exists = await this.driveFilesRepository.findOneBy({ name: name, userId: user.id });
 
-						if (!exists) {
-							try {
-								await this.downloadService.downloadUrl(file.media_url_https, filePath);
-							} catch (e) {
-								this.logger.error(e instanceof Error ? e : new Error(e as string));
+							if (!exists) {
+								try {
+									await this.downloadUrl(file.media_url_https, filePath);
+								} catch (e) {
+									this.logger.error(e instanceof Error ? e : new Error(e as string));
+									continue;
+								}
+
+								const driveFile = await this.driveService.addFile({
+									user: user,
+									path: filePath,
+									name: name,
+									folderId: twitFolder?.id,
+								});
+								files.push(driveFile);
+							} else {
+								files.push(exists);
 							}
-
-							const driveFile = await this.driveService.addFile({
-								user: user,
-								path: filePath,
-								name: name,
-								folderId: twitFolder?.id,
-							});
-							files.push(driveFile);
-						} else {
-							files.push(exists);
+						} finally {
+							cleanup();
 						}
-						cleanup();
 					}
 				}
 			}
 			const createdNote = await this.noteCreateService.import(user, { createdAt: date, reply: parentNote, text: text, files: files });
-			if (tweet.childNotes) this.queueService.createImportTweetsToDbJob(user, tweet.childNotes, createdNote.id);
+			if (tweet.childNotes) await this.queueService.createImportTweetsToDbJob({ id: user.id }, tweet.childNotes, createdNote.id);
 		} catch (e) {
 			this.logger.warn(`Error: ${e}`);
 		}

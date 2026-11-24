@@ -19,6 +19,58 @@ import { QueueLoggerService } from '../QueueLoggerService.js';
 import type * as Bull from 'bullmq';
 import type { DbUserImportJobData } from '../types.js';
 
+type ParsedCsvField = { value: string; quoted: boolean };
+
+function parseCsvRows(input: string): ParsedCsvField[][] {
+	const rows: ParsedCsvField[][] = [];
+	let row: ParsedCsvField[] = [];
+	let field = '';
+	let inQuotes = false;
+	let wasQuoted = false;
+
+	for (let i = 0; i < input.length; i++) {
+		const ch = input[i];
+		if (inQuotes) {
+			if (ch === '"') {
+				if (input[i + 1] === '"') {
+					field += '"';
+					i++;
+				} else {
+					inQuotes = false;
+				}
+			} else {
+				field += ch;
+			}
+		} else if (ch === '"' && field.length === 0 && !wasQuoted) {
+			inQuotes = true;
+			wasQuoted = true;
+		} else if (ch === ',') {
+			row.push({ value: field, quoted: wasQuoted });
+			field = '';
+			wasQuoted = false;
+		} else if (ch === '\r' || ch === '\n') {
+			if (ch === '\r' && input[i + 1] === '\n') i++;
+			row.push({ value: field, quoted: wasQuoted });
+			field = '';
+			wasQuoted = false;
+			if (row.some(cell => cell.value.length > 0 || cell.quoted)) rows.push(row);
+			row = [];
+		} else {
+			field += ch;
+		}
+	}
+
+	if (field.length > 0 || wasQuoted || row.length > 0) {
+		row.push({ value: field, quoted: wasQuoted });
+		if (row.some(cell => cell.value.length > 0 || cell.quoted)) rows.push(row);
+	}
+	return rows;
+}
+
+function unescapeSpreadsheetFormulaPrefix(value: string): string {
+	return /^'['=+\-@\t\r]/.test(value) ? value.slice(1) : value;
+}
+
 @Injectable()
 export class ImportUserListsProcessorService {
 	private logger: Logger;
@@ -66,17 +118,18 @@ export class ImportUserListsProcessorService {
 
 		let linenum = 0;
 
-		for (const line of csv.trim().split('\n')) {
+		for (const parts of parseCsvRows(csv)) {
 			linenum++;
 
 			try {
-				const parts = line.split(',');
-				const listName = parts[0].trim();
-				const { username, host } = Acct.parse(parts[1].trim());
+				if (parts.length < 2) continue;
+				const rawListName = unescapeSpreadsheetFormulaPrefix(parts[0].value);
+				const listName = parts[0].quoted ? rawListName : rawListName.trim();
+				const { username, host } = Acct.parse(unescapeSpreadsheetFormulaPrefix(parts[1].value).trim());
 				let withReplies = false;
 
 				for (const keyValue of parts.slice(2)) {
-					const [key, value] = keyValue.split('=');
+					const [key, value] = keyValue.value.split('=');
 					switch (key) {
 						case 'withReplies':
 							withReplies = value === 'true';

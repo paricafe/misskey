@@ -28,6 +28,14 @@ import { EmailService } from '@/core/EmailService.js';
 import { QueueLoggerService } from '../QueueLoggerService.js';
 import type * as Bull from 'bullmq';
 
+function escapeCsvField(value: string): string {
+	const safe = /^['=+\-@\t\r]/.test(value) ? `'${value}` : value;
+	if (/[",\r\n]/.test(safe) || /^\s|\s$/.test(value)) {
+		return `"${safe.replaceAll('"', '""')}"`;
+	}
+	return safe;
+}
+
 @Injectable()
 export class ExportAccountDataProcessorService {
 	private logger: Logger;
@@ -110,153 +118,160 @@ export class ExportAccountDataProcessorService {
 			await push(this.utilityService.getFullApAccount(u.username, u.host));
 		};
 
-		await this.writeJsonExport(path, 'user', async push => {
-			// eslint-disable-next-line @typescript-eslint/no-unused-vars
-			const { host, uri, sharedInbox, followersUri, lastFetchedAt, inbox, token, ...userTrimmed } = user;
-			await push(userTrimmed);
-		});
-
-		await this.writeJsonExport(path, 'profile', async push => {
-			// eslint-disable-next-line @typescript-eslint/no-unused-vars
-			const { emailVerifyCode, twoFactorBackupSecret, twoFactorSecret, password, twoFactorTempSecret, userHost, moderationNote, ...profileTrimmed } = profile;
-			await push(profileTrimmed);
-		});
-
-		await this.writeJsonExport(path, 'ips', async push => {
-			for (const signin of await this.signinsRepository.findBy({ userId: user.id })) {
+		try {
+			await this.writeJsonExport(path, 'user', async push => {
 				// eslint-disable-next-line @typescript-eslint/no-unused-vars
-				const { userId, id, user, ...signinTrimmed } = signin;
-				await push(signinTrimmed);
-			}
-		});
-
-		await this.writeJsonExport(path, 'notes', async push => {
-			for await (const note of this.paginate(this.notesRepository, { userId: user.id })) {
-				const poll = note.hasPoll ? await this.pollsRepository.findOneByOrFail({ noteId: note.id }) : null;
-				const files = await this.driveFileEntityService.packManyByIds(note.fileIds);
-				await push(this.noteSerialize(note, poll, files));
-			}
-		});
-
-		await this.writeJsonExport(path, 'followings', async push => {
-			const mutings = await this.mutingsRepository.findBy({ muterId: user.id });
-			const where = mutings.length > 0 ? { followerId: user.id, followeeId: Not(In(mutings.map(x => x.muteeId))) } : { followerId: user.id };
-			for await (const following of this.paginate(this.followingsRepository, where)) {
-				await pushAccount(push, following.followeeId, u => u.updatedAt != null && Date.now() - u.updatedAt.getTime() > 1000 * 60 * 60 * 24 * 90);
-			}
-		});
-
-		await this.writeJsonExport(path, 'followers', async push => {
-			for await (const following of this.paginate(this.followingsRepository, { followeeId: user.id })) {
-				await pushAccount(push, following.followerId);
-			}
-		});
-
-		fs.mkdirSync(`${path}/files`);
-
-		await this.writeJsonExport(path, 'drive', async push => {
-			for (const file of await this.driveFilesRepository.findBy({ userId: user.id })) {
-				const extension = mime.extension(file.type);
-				const fileName = extension ? `${file.id}.${extension}` : file.id;
-				const filePath = path + '/files/' + fileName;
-				try {
-					await this.downloadService.downloadUrl(file.url, filePath);
-				} catch (e) {
-					this.logger.error(e instanceof Error ? e : new Error(e as string));
-					fs.rmSync(filePath, { force: true });
-				}
-				await push({ fileName, file });
-			}
-		});
-
-		await this.writeJsonExport(path, 'mutings', async push => {
-			for await (const muting of this.paginate(this.mutingsRepository, { muterId: user.id, expiresAt: IsNull() })) {
-				await pushAccount(push, muting.muteeId);
-			}
-		});
-
-		await this.writeJsonExport(path, 'blockings', async push => {
-			for await (const blocking of this.paginate(this.blockingsRepository, { blockerId: user.id })) {
-				await pushAccount(push, blocking.blockeeId);
-			}
-		});
-
-		await this.writeJsonExport(path, 'favorites', async push => {
-			const favorites = this.paginate(this.noteFavoritesRepository, { userId: user.id }, { note: { user: true } }) as AsyncGenerator<MiNoteFavorite & { note: MiNote & { user: MiUser } }>;
-			for await (const favorite of favorites) {
-				const poll = favorite.note.hasPoll ? await this.pollsRepository.findOneByOrFail({ noteId: favorite.note.id }) : null;
-				await push(this.favoriteSerialize(favorite, poll));
-			}
-		});
-
-		await this.writeJsonExport(path, 'antennas', async push => {
-			for (const antenna of await this.antennasRepository.findBy({ userId: user.id })) {
-				let users: MiUser[] | undefined;
-				if (antenna.userListId !== null) {
-					const memberships = await this.userListMembershipsRepository.findBy({ userListId: antenna.userListId });
-					users = await this.usersRepository.findBy({
-						id: In(memberships.map(j => j.userId)),
-					});
-				}
-
-				await push({
-					name: antenna.name,
-					src: antenna.src,
-					keywords: antenna.keywords,
-					excludeKeywords: antenna.excludeKeywords,
-					users: antenna.users,
-					userListAccts: users ? users.map(u => this.utilityService.getFullApAccount(u.username, u.host)) : null,
-					caseSensitive: antenna.caseSensitive,
-					localOnly: antenna.localOnly,
-					withReplies: antenna.withReplies,
-					withFile: antenna.withFile,
-				});
-			}
-		});
-
-		const listLines: string[] = [];
-		for (const list of await this.userListsRepository.findBy({ userId: user.id })) {
-			const memberships = await this.userListMembershipsRepository.findBy({ userListId: list.id });
-			const users = await this.usersRepository.findBy({
-				id: In(memberships.map(j => j.userId)),
+				const { host, uri, sharedInbox, followersUri, lastFetchedAt, inbox, token, ...userTrimmed } = user;
+				await push(userTrimmed);
 			});
 
-			for (const u of users) {
-				listLines.push(`${list.name},${this.utilityService.getFullApAccount(u.username, u.host)}\n`);
-			}
-		}
-		fs.writeFileSync(path + '/lists.csv', listLines.join(''), 'utf-8');
+			await this.writeJsonExport(path, 'profile', async push => {
+				// eslint-disable-next-line @typescript-eslint/no-unused-vars
+				const { emailVerifyCode, twoFactorBackupSecret, twoFactorSecret, password, twoFactorTempSecret, userHost, moderationNote, ...profileTrimmed } = profile;
+				await push(profileTrimmed);
+			});
 
-		const [archivePath, archiveCleanup] = await createTemp();
-		try {
-			const archive = await ZipArchive.create(archivePath);
-			try {
-				for (const entry of fs.readdirSync(path, { recursive: true, withFileTypes: true })) {
-					if (!entry.isFile()) continue;
-					const entryPath = nodePath.join(entry.parentPath, entry.name);
-					await archive.addFile(nodePath.relative(path, entryPath).split(nodePath.sep).join('/'), entryPath);
+			await this.writeJsonExport(path, 'ips', async push => {
+				for await (const signin of this.paginate(this.signinsRepository, { userId: user.id })) {
+					// eslint-disable-next-line @typescript-eslint/no-unused-vars
+					const { userId, id, user, ...signinTrimmed } = signin;
+					await push(signinTrimmed);
 				}
-			} catch (e) {
-				await archive.abort();
-				throw e;
+			});
+
+			await this.writeJsonExport(path, 'notes', async push => {
+				for await (const note of this.paginate(this.notesRepository, { userId: user.id })) {
+					const poll = note.hasPoll ? await this.pollsRepository.findOneBy({ noteId: note.id }) : null;
+					const files = await this.driveFileEntityService.packManyByIds(note.fileIds);
+					await push(this.noteSerialize(note, poll, files));
+				}
+			});
+
+			await this.writeJsonExport(path, 'followings', async push => {
+				const mutings = await this.mutingsRepository.findBy({ muterId: user.id });
+				const where = mutings.length > 0 ? { followerId: user.id, followeeId: Not(In(mutings.map(x => x.muteeId))) } : { followerId: user.id };
+				for await (const following of this.paginate(this.followingsRepository, where)) {
+					await pushAccount(push, following.followeeId, u => u.updatedAt != null && Date.now() - u.updatedAt.getTime() > 1000 * 60 * 60 * 24 * 90);
+				}
+			});
+
+			await this.writeJsonExport(path, 'followers', async push => {
+				for await (const following of this.paginate(this.followingsRepository, { followeeId: user.id })) {
+					await pushAccount(push, following.followerId);
+				}
+			});
+
+			fs.mkdirSync(`${path}/files`);
+
+			await this.writeJsonExport(path, 'drive', async push => {
+				for await (const file of this.paginate(this.driveFilesRepository, { userId: user.id })) {
+					if (/^data-request-\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-\d{2}\.zip$/.test(file.name)) continue;
+					const extension = mime.extension(file.type);
+					const fileName = extension ? `${file.id}.${extension}` : file.id;
+					const filePath = path + '/files/' + fileName;
+					try {
+						await this.downloadService.downloadUrl(file.url, filePath);
+					} catch (e) {
+						this.logger.error(e instanceof Error ? e : new Error(e as string));
+						fs.rmSync(filePath, { force: true });
+					}
+					await push({ fileName, file });
+				}
+			});
+
+			await this.writeJsonExport(path, 'mutings', async push => {
+				for await (const muting of this.paginate(this.mutingsRepository, { muterId: user.id, expiresAt: IsNull() })) {
+					await pushAccount(push, muting.muteeId);
+				}
+			});
+
+			await this.writeJsonExport(path, 'blockings', async push => {
+				for await (const blocking of this.paginate(this.blockingsRepository, { blockerId: user.id })) {
+					await pushAccount(push, blocking.blockeeId);
+				}
+			});
+
+			await this.writeJsonExport(path, 'favorites', async push => {
+				const favorites = this.paginate(this.noteFavoritesRepository, { userId: user.id }, { note: { user: true } }) as AsyncGenerator<MiNoteFavorite & { note: MiNote & { user: MiUser } }>;
+				for await (const favorite of favorites) {
+					const poll = favorite.note.hasPoll ? await this.pollsRepository.findOneBy({ noteId: favorite.note.id }) : null;
+					await push(this.favoriteSerialize(favorite, poll));
+				}
+			});
+
+			await this.writeJsonExport(path, 'antennas', async push => {
+				for (const antenna of await this.antennasRepository.findBy({ userId: user.id })) {
+					let users: MiUser[] | undefined;
+					if (antenna.userListId !== null) {
+						const memberships = await this.userListMembershipsRepository.findBy({ userListId: antenna.userListId });
+						users = await this.usersRepository.findBy({
+							id: In(memberships.map(j => j.userId)),
+						});
+					}
+
+					await push({
+						name: antenna.name,
+						src: antenna.src,
+						keywords: antenna.keywords,
+						excludeKeywords: antenna.excludeKeywords,
+						users: antenna.users,
+						userListAccts: users ? users.map(u => this.utilityService.getFullApAccount(u.username, u.host)) : null,
+						caseSensitive: antenna.caseSensitive,
+						localOnly: antenna.localOnly,
+						withReplies: antenna.withReplies,
+						withFile: antenna.withFile,
+					});
+				}
+			});
+
+			const listLines: string[] = [];
+			for (const list of await this.userListsRepository.findBy({ userId: user.id })) {
+				const memberships = await this.userListMembershipsRepository.findBy({ userListId: list.id });
+				const users = await this.usersRepository.findBy({
+					id: In(memberships.map(j => j.userId)),
+				});
+
+				for (const u of users) {
+					listLines.push(`${escapeCsvField(list.name)},${escapeCsvField(this.utilityService.getFullApAccount(u.username, u.host))}\n`);
+				}
 			}
-			await archive.close();
-			this.logger.succ(`Exported to: ${archivePath}`);
+			fs.writeFileSync(path + '/lists.csv', listLines.join(''), 'utf-8');
 
-			const fileName = 'data-request-' + dateFormat(new Date(), 'yyyy-MM-dd-HH-mm-ss') + '.zip';
-			const driveFile = await this.driveService.addFile({ user, path: archivePath, name: fileName, force: true, skipPolicyCheck: true });
+			const [archivePath, archiveCleanup] = await createTemp();
+			try {
+				const archive = await ZipArchive.create(archivePath);
+				try {
+					for (const entry of fs.readdirSync(path, { recursive: true, withFileTypes: true })) {
+						if (!entry.isFile()) continue;
+						const entryPath = nodePath.join(entry.parentPath, entry.name);
+						await archive.addFile(nodePath.relative(path, entryPath).split(nodePath.sep).join('/'), entryPath);
+					}
+				} catch (e) {
+					await archive.abort();
+					throw e;
+				}
+				await archive.close();
+				this.logger.succ(`Exported to: ${archivePath}`);
 
-			this.logger.succ(`Exported to: ${driveFile.id}`);
-			if (profile.email && profile.emailVerified) {
-				this.emailService.sendEmail(profile.email,
-					'Your data archive is ready',
-					`Click the following link to download the archive: ${driveFile.url}<br/>It is also available in your drive.`,
-					`Click the following link to download the archive: ${driveFile.url}\r\n\r\nIt is also available in your drive.`,
-				);
+				const fileName = 'data-request-' + dateFormat(new Date(), 'yyyy-MM-dd-HH-mm-ss') + '.zip';
+				const driveFile = await this.driveService.addFile({ user, path: archivePath, name: fileName, force: true, skipPolicyCheck: true });
+
+				this.logger.succ(`Exported to: ${driveFile.id}`);
+				if (profile.email && profile.emailVerified) {
+					const driveUrl = this.config.url ? `${this.config.url.replace(/\/$/, '')}/my/drive` : `https://${this.config.host}/my/drive`;
+					await Promise.resolve(this.emailService.sendEmail(profile.email,
+						'Your data archive is ready',
+						`Your account data archive (${fileName}) is ready. Sign in and download it from your Drive: <a href="${driveUrl}">${driveUrl}</a>`,
+						`Your account data archive (${fileName}) is ready. Sign in and download it from your Drive: ${driveUrl}`,
+					)).catch((err: unknown) => {
+						this.logger.error(err instanceof Error ? err : new Error(String(err)));
+					});
+				}
+			} finally {
+				archiveCleanup();
 			}
 		} finally {
 			cleanup();
-			archiveCleanup();
 		}
 	}
 

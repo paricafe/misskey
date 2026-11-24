@@ -24,7 +24,7 @@ function setup(
 	};
 	const logger = { info: vi.fn(), succ: vi.fn(), error: vi.fn() };
 	const driveService = { addFile: vi.fn(addFile) };
-	const driveFilesRepository = { findBy: vi.fn().mockResolvedValue([]) };
+	const driveFilesRepository = { find: vi.fn().mockResolvedValue([]), findBy: vi.fn().mockResolvedValue([]) };
 	const downloadService = { downloadUrl: vi.fn(async (url: string, path: string) => fs.promises.writeFile(path, url)) };
 	const emailService = { sendEmail: vi.fn() };
 	const service = new ExportAccountDataProcessorService(
@@ -124,10 +124,10 @@ describe('ExportAccountDataProcessorService archive delivery', () => {
 			for (const entry of exported) contents.set(entry.file.id, fs.readFileSync(`${dir}/files/${entry.fileName}`, 'utf8'));
 			return { id: 'archive', url: 'https://files.example/archive.zip' };
 		});
-		driveFilesRepository.findBy.mockResolvedValue([
+		driveFilesRepository.find.mockResolvedValueOnce([
 			{ id: 'first', name: 'photo.jpg', type: 'image/jpeg', folderId: 'folder-a', url: 'https://files.example/first' },
 			{ id: 'second', name: 'photo.jpg', type: 'image/jpeg', folderId: 'folder-b', url: 'https://files.example/second' },
-		] as never);
+		] as never).mockResolvedValue([]);
 		await service.process({ data: { user: { id: 'user' } } } as never);
 		expect(new Set(exported.map(entry => entry.fileName)).size).toBe(2);
 		expect(exported.map(entry => entry.file.name)).toEqual(['photo.jpg', 'photo.jpg']);
