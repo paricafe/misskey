@@ -6,7 +6,7 @@
 import { Column, Entity, Index, PrimaryColumn } from 'typeorm';
 
 @Entity('mastodon_compat_entry')
-@Index('IDX_mastodon_compat_entry_expires_at', ['expiresAt'])
+@Index('IDX_mastodon_compat_entry_expires_at', ['expiresAt', 'namespace', 'owner', 'key'], { where: '"expiresAt" IS NOT NULL' })
 export class MiMastodonCompatEntry {
 	@PrimaryColumn('varchar', { length: 96, primaryKeyConstraintName: 'PK_mastodon_compat_entry' })
 	public namespace: string;
