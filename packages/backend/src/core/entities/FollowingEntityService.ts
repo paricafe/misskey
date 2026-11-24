@@ -106,7 +106,7 @@ export class FollowingEntityService {
 			}
 
 			query.leftJoin(MiUserProfile, 'followee', 'followee."userId" = following."followeeId"');
-			query.leftJoin(MiFollowing, 'me_following_followee', 'me_following_followee."followerId" = :me AND me_following_followee."followeeId" = following."followerId"');
+			query.leftJoin(MiFollowing, 'me_following_followee', 'me_following_followee."followerId" = :me AND me_following_followee."followeeId" = following."followeeId"');
 			query.andWhere('(followee."userId" = :me OR followee."followersVisibility" = \'public\' OR (followee."followersVisibility" = \'followers\' AND me_following_followee.id IS NOT NULL))');
 
 			query.leftJoin(MiUserProfile, 'follower', 'follower."userId" = following."followerId"');

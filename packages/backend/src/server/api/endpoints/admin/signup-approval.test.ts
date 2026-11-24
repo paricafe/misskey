@@ -21,7 +21,7 @@ function createApproveEndpoint(user: Record<string, unknown> | null) {
 
 function createDeclineEndpoint(user: Record<string, unknown> | null) {
 	return new DeclineUserEndpoint(
-		{ findOneBy: vi.fn().mockResolvedValue(user) } as never,
+		{ findOneBy: vi.fn().mockResolvedValue(user), update: vi.fn().mockResolvedValue({ affected: 1 }) } as never,
 		{ findOneBy: vi.fn().mockResolvedValue(null) } as never,
 		{ delete: vi.fn() } as never,
 		{ log: vi.fn() } as never,

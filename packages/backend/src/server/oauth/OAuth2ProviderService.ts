@@ -444,6 +444,9 @@ export class OAuth2ProviderService implements OnApplicationShutdown {
 		if (!user) {
 			throw new InvalidRequestError('No such user');
 		}
+		if (user.isSuspended || user.isDeleted || user.approved === false) {
+			throw createForbiddenAccessDenied('Account is not active');
+		}
 
 		return user;
 	}

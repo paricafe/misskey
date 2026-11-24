@@ -622,7 +622,10 @@ export class NoteEntityService implements OnModuleInit {
 						.map(e => this.customEmojiService.parseEmojiStr(e, note.renote!.userHost)));
 				}
 			}
-			const customReactions = Object.keys(note.reactions).map(x => this.reactionService.decodeReaction(x)).filter(x => x.name != null) as typeof emojis;
+			const customReactions = Object.entries(note.reactions)
+				.filter(([, count]) => count > 0)
+				.map(([x]) => this.reactionService.decodeReaction(x))
+				.filter(x => x.name != null) as typeof emojis;
 			emojis = emojis.concat(customReactions);
 			if (note.user) {
 				emojis = emojis.concat(note.user.emojis

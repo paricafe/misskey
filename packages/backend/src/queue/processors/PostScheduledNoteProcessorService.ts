@@ -49,6 +49,25 @@ export class PostScheduledNoteProcessorService {
 			return;
 		}
 
+		const hasText = draft.text != null && draft.text.trim().length > 0;
+		const hasFiles = (draft.fileIds?.length ?? 0) > 0;
+		const hasValidPoll = draft.hasPoll && Array.isArray(draft.pollChoices) && draft.pollChoices.length >= 2;
+		const hasInvalidPoll = draft.hasPoll && !hasValidPoll;
+		const isEmpty = !hasText && !hasFiles && !hasValidPoll && draft.renoteId == null;
+		if (draft.user.isSuspended || draft.user.isDeleted || draft.user.movedToUri != null || hasInvalidPoll || isEmpty) {
+			const result = await this.noteDraftsRepository.update({
+				id: draft.id,
+				scheduleRevision: revision,
+				isActuallyScheduled: true,
+			}, { isActuallyScheduled: false });
+			if (result.affected && !draft.user.isSuspended && !draft.user.isDeleted) {
+				await this.notificationService.createNotification(draft.userId, 'scheduledNotePostFailed', {
+					noteDraftId: draft.id,
+				});
+			}
+			return;
+		}
+
 		let noteId: string;
 		try {
 			const note = await this.noteCreateService.fetchAndCreate(draft.user, {

@@ -4,6 +4,7 @@
  */
 
 import { Inject, Injectable } from '@nestjs/common';
+import { IsNull } from 'typeorm';
 import { Endpoint } from '@/server/api/endpoint-base.js';
 import { ApiError } from '@/server/api/error.js';
 import type { UserProfilesRepository, UsersRepository } from '@/models/_.js';
@@ -50,27 +51,41 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 			super(meta, paramDef, async (ps, me) => {
 			const user = await this.usersRepository.findOneBy({ id: ps.userId });
 
-			if (user == null) {
+			if (user == null || user.isDeleted || user.host != null || user.isSuspended) {
+				throw new ApiError(meta.errors.noSuchUser);
+			}
+
+			const result = await this.usersRepository.update({
+				id: user.id,
+				host: IsNull(),
+				isDeleted: false,
+				isSuspended: false,
+				approved: false,
+			}, {
+				approved: true,
+			});
+
+			if (result?.affected === 0) {
+				const latest = await this.usersRepository.findOneBy({ id: user.id });
+				if (latest?.approved && !latest.isDeleted) {
+					return;
+				}
 				throw new ApiError(meta.errors.noSuchUser);
 			}
 
 			const profile = await this.userProfilesRepository.findOneBy({ userId: ps.userId });
 
-			await this.usersRepository.update(user.id, {
-				approved: true,
-			});
-
 			if (profile?.email) {
-				this.emailService.sendEmail(profile.email, 'Account Approved',
+				void Promise.resolve(this.emailService.sendEmail(profile.email, 'Account Approved',
 					'Your Account has been approved have fun socializing!',
-					'Your Account has been approved have fun socializing!');
+					'Your Account has been approved have fun socializing!')).catch(() => {});
 			}
 
-			this.moderationLogService.log(me, 'approve', {
+			void Promise.resolve(this.moderationLogService.log(me, 'approve', {
 				userId: user.id,
 				userUsername: user.username,
 				userHost: user.host,
-			});
+			})).catch(() => {});
 		});
 	}
 }

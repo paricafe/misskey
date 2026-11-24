@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { Injectable, Inject } from '@nestjs/common';
+import { Injectable, Inject, Optional } from '@nestjs/common';
 import { In } from 'typeorm';
 import * as mfm from 'mfm-js';
 import type { MiUser, MiLocalUser, MiRemoteUser } from '@/models/User.js';
@@ -14,7 +14,9 @@ import { RelayService } from '@/core/RelayService.js';
 import { FederatedInstanceService } from '@/core/FederatedInstanceService.js';
 import { DI } from '@/di-symbols.js';
 import type { Config } from '@/config.js';
+import { DB_MAX_NOTE_TEXT_LENGTH } from '@/const.js';
 import type { Packed } from '@/misc/json-schema.js';
+import { isQuote, isRenote } from '@/misc/is-renote.js';
 import NotesChart from '@/core/chart/charts/notes.js';
 import PerUserNotesChart from '@/core/chart/charts/per-user-notes.js';
 import InstanceChart from '@/core/chart/charts/instance.js';
@@ -31,6 +33,7 @@ import { IdService } from '@/core/IdService.js';
 import { trackPromise } from '@/misc/promise-tracker.js';
 import { resolveNoteMentions } from '@/misc/resolve-note-mentions.js';
 import { RemoteUserResolveService } from '@/core/RemoteUserResolveService.js';
+import { RoleService } from '@/core/RoleService.js';
 import { extractHashtags } from "@/misc/extract-hashtags.js";
 import { extractCustomEmojisFromMfm } from "@/misc/extract-custom-emojis-from-mfm.js";
 import { UtilityService } from "@/core/UtilityService.js";
@@ -48,6 +51,8 @@ export const NOTE_PROHIBITED_WORDS_ERROR_ID = '689ee33f-f97c-479a-ac49-1b9f8140a
 export const NOTE_SENSITIVE_WORDS_ERROR_ID = '3f0e7c8a-5b2d-4c1e-9a6f-8d4b2e7c1a90';
 export const NOTE_NOT_FOUND_ERROR_ID = '512d8fe8-453e-463c-bf87-5b795293dc0c';
 export const NOTE_NO_CONTENT_ERROR_ID = '238ea885-ef3d-489f-8a93-76b4709c3b5e';
+export const NOTE_CANNOT_EDIT_RENOTE_ERROR_ID = 'a1b94f1c-4d23-4b88-9c10-2c3f6a7d8e11';
+export const NOTE_TOO_MANY_MENTIONS_ERROR_ID = 'b7e34a90-2e12-4a61-8f5d-9b0c1d2e3f44';
 
 type Option = {
 	updatedAt?: Date | null;
@@ -110,6 +115,7 @@ export class NoteUpdateService {
 		private instanceChart: InstanceChart,
 		private idService: IdService,
 		private utilityService: UtilityService,
+		@Optional() private roleService?: RoleService,
 	) {}
 
 	async update(
@@ -125,23 +131,30 @@ export class NoteUpdateService {
 		const updatedAt = data.updatedAt;
 
 		this.assertNoteOwner(user, note);
+		if (isRenote(note) && !isQuote(note)) {
+			throw new IdentifiableError(NOTE_CANNOT_EDIT_RENOTE_ERROR_ID, 'Cannot edit a pure renote');
+		}
 
 		if (this.isUpdateAlreadyApplied(note, updatedAt)) {
 			return note;
 		}
 
+		const trimmedText = data.text?.trim();
+		const text = trimmedText && trimmedText.length > 0 ? trimmedText.slice(0, DB_MAX_NOTE_TEXT_LENGTH) : null;
+		const cw = data.cw != null && data.cw.length > 0 ? data.cw : null;
+
 		const meta = await this.metaService.fetch();
 		if (meta.prohibitedWords.length > 0 && this.utilityService.isKeyWordIncluded(
 			this.utilityService.concatNoteContentsForKeyWordCheck({
-				cw: data.cw,
-				text: data.text,
-				others: [...extractUrlsForKeyWordCheck(data.cw ?? ''), ...extractUrlsForKeyWordCheck(data.text ?? '')],
+				cw,
+				text,
+				others: [...extractUrlsForKeyWordCheck(cw ?? ''), ...extractUrlsForKeyWordCheck(text ?? '')],
 			}),
 			meta.prohibitedWords,
 		)) {
 			throw new IdentifiableError(NOTE_PROHIBITED_WORDS_ERROR_ID, 'Note contains prohibited words');
 		}
-		const sensitiveWordsTarget = data.cw ?? data.text ?? '';
+		const sensitiveWordsTarget = cw ?? text ?? '';
 		if (
 			user.host == null && note.visibility === 'public' && note.channelId == null && meta.sensitiveWords.length > 0 &&
 			this.utilityService.isKeyWordIncluded([sensitiveWordsTarget, ...extractUrlsForKeyWordCheck(sensitiveWordsTarget)].join('\n'), meta.sensitiveWords)
@@ -153,26 +166,33 @@ export class NoteUpdateService {
 		let emojis = data.apEmojis;
 
 		if (!tags || !emojis) {
-			const tokens = (data.text ? mfm.parse(data.text)! : []);
-			const cwTokens = data.cw ? mfm.parse(data.cw)! : [];
+			const tokens = (text ? mfm.parse(text)! : []);
+			const cwTokens = cw ? mfm.parse(cw)! : [];
 			const combinedTokens = tokens.concat(cwTokens);
 			tags = data.apHashtags ?? extractHashtags(combinedTokens);
 			emojis = data.apEmojis ?? extractCustomEmojisFromMfm(combinedTokens);
 		}
 
 		if (this.utilityService.isMediaSilencedHost(meta.mediaSilencedHosts, user.host)) emojis = [];
-		tags = tags.filter(tag => Array.from(tag).length <= 128).splice(0, 32).map(tag => normalizeTag(tag));
+		tags = [...new Set(tags.filter(tag => Array.from(tag).length <= 128).map(tag => normalizeTag(tag)))].slice(0, 32);
 		const pollChoices = note.hasPoll && data.apMentions == null
 			? (await this.pollsRepository.findOneByOrFail({ noteId: note.id })).choices
 			: [];
-		const mentionTokens = [data.text, data.cw, ...pollChoices].flatMap(text => text ? mfm.parse(text) : []);
+		const mentionTokens = [text, cw, ...pollChoices].flatMap(value => value ? mfm.parse(value) : []);
 		let mentionedUsers = data.apMentions ?? await resolveNoteMentions(user.host, mentionTokens, this.remoteUserResolveService.resolveUser);
 		const audienceIds = [...new Set([...(note.visibleUserIds ?? []), ...(note.replyUserId && note.replyUserId !== user.id ? [note.replyUserId] : [])])];
 		const missingAudienceIds = audienceIds.filter(id => !mentionedUsers.some(mentioned => mentioned.id === id));
 		if (missingAudienceIds.length > 0) mentionedUsers.push(...await this.usersRepository.findBy({ id: In(missingAudienceIds) }));
 		if (note.visibility === 'specified') mentionedUsers = mentionedUsers.filter(mentioned => audienceIds.includes(mentioned.id));
-		const mentions = mentionedUsers.map(mentioned => mentioned.id);
-		const mentionedRemoteUsers = JSON.stringify(mentionedUsers.filter(mentioned => mentioned.host != null).map(mentioned => ({
+		const dedupedMentionedUsers = [...new Map(mentionedUsers.map(mentioned => [mentioned.id, mentioned])).values()];
+		if (user.host == null && this.roleService != null) {
+			const policies = await this.roleService.getUserPolicies(user.id);
+			if (dedupedMentionedUsers.length > policies.mentionLimit) {
+				throw new IdentifiableError(NOTE_TOO_MANY_MENTIONS_ERROR_ID, 'Too many mentions');
+			}
+		}
+		const mentions = dedupedMentionedUsers.map(mentioned => mentioned.id);
+		const mentionedRemoteUsers = JSON.stringify(dedupedMentionedUsers.filter(mentioned => mentioned.host != null).map(mentioned => ({
 			uri: mentioned.uri,
 			username: mentioned.username,
 			host: mentioned.host,
@@ -190,6 +210,9 @@ export class NoteUpdateService {
 			const lockedNote = await this.withHistory({ ...note, ...lockedRow }, transactionalNotesRepository);
 
 			this.assertNoteOwner(user, lockedNote);
+			if (isRenote(lockedNote) && !isQuote(lockedNote)) {
+				throw new IdentifiableError(NOTE_CANNOT_EDIT_RENOTE_ERROR_ID, 'Cannot edit a pure renote');
+			}
 			if (this.isUpdateAlreadyApplied(lockedNote, updatedAt)) {
 				return { updatedNote: lockedNote, changed: false };
 			}
@@ -197,7 +220,10 @@ export class NoteUpdateService {
 			const fileIds = data.files === undefined
 				? [...lockedNote.fileIds]
 				: data.files?.map(file => file.id) ?? [];
-			if ((data.text == null || data.text.length === 0) && fileIds.length === 0 && !lockedNote.hasPoll) {
+			const attachedFileTypes = data.files === undefined
+				? [...(lockedNote.attachedFileTypes ?? [])]
+				: data.files?.map(file => file.type) ?? [];
+			if ((text == null || text.length === 0) && fileIds.length === 0 && !lockedNote.hasPoll) {
 				throw new IdentifiableError(NOTE_NO_CONTENT_ERROR_ID, 'Note must have text, files, or a poll');
 			}
 
@@ -205,23 +231,25 @@ export class NoteUpdateService {
 			const history = [...preparedUpdate.history];
 			const newNote: MiNote = {
 				...lockedNote,
-				text: data.text,
-				cw: data.cw,
+				text,
+				cw,
 				updatedAt,
 				tags,
 				emojis,
 				mentions,
 				mentionedRemoteUsers,
 				fileIds,
+				attachedFileTypes,
 				history,
 			};
 
 			await transactionalNotesRepository.update({ id: lockedNote.id }, {
 				updatedAt,
 				fileIds: newNote.fileIds,
+				...(data.files !== undefined ? { attachedFileTypes } : {}),
 				history,
-				cw: data.cw,
-				text: data.text,
+				cw,
+				text,
 				tags,
 				emojis,
 				mentions,
@@ -234,7 +262,11 @@ export class NoteUpdateService {
 		if (!result.changed) return result.updatedNote;
 
 		const updatedNote = result.updatedNote;
-		this.searchService.indexNote(updatedNote);
+		if (updatedNote.text == null && updatedNote.cw == null) {
+			this.searchService.unindexNote?.(updatedNote);
+		} else {
+			this.searchService.indexNote(updatedNote);
+		}
 
 		if (!quiet) {
 			this.globalEventService.publishNoteStream(updatedNote, 'updated', await awaitAll({
@@ -253,7 +285,7 @@ export class NoteUpdateService {
 						await this.apRendererService.renderNote(updatedNote, false), updatedNote,
 					),
 				);
-				this.deliverToConcerned(user, updatedNote, content);
+				trackPromise(this.deliverToConcerned(user, updatedNote, content).catch(() => {}));
 			}
 		}
 
@@ -384,39 +416,44 @@ export class NoteUpdateService {
 	private async deliverToConcerned(user: { id: MiLocalUser['id']; host: null; }, note: MiNote, noteActivity: any) {
 		const dm = this.apDeliverManagerService.createDeliverManager(user, noteActivity);
 
-		const legacyRevisions = (note.history ?? []).filter(revision => revision.mentions == null);
-		const tokens = legacyRevisions.flatMap(revision =>
-			[revision.text, revision.cw].flatMap(text => text ? mfm.parse(text) : []));
-		const mentionedUsers = await resolveNoteMentions(user.host, tokens, this.remoteUserResolveService.resolveUser);
-
-		const mentionIds = new Set([...note.mentions, ...(note.history ?? []).flatMap(revision => revision.mentions ?? [])]);
-		const previouslyMentionedIds = [...mentionIds].filter(id => !mentionedUsers.some(u => u.id === id));
-		if (previouslyMentionedIds.length > 0) {
-			mentionedUsers.push(...await this.usersRepository.findBy({ id: In(previouslyMentionedIds) }));
-		}
-
 		if (note.visibility === 'specified') {
 			if (note.visibleUserIds == null) throw new Error('invalid param');
 
-			for (const u of note.visibleUserIds) {
-				if (!mentionedUsers.some(x => x.id === u)) {
-					mentionedUsers.push(await this.usersRepository.findOneByOrFail({ id: u }));
+			const allowedIds = new Set([
+				...note.visibleUserIds,
+				...(note.replyUserId != null && note.replyUserId !== user.id ? [note.replyUserId] : []),
+			]);
+			if (allowedIds.size > 0) {
+				const targetUsers = await this.usersRepository.findBy({ id: In([...allowedIds]) });
+				for (const u of targetUsers.filter(u => this.userEntityService.isRemoteUser(u))) {
+					dm.addDirectRecipe(u as MiRemoteUser);
 				}
 			}
-		}
+		} else {
+			const legacyRevisions = (note.history ?? []).filter(revision => revision.mentions == null);
+			const tokens = legacyRevisions.flatMap(revision =>
+				[revision.text, revision.cw].flatMap(text => text ? mfm.parse(text) : []));
+			const mentionedUsers = await resolveNoteMentions(user.host, tokens, this.remoteUserResolveService.resolveUser);
 
-		for (const u of mentionedUsers.filter(u => this.userEntityService.isRemoteUser(u))) {
-			dm.addDirectRecipe(u as MiRemoteUser);
-		}
+			const mentionIds = new Set([...note.mentions, ...(note.history ?? []).flatMap(revision => revision.mentions ?? [])]);
+			const previouslyMentionedIds = [...mentionIds].filter(id => !mentionedUsers.some(u => u.id === id));
+			if (previouslyMentionedIds.length > 0) {
+				mentionedUsers.push(...await this.usersRepository.findBy({ id: In(previouslyMentionedIds) }));
+			}
 
-		if (note.replyUserId != null && note.replyUserHost != null) {
-			const u = await this.usersRepository.findOneBy({ id: note.replyUserId });
-			if (u && this.userEntityService.isRemoteUser(u)) dm.addDirectRecipe(u);
-		}
+			for (const u of mentionedUsers.filter(u => this.userEntityService.isRemoteUser(u))) {
+				dm.addDirectRecipe(u as MiRemoteUser);
+			}
 
-		if (note.renoteUserId != null && note.renoteUserHost != null) {
-			const u = await this.usersRepository.findOneBy({ id: note.renoteUserId });
-			if (u && this.userEntityService.isRemoteUser(u)) dm.addDirectRecipe(u);
+			if (note.replyUserId != null && note.replyUserHost != null) {
+				const u = await this.usersRepository.findOneBy({ id: note.replyUserId });
+				if (u && this.userEntityService.isRemoteUser(u)) dm.addDirectRecipe(u);
+			}
+
+			if (note.renoteUserId != null && note.renoteUserHost != null) {
+				const u = await this.usersRepository.findOneBy({ id: note.renoteUserId });
+				if (u && this.userEntityService.isRemoteUser(u)) dm.addDirectRecipe(u);
+			}
 		}
 
 		if (['public', 'home', 'followers'].includes(note.visibility)) {

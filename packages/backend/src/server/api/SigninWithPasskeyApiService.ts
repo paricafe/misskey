@@ -149,9 +149,15 @@ export class SigninWithPasskeyApiService {
 			});
 		}
 
-		if (user.isSuspended) {
+		if (user.isSuspended || user.isDeleted) {
 			return error(403, {
 				id: 'e03a5f46-d309-4865-9b69-56282d94e1eb',
+			});
+		}
+
+		if (user.approved === false) {
+			return error(403, {
+				id: '5d1c0b3e-8f2a-4c6d-9e7b-3a4f1b2c8d90',
 			});
 		}
 

@@ -25,6 +25,15 @@ import type { FastifyRequest, FastifyReply } from 'fastify';
 
 const invitationCodeMailTimeoutMs = 1000 * 60 * 30;
 
+function escapeHtml(value: string): string {
+	return value
+		.replaceAll('&', '&amp;')
+		.replaceAll('<', '&lt;')
+		.replaceAll('>', '&gt;')
+		.replaceAll('"', '&quot;')
+		.replaceAll('\'', '&#39;');
+}
+
 @Injectable()
 export class SignupApiService {
 	constructor(
@@ -117,7 +126,10 @@ export class SignupApiService {
 		const host: string | null = process.env.NODE_ENV === 'test' ? (body['host'] ?? null) : null;
 		const invitationCode = body['invitationCode'];
 		const reason = body['reason'];
-		const emailAddress = body['emailAddress'];
+		const rawEmailAddress = body['emailAddress'];
+		const emailAddress = typeof rawEmailAddress === 'string' && rawEmailAddress.trim() === ''
+			? undefined
+			: rawEmailAddress;
 
 		if (this.meta.emailRequiredForSignup) {
 			if (emailAddress == null || typeof emailAddress !== 'string') {
@@ -233,6 +245,18 @@ export class SignupApiService {
 			reply.code(204);
 			return;
 		} else if (this.meta.approvalRequiredForSignup) {
+			if (emailAddress != null) {
+				if (typeof emailAddress !== 'string') {
+					reply.code(400);
+					return;
+				}
+				const res = await this.emailService.validateEmailForAccount(emailAddress);
+				if (!res.available) {
+					reply.code(400);
+					return;
+				}
+			}
+
 			if (ticket && !await this.claimRegistrationTicket(ticket)) {
 				reply.code(400);
 				return;
@@ -251,20 +275,26 @@ export class SignupApiService {
 				}
 
 				if (emailAddress) {
-					this.emailService.sendEmail(emailAddress, 'Approval pending',
+					void Promise.resolve(this.emailService.sendEmail(emailAddress, 'Approval pending',
 						'Congratulations! Your account is now pending approval. You will get notified when you have been accepted.',
-						'Congratulations! Your account is now pending approval. You will get notified when you have been accepted.');
+						'Congratulations! Your account is now pending approval. You will get notified when you have been accepted.')).catch(() => {});
 				}
 
-				const moderators = await this.roleService.getModerators();
+				const moderators = await this.roleService.getModerators({
+					includeAdmins: true,
+					includeRoot: true,
+					excludeExpire: true,
+				});
 
+				const escapedUsername = escapeHtml(account.username);
+				const escapedReason = escapeHtml(reason ?? '');
 				for (const moderator of moderators) {
 					const profile = await this.userProfilesRepository.findOneBy({ userId: moderator.id });
 
 					if (profile?.email) {
-						this.emailService.sendEmail(profile.email, 'New user awaiting approval',
-							`A new user called ${account.username} is awaiting approval with the following reason: "${reason}"`,
-							`A new user called ${account.username} is awaiting approval with the following reason: "${reason}"`);
+						void Promise.resolve(this.emailService.sendEmail(profile.email, 'New user awaiting approval',
+							`A new user called ${escapedUsername} is awaiting approval with the following reason: "${escapedReason}"`,
+							`A new user called ${account.username} is awaiting approval with the following reason: "${reason}"`)).catch(() => {});
 					}
 				}
 
@@ -407,20 +437,26 @@ export class SignupApiService {
 
 			if (this.meta.approvalRequiredForSignup) {
 				if (pendingUser.email) {
-					this.emailService.sendEmail(pendingUser.email, 'Approval pending',
+					void Promise.resolve(this.emailService.sendEmail(pendingUser.email, 'Approval pending',
 						'Congratulations! Your account is now pending approval. You will get notified when you have been accepted.',
-						'Congratulations! Your account is now pending approval. You will get notified when you have been accepted.');
+						'Congratulations! Your account is now pending approval. You will get notified when you have been accepted.')).catch(() => {});
 				}
 
-				const moderators = await this.roleService.getModerators();
+				const moderators = await this.roleService.getModerators({
+					includeAdmins: true,
+					includeRoot: true,
+					excludeExpire: true,
+				});
 
+				const escapedUsername = escapeHtml(pendingUser.username);
+				const escapedReason = escapeHtml(pendingUser.reason ?? '');
 				for (const moderator of moderators) {
 					const profile = await this.userProfilesRepository.findOneBy({ userId: moderator.id });
 
 					if (profile?.email) {
-						this.emailService.sendEmail(profile.email, 'New user awaiting approval',
-							`A new user called ${pendingUser.username} is awaiting approval with the following reason: "${pendingUser.reason}"`,
-							`A new user called ${pendingUser.username} is awaiting approval with the following reason: "${pendingUser.reason}"`);
+						void Promise.resolve(this.emailService.sendEmail(profile.email, 'New user awaiting approval',
+							`A new user called ${escapedUsername} is awaiting approval with the following reason: "${escapedReason}"`,
+							`A new user called ${pendingUser.username} is awaiting approval with the following reason: "${pendingUser.reason}"`)).catch(() => {});
 					}
 				}
 

@@ -12,14 +12,25 @@ import { GetterService } from '@/server/api/GetterService.js';
 import { MAX_NOTE_FILES, MAX_NOTE_TEXT_LENGTH } from '@/const.js';
 import { ApiError } from '@/server/api/error.js';
 import { NoteEntityService } from '@/core/entities/NoteEntityService.js';
-import { NOTE_HISTORY_LIMIT_ERROR_ID, NOTE_NO_CONTENT_ERROR_ID, NOTE_NOT_FOUND_ERROR_ID, NOTE_PROHIBITED_WORDS_ERROR_ID, NOTE_SENSITIVE_WORDS_ERROR_ID, NoteUpdateService } from '@/core/NoteUpdateService.js';
+import {
+	NOTE_CANNOT_EDIT_RENOTE_ERROR_ID,
+	NOTE_HISTORY_LIMIT_ERROR_ID,
+	NOTE_NO_CONTENT_ERROR_ID,
+	NOTE_NOT_FOUND_ERROR_ID,
+	NOTE_PROHIBITED_WORDS_ERROR_ID,
+	NOTE_SENSITIVE_WORDS_ERROR_ID,
+	NOTE_TOO_MANY_MENTIONS_ERROR_ID,
+	NoteUpdateService,
+} from '@/core/NoteUpdateService.js';
 import { IdentifiableError } from '@/misc/identifiable-error.js';
+import { isQuote, isRenote } from '@/misc/is-renote.js';
 
 export const meta = {
 	tags: ['notes'],
 
 	requireCredential: true,
 	requiredRolePolicy: 'canEditNote',
+	prohibitMoved: true,
 
 	kind: 'write:notes',
 
@@ -81,6 +92,22 @@ export const meta = {
 			kind: 'client',
 			httpStatusCode: 400,
 		},
+
+		cannotEditRenote: {
+			message: 'Cannot edit a pure renote.',
+			code: 'CANNOT_EDIT_RENOTE',
+			id: NOTE_CANNOT_EDIT_RENOTE_ERROR_ID,
+			kind: 'client',
+			httpStatusCode: 400,
+		},
+
+		tooManyMentions: {
+			message: 'Too many mentions.',
+			code: 'TOO_MANY_MENTIONS',
+			id: NOTE_TOO_MANY_MENTIONS_ERROR_ID,
+			kind: 'client',
+			httpStatusCode: 400,
+		},
 	},
 } as const;
 
@@ -108,7 +135,7 @@ export const paramDef = {
 			maxItems: MAX_NOTE_FILES,
 			items: { type: 'string', format: 'misskey:id' },
 		},
-		cw: { type: 'string', nullable: true, maxLength: 100 },
+		cw: { type: 'string', nullable: true, minLength: 1, maxLength: 100 },
 	},
 	required: ['noteId', 'text', 'cw'],
 } as const;
@@ -137,6 +164,10 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				throw new ApiError(meta.errors.noSuchNote);
 			}
 
+			if (isRenote(note) && !isQuote(note)) {
+				throw new ApiError(meta.errors.cannotEditRenote);
+			}
+
 			let files: MiDriveFile[] | undefined;
 			const fileIds = ps.fileIds ?? ps.mediaIds ?? null;
 			if (fileIds != null) {
@@ -156,14 +187,16 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				}
 			}
 
+			const normalizedText = ps.text?.trim() ? ps.text.trim() : null;
+			const normalizedCw = ps.cw != null && ps.cw.length > 0 ? ps.cw : null;
 			const finalFileIds = fileIds ?? note.fileIds;
-			if (ps.text == null && finalFileIds.length === 0 && !note.hasPoll) {
+			if (normalizedText == null && finalFileIds.length === 0 && !note.hasPoll) {
 				throw new ApiError(meta.errors.noContent);
 			}
 
 			if (
-				note.text === ps.text &&
-				note.cw === ps.cw &&
+				note.text === normalizedText &&
+				note.cw === normalizedCw &&
 				note.fileIds.length === finalFileIds.length &&
 				note.fileIds.every((fileId, index) => fileId === finalFileIds[index])
 			) {
@@ -173,8 +206,8 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 			}
 
 			const updatedNote = await this.noteUpdateService.update(await this.usersRepository.findOneByOrFail({ id: note.userId }), note, {
-				text: ps.text,
-				cw: ps.cw,
+				text: normalizedText,
+				cw: normalizedCw,
 				updatedAt: new Date(),
 				files,
 			}, false, me).catch(error => {
@@ -184,6 +217,8 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 					if (error.id === NOTE_SENSITIVE_WORDS_ERROR_ID) throw new ApiError(meta.errors.containsSensitiveWords);
 					if (error.id === NOTE_NOT_FOUND_ERROR_ID) throw new ApiError(meta.errors.noSuchNote);
 					if (error.id === NOTE_NO_CONTENT_ERROR_ID) throw new ApiError(meta.errors.noContent);
+					if (error.id === NOTE_CANNOT_EDIT_RENOTE_ERROR_ID) throw new ApiError(meta.errors.cannotEditRenote);
+					if (error.id === NOTE_TOO_MANY_MENTIONS_ERROR_ID) throw new ApiError(meta.errors.tooManyMentions);
 				}
 				throw error;
 			});

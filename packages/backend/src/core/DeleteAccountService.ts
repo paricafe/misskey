@@ -57,6 +57,7 @@ export class DeleteAccountService {
 			});
 		}
 
+		let jobEnqueued = false;
 		if (this.userEntityService.isLocalUser(user)) {
 			const content = this.apRendererService.addContext(this.apRendererService.renderDelete(this.userEntityService.genLocalUserUri(user.id), user));
 
@@ -80,21 +81,30 @@ export class DeleteAccountService {
 			}
 
 			for (const inbox of queue) {
-				this.queueService.deliver(user, content, inbox, true);
+				await this.queueService.deliver(user, content, inbox, true);
 			}
 
-			this.queueService.createDeleteAccountJob(user, {
+			await this.queueService.createDeleteAccountJob(user, {
 				soft: false,
 			});
+			jobEnqueued = true;
 		} else {
-			this.queueService.createDeleteAccountJob(user, {
+			await this.queueService.createDeleteAccountJob(user, {
 				soft: true,
 			});
+			jobEnqueued = true;
 		}
 
-		await this.usersRepository.update(user.id, {
-			isDeleted: true,
-		});
+		try {
+			await this.usersRepository.update(user.id, {
+				isDeleted: true,
+			});
+		} catch (error) {
+			if (jobEnqueued && error != null && typeof error === 'object') {
+				Object.assign(error, { deleteJobEnqueued: true });
+			}
+			throw error;
+		}
 
 		this.globalEventService.publishInternalEvent('userChangeDeletedState', { id: user.id, isDeleted: true });
 	}

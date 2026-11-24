@@ -4,6 +4,7 @@
  */
 
 import { Inject, Injectable } from '@nestjs/common';
+import { IsNull } from 'typeorm';
 import { Endpoint } from '@/server/api/endpoint-base.js';
 import { ApiError } from '@/server/api/error.js';
 import type { UsedUsernamesRepository, UserProfilesRepository, UsersRepository } from '@/models/_.js';
@@ -77,23 +78,50 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				throw new ApiError(meta.errors.notLocal);
 			}
 
-			const profile = await this.userProfilesRepository.findOneBy({ userId: ps.userId });
+			const claimed = await this.usersRepository.update({
+				id: user.id,
+				host: IsNull(),
+				isDeleted: false,
+				isSuspended: false,
+				approved: false,
+			}, {
+				isSuspended: true,
+			});
 
-			if (profile?.email) {
-				this.emailService.sendEmail(profile.email, 'Account Declined',
-					'Your Account has been declined!',
-					'Your Account has been declined!');
+			if (claimed?.affected === 0) {
+				const latest = await this.usersRepository.findOneBy({ id: user.id });
+				if (latest?.approved) {
+					throw new ApiError(meta.errors.alreadyApproved);
+				}
+				throw new ApiError(meta.errors.noSuchUser);
 			}
 
-			await this.usedUsernamesRepository.delete({ username: user.username });
+			let profile: Awaited<ReturnType<UserProfilesRepository['findOneBy']>>;
+			try {
+				profile = await this.userProfilesRepository.findOneBy({ userId: ps.userId });
 
-			await this.deleteAccountService.deleteAccount(user);
+				await this.usedUsernamesRepository.delete({ username: user.username.toLowerCase() });
 
-			this.moderationLogService.log(me, 'decline', {
+				await this.deleteAccountService.deleteAccount(user);
+			} catch (err) {
+				const deleteJobEnqueued = err != null && typeof err === 'object' && 'deleteJobEnqueued' in err && err.deleteJobEnqueued === true;
+				if (!deleteJobEnqueued) {
+					await this.usersRepository.update({ id: user.id, isDeleted: false, approved: false }, { isSuspended: false }).catch(() => {});
+				}
+				throw err;
+			}
+
+			if (profile?.email) {
+				void Promise.resolve(this.emailService.sendEmail(profile.email, 'Account Declined',
+					'Your Account has been declined!',
+					'Your Account has been declined!')).catch(() => {});
+			}
+
+			void Promise.resolve(this.moderationLogService.log(me, 'decline', {
 				userId: user.id,
 				userUsername: user.username,
 				userHost: user.host,
-			});
+			})).catch(() => {});
 		});
 	}
 }

@@ -320,8 +320,12 @@ export class MfmService {
 						if (node.children.length === 1) {
 							const child = node.children[0];
 							const text = child.type === 'text' ? child.props.text : '';
+							const separator = text.includes('|') ? '|' : ' ';
+							const separatorIndex = text.indexOf(separator);
+							const base = separatorIndex === -1 ? text : text.slice(0, separatorIndex);
+							const rt = separatorIndex === -1 ? '' : text.slice(separatorIndex + 1);
 
-							return `<ruby>${escapeHtml(text.split(' ')[0])}<rp>(</rp><rt>${escapeHtml(text.split(' ')[1])}</rt><rp>)</rp></ruby>`;
+							return `<ruby>${escapeHtml(base)}<rp>(</rp><rt>${escapeHtml(rt)}</rt><rp>)</rp></ruby>`;
 						} else {
 							const rt = node.children.at(-1);
 
