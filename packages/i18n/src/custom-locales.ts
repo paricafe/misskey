@@ -138,7 +138,7 @@ const customLocales: Record<string, ILocale> = {
 		autoSpacingDescription: 'Use your browser to add visual spacing between CJK characters and letters or numbers.',
 		defaultLike: 'Default like reaction',
 		_dataRequest: {
-			lable: 'Data export',
+			label: 'Data export',
 			title: 'Request account data',
 			warn: 'You can request your data only once every 3 days.',
 			text: 'When your data is ready to download, a notification will be sent to the email address registered to this account.',
@@ -278,7 +278,7 @@ const customLocales: Record<string, ILocale> = {
 		autoSpacingDescription: '使用浏览器在中日韩文字与英文字母、数字之间添加视觉间距。',
 		defaultLike: '默认点赞表情',
 		_dataRequest: {
-			lable: '数据导出',
+			label: '数据导出',
 			title: '请求账户数据',
 			warn: '每 3 天只能请求导出一次数据。',
 			text: '数据准备好可供下载后，将通过此账户注册的电子邮件地址通知您。',
@@ -417,7 +417,7 @@ const customLocales: Record<string, ILocale> = {
 		autoSpacingDescription: '使用瀏覽器在中日韓文字與英文字母、數字之間加入視覺間距。',
 		defaultLike: '預設按讚反應',
 		_dataRequest: {
-			lable: '資料匯出',
+			label: '資料匯出',
 			title: '申請帳號資料',
 			warn: '每 3 天只能申請匯出一次資料。',
 			text: '資料準備好可供下載後，將透過此帳號註冊的電子郵件地址通知您。',

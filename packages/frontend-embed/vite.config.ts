@@ -27,13 +27,6 @@ const externalPackages = [
 				: id;
 		},
 	},
-	{
-		name: 'tinyld',
-		match: /^tinyld$/,
-		path(): string {
-			return `https://cdn.jsdelivr.net/npm/tinyld@${packageInfo.dependencies.tinyld}/dist/tinyld.heavy.node.mjs`
-		},
-	},
 ];
 
 const hash = (str: string, seed = 0): number => {

@@ -16,12 +16,16 @@ type PrimaryLang = keyof typeof primaries;
 
 type Locales = Record<Language, ILocale>;
 
+function isRecord(value: unknown): value is ILocale {
+	return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 function merge<T extends ILocale>(...args: (T | ILocale | undefined)[]): T {
 	return args.reduce<ILocale>((a, c) => ({
 		...a,
 		...c,
 		...Object.entries(a)
-			.filter(([k]) => c && typeof c[k] === 'object')
+			.filter(([k, v]) => isRecord(v) && c != null && isRecord(c[k]))
 			.reduce<Record<string, ILocale[string]>>((acc, [k, v]) => {
 				acc[k] = merge(v as ILocale, (c as ILocale)[k] as ILocale);
 				return acc;
@@ -35,10 +39,10 @@ function clean (text: string) {
 
 function removeEmpty<T extends ILocale>(obj: T): T {
 	for (const [k, v] of Object.entries(obj)) {
-		if (v === '') {
+		if (v === '' || v === null) {
 			delete obj[k];
-		} else if (typeof v === 'object') {
-			removeEmpty(v as ILocale);
+		} else if (isRecord(v)) {
+			removeEmpty(v);
 		}
 	}
 	return obj;

@@ -10,6 +10,17 @@ export type StoredAccount = {
 	token: string;
 };
 
+export async function readLegacyStoredAccounts(read: (key: string) => Promise<unknown>, host: string): Promise<StoredAccount[]> {
+	const legacy = await read('accounts');
+	if (!Array.isArray(legacy)) return [];
+	return legacy.filter((account): account is StoredAccount => account != null
+		&& typeof account.id === 'string'
+		&& typeof account.token === 'string'
+		&& account.token.length > 0
+		&& (account.host == null || account.host === host))
+		.map(({ id, token }) => ({ id, token }));
+}
+
 export async function readStoredAccounts(read: (key: string) => Promise<unknown>, host: string): Promise<StoredAccount[]> {
 	const state = await read(ACCOUNT_DEVICE_STATE_KEY) as { accountTokens?: Record<string, string>; accountHost?: string } | undefined;
 	if (state?.accountTokens != null) {
@@ -20,12 +31,5 @@ export async function readStoredAccounts(read: (key: string) => Promise<unknown>
 			.map(([key, token]) => ({ id: key.slice(prefix.length), token }));
 	}
 
-	const legacy = await read('accounts');
-	if (!Array.isArray(legacy)) return [];
-	return legacy.filter((account): account is StoredAccount => account != null
-		&& typeof account.id === 'string'
-		&& typeof account.token === 'string'
-		&& account.token.length > 0
-		&& (account.host == null || account.host === host))
-		.map(({ id, token }) => ({ id, token }));
+	return readLegacyStoredAccounts(read, host);
 }

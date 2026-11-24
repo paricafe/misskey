@@ -312,7 +312,10 @@ export function createMfmRenderer<P extends MfmBaseProps = MfmBaseProps>(config:
 									text = Misskey.nyaize(text);
 								}
 								const separator = text.includes('|') ? '|' : ' ';
-								return h('ruby', {}, [text.split(separator)[0], h('rt', text.split(separator)[1])]);
+								const separatorIndex = text.indexOf(separator);
+								const base = separatorIndex === -1 ? text : text.slice(0, separatorIndex);
+								const rt = separatorIndex === -1 ? '' : text.slice(separatorIndex + 1);
+								return h('ruby', {}, [base, h('rt', rt)]);
 							} else {
 								const rt = token.children.at(-1)!;
 								let text = rt.type === 'text' ? rt.props.text : '';

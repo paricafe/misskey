@@ -13039,7 +13039,7 @@ export interface Locale extends ILocale {
         /**
          * データのエクスポート
          */
-        "lable": string;
+        "label": string;
         /**
          * アカウントデータをリクエスト
          */

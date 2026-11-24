@@ -17,7 +17,7 @@ export function useInterval(fn: () => void, interval: MaybeRefOrGetter<number>, 
 
 	const start = () => {
 		const intervalMs = toValue(interval);
-		if (!active || disposer || Number.isNaN(intervalMs)) return;
+		if (!active || disposer || !Number.isFinite(intervalMs) || intervalMs <= 0) return;
 
 		if (options.keepRunningWhenHidden) {
 			if (options.immediate) fn();

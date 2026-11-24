@@ -3474,7 +3474,7 @@ autoSpacingDescription: "ブラウザの機能で、CJK文字と英数字の間�
 clickToShowInstanceTickerWindow: "サーバーラベルをクリックしてサーバー情報を表示する"
 defaultLike: "「いいね」で使用する既定のリアクション"
 _dataRequest:
-  lable: "データのエクスポート"
+  label: "データのエクスポート"
   title: "アカウントデータをリクエスト"
   warn: "データのリクエストは3日ごとに1回のみ行えます。"
   text: "データのダウンロード準備ができると、このアカウントに登録されたメールアドレスに通知が届きます。"
