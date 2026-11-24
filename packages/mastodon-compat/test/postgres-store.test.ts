@@ -7,7 +7,14 @@ import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { setImmediate } from 'node:timers/promises';
 import { test } from 'node:test';
+import Fastify from 'fastify';
 import { Pool } from 'pg';
+import { dispatchHandler } from '../src/oauth.js';
+import { EntityConverter } from '../src/entities.js';
+import { registerFeatures } from '../src/features.js';
+import { NativeClient } from '../src/native-client.js';
+import { parameters } from '../src/parameters.js';
+import { Routes } from '../src/routes.js';
 import { createPostgresStore, hashCredential, type CompatStore } from '../src/store.js';
 import { postgresFixture } from './postgres-http-fixture.js';
 
@@ -127,27 +134,51 @@ test('two PostgreSQL stores redeem an authorization code and consume pending ope
 	const first = await createPostgresStore({ connectionString });
 	const second = await createPostgresStore({ connectionString });
 	const inspection = new Pool({ connectionString });
+	const makeApp = (store: CompatStore) => {
+		const app = Fastify();
+		app.all('/oauth/*', (request, reply) => dispatchHandler(request, reply, {
+			publicUrl: 'https://social.example',
+			nativeUrl: 'http://127.0.0.1:3000',
+			store,
+			native: {} as never,
+		}));
+		return app;
+	};
+	const firstApp = makeApp(first);
+	const secondApp = makeApp(second);
 	try {
-		const { client } = await first.createClient({ name: 'App', scopes: ['read'], redirectUris: ['app://callback'] });
+		const { client, clientSecret } = await first.createClient({ name: 'App', scopes: ['read'], redirectUris: ['app://callback'] });
 		const code = await first.issueCode({ clientId: client.id, redirectUri: 'app://callback', scopes: ['read'], userId: 'alice', nativeToken: 'native' }, Date.now() + 60000);
-		const redeem = (store: CompatStore) => store.transaction(async () => {
-			const authorization = await store.getCode(code);
-			if (!authorization) return undefined;
-			const grant = await store.createGrant({ kind: 'user', clientId: client.id, scopes: authorization.scopes, userId: authorization.userId, nativeToken: authorization.nativeToken });
-			assert.equal(await store.deleteCode(code), true);
-			return grant;
+		const redeem = (app: ReturnType<typeof Fastify>) => app.inject({
+			method: 'POST',
+			url: '/oauth/token',
+			payload: {
+				grant_type: 'authorization_code',
+				client_id: client.id,
+				client_secret: clientSecret,
+				redirect_uri: 'app://callback',
+				code,
+			},
 		});
-		const grants = await Promise.all([redeem(first), redeem(second)]);
-		assert.equal(grants.filter(Boolean).length, 1);
+		const responses = await Promise.all([redeem(firstApp), redeem(secondApp)]);
+		const statuses = responses.map(res => res.statusCode).sort((a, b) => a - b);
+		assert.deepEqual(statuses, [200, 400]);
+		assert.equal(responses.find(res => res.statusCode === 400)?.json().error, 'invalid_grant');
 		assert.equal((await inspection.query('SELECT COUNT(*) AS count FROM "mastodon_compat_entry" WHERE "namespace" = $1', ['grants'])).rows[0].count, '1');
 		assert.equal(await second.getCode(code), undefined);
 		await first.putOperation('oauth_state', 'once', { value: 1 }, Date.now() + 60000);
 		const consumed = await Promise.all([first.takeOperation('oauth_state', 'once'), second.takeOperation('oauth_state', 'once')]);
 		assert.equal(consumed.filter(value => value !== undefined).length, 1);
-	} finally { await first.close(); await second.close(); await inspection.end(); }
+	} finally {
+		await firstApp.close();
+		await secondApp.close();
+		await first.close();
+		await second.close();
+		await inspection.end();
+	}
 });
 
-test('PostgreSQL rolls back nested state changes and serializes standalone writes behind transactions', postgresOnly, async t => {
+test('PostgreSQL rolls back nested state changes, allows unrelated writes, and serializes same-key transactions', postgresOnly, async t => {
 	const connectionString = await postgresFixture(t);
 	const first = await createPostgresStore({ connectionString });
 	const second = await createPostgresStore({ connectionString });
@@ -164,13 +195,9 @@ test('PostgreSQL rolls back nested state changes and serializes standalone write
 		});
 		await started.promise;
 		assert.deepEqual(await second.get('filter', 'alice', 'one'), { value: 'original' });
-		let writeFinished = false;
-		const write = second.put('filter', 'alice', 'outside', true).then(() => { writeFinished = true; });
-		await setImmediate();
-		assert.equal(writeFinished, false);
+		await second.put('filter', 'alice', 'outside', true);
 		finish.resolve();
 		await assert.rejects(transaction, /abort transaction/u);
-		await write;
 		assert.deepEqual(await second.get('filter', 'alice', 'one'), { value: 'original' });
 		assert.equal(await second.get('filter', 'alice', 'nested'), undefined);
 		assert.equal(await first.get('filter', 'alice', 'outside'), true);
@@ -235,4 +262,40 @@ test('PostgreSQL startup requires the native migration and never recreates a mis
 		const store = await createPostgresStore({ connectionString });
 		await store.close();
 	} finally { await pool.end(); }
+});
+
+test('two PostgreSQL stores preserve concurrent keyword edits on the same filter', postgresOnly, async t => {
+	const connectionString = await postgresFixture(t);
+	const first = await createPostgresStore({ connectionString });
+	const second = await createPostgresStore({ connectionString });
+	const makeApp = (store: CompatStore) => {
+		const app = Fastify();
+		app.addHook('preValidation', async request => { request.query = parameters(request.query); request.body = parameters(request.body); });
+		const native = new NativeClient({ baseUrl: 'http://native.example', publicUrl: 'https://social.example', transport: async () => ({ status: 200, body: '{}' }) });
+		registerFeatures(new Routes(app, { store, native, entities: new EntityConverter('https://social.example'), publicUrl: 'https://social.example' }));
+		return app;
+	};
+	const firstApp = makeApp(first);
+	const secondApp = makeApp(second);
+	try {
+		const { client } = await first.createClient({ name: 'Filters', scopes: ['read:filters', 'write:filters'], redirectUris: ['app://callback'] });
+		const { token } = await first.createGrant({ clientId: client.id, kind: 'user', userId: 'alice', nativeToken: 'native', scopes: ['read:filters', 'write:filters'] });
+		const headers = { authorization: `Bearer ${token}` };
+		const created = (await firstApp.inject({ method: 'POST', url: '/api/v2/filters', headers, payload: { title: 'Concurrent', context: ['home'] } })).json();
+		const kw1 = (await firstApp.inject({ method: 'POST', url: `/api/v2/filters/${created.id}/keywords`, headers, payload: { keyword: 'alpha' } })).json();
+		const kw2 = (await firstApp.inject({ method: 'POST', url: `/api/v2/filters/${created.id}/keywords`, headers, payload: { keyword: 'beta' } })).json();
+		const [res1, res2] = await Promise.all([
+			firstApp.inject({ method: 'PUT', url: `/api/v2/filters/keywords/${kw1.id}`, headers, payload: { keyword: 'alpha-updated' } }),
+			secondApp.inject({ method: 'PUT', url: `/api/v2/filters/keywords/${kw2.id}`, headers, payload: { keyword: 'beta-updated' } }),
+		]);
+		assert.equal(res1.statusCode, 200, res1.body);
+		assert.equal(res2.statusCode, 200, res2.body);
+		const finalFilter = (await secondApp.inject({ method: 'GET', url: `/api/v2/filters/${created.id}`, headers })).json();
+		assert.deepEqual(finalFilter.keywords.map((item: { keyword: string }) => item.keyword).sort(), ['alpha-updated', 'beta-updated']);
+	} finally {
+		await firstApp.close();
+		await secondApp.close();
+		await first.close();
+		await second.close();
+	}
 });

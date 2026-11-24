@@ -4,6 +4,7 @@
  */
 
 import { createHash } from 'node:crypto';
+import * as mfm from 'mfm-js';
 import type { FastifyInstance, FastifyReply, FastifyRequest, HTTPMethods } from 'fastify';
 import { EntityConverter } from './entities.js';
 import { NativeClient, NativeError } from './native-client.js';
@@ -51,7 +52,7 @@ export class Routes {
 		return this.completeStatus(status, context, this.deps.store);
 	}
 	private async completeStatus(status: Json, context: RequestContext, store: StatusStore): Promise<Json> {
-		const path = context.request.url;
+		const path = context.request.routeOptions?.url ?? new URL(context.request.url, 'http://localhost').pathname;
 		const filterContext: FilterContext = path.includes('/timelines/home') || path.includes('/timelines/list/') ? 'home' : path.includes('/accounts/') ? 'account' : path.includes('/notifications') ? 'notifications' : path.includes('/statuses/') ? 'thread' : 'public';
 		const readAccount = !!context.grant && toNativePermissions(context.grant.scopes).includes('read:account');
 		const decorated = await decorateStatus(store, status, context.userId);
@@ -77,14 +78,17 @@ export class Routes {
 		await Promise.all(Array.from({ length: Math.min(4, statuses.length) }, async () => {
 			for (let index = next++; !failed && index < statuses.length; index = next++) {
 				try { result[index] = await this.completeStatus(statuses[index], context, store); } catch (error) {
-					if (!(error instanceof HttpError && error.statusCode === 404)) { failed = true; throw error; }
+					if (!(error instanceof HttpError && error.statusCode === 404) && !(error instanceof NativeError && (error.status === 404 || error.code === 'NO_SUCH_NOTE' || error.code === 'NO_SUCH_USER'))) {
+						failed = true;
+						throw error;
+					}
 				}
 			}
 		}));
 		return result.filter((status): status is Json => status !== null);
 	}
 	private async prefetchAuthors(context: RequestContext, ids: string[]): Promise<void> {
-		if (!context.grant?.nativeToken) return;
+		if (!ids.length) return;
 		const users = await context.call<Json[]>('users/show', { userIds: ids });
 		let cache = this.readCache.get(context);
 		if (!cache) { cache = new Map(); this.readCache.set(context, cache); }
@@ -148,7 +152,21 @@ export function registerRoutes(app: FastifyInstance, deps: RouteDependencies): R
 		result.source = { ...result.source, ...await store.get<Json>('account-source', c.userId, 'defaults') };
 		return result;
 	});
-	add('GET', '/api/v1/accounts/relationships', 'read:follows', c => Promise.all(strings(c.query.id).map(id => routes.relationship(c, id))));
+	add('GET', '/api/v1/accounts/relationships', 'read:follows', async c => {
+		const ids = [...new Set(strings(c.query.id))];
+		if (ids.length > 100) throw new HttpError(422, 'Too many account IDs');
+		if (!ids.length) return [];
+		const [users, notes] = await Promise.all([
+			c.call<Json[]>('users/show', { userIds: ids }),
+			store.getMany(ids.map(id => ({ namespace: 'account-note', owner: c.userId, key: id }))),
+		]);
+		const noteMap = new Map(notes.map(entry => [entry.key, entry.value]));
+		const userMap = new Map(users.map(user => [string(user.id), user]));
+		return ids.flatMap(id => {
+			const user = userMap.get(id);
+			return user ? [{ ...entities.relationship(user), note: noteMap.get(id) ?? '' }] : [];
+		});
+	});
 	add('GET', '/api/v1/accounts/search', 'read:accounts', async c => (await c.call<Json[]>('users/search', { query: string(c.query.q), limit: integer(c.query.limit, 40, 1, 80), origin: boolean(c.query.resolve) ? 'combined' : 'local', detail: true })).map(account));
 	add('GET', '/api/v1/accounts/lookup', 'read:accounts', async c => {
 		const [username, host] = string(c.query.acct).replace(/^@/u, '').split('@');
@@ -170,7 +188,8 @@ export function registerRoutes(app: FastifyInstance, deps: RouteDependencies): R
 	for (const [action, endpoint, scope] of [
 		['follow', 'following/create', 'follows'], ['unfollow', 'following/delete', 'follows'], ['block', 'blocking/create', 'blocks'], ['unblock', 'blocking/delete', 'blocks'], ['mute', 'mute/create', 'mutes'], ['unmute', 'mute/delete', 'mutes'], ['remove_from_followers', 'following/invalidate', 'follows'],
 	]) add('POST', `/api/v1/accounts/:id/${action}`, `write:${scope}`, async c => {
-		await c.call(endpoint, { userId: c.params.id, ...(action === 'mute' && c.body.duration ? { expiresAt: Date.now() + integer(c.body.duration, 0) * 1000 } : {}) }).catch(error => {
+		const muteDuration = action === 'mute' ? integer(c.body.duration, 0) : 0;
+		await c.call(endpoint, { userId: c.params.id, ...(muteDuration > 0 ? { expiresAt: Date.now() + muteDuration * 1000 } : {}) }).catch(error => {
 			if (!(error instanceof NativeError && ['ALREADY_FOLLOWING', 'ALREADY_BLOCKING', 'ALREADY_MUTING', 'NOT_FOLLOWING', 'NOT_BLOCKING', 'NOT_MUTING'].includes(error.code))) throw error;
 		});
 		if (action === 'follow' && c.body.notify !== undefined) await c.call('following/update', { userId: c.params.id, notify: boolean(c.body.notify) ? 'normal' : 'none' });
@@ -192,7 +211,17 @@ export function registerRoutes(app: FastifyInstance, deps: RouteDependencies): R
 			return routes.page(c, notes, await routes.statuses(filtered, c));
 		}, path === 'public' || path.startsWith('tag'));
 	}
-	add('GET', '/api/v1/statuses', 'read:statuses', async c => routes.statuses(await Promise.all(strings(c.query.id).map(id => routes.note(c, id))), c), true);
+	add('GET', '/api/v1/statuses', 'read:statuses', async c => {
+		const ids = [...new Set(strings(c.query.id))];
+		if (ids.length > 100) throw new HttpError(422, 'Too many status IDs');
+		const notes = (await Promise.all(ids.map(async id => {
+			try { return await routes.note(c, id); } catch (error) {
+				if (error instanceof NativeError && (error.status === 403 || error.status === 404 || error.code === 'NO_SUCH_NOTE')) return null;
+				throw error;
+			}
+		}))).filter((item): item is Json => item !== null);
+		return routes.statuses(notes, c);
+	}, true);
 	add('GET', '/api/v1/statuses/:id', 'read:statuses', async c => routes.status(await routes.note(c), c), true);
 	add('GET', '/api/v1/statuses/:id/context', 'read:statuses', async c => {
 		await routes.status(await routes.note(c), c);
@@ -221,9 +250,20 @@ export function registerRoutes(app: FastifyInstance, deps: RouteDependencies): R
 		const note = await routes.note(c);
 		if (action === 'reblog') {
 			const existing = await liveReblog(store, c.userId, note.id, c.call);
-			if (!existing) { const result = await c.call(endpoint, { renoteId: note.id, visibility: selectedVisibility }); await store.put('reblog', c.userId, note.id, result.createdNote.id); }
-		} else { await c.call(endpoint, { noteId: note.id }); await store.delete('reblog', c.userId, note.id); }
-		return { ...await routes.status(await routes.note(c), c), reblogged: action === 'reblog' };
+			let reblogNote: Json;
+			if (existing) {
+				reblogNote = await routes.note(c, existing);
+			} else {
+				const result = await c.call(endpoint, { renoteId: note.id, visibility: selectedVisibility });
+				reblogNote = result.createdNote;
+				await store.put('reblog', c.userId, note.id, reblogNote.id);
+			}
+			const status = await routes.status(reblogNote.renote ? reblogNote : { ...reblogNote, renote: note }, c);
+			return status.reblog ? { ...status, reblog: { ...status.reblog, reblogged: true } } : { ...status, reblogged: true };
+		}
+		await c.call(endpoint, { noteId: note.id });
+		await store.delete('reblog', c.userId, note.id);
+		return { ...await routes.status(await routes.note(c), c), reblogged: false };
 	});
 	for (const action of ['favourite', 'unfavourite']) add('POST', `/api/v1/statuses/:id/${action}`, 'write:favourites', async c => {
 		const note = await routes.note(c);
@@ -240,7 +280,9 @@ export function registerRoutes(app: FastifyInstance, deps: RouteDependencies): R
 	});
 	for (const [suffix, endpoint] of [['reblogged_by', 'notes/renotes'], ['favourited_by', 'notes/reactions']]) add('GET', `/api/v1/statuses/:id/${suffix}`, 'read:statuses', async c => {
 		await routes.note(c);
-		const rows = await routes.readPage(c, endpoint, { noteId: c.params.id, ...(suffix === 'favourited_by' ? { type: '❤' } : {}) }); return routes.page(c, rows, rows.map(item => account(item.user)));
+		const rows = await routes.readPage(c, endpoint, { noteId: c.params.id });
+		const filtered = suffix === 'favourited_by' ? rows.filter(item => ['❤', '❤️'].includes(item.type)) : rows;
+		return routes.page(c, rows, filtered.map(item => account(item.user)));
 	}, true);
 	add('GET', '/api/v1/bookmarks', 'read:bookmarks', async c => { const rows = await routes.readPage(c, 'i/favorites'); return routes.page(c, rows, (await routes.statuses(rows.map(item => item.note), c)).map(status => ({ ...status, bookmarked: true }))); });
 	add('GET', '/api/v1/favourites', 'read:favourites', async c => { const rows = await routes.readPage(c, 'users/reactions', { userId: c.userId }); return routes.page(c, rows, await routes.statuses(rows.filter(row => ['❤', '❤️'].includes(row.type)).map(row => row.note), c)); });
@@ -258,7 +300,19 @@ export function registerRoutes(app: FastifyInstance, deps: RouteDependencies): R
 	add('GET', '/api/v1/lists/:id', 'read:lists', async c => list(await c.call('users/lists/show', { listId: c.params.id })));
 	add('PUT', '/api/v1/lists/:id', 'write:lists', async c => { if (c.body.exclusive === true || (c.body.replies_policy && c.body.replies_policy !== 'list')) throw new HttpError(422, 'This list policy is unavailable'); return list(await c.call('users/lists/update', { listId: c.params.id, name: string(c.body.title) })); });
 	add('DELETE', '/api/v1/lists/:id', 'write:lists', async c => { await c.call('users/lists/delete', { listId: c.params.id }); return {}; });
-	add('GET', '/api/v1/lists/:id/accounts', 'read:lists', async c => { const item = await c.call('users/lists/show', { listId: c.params.id }); return Promise.all(strings(item.userIds).map(async userId => account(await c.call('users/show', { userId })))); });
+	add('GET', '/api/v1/lists/:id/accounts', 'read:lists', async c => {
+		const item = await c.call('users/lists/show', { listId: c.params.id });
+		const pagedRows = pageRows(strings(item.userIds).map(id => ({ id })), c.query, row => string(row.id), 40, 80);
+		const pagedIds = pagedRows.map(row => string(row.id));
+		if (!pagedIds.length) return [];
+		const users = await c.call<Json[]>('users/show', { userIds: pagedIds });
+		const userMap = new Map(users.map(user => [string(user.id), user]));
+		const accounts = pagedIds.flatMap(id => {
+			const user = userMap.get(id);
+			return user ? [account(user)] : [];
+		});
+		return routes.page(c, pagedRows, accounts);
+	});
 	for (const method of ['POST', 'DELETE'] as const) add(method, '/api/v1/lists/:id/accounts', 'write:lists', async c => { for (const userId of strings(c.body.account_ids)) await c.call(`users/lists/${method === 'POST' ? 'push' : 'pull'}`, { listId: c.params.id, userId }); return {}; });
 	add('GET', '/api/v1/accounts/:id/lists', 'read:lists', async c => (await c.call<Json[]>('users/lists/list')).filter(item => array(item.userIds).includes(c.params.id)).map(list));
 	registerMarkers(routes);
@@ -369,19 +423,31 @@ async function createStatus(routes: Routes, c: RequestContext): Promise<Json> {
 		if (!body.text?.trim() && !body.cw && !body.fileIds?.length && !body.poll && !body.replyId) body.text = quoted.url;
 	}
 	if (body.visibility === 'specified') {
-		const mentions = [...string(body.text).matchAll(/(?:^|\s)@([a-zA-Z0-9_]+)(?:@([a-zA-Z0-9.-]+))?/gu)];
-		const ids = await Promise.all(mentions.map(async match => (await c.call('users/show', { username: match[1], host: match[2] ?? null })).id));
+		const localHost = new URL(routes.deps.publicUrl).host.toLowerCase();
+		const mentions = extractMentions(mfm.parse(string(body.text)));
+		const seen = new Set<string>();
+		const uniqueMentions = mentions
+			.map(m => ({ username: m.username, host: m.host && m.host.toLowerCase() !== localHost ? m.host : null }))
+			.filter(m => {
+				const key = `${m.username.toLowerCase()}@${m.host?.toLowerCase() ?? ''}`;
+				if (seen.has(key)) return false;
+				seen.add(key);
+				return true;
+			});
+		const ids = await Promise.all(uniqueMentions.map(async m => (await c.call('users/show', { username: m.username, host: m.host })).id));
 		if (quoted && quoted.account.id !== c.userId && !ids.includes(quoted.account.id)) throw new HttpError(422, 'A direct quote must explicitly mention the quoted author');
 		if (body.replyId) { const reply = await routes.note(c, body.replyId); ids.push(reply.userId); }
 		body.visibleUserIds = [...new Set(ids)].filter(id => id !== c.userId);
 		if (!body.visibleUserIds.length) throw new HttpError(422, 'A direct status needs a recipient mention');
 	}
-	const claimedReplay = key ? await store.transaction(async () => {
-		const id = await existing();
-		if (id) return id;
-		await store.putIdempotency(c.userId, key, { digest, expiresAt: Date.now() + 86400000 });
-		return undefined;
-	}) : undefined;
+	const claimedReplay = key ? await (async () => {
+		const claim = await store.claimIdempotency(c.userId, key, { digest, expiresAt: Date.now() + 86400000 });
+		if (claim.status === 'claimed') return undefined;
+		if (claim.status === 'retry') throw new HttpError(409, 'This request is already being processed; check the timeline before retrying');
+		if (claim.entry.digest !== digest) throw new HttpError(422, 'Idempotency key was used for a different request');
+		if (!claim.entry.id) throw new HttpError(409, 'This request is already being processed; check the timeline before retrying');
+		return string(claim.entry.id);
+	})() : undefined;
 	if (claimedReplay) return routes.status(await routes.note(c, claimedReplay), c);
 	let result: Json;
 	try { result = await c.call('notes/create', body); } catch (error) {
@@ -420,6 +486,18 @@ async function replyDescendants(routes: Routes, context: RequestContext, rootId:
 		}
 	}
 	return routes.statuses(notes, context);
+}
+
+function extractMentions(nodes: mfm.MfmNode[]): { username: string; host: string | null }[] {
+	const result: { username: string; host: string | null }[] = [];
+	for (const node of nodes) {
+		if (node.type === 'mention') {
+			result.push({ username: node.props.username, host: node.props.host });
+		} else if ('children' in node && Array.isArray(node.children)) {
+			result.push(...extractMentions(node.children));
+		}
+	}
+	return result;
 }
 
 function registerMarkers(routes: Routes): void {

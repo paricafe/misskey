@@ -105,7 +105,7 @@ test('concurrent authorization code exchanges issue exactly one bearer', async t
 	assert.equal(await f.store.getCode(code!, 1000), undefined);
 });
 
-test('PKCE requires S256, verifies the challenge, and retains a code after a rejected verifier', async t => {
+test('PKCE requires S256, verifies the challenge, and consumes the code on a rejected verifier', async t => {
 	const f = await fixture(t);
 	const client = await f.app('read');
 	const verifier = 'a'.repeat(43);
@@ -115,10 +115,14 @@ test('PKCE requires S256, verifies the challenge, and retains a code after a rej
 	const code = new URL(String(response.headers.location)).searchParams.get('code');
 	const payload = { ...client, grant_type: 'authorization_code', code, redirect_uri: 'testapp://callback', code_verifier: 'b'.repeat(43) };
 	assert.equal((await f.server.inject({ method: 'POST', url: '/oauth/token', payload })).statusCode, 400);
-	assert.equal((await f.server.inject({ method: 'POST', url: '/oauth/token', payload: { ...payload, code_verifier: verifier } })).statusCode, 200);
+	assert.equal((await f.server.inject({ method: 'POST', url: '/oauth/token', payload: { ...payload, code_verifier: verifier } })).statusCode, 400);
+
+	const second = await f.complete(client.client_id, { code_challenge: challenge, code_challenge_method: 'S256' });
+	const validCode = new URL(String(second.response.headers.location)).searchParams.get('code');
+	assert.equal((await f.server.inject({ method: 'POST', url: '/oauth/token', payload: { ...payload, code: validCode, code_verifier: verifier } })).statusCode, 200);
 });
 
-test('client, redirect and scope binding reject escalation before consuming a valid code', async t => {
+test('client, redirect and scope binding reject escalation and consume codes after owner validation failure', async t => {
 	const f = await fixture(t);
 	const first = await f.app();
 	const second = await f.app();
@@ -128,8 +132,16 @@ test('client, redirect and scope binding reject escalation before consuming a va
 	const payload = { ...first, grant_type: 'authorization_code', code, redirect_uri: 'testapp://callback' };
 	assert.equal((await f.server.inject({ method: 'POST', url: '/oauth/token', payload: { ...payload, ...second } })).statusCode, 400);
 	assert.equal((await f.server.inject({ method: 'POST', url: '/oauth/token', payload: { ...payload, redirect_uri: 'wrong://callback' } })).statusCode, 400);
-	assert.equal((await f.server.inject({ method: 'POST', url: '/oauth/token', payload: { ...payload, scope: 'write' } })).statusCode, 400);
-	const good = await f.server.inject({ method: 'POST', url: '/oauth/token', payload });
+	assert.equal((await f.server.inject({ method: 'POST', url: '/oauth/token', payload })).statusCode, 400);
+
+	const secondRun = await f.complete(first.client_id, { scope: 'read:accounts' });
+	const secondCode = new URL(String(secondRun.response.headers.location)).searchParams.get('code');
+	assert.equal((await f.server.inject({ method: 'POST', url: '/oauth/token', payload: { ...payload, code: secondCode, scope: 'write' } })).statusCode, 400);
+	assert.equal((await f.server.inject({ method: 'POST', url: '/oauth/token', payload: { ...payload, code: secondCode } })).statusCode, 400);
+
+	const thirdRun = await f.complete(first.client_id, { scope: 'read:accounts' });
+	const thirdCode = new URL(String(thirdRun.response.headers.location)).searchParams.get('code');
+	const good = await f.server.inject({ method: 'POST', url: '/oauth/token', payload: { ...payload, code: thirdCode } });
 	assert.equal(good.statusCode, 200);
 	assert.equal(good.json().scope, 'read:accounts');
 });
@@ -162,6 +174,15 @@ test('revocation is client-owned, persistent and idempotent', async t => {
 	assert.equal((await f.server.inject({ method: 'POST', url: '/oauth/revoke', payload: { ...client, token } })).statusCode, 200);
 	assert.equal(await f.store.getGrant(token), undefined);
 	assert.equal((await f.server.inject({ method: 'POST', url: '/oauth/revoke', payload: { ...client, token } })).statusCode, 200);
+
+	const { response: callbackResponse } = await f.complete(client.client_id);
+	const code = new URL(String(callbackResponse.headers.location)).searchParams.get('code');
+	const issued = await f.server.inject({ method: 'POST', url: '/oauth/token', payload: { ...client, grant_type: 'authorization_code', code, redirect_uri: 'testapp://callback' } });
+	const userToken = issued.json().access_token;
+	f.calls.length = 0;
+	assert.equal((await f.server.inject({ method: 'POST', url: '/oauth/revoke', payload: { ...client, token: userToken } })).statusCode, 200);
+	assert.ok(f.calls.includes('i/revoke-token'));
+	assert.equal(await f.store.getGrant(userToken), undefined);
 });
 
 test('expired authorization state and code cannot issue grants', async t => {
@@ -213,4 +234,13 @@ test('scope implication and native permission mapping stay minimal', () => {
 	assert.deepEqual(toNativePermissions(['write:filters', 'write:collections']), []);
 	assert.deepEqual(toNativePermissions(['write:statuses']), ['write:notes', 'write:votes']);
 	assert.deepEqual(toNativePermissions(['read:notifications']), ['read:notifications', 'read:account']);
+});
+
+test('unexpected internal errors return generic 500 server_error without leaking details', async t => {
+	const f = await fixture(t);
+	f.store.getClient = async () => { throw new Error('secret-db-connection-string'); };
+	const res = await f.server.inject({ method: 'GET', url: '/oauth/authorize?client_id=mc_1&redirect_uri=testapp://callback&response_type=code' });
+	assert.equal(res.statusCode, 500);
+	assert.equal(res.json().error, 'server_error');
+	assert.ok(!res.body.includes('secret-db-connection-string'));
 });

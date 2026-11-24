@@ -118,7 +118,9 @@ async function saveFilter(store: CompatStore, userId: string, filter: Filter): P
 }
 
 async function findKeyword(store: CompatStore, userId: string, id: string): Promise<{ filter: Filter; keyword: FilterKeyword }> {
-	for (const { value: filter } of await store.list<Filter>('filter', userId)) {
+	for (const { value: listed } of await store.list<Filter>('filter', userId)) {
+		if (!listed.keywords.some(item => item.id === id)) continue;
+		const filter = await getFilter(store, userId, listed.id);
 		const keyword = filter.keywords.find(item => item.id === id);
 		if (keyword) return { filter, keyword };
 	}
@@ -126,7 +128,9 @@ async function findKeyword(store: CompatStore, userId: string, id: string): Prom
 }
 
 async function findStatusFilter(store: CompatStore, userId: string, id: string): Promise<{ filter: Filter; status: FilterStatus }> {
-	for (const { value: filter } of await store.list<Filter>('filter', userId)) {
+	for (const { value: listed } of await store.list<Filter>('filter', userId)) {
+		if (!listed.statuses.some(item => item.id === id)) continue;
+		const filter = await getFilter(store, userId, listed.id);
 		const status = filter.statuses.find(item => item.id === id);
 		if (status) return { filter, status };
 	}
@@ -224,8 +228,19 @@ export async function conversationFromNote(store: CompatStore, userId: string, n
 	});
 	if (state.hidden) return null;
 	const participantIds = new Set<string>([latest.userId ?? latest.user?.id, ...strings(latest.visibleUserIds)].filter(value => typeof value === 'string' && value && value !== userId));
-	const accounts = await Promise.all([...participantIds].map(async participantId => entities.account(participantId === latest.user?.id ? latest.user : await call('users/show', { userId: participantId }))));
-	return { id, accounts, unread: state.unread, last_status: await applyFilters(store, userId, await decorateStatus(store, lastStatus, userId)) };
+	const accounts = (await Promise.all([...participantIds].map(async participantId => {
+		if (participantId === latest.user?.id) return entities.account(latest.user);
+		try {
+			return entities.account(await call('users/show', { userId: participantId }));
+		} catch (error) {
+			if (error instanceof NativeError && (error.status === 404 || error.code === 'NO_SUCH_USER')) return null;
+			throw error;
+		}
+	}))).filter((item): item is Json => item !== null);
+	const finalStatus = options.status && options.status.id === lastStatus.id
+		? options.status
+		: await applyFilters(store, userId, await decorateStatus(store, lastStatus, userId), 'home');
+	return { id, accounts, unread: state.unread, last_status: finalStatus };
 }
 
 export async function latestConversationNote(store: CompatStore, userId: string, rootId: string, call: NativeCall, removedId: string): Promise<Json | null> {
@@ -396,13 +411,27 @@ export function registerFeatures(routes: Routes): void {
 	add('DELETE', '/api/v1/filters/:id', 'write:filters', async c => store.transaction(async () => {
 		const { filter, keyword } = await findKeyword(store, c.userId, string(c.params.id));
 		filter.keywords = filter.keywords.filter(item => item.id !== keyword.id);
-		await save(c.userId, filter);
+		if (filter.keywords.length === 0 && filter.statuses.length === 0) {
+			await store.delete('filter', c.userId, filter.id);
+			await store.put('filter-revision', c.userId, 'current', newId());
+		} else {
+			await save(c.userId, filter);
+		}
 		return {};
 	}));
 
 	add('GET', '/api/v1/preferences', 'read:accounts', async c => {
-		const user = await c.call('i');
-		return { 'posting:default:visibility': ({ public: 'public', home: 'unlisted', followers: 'private', specified: 'direct' } as Json)[user.defaultNoteVisibility] ?? 'public', 'posting:default:sensitive': user.alwaysMarkNsfw === true, 'posting:default:language': user.lang ?? null, 'reading:expand:media': 'default', 'reading:expand:spoilers': false };
+		const [user, defaults] = await Promise.all([
+			c.call('i'),
+			store.get<Json>('account-source', c.userId, 'defaults'),
+		]);
+		return {
+			'posting:default:visibility': defaults?.privacy ?? ({ public: 'public', home: 'unlisted', followers: 'private', specified: 'direct' } as Json)[user.defaultNoteVisibility] ?? 'public',
+			'posting:default:sensitive': typeof defaults?.sensitive === 'boolean' ? defaults.sensitive : user.alwaysMarkNsfw === true,
+			'posting:default:language': defaults?.language !== undefined ? defaults.language : (user.lang ?? null),
+			'reading:expand:media': 'default',
+			'reading:expand:spoilers': false,
+		};
 	});
 	add('GET', '/api/v1/announcements', 'read:accounts', async c => {
 		const announcements = await c.call<Json[]>('announcements', { limit: 100, isActive: true });

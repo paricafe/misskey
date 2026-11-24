@@ -207,3 +207,95 @@ test('v1 unread count scans past one page and counts only visible notifications 
 	assert.equal((await f.store.get<Json>('marker', 'alice', 'notifications'))?.last_read_id, 'notification-0020');
 	assert.equal(f.markedRead(), 0);
 });
+
+test('v1 and v2 detail lookup finds historical ULID notifications beyond 1000 items', async t => {
+	const ulid = (index: number) => `01ARZ3NDEKTSV4RRFFQ69G${String(index).padStart(4, '0')}`;
+	const events = Array.from({ length: 1050 }, (_, index) => event(index + 1, { id: ulid(index + 1) }));
+	const targetId = ulid(5);
+	const f = await fixture(t, events);
+	const v1 = await f.app.inject({ url: `/api/v1/notifications/${targetId}`, headers: { authorization: f.authorization } });
+	assert.equal(v1.statusCode, 200, v1.body);
+	assert.equal(v1.json().id, targetId);
+	const v2 = await f.app.inject({ url: `/api/v2/notifications/ungrouped-${targetId}`, headers: { authorization: f.authorization } });
+	assert.equal(v2.statusCode, 200, v2.body);
+	assert.equal(v2.json().notification_groups[0].most_recent_notification_id, targetId);
+	const accounts = await f.app.inject({ url: `/api/v2/notifications/ungrouped-${targetId}/accounts`, headers: { authorization: f.authorization } });
+	assert.equal(accounts.statusCode, 200, accounts.body);
+	assert.equal(accounts.json()[0].id, 'bob');
+	assert.equal((await f.app.inject({ method: 'POST', url: `/api/v1/notifications/${targetId}/dismiss`, headers: { authorization: f.authorization } })).statusCode, 200);
+	assert.equal((await f.app.inject({ url: `/api/v1/notifications/${targetId}`, headers: { authorization: f.authorization } })).statusCode, 404);
+});
+
+test('v1 and v2 detail lookup finds historical MEIDG notifications with hex carry including trailing f and multiple fs', async t => {
+	const parseMeidg = (id: string) => {
+		if (!/^g[0-9a-f]{23}$/u.test(id)) return null;
+		return { date: parseInt(id.slice(1, 12), 16), additional: BigInt(`0x${id.slice(12, 24)}`) };
+	};
+	const compareMeidg = (a: string, b: string) => {
+		const pa = parseMeidg(a);
+		const pb = parseMeidg(b);
+		if (!pa || !pb) return 0;
+		if (pa.date !== pb.date) return pa.date < pb.date ? -1 : 1;
+		return pa.additional < pb.additional ? -1 : pa.additional > pb.additional ? 1 : 0;
+	};
+	const mkMeidg = (date: number, additional: bigint) => `g${date.toString(16).padStart(11, '0')}${additional.toString(16).padStart(12, '0')}`;
+	const trailingF = mkMeidg(0x19500000001, 0x00000000000fn);
+	const multiF = mkMeidg(0x19500000002, 0xffffffffffffn);
+	const events: Json[] = [
+		event(1, { id: trailingF }),
+		event(2, { id: multiF }),
+		...Array.from({ length: 1050 }, (_, index) => event(index + 3, { id: mkMeidg(0x19500000010 + index, 1n) })),
+	];
+
+	const app = Fastify();
+	app.addHook('preValidation', async request => { request.query = parameters(request.query); request.body = parameters(request.body); });
+	app.setErrorHandler((error, _request, reply) => reply.code(error instanceof NativeError ? error.status : (error as { statusCode?: number }).statusCode ?? 500).send({ error: (error as Error).message }));
+	const store = new CompatStore(':memory:');
+	const { client } = await store.createClient({ name: 'MEIDG', scopes: ['read', 'write'], redirectUris: ['client://callback'] });
+	const token = (await store.createGrant({ clientId: client.id, kind: 'user', userId: 'alice', scopes: ['read', 'write'], nativeToken: 'native-alice' })).token;
+	const authorization = `Bearer ${token}`;
+	const calls: Array<{ endpoint: string; body: Json }> = [];
+	const native = new NativeClient({ baseUrl: 'http://native.example', publicUrl: 'https://social.example', transport: async request => {
+		const endpoint = new URL(request.url).pathname.slice(5);
+		if (endpoint === 'ping') return { status: 200, body: '{"pong":0}' };
+		const body = JSON.parse(String(request.body));
+		calls.push({ endpoint, body });
+		if (endpoint === 'notes/state') return { status: 200, body: '{"isFavorited":false,"isMutedThread":false}' };
+		if (endpoint === 'users/show') return { status: 200, body: JSON.stringify({ ...bob, pinnedNoteIds: [] }) };
+		assert.equal(endpoint, 'i/notifications');
+		if (body.untilId && !parseMeidg(body.untilId)) return { status: 200, body: '[]' };
+		if (body.sinceId && !parseMeidg(body.sinceId)) return { status: 200, body: '[]' };
+		const ascending = body.sinceId && !body.untilId;
+		const rows = events
+			.filter(item => (!body.sinceId || compareMeidg(item.id, body.sinceId) > 0) && (!body.untilId || compareMeidg(item.id, body.untilId) < 0))
+			.sort((a, b) => (ascending ? 1 : -1) * compareMeidg(a.id, b.id))
+			.slice(0, body.limit);
+		return { status: 200, body: JSON.stringify(rows) };
+	} });
+	registerNotifications(new Routes(app, { store, native, entities: new EntityConverter('https://social.example'), publicUrl: 'https://social.example' }));
+	t.after(async () => { await app.close(); await store.close(); });
+
+	const listed = await app.inject({ url: `/api/v1/notifications?limit=2&max_id=${mkMeidg(0x19500000010, 1n)}`, headers: { authorization } });
+	assert.equal(listed.statusCode, 200, listed.body);
+	const listedIds = listed.json().map((item: Json) => item.id);
+	assert.deepEqual(listedIds, [multiF, trailingF]);
+
+	for (const targetId of listedIds) {
+		const beforeCalls = calls.length;
+		const v1 = await app.inject({ url: `/api/v1/notifications/${targetId}`, headers: { authorization } });
+		assert.equal(v1.statusCode, 200, v1.body);
+		assert.equal(v1.json().id, targetId);
+		assert.equal(calls.length - beforeCalls, 1, 'MEIDG probe must locate target in a single bounded call');
+
+		const v2 = await app.inject({ url: `/api/v2/notifications/ungrouped-${targetId}`, headers: { authorization } });
+		assert.equal(v2.statusCode, 200, v2.body);
+		assert.equal(v2.json().notification_groups[0].most_recent_notification_id, targetId);
+
+		const accounts = await app.inject({ url: `/api/v2/notifications/ungrouped-${targetId}/accounts`, headers: { authorization } });
+		assert.equal(accounts.statusCode, 200, accounts.body);
+		assert.equal(accounts.json()[0].id, 'bob');
+	}
+
+	assert.equal((await app.inject({ method: 'POST', url: `/api/v1/notifications/${trailingF}/dismiss`, headers: { authorization } })).statusCode, 200);
+	assert.equal((await app.inject({ url: `/api/v1/notifications/${trailingF}`, headers: { authorization } })).statusCode, 404);
+});

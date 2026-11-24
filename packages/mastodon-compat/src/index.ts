@@ -132,5 +132,5 @@ export function installGateway(app: FastifyInstance, options: GatewayOptions): {
 	const stopPruning = registerPruning(app, deps.store);
 	app.addHook('preClose', async () => { await Promise.all([stopPruning(), streaming.close()]); });
 	app.addHook('onClose', async () => { await deps.store.close(); });
-	return { close: async () => { await Promise.all([stopPruning(), streaming.close()]); } };
+	return { close: async () => { await Promise.all([stopPruning(), streaming.close()]); await deps.store.close(); } };
 }

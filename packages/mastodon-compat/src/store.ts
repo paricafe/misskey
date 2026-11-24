@@ -52,12 +52,18 @@ export interface StoreEntry {
 
 export type StoreKey = Pick<StoreEntry, 'namespace' | 'owner' | 'key'>;
 
+export type ClaimResult<T = StoreEntry> =
+	| { status: 'claimed' }
+	| { status: 'existing'; entry: T }
+	| { status: 'retry' };
+
 export interface StoreAdapter {
 	close(): Promise<void>;
 	transaction<T>(callback: () => T | Promise<T>): Promise<T>;
 	get(namespace: string, owner: string, key: string): Promise<StoreEntry | undefined>;
 	getMany(keys: StoreKey[]): Promise<StoreEntry[]>;
 	put(entry: StoreEntry, insertOnly?: boolean): Promise<void>;
+	claim(entry: StoreEntry, now: number): Promise<ClaimResult<StoreEntry>>;
 	delete(namespace: string, owner: string, key: string): Promise<boolean>;
 	take(namespace: string, owner: string, key: string): Promise<StoreEntry | undefined>;
 	list(namespace: string, owner: string): Promise<StoreEntry[]>;
@@ -129,6 +135,18 @@ class MemoryAdapter implements StoreAdapter {
 			const key = entryKey(entry.namespace, entry.owner, entry.key);
 			if (insertOnly && this.data().has(key)) throw new Error('Compatibility entry already exists');
 			this.data().set(key, { ...clone(entry), value: clone(entry.value) });
+		});
+	}
+
+	async claim(entry: StoreEntry, now: number): Promise<ClaimResult<StoreEntry>> {
+		return this.locked(() => {
+			const key = entryKey(entry.namespace, entry.owner, entry.key);
+			const existing = this.data().get(key);
+			if (existing && (existing.expiresAt == null || existing.expiresAt > now)) {
+				return { status: 'existing', entry: clone(existing) };
+			}
+			this.data().set(key, { ...clone(entry), value: clone(entry.value) });
+			return { status: 'claimed' };
 		});
 	}
 
@@ -260,6 +278,14 @@ export class CompatStore {
 	async putIdempotency(ownerId: string, key: string, value: IdempotencyRecord): Promise<void> {
 		if (!Number.isSafeInteger(value.expiresAt) || value.expiresAt < 0) throw new RangeError('Invalid idempotency expiration');
 		await this.adapter.put({ namespace: 'kv:idempotency', owner: ownerId, key, value, expiresAt: value.expiresAt });
+	}
+
+	async claimIdempotency(ownerId: string, key: string, value: IdempotencyRecord, now = Date.now()): Promise<ClaimResult<IdempotencyRecord>> {
+		if (!Number.isSafeInteger(value.expiresAt) || value.expiresAt < 0) throw new RangeError('Invalid idempotency expiration');
+		const result = await this.adapter.claim({ namespace: 'kv:idempotency', owner: ownerId, key, value, expiresAt: value.expiresAt }, now);
+		if (result.status !== 'existing') return result;
+		if (result.entry.expiresAt == null || result.entry.expiresAt <= now) return { status: 'retry' };
+		return { status: 'existing', entry: { ...result.entry.value as IdempotencyRecord, expiresAt: result.entry.expiresAt } };
 	}
 
 	async putOperation(kind: string, id: string, value: unknown, expiresAt: number): Promise<void> {

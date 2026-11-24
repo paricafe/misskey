@@ -3,13 +3,13 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { boolean, HttpError, integer, string, strings } from './parameters.js';
+import { boolean, compareIds, HttpError, integer, string, strings } from './parameters.js';
 import type { RequestContext, Routes } from './routes.js';
 import type { Json } from './types.js';
 
 interface NotificationPage { notifications: Json[]; cursors: Json[]; }
 
-const compareIds = (a: string, b: string): number => a < b ? -1 : a > b ? 1 : 0;
+const MAX_SCAN_PAGES = 10;
 
 function groupNotificationId(value: unknown): string {
 	const key = string(value);
@@ -22,11 +22,10 @@ async function isDismissed(routes: Routes, c: RequestContext, id: string): Promi
 	return !!((cleared && compareIds(id, cleared) <= 0) || await routes.deps.store.get('dismissed-notification', c.userId, id));
 }
 
-async function convert(routes: Routes, c: RequestContext, row: Json): Promise<Json | null> {
-	if (await isDismissed(routes, c, row.id)) return null;
-	const result = routes.deps.entities.notification(row);
+async function convert(routes: Routes, c: RequestContext, row: Json, hydrate = true): Promise<Json | null> {
+	const result = routes.deps.entities.notification(row, { viewerId: c.userId || null, allowLocalOnly: true });
 	if (!result) return null;
-	if (result.status) {
+	if (result.status && hydrate) {
 		try { result.status = await routes.status(row.note, c); } catch (error) {
 			if (error instanceof HttpError && error.statusCode === 404) return null;
 			throw error;
@@ -60,7 +59,7 @@ function validateQuery(query: Json): void {
 	boolean(query.include_filtered);
 }
 
-async function readPage(routes: Routes, c: RequestContext, limit: number, query = c.query): Promise<NotificationPage> {
+async function readPage(routes: Routes, c: RequestContext, limit: number, query = c.query, hydrate = true): Promise<NotificationPage> {
 	validateQuery(query);
 	const types = strings(query.types);
 	const excluded = strings(query.exclude_types);
@@ -69,7 +68,7 @@ async function readPage(routes: Routes, c: RequestContext, limit: number, query 
 	const sinceId = string(query.since_id);
 	const maxId = string(query.max_id);
 	const cleared = await routes.deps.store.get<string>('notifications', c.userId, 'cleared');
-	const lowerBound = [minId || sinceId, cleared ?? ''].sort(compareIds).at(-1)!;
+	const lowerBound = [minId, sinceId, cleared ?? ''].filter(Boolean).sort(compareIds).at(-1) ?? '';
 	if (maxId && lowerBound && compareIds(maxId, lowerBound) <= 0) return { notifications: [], cursors: [] };
 	const ascending = !!minId;
 	let cursor = ascending ? lowerBound : maxId;
@@ -77,23 +76,37 @@ async function readPage(routes: Routes, c: RequestContext, limit: number, query 
 	const cursors: Json[] = [];
 	const seen = new Set<string>();
 	const visited = new Set<string>();
-	while (notifications.length < limit) {
+	let pages = 0;
+	while (notifications.length < limit && pages++ < MAX_SCAN_PAGES) {
 		if (visited.has(cursor)) break;
 		visited.add(cursor);
-		const rows = await c.call<Json[]>('i/notifications', { limit: Math.min(100, limit - notifications.length), markAsRead: false, ...(cursor ? { [ascending ? 'sinceId' : 'untilId']: cursor } : {}) });
+		const batchLimit = Math.min(100, limit - notifications.length);
+		const rows = await c.call<Json[]>('i/notifications', { limit: batchLimit, markAsRead: false, ...(cursor ? { [ascending ? 'sinceId' : 'untilId']: cursor } : {}) });
 		if (!rows.length) break;
 		const ordered = [...rows].sort((a, b) => (ascending ? 1 : -1) * compareIds(string(a.id), string(b.id)));
+		const candidates: Json[] = [];
 		let crossedBound = false;
 		for (const row of ordered) {
 			const id = string(row.id);
 			if ((ascending && maxId && compareIds(id, maxId) >= 0) || (!ascending && lowerBound && compareIds(id, lowerBound) <= 0)) { crossedBound = true; break; }
 			if (seen.has(id)) continue;
 			seen.add(id);
-			cursors.push(row);
-			const notification = await convert(routes, c, row);
-			if (!notification || (types.length && !types.includes(notification.type)) || excluded.includes(notification.type) || (accountId && notification.account.id !== accountId)) continue;
-			notifications.push(notification);
-			if (notifications.length === limit) break;
+			candidates.push(row);
+		}
+		if (candidates.length) {
+			const dismissedEntries = await routes.deps.store.getMany(candidates.map(row => ({ namespace: 'dismissed-notification', owner: c.userId, key: string(row.id) })));
+			const dismissed = new Set(dismissedEntries.map(entry => entry.key));
+			for (const row of candidates) {
+				const id = string(row.id);
+				cursors.push(row);
+				if ((cleared && compareIds(id, cleared) <= 0) || dismissed.has(id)) continue;
+				const preview = routes.deps.entities.notification(row, { viewerId: c.userId || null, allowLocalOnly: true });
+				if (!preview || (types.length && !types.includes(preview.type)) || excluded.includes(preview.type) || (accountId && preview.account.id !== accountId)) continue;
+				const notification = hydrate ? await convert(routes, c, row, true) : preview;
+				if (!notification) continue;
+				notifications.push(notification);
+				if (notifications.length === limit) break;
+			}
 		}
 		if (crossedBound || notifications.length === limit) break;
 		const next = string(ordered.at(-1)!.id);
@@ -103,11 +116,55 @@ async function readPage(routes: Routes, c: RequestContext, limit: number, query 
 	return { notifications: notifications.sort((a, b) => compareIds(b.id, a.id)), cursors: cursors.sort((a, b) => compareIds(b.id, a.id)) };
 }
 
+const BASE36_CHARS = '0123456789abcdefghijklmnopqrstuvwxyz';
+const ULID_CHARS = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+const HEX_LOWER_CHARS = '0123456789abcdef';
+const HEX_UPPER_CHARS = '0123456789ABCDEF';
+
+function incrementAlphabet(id: string, alphabet: string): string | undefined {
+	const chars = id.split('');
+	for (let i = chars.length - 1; i >= 0; i--) {
+		const index = alphabet.indexOf(chars[i]);
+		if (index === -1) return undefined;
+		if (index < alphabet.length - 1) {
+			chars[i] = alphabet[index + 1];
+			return chars.join('');
+		}
+		chars[i] = alphabet[0];
+	}
+	return undefined;
+}
+
+function nextProbeId(id: string): string | undefined {
+	if (/^[0-9A-HJKMNP-TV-Z]{26}$/u.test(id)) return incrementAlphabet(id, ULID_CHARS);
+	if (/^g[0-9a-f]{23}$/u.test(id)) {
+		const nextHex = incrementAlphabet(id.slice(1), HEX_LOWER_CHARS);
+		return nextHex ? `g${nextHex}` : undefined;
+	}
+	if (/^[0-9a-f]{16}$/u.test(id) || /^[0-9a-f]{24}$/u.test(id)) return incrementAlphabet(id, HEX_LOWER_CHARS);
+	if (/^[0-9A-F]{16}$/u.test(id) || /^[0-9A-F]{24}$/u.test(id)) return incrementAlphabet(id, HEX_UPPER_CHARS);
+	if (/^[0-9a-z]{1,32}$/u.test(id)) return incrementAlphabet(id, BASE36_CHARS);
+	return undefined;
+}
+
 async function findNotification(routes: Routes, c: RequestContext, target: string): Promise<Json> {
 	if (await isDismissed(routes, c, target)) throw new HttpError(404, 'Record not found');
+	const cleared = await routes.deps.store.get<string>('notifications', c.userId, 'cleared');
+	if (cleared && compareIds(target, cleared) <= 0) throw new HttpError(404, 'Record not found');
+	const probeUntilId = nextProbeId(target);
+	if (probeUntilId) {
+		const probe = await c.call<Json[]>('i/notifications', { limit: 10, markAsRead: false, untilId: probeUntilId }).catch(() => []);
+		const raw = probe.find(row => row.id === target);
+		if (raw) {
+			const result = await convert(routes, c, raw);
+			if (result) return result;
+			throw new HttpError(404, 'Record not found');
+		}
+	}
 	let untilId: string | undefined;
 	const visited = new Set<string>();
-	while (true) {
+	let pages = 0;
+	while (pages++ < MAX_SCAN_PAGES) {
 		const rows = await c.call<Json[]>('i/notifications', { limit: 100, markAsRead: false, ...(untilId ? { untilId } : {}) });
 		if (!rows.length) break;
 		const raw = rows.find(row => row.id === target);
@@ -125,6 +182,7 @@ async function findNotification(routes: Routes, c: RequestContext, target: strin
 }
 
 async function dismissNotification(routes: Routes, c: RequestContext, id: string): Promise<Json> {
+	if (!id || id.length > 128 || !/^[A-Za-z0-9_-]+$/u.test(id)) throw new HttpError(404, 'Record not found');
 	await routes.deps.store.put('dismissed-notification', c.userId, id, true);
 	return {};
 }
@@ -132,14 +190,20 @@ async function dismissNotification(routes: Routes, c: RequestContext, id: string
 async function clearNotifications(routes: Routes, c: RequestContext): Promise<Json> {
 	const latest = await c.call<Json[]>('i/notifications', { limit: 1, markAsRead: false });
 	await c.call('notifications/mark-all-as-read');
-	if (latest[0]) await routes.deps.store.put('notifications', c.userId, 'cleared', latest[0].id);
+	if (latest[0]) {
+		const latestId = string(latest[0].id);
+		await routes.deps.store.transaction(async () => {
+			const existing = await routes.deps.store.get<string>('notifications', c.userId, 'cleared');
+			if (!existing || compareIds(latestId, existing) > 0) await routes.deps.store.put('notifications', c.userId, 'cleared', latestId);
+		});
+	}
 	return {};
 }
 
 async function unreadCount(routes: Routes, c: RequestContext): Promise<Json> {
 	const marker = await routes.deps.store.get<Json>('marker', c.userId, 'notifications');
 	const query = { types: c.query.types, exclude_types: c.query.exclude_types, account_id: c.query.account_id, grouped_types: c.query.grouped_types, since_id: marker?.last_read_id };
-	const page = await readPage(routes, c, integer(c.query.limit, 100, 1, 1000), query);
+	const page = await readPage(routes, c, integer(c.query.limit, 100, 1, 1000), query, false);
 	return { count: page.notifications.length };
 }
 

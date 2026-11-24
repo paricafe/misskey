@@ -50,7 +50,7 @@ async function fixture(t: TestContext, options: { store?: CompatStore; handler?:
 			return found ? response(found) : response({ error: { code: 'NO_SUCH_NOTE', message: 'Missing' } }, 404);
 		}
 		if (endpoint === 'notes/create') {
-			const created = note(String(++sequence), { ...body, ...(body.renoteId ? { renote: notes.find(item => item.id === body.renoteId) } : {}), files: (body.fileIds ?? []).map((id: string) => ({ id, type: 'image/png' })) });
+			const created = note(String(++sequence), { ...(body.renoteId && body.text === undefined ? { text: null } : {}), ...body, ...(body.renoteId ? { renote: notes.find(item => item.id === body.renoteId) } : {}), files: (body.fileIds ?? []).map((id: string) => ({ id, type: 'image/png' })) });
 			notes.push(created);
 			return response({ createdNote: created });
 		}
@@ -356,7 +356,10 @@ test('native state overrides stale compatibility booleans and stale reblog hints
 	assert.equal(changed.muted, true);
 	assert.equal(changed.pinned, true);
 	await f.store.put('reblog', 'alice', '100', 'another-deleted-renote');
-	assert.equal((await f.request('POST', '/api/v1/statuses/100/reblog', {})).statusCode, 200);
+	const reblogged = await f.request('POST', '/api/v1/statuses/100/reblog', {});
+	assert.equal(reblogged.statusCode, 200);
+	assert.equal(reblogged.json().reblog?.id, '100');
+	assert.equal(reblogged.json().reblog?.reblogged, true);
 	assert.equal(f.calls.filter(call => call.endpoint === 'notes/create').length, 1);
 });
 
@@ -526,4 +529,27 @@ test('reads overlap the native token check but never answer before it, while wri
 	revoked = true;
 	pingGate = Promise.resolve();
 	assert.equal((await f.request('GET', '/api/v1/statuses/1000')).statusCode, 401);
+});
+
+test('direct status mentions preserve hyphenated usernames and normalize the local host', async t => {
+	const lookups: { username: string; host: string | null }[] = [];
+	const f = await fixture(t, { handler: async (endpoint, body) => {
+		if (endpoint !== 'users/show' || typeof body.username !== 'string') return;
+		lookups.push({ username: body.username, host: (body.host as string | null) ?? null });
+		if (body.username === 'foo-bar' && body.host === 'remote.example') return response({ id: 'remote-foobar', username: 'foo-bar', host: 'remote.example' });
+		if (body.username === 'bob' && body.host === null) return response({ id: 'local-bob', username: 'bob', host: null });
+		if (body.username === 'foo' && body.host === null) return response({ id: 'local-foo', username: 'foo', host: null });
+		return response({ error: { code: 'NO_SUCH_USER' } }, 404);
+	} });
+	const res = await f.request('POST', '/api/v1/statuses', {
+		status: 'Hi @foo-bar@remote.example. and @bob@social.test',
+		visibility: 'direct',
+	});
+	assert.equal(res.statusCode, 200);
+	assert.deepEqual(lookups, [
+		{ username: 'foo-bar', host: 'remote.example' },
+		{ username: 'bob', host: null },
+	]);
+	const created = f.calls.find(call => call.endpoint === 'notes/create');
+	assert.deepEqual(created?.body.visibleUserIds, ['remote-foobar', 'local-bob']);
 });

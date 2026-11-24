@@ -196,7 +196,34 @@ test('status search applies opaque cursor offsets and removes invisible results'
 	});
 	const response = await f.app.inject({ method: 'GET', url: '/api/v2/search?q=text&type=statuses&offset=1&limit=2&max_id=upper-opaque&min_id=lower-opaque&account_id=alice', headers: { authorization: f.authorization } });
 	assert.equal(response.statusCode, 200, response.body);
+	assert.equal(response.json().statuses.map((status: Json) => status.id).length, 2);
 	assert.deepEqual(response.json().statuses.map((status: Json) => status.id), ['n3', 'n2']);
+	assert.equal(f.calls.length, 2);
+});
+
+test('status search continues paging after a filtered short page from native search', async t => {
+	const f = await fixture(t, (endpoint, body) => {
+		assert.equal(endpoint, 'notes/search');
+		if (!body.untilId) return [note('n4')];
+		if (body.untilId === 'n4') return [note('n3'), note('n2')];
+		return [];
+	});
+	const response = await f.app.inject({ method: 'GET', url: '/api/v2/search?q=text&type=statuses&limit=2', headers: { authorization: f.authorization } });
+	assert.equal(response.statusCode, 200, response.body);
+	assert.deepEqual(response.json().statuses.map((status: Json) => status.id), ['n4', 'n3']);
+	assert.equal(f.calls.length, 2);
+});
+
+test('status search continues paging after an entirely hidden page with min_id and bounded cursor advancement', async t => {
+	const f = await fixture(t, (endpoint, body) => {
+		assert.equal(endpoint, 'notes/search');
+		if (body.sinceId === 'n1' && !body.untilId) return [note('n2', { isHidden: true }), note('n3', { isHidden: true })];
+		if (body.sinceId === 'n3' && !body.untilId) return [note('n4'), note('n5')];
+		return [];
+	});
+	const response = await f.app.inject({ method: 'GET', url: '/api/v2/search?q=text&type=statuses&limit=2&min_id=n1', headers: { authorization: f.authorization } });
+	assert.equal(response.statusCode, 200, response.body);
+	assert.deepEqual(response.json().statuses.map((status: Json) => status.id), ['n4', 'n5']);
 	assert.equal(f.calls.length, 2);
 });
 

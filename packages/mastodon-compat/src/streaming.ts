@@ -76,12 +76,16 @@ function subscription(input: Json): Subscription {
 async function authorizedGrant(store: StreamingDependencies['store'], token: string): Promise<UserGrant> {
 	const grant = await store.getGrant(token);
 	if (!grant || grant.kind !== 'user' || !identifier(grant.userId) || !grant.nativeToken) throw new StreamError(401, 'The access token is invalid');
-	if (!allowsScope(grant.scopes, 'read:statuses') && !allowsScope(grant.scopes, 'read:notifications')) throw new StreamError(403, 'A read scope is required');
+	if (!allowsScope(grant.scopes, 'read:statuses') && !allowsScope(grant.scopes, 'read:notifications') && !allowsScope(grant.scopes, 'read:lists')) throw new StreamError(403, 'A read scope is required');
 	return grant as UserGrant;
 }
 
 function authorizeSubscription(grant: UserGrant, target: Subscription): void {
-	const required = target.stream === 'user:notification' ? 'read:notifications' : 'read:statuses';
+	const required = target.stream === 'user:notification'
+		? 'read:notifications'
+		: target.stream === 'list'
+			? 'read:lists'
+			: 'read:statuses';
 	if (target.stream === 'user') {
 		if (allowsScope(grant.scopes, 'read:statuses') || allowsScope(grant.scopes, 'read:notifications')) return;
 	}
@@ -184,13 +188,16 @@ class StreamingSession {
 			this.validating = true;
 			void (async () => {
 				if (await this.currentGrant() == null) return;
-				await this.checkFilters();
 				if (this.ended || this.client.readyState !== WebSocket.OPEN) return;
+				this.enqueue(() => Promise.resolve());
 				this.alive = false;
 				this.client.ping();
+				if (this.upstream.readyState === WebSocket.OPEN) this.upstream.ping();
 				const user = await this.native<Json>('i');
 				if (user.id !== this.grant.userId || user.isSuspended === true || user.isDeleted === true) this.close(1008, 'The access token is invalid');
-			})().catch(() => this.close(1008, 'The native authorization is unavailable')).finally(() => { this.validating = false; });
+			})().catch(error => {
+				if (error instanceof NativeError && (error.status === 401 || error.status === 403)) this.close(1008, 'The native authorization is unavailable');
+			}).finally(() => { this.validating = false; });
 		}, HEARTBEAT_MS);
 		this.heartbeat.unref();
 	}
@@ -204,21 +211,33 @@ class StreamingSession {
 
 	private async subscribe(target: Subscription): Promise<void> {
 		if (this.desiredSubscriptions.get(target.key) !== target) return;
-		const grant = await this.currentGrant();
-		if (!grant) return;
-		authorizeSubscription(grant, target);
-		if (this.subscriptions.has(target.key)) return;
-		if (this.subscriptions.size >= MAX_SUBSCRIPTIONS) throw new StreamError(400, 'Too many stream subscriptions');
-		if (target.list) await this.native('users/lists/show', { listId: target.list });
-		if (this.ended || this.desiredSubscriptions.get(target.key) !== target) return;
-		this.subscriptions.set(target.key, target);
-		if (target.stream === 'user' || target.stream === 'direct') {
-			if (allowsScope(grant.scopes, 'read:statuses')) this.connect(target, 'homeTimeline');
-			if (target.stream === 'direct' || allowsScope(grant.scopes, 'read:notifications')) this.connect(target, 'main');
-		} else if (target.stream === 'user:notification') this.connect(target, 'main');
-		else if (target.stream.startsWith('hashtag')) this.connect(target, 'hashtag', { q: [[target.tag]] });
-		else if (target.list) this.connect(target, 'userList', { listId: target.list, withRenotes: true });
-		else this.connect(target, target.stream.startsWith('public:local') ? 'localTimeline' : 'globalTimeline', { withRenotes: true, withFiles: false });
+		try {
+			const grant = await this.currentGrant();
+			if (!grant) return;
+			authorizeSubscription(grant, target);
+			if (this.subscriptions.has(target.key)) return;
+			if (this.subscriptions.size >= MAX_SUBSCRIPTIONS) throw new StreamError(400, 'Too many stream subscriptions');
+			if (target.list) {
+				try {
+					await this.native('users/lists/show', { listId: target.list });
+				} catch (error) {
+					if (error instanceof NativeError && (error.status === 400 || error.status === 404)) throw new StreamError(404, 'Record not found');
+					throw error;
+				}
+			}
+			if (this.ended || this.desiredSubscriptions.get(target.key) !== target) return;
+			this.subscriptions.set(target.key, target);
+			if (target.stream === 'user' || target.stream === 'direct') {
+				if (allowsScope(grant.scopes, 'read:statuses')) this.connect(target, 'homeTimeline');
+				if (target.stream === 'direct' || allowsScope(grant.scopes, 'read:notifications')) this.connect(target, 'main');
+			} else if (target.stream === 'user:notification') this.connect(target, 'main');
+			else if (target.stream.startsWith('hashtag')) this.connect(target, 'hashtag', { q: [[target.tag]] });
+			else if (target.list) this.connect(target, 'userList', { listId: target.list, withRenotes: true });
+			else this.connect(target, target.stream.startsWith('public:local') ? 'localTimeline' : 'globalTimeline', { withRenotes: true, withFiles: false });
+		} catch (error) {
+			if (this.desiredSubscriptions.get(target.key) === target) this.desiredSubscriptions.delete(target.key);
+			throw error;
+		}
 	}
 
 	close(code = 1001, reason = 'The streaming connection closed'): void {
@@ -294,6 +313,7 @@ class StreamingSession {
 		if (this.ended) return;
 		if (++this.pendingEvents > MAX_PENDING_EVENTS) { this.close(1013, 'Too many pending streaming events'); return; }
 		this.queue = this.queue.then(async () => {
+			if (this.ended) return;
 			await this.checkFilters();
 			if (!this.ended) await action();
 		}).catch(async error => {
@@ -340,7 +360,7 @@ class StreamingSession {
 
 	private emit(grant: UserGrant, target: Subscription, event: string, payload?: Json | string): boolean {
 		if (this.ended || this.desiredSubscriptions.get(target.key) !== target || this.subscriptions.get(target.key) !== target || this.client.readyState !== WebSocket.OPEN) return false;
-		const required = event === 'notification' ? 'read:notifications' : 'read:statuses';
+		const required = event === 'notification' ? 'read:notifications' : target.stream === 'list' ? 'read:lists' : 'read:statuses';
 		if (event !== 'filters_changed' && !allowsScope(grant.scopes, required)) return false;
 		if (this.client.bufferedAmount > MAX_BUFFERED_BYTES) { this.close(1013, 'The streaming client is too slow'); return false; }
 		this.client.send(JSON.stringify({ stream: target.identity, event, ...(payload === undefined ? {} : { payload: typeof payload === 'string' ? payload : JSON.stringify(payload) }) }));
@@ -360,8 +380,18 @@ class StreamingSession {
 		if (!channel || !object(frame.body.body)) return;
 		if (frame.body.type === 'notification') await this.notification(channel, frame.body.body);
 		else if (['note', 'mention', 'reply', 'renote'].includes(frame.body.type) && identifier(frame.body.body.id)) {
-			const note = await this.visibleNote(frame.body.body.id);
-			if (note) await this.deliverNote(note, [...channel.targets], 'update');
+			const candidate = frame.body.body;
+			const keys = (frame.body.type !== 'note'
+				? [...channel.targets].filter(key => this.subscriptions.get(key)?.stream === 'direct')
+				: [...channel.targets]
+			).filter(key => {
+				const target = this.subscriptions.get(key);
+				if (!target) return false;
+				return typeof candidate.visibility === 'string' ? this.matches(target, candidate) : true;
+			});
+			if (!keys.length) return;
+			const note = await this.visibleNote(candidate.id);
+			if (note) await this.deliverNote(note, keys, 'update');
 		}
 	}
 
@@ -377,6 +407,7 @@ class StreamingSession {
 
 	private matches(target: Subscription, note: Json): boolean {
 		if (target.stream === 'user:notification') return false;
+		if (target.stream === 'user') return note.visibility !== 'specified';
 		if (target.stream === 'direct') return note.visibility === 'specified';
 		if (target.stream.startsWith('public') || target.stream.startsWith('hashtag')) {
 			if (note.visibility !== 'public' || note.channelId != null) return false;
@@ -529,7 +560,11 @@ class StreamingSession {
 
 	private async conversation(note: Json, status: Json): Promise<Json | null> {
 		const conversation = await conversationFromNote(this.deps.store, this.grant.userId, note, this.native.bind(this), this.deps.entities, { status: await decorateStatus(this.deps.store, status, this.grant.userId) });
-		if (conversation?.last_status) conversation.last_status = await this.hydratedStatus(conversation.last_status, await this.statusStore(conversation.last_status));
+		if (conversation?.last_status) {
+			const store = await this.statusStore(conversation.last_status);
+			const hydrated = await this.hydratedStatus(conversation.last_status, store);
+			conversation.last_status = await applyFilters(store, this.grant.userId, hydrated, 'home');
+		}
 		return conversation;
 	}
 

@@ -125,7 +125,7 @@ export class EntityConverter {
 		return this.statusEntity(note, options, new Set(), 0);
 	}
 
-	notification(notification: Json): Json | null {
+	notification(notification: Json, options: StatusOptions = {}): Json | null {
 		const types: Record<string, string> = {
 			mention: 'mention', reply: 'mention', quote: 'quote', note: 'status', renote: 'reblog',
 			reaction: 'favourite', follow: 'follow', followRequestAccepted: 'follow', receiveFollowRequest: 'follow_request', pollEnded: 'poll',
@@ -133,7 +133,7 @@ export class EntityConverter {
 		const type = types[text(notification.type)];
 		if (type == null || !object(notification.user)) return null;
 		if (notification.type === 'reaction' && !isFavouriteReaction(notification.reaction)) return null;
-		const status = object(notification.note) ? this.status(notification.note) : null;
+		const status = object(notification.note) ? this.status(notification.note, options) : null;
 		if (['mention', 'quote', 'status', 'reblog', 'favourite', 'poll'].includes(type) && status == null) return null;
 		return {
 			id: id(notification.id),
@@ -372,7 +372,7 @@ export class EntityConverter {
 		if (note.isHidden === true || note.isDeleted === true || note.deletedAt != null) return false;
 		if (options.allowLocalOnly === false && note.localOnly === true) return false;
 		if ((options.viewerId === null || options.viewerId === '') && ['followers', 'specified'].includes(note.visibility)) return false;
-		if (typeof options.viewerId === 'string' && note.visibility === 'specified' && note.userId !== options.viewerId && Array.isArray(note.visibleUserIds) && !note.visibleUserIds.includes(options.viewerId)) return false;
+		if (typeof options.viewerId === 'string' && note.visibility === 'specified' && note.userId !== options.viewerId && (!Array.isArray(note.visibleUserIds) || !note.visibleUserIds.includes(options.viewerId))) return false;
 		return true;
 	}
 

@@ -8,6 +8,7 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import type {} from '@fastify/multipart';
 import { CompatStore, hashCredential, type AuthorizationCode, type CompatClient, type Grant } from './store.js';
 import { allowsScope, normalizeScopes, toNativePermissions } from './scopes.js';
+import { NativeError } from './native-client.js';
 
 const OOB = 'urn:ietf:wg:oauth:2.0:oob';
 const STATE_TTL = 10 * 60 * 1000;
@@ -16,7 +17,7 @@ type Parameters = Record<string, unknown>;
 
 export interface OAuthDependencies {
 	store: CompatStore;
-	native: { call<T>(endpoint: string, body: Record<string, never>): Promise<T> };
+	native: { call<T>(endpoint: string, body: Record<string, unknown>, token?: string): Promise<T> };
 	publicUrl: string;
 	nativeUrl: string;
 	now?: () => number;
@@ -104,13 +105,14 @@ export function handlesOAuth(request: FastifyRequest): boolean {
 
 async function readBody(request: FastifyRequest): Promise<Parameters> {
 	if (!request.isMultipart?.()) return object(request.body);
-	const body: Parameters = {};
+	const body: Parameters = Object.create(null);
 	for await (const part of request.parts({ limits: { fields: 64, parts: 64, files: 0, fieldSize: 16 * 1024 } })) {
 		if (part.type === 'file') {
 			part.file.resume();
 			throw new OAuthError(422, 'invalid_request', 'Files are not accepted by OAuth endpoints');
 		}
 		if (part.valueTruncated) throw new OAuthError(422, 'invalid_request', 'OAuth parameter is too large');
+		if (['__proto__', 'constructor', 'prototype'].includes(part.fieldname)) continue;
 		const previous = body[part.fieldname];
 		body[part.fieldname] = previous === undefined ? part.value : Array.isArray(previous) ? [...previous, part.value] : [previous, part.value];
 	}
@@ -160,7 +162,6 @@ async function beginAuthorization(query: Parameters, reply: FastifyReply, deps: 
 		throw new OAuthError(400, 'invalid_request', 'PKCE requires an S256 code challenge');
 	}
 	const now = deps.now?.() ?? Date.now();
-	await deps.store.prune(now);
 	const state = randomBytes(32).toString('base64url');
 	const session = randomUUID();
 	const pending: AuthorizationState = { clientId: client.id, redirectUri, scopes: requested, session, clientState: field(query, 'state'), codeChallenge: challenge };
@@ -225,15 +226,24 @@ async function token(request: FastifyRequest, body: Parameters, deps: OAuthDepen
 		issued = await deps.store.createGrant({ clientId: client.id, scopes: requested, kind: 'app' }, now);
 	} else if (body.grant_type === 'authorization_code') {
 		const raw = required(body, 'code');
-		issued = await deps.store.transaction(async () => {
-			const code = await deps.store.getCode(raw, now);
-			if (!code || code.clientId !== client.id || code.redirectUri !== field(body, 'redirect_uri')) throw new OAuthError(400, 'invalid_grant', 'Invalid authorization code or redirect URI');
-			verifyPkce(code, body);
-			const requested = scopes(body.scope, code.scopes);
-			requireSubset(requested, code.scopes);
-			await deps.store.deleteCode(raw);
-			return await deps.store.createGrant({ clientId: client.id, scopes: requested, kind: 'user', userId: code.userId, nativeToken: code.nativeToken }, now);
-		});
+		let consumeOnFailure = false;
+		try {
+			issued = await deps.store.transaction(async () => {
+				const code = await deps.store.getCode(raw, now);
+				if (!code || code.clientId !== client.id) throw new OAuthError(400, 'invalid_grant', 'Invalid authorization code or redirect URI');
+				consumeOnFailure = true;
+				if (code.redirectUri !== field(body, 'redirect_uri')) throw new OAuthError(400, 'invalid_grant', 'Invalid authorization code or redirect URI');
+				verifyPkce(code, body);
+				const requested = scopes(body.scope, code.scopes);
+				requireSubset(requested, code.scopes);
+				const consumed = await deps.store.deleteCode(raw);
+				if (!consumed) throw new OAuthError(400, 'invalid_grant', 'Invalid authorization code or redirect URI');
+				return await deps.store.createGrant({ clientId: client.id, scopes: requested, kind: 'user', userId: code.userId, nativeToken: code.nativeToken }, now);
+			});
+		} catch (error) {
+			if (consumeOnFailure) await deps.store.deleteCode(raw);
+			throw error;
+		}
 	} else {
 		throw new OAuthError(400, 'unsupported_grant_type', 'Only authorization_code and client_credentials are supported');
 	}
@@ -246,6 +256,13 @@ async function revoke(request: FastifyRequest, body: Parameters, deps: OAuthDepe
 	if (!raw) throw new OAuthError(403, 'access_denied', 'A token is required');
 	const grant = await deps.store.getGrant(raw);
 	if (grant && grant.clientId !== client.id) throw new OAuthError(403, 'access_denied', 'The token belongs to another application');
+	if (grant?.kind === 'user' && grant.nativeToken) {
+		try {
+			await deps.native.call('i/revoke-token', { token: grant.nativeToken }, grant.nativeToken);
+		} catch (error) {
+			if (!(error instanceof NativeError && (error.status === 401 || error.status === 404))) throw error;
+		}
+	}
 	await deps.store.revokeGrant(raw, client.id);
 	return {};
 }
@@ -271,6 +288,7 @@ export async function dispatchHandler(request: FastifyRequest, reply: FastifyRep
 			if (error.statusCode === 401) reply.header('WWW-Authenticate', error.code === 'invalid_client' ? 'Basic realm="OAuth"' : 'Bearer realm="Mastodon"');
 			return reply.code(error.statusCode).send({ error: error.code, error_description: error.message });
 		}
-		throw error;
+		request.log.error(error);
+		return reply.code(500).send({ error: 'server_error', error_description: 'The authorization server could not complete this request' });
 	}
 }

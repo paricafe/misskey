@@ -83,12 +83,17 @@ export async function hydrateStatus(store: Pick<CompatStore, 'get' | 'delete'>, 
 	}
 	if (userId) {
 		const reblog = await liveReblog(store, userId, status.id, call);
-		if (reblog) result.reblogged = true;
+		if (reblog || status.reblogged === true) result.reblogged = true;
 		else delete result.reblogged;
 	} else delete result.reblogged;
-	const author = await call('users/show', { userId: status.account.id });
-	if (Array.isArray(author.pinnedNoteIds)) result.pinned = author.pinnedNoteIds.includes(status.id);
-	else if (Array.isArray(author.pinnedNotes)) result.pinned = author.pinnedNotes.some((note: Json) => note.id === status.id);
+	let author: Json | undefined;
+	try {
+		author = await call('users/show', { userId: status.account.id });
+	} catch (error) {
+		if (!(error instanceof NativeError && (error.status === 404 || error.code === 'NO_SUCH_USER'))) throw error;
+	}
+	if (Array.isArray(author?.pinnedNoteIds)) result.pinned = author.pinnedNoteIds.includes(status.id);
+	else if (Array.isArray(author?.pinnedNotes)) result.pinned = author.pinnedNotes.some((note: Json) => note.id === status.id);
 	else delete result.pinned;
 	if (status.reblog) result.reblog = await hydrateStatus(store, status.reblog, userId, canReadAccount, call);
 	if (status.quote?.quoted_status) result.quote = { ...status.quote, quoted_status: await hydrateStatus(store, status.quote.quoted_status, userId, canReadAccount, call) };

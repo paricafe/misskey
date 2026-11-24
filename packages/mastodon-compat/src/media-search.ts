@@ -185,19 +185,33 @@ async function search(routes: Routes, c: RequestContext, version: number): Promi
 	if ((!type || type === 'statuses') && c.grant?.kind === 'user') tasks.push((async () => {
 		const notes: Json[] = [];
 		let untilId = c.query.max_id ? string(c.query.max_id) : undefined;
+		let sinceId = c.query.min_id ? string(c.query.min_id) : undefined;
+		const forwardOnly = Boolean(sinceId && !untilId);
+		const maxPages = Math.max(10, Math.min(12, Math.ceil((offset + limit) / 100) + 1));
+		const compareIds = (a: string, b: string) => a < b ? -1 : a > b ? 1 : 0;
 		let skipped = 0;
-		while (notes.length < limit) {
+		let pages = 0;
+		while (notes.length < limit && pages++ < maxPages) {
 			const pageSize = Math.min(100, offset - skipped + limit - notes.length);
-			const page = await c.call<Json[]>('notes/search', { query, limit: pageSize, ...(untilId ? { untilId } : {}), ...(c.query.min_id ? { sinceId: string(c.query.min_id) } : {}), ...(c.query.account_id ? { userId: string(c.query.account_id) } : {}) }).catch(error => {
+			const page = await c.call<Json[]>('notes/search', { query, limit: pageSize, ...(untilId ? { untilId } : {}), ...(sinceId ? { sinceId } : {}), ...(c.query.account_id ? { userId: string(c.query.account_id) } : {}) }).catch(error => {
 				if (error instanceof NativeError && error.code === 'UNAVAILABLE') return [];
 				throw error;
 			});
 			if (!page.length) break;
 			const visible = await routes.statuses(page, c);
 			for (const note of visible) { if (skipped < offset) skipped++; else if (!notes.some(item => item.id === note.id)) notes.push(note); }
-			const cursor = string(page.at(-1)!.id);
-			if (page.length < pageSize || cursor === untilId) break;
-			untilId = cursor;
+			const sortedIds = page.map(item => string(item.id)).sort(compareIds);
+			const pageDescending = page.length >= 2 && compareIds(string(page[0].id), string(page.at(-1)!.id)) > 0;
+			if (forwardOnly && !pageDescending) {
+				const cursor = sortedIds.at(-1)!;
+				if (sinceId && compareIds(cursor, sinceId) <= 0) break;
+				sinceId = cursor;
+			} else {
+				const cursor = sortedIds[0]!;
+				if (untilId && compareIds(cursor, untilId) >= 0) break;
+				if (sinceId && compareIds(cursor, sinceId) <= 0) break;
+				untilId = cursor;
+			}
 		}
 		result.statuses = notes.slice(0, limit);
 	})());
@@ -231,8 +245,15 @@ async function history(routes: Routes, c: RequestContext): Promise<Json[]> {
 async function translate(routes: Routes, c: RequestContext): Promise<Json> {
 	const note = await routes.note(c);
 	await routes.status(note, c);
-	const language = string(c.body.lang, c.request.headers['accept-language']?.split(',')[0]?.split(';')[0] || 'en');
-	if (!/^[a-z]{2,3}(?:-[a-zA-Z]{2,4})?$/u.test(language)) throw new HttpError(422, 'Invalid target language');
+	const langPattern = /^[a-z]{2,3}(?:-[a-zA-Z]{2,4}){0,2}$/u;
+	let language: string;
+	if (c.body.lang !== undefined) {
+		language = string(c.body.lang);
+		if (!langPattern.test(language)) throw new HttpError(422, 'Invalid target language');
+	} else {
+		const headerLang = c.request.headers['accept-language']?.split(',')[0]?.split(';')[0]?.trim() ?? '';
+		language = langPattern.test(headerLang) ? headerLang : 'en';
+	}
 	const translated = await c.call<Json | undefined>('notes/translate', { noteId: note.id, targetLang: language }).catch(error => {
 		if (error instanceof NativeError && error.code === 'UNAVAILABLE') throw new HttpError(503, 'Translation is unavailable');
 		throw error;
