@@ -1,0 +1,89 @@
+packages/backend/src/server/web/ClientServerService.ts
+  a98097cae5c78d9d 876,879,882
+packages/backend/src/core/CustomEmojiService.ts
+  a98097cae5c78d9d 385,388
+package.json
+  4e98740baee727a0 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8-ntes.10",
+  "base_commit_sha": "09013a2ae4e8c2a2479c39903e3dbf847b1857df",
+  "prompts": {
+    "4e98740baee727a0": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1f972-f9ce-7790-8b51-d56e5387279b",
+        "model": "gpt-6.2-sol"
+      },
+      "human_author": "Natsuki-Kaede",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "package.json": {
+          "accepted_lines": 1
+        }
+      }
+    },
+    "a98097cae5c78d9d": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1d8ff-2f59-7090-b1bb-0db4713ea2aa",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Natsuki-Kaede",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 21,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "packages/backend/src/server/web/ClientServerService.ts": {
+          "accepted_lines": 4
+        },
+        "packages/backend/src/core/activitypub/ApRequestService.ts": {
+          "accepted_lines": 2
+        },
+        "packages/backend/src/core/activitypub/models/ApNoteService.ts": {
+          "accepted_lines": 1
+        },
+        "packages/backend/src/core/CustomEmojiService.ts": {
+          "accepted_lines": 9
+        },
+        "packages/backend/src/core/MfmService.ts": {
+          "accepted_lines": 3
+        },
+        "packages/backend/test/e2e/endpoints.ts": {
+          "accepted_lines": 2
+        }
+      }
+    },
+    "a9881cb2263f7e3b": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1d92c-ea12-7fa2-a8c3-ea3031e978fa",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "Natsuki-Kaede",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 20,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "packages/backend/src/server/oauth/OAuth2ProviderService.ts": {
+          "accepted_lines": 11
+        },
+        "packages/backend/src/core/activitypub/models/ApNoteService.ts": {
+          "accepted_lines": 3
+        },
+        "packages/backend/test/e2e/endpoints.ts": {
+          "accepted_lines": 6
+        }
+      }
+    }
+  }
+}
