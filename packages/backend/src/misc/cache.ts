@@ -227,10 +227,12 @@ export class RedisSingleCache<T> {
 
 	@bindThis
 	public async refresh() {
-		this.version++;
+		const version = ++this.version;
 		this.pendingFetch = undefined;
 		const value = await this.fetcher();
-		await this.set(value);
+		if (this.version === version) {
+			await this.set(value);
+		}
 	}
 }
 

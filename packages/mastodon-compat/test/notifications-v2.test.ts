@@ -299,3 +299,14 @@ test('v1 and v2 detail lookup finds historical MEIDG notifications with hex carr
 	assert.equal((await app.inject({ method: 'POST', url: `/api/v1/notifications/${trailingF}/dismiss`, headers: { authorization } })).statusCode, 200);
 	assert.equal((await app.inject({ url: `/api/v1/notifications/${trailingF}`, headers: { authorization } })).statusCode, 404);
 });
+
+test('filtered unread_count with limit=1 scans beyond 10 non-matching native notifications', async t => {
+	const items = [
+		event(1, { type: 'mention', note: status }),
+		...Array.from({ length: 12 }, (_, index) => event(index + 2)),
+	];
+	const f = await fixture(t, items);
+	const response = await f.app.inject({ url: '/api/v1/notifications/unread_count?limit=1&types[]=mention', headers: { authorization: f.authorization } });
+	assert.equal(response.statusCode, 200, response.body);
+	assert.deepEqual(response.json(), { count: 1 });
+});

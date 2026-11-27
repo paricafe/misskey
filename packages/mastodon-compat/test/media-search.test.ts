@@ -266,3 +266,32 @@ test('translation converts native text safely and separates the native warning d
 	assert.doesNotMatch(response.json().content, /<script>/u);
 	assert.equal(response.json().detected_source_language, 'ja');
 });
+
+test('status search with min_id keeps paging backward after a single-item descending page', async t => {
+	const f = await fixture(t, (endpoint, body) => {
+		assert.equal(endpoint, 'notes/search');
+		if (!body.untilId) return [note('n5')];
+		if (body.untilId === 'n5') return [note('n3')];
+		return [];
+	});
+	const response = await f.app.inject({ method: 'GET', url: '/api/v2/search?q=text&type=statuses&limit=2&min_id=n1', headers: { authorization: f.authorization } });
+	assert.equal(response.statusCode, 200, response.body);
+	assert.deepEqual(response.json().statuses.map((status: Json) => status.id), ['n5', 'n3']);
+});
+
+test('translation accepts BCP-47 numeric region codes from Accept-Language', async t => {
+	const f = await fixture(t, (endpoint, body) => {
+		if (endpoint === 'notes/show') return note('translated');
+		assert.equal(endpoint, 'notes/translate');
+		assert.deepEqual(body, { noteId: 'translated', targetLang: 'es-419' });
+		return { sourceLang: 'EN', text: 'Hola' };
+	});
+	const response = await f.app.inject({
+		method: 'POST',
+		url: '/api/v1/statuses/translated/translate',
+		headers: { authorization: f.authorization, 'accept-language': 'es-419,es;q=0.9' },
+		payload: {},
+	});
+	assert.equal(response.statusCode, 200, response.body);
+	assert.equal(response.json().language, 'es-419');
+});

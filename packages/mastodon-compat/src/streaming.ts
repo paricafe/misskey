@@ -606,7 +606,14 @@ export function attachStreaming(server: Server, deps: StreamingDependencies): { 
 				const context = { signal: AbortSignal.any([controller.signal, AbortSignal.timeout(10_000)]) };
 				const user = await deps.native.call<Json>('i', {}, grant.nativeToken, context);
 				if (user.id !== grant.userId || user.isSuspended === true || user.isDeleted === true) throw new StreamError(401, 'The access token is invalid');
-				if (initial?.list) await deps.native.call('users/lists/show', { listId: initial.list }, grant.nativeToken, context);
+				if (initial?.list) {
+					try {
+						await deps.native.call('users/lists/show', { listId: initial.list }, grant.nativeToken, context);
+					} catch (error) {
+						if (error instanceof NativeError && (error.status === 400 || error.status === 404)) throw new StreamError(404, 'Record not found');
+						throw error;
+					}
+				}
 				upstream = await openNative(deps.native, grant.nativeToken, controller.signal);
 				if (closed || socket.destroyed || controller.signal.aborted) { upstream.terminate(); return; }
 				if (upstream.readyState !== WebSocket.OPEN) throw new StreamError(502, 'The native streaming connection closed');

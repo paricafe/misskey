@@ -241,7 +241,7 @@ async function token(request: FastifyRequest, body: Parameters, deps: OAuthDepen
 				return await deps.store.createGrant({ clientId: client.id, scopes: requested, kind: 'user', userId: code.userId, nativeToken: code.nativeToken }, now);
 			});
 		} catch (error) {
-			if (consumeOnFailure) await deps.store.deleteCode(raw);
+			if (consumeOnFailure && error instanceof OAuthError) await deps.store.deleteCode(raw);
 			throw error;
 		}
 	} else {

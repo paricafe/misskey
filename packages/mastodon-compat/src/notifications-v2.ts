@@ -77,10 +77,11 @@ async function readPage(routes: Routes, c: RequestContext, limit: number, query 
 	const seen = new Set<string>();
 	const visited = new Set<string>();
 	let pages = 0;
+	const expandScanBatch = !hydrate && (types.length > 0 || excluded.length > 0 || accountId.length > 0);
 	while (notifications.length < limit && pages++ < MAX_SCAN_PAGES) {
 		if (visited.has(cursor)) break;
 		visited.add(cursor);
-		const batchLimit = Math.min(100, limit - notifications.length);
+		const batchLimit = expandScanBatch ? 100 : Math.min(100, limit - notifications.length);
 		const rows = await c.call<Json[]>('i/notifications', { limit: batchLimit, markAsRead: false, ...(cursor ? { [ascending ? 'sinceId' : 'untilId']: cursor } : {}) });
 		if (!rows.length) break;
 		const ordered = [...rows].sort((a, b) => (ascending ? 1 : -1) * compareIds(string(a.id), string(b.id)));

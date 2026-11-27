@@ -110,7 +110,7 @@ async function fixture() {
 				result = ancestors;
 			} else if (endpoint === 'notes/mentions' || endpoint === 'users/notes') result = [...notes.values()].filter(value => value.visibility === 'specified' && (!body.untilId || value.id < body.untilId)).sort((a, b) => b.id.localeCompare(a.id)).slice(0, body.limit ?? 100);
 			if (result == null) {
-				response.statusCode = 404;
+				response.statusCode = endpoint === 'users/lists/show' ? 400 : 404;
 				response.end(JSON.stringify({ error: { code: endpoint === 'notes/show' ? 'NO_SUCH_NOTE' : 'NO_SUCH_LIST', message: 'Not found' } }));
 			} else response.end(JSON.stringify(result));
 		})().catch(() => { response.statusCode = 500; response.end('{}'); });

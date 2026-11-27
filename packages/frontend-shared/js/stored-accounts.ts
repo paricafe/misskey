@@ -22,13 +22,28 @@ export async function readLegacyStoredAccounts(read: (key: string) => Promise<un
 }
 
 export async function readStoredAccounts(read: (key: string) => Promise<unknown>, host: string): Promise<StoredAccount[]> {
-	const state = await read(ACCOUNT_DEVICE_STATE_KEY) as { accountTokens?: Record<string, string>; accountHost?: string } | undefined;
+	const state = await read(ACCOUNT_DEVICE_STATE_KEY) as {
+		accountTokens?: Record<string, string>;
+		accountInfos?: Record<string, unknown>;
+		accountHost?: string;
+	} | undefined;
 	if (state?.accountTokens != null) {
 		const accountHost = typeof state.accountHost === 'string' && state.accountHost.length > 0 ? state.accountHost : host;
 		const prefix = accountHost + '/';
-		return Object.entries(state.accountTokens)
+		const stored = Object.entries(state.accountTokens)
 			.filter(([key, token]) => key.startsWith(prefix) && key.length > prefix.length && typeof token === 'string' && token.length > 0)
 			.map(([key, token]) => ({ id: key.slice(prefix.length), token }));
+		if (state.accountInfos != null) {
+			const storedIds = new Set(stored.map(account => account.id));
+			const legacyAccounts = await readLegacyStoredAccounts(read, accountHost);
+			for (const legacy of legacyAccounts) {
+				if (!storedIds.has(legacy.id) && Object.hasOwn(state.accountInfos, prefix + legacy.id)) {
+					stored.push(legacy);
+					storedIds.add(legacy.id);
+				}
+			}
+		}
+		return stored;
 	}
 
 	return readLegacyStoredAccounts(read, host);

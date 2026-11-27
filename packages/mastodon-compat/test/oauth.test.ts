@@ -244,3 +244,32 @@ test('unexpected internal errors return generic 500 server_error without leaking
 	assert.equal(res.json().error, 'server_error');
 	assert.ok(!res.body.includes('secret-db-connection-string'));
 });
+
+test('transient store failure during grant creation does not consume a valid authorization code', async t => {
+	const f = await fixture(t);
+	const client = await f.app('read');
+	const { response } = await f.complete(client.client_id);
+	const code = new URL(String(response.headers.location)).searchParams.get('code')!;
+	const originalCreateGrant = f.store.createGrant.bind(f.store);
+	let failOnce = true;
+	f.store.createGrant = async (...args) => {
+		if (failOnce) {
+			failOnce = false;
+			throw new Error('transient db error');
+		}
+		return originalCreateGrant(...args);
+	};
+	const failed = await f.server.inject({
+		method: 'POST',
+		url: '/oauth/token',
+		payload: { grant_type: 'authorization_code', client_id: client.client_id, client_secret: client.client_secret, redirect_uri: 'testapp://callback', code },
+	});
+	assert.equal(failed.statusCode, 500);
+	const retried = await f.server.inject({
+		method: 'POST',
+		url: '/oauth/token',
+		payload: { grant_type: 'authorization_code', client_id: client.client_id, client_secret: client.client_secret, redirect_uri: 'testapp://callback', code },
+	});
+	assert.equal(retried.statusCode, 200, retried.body);
+	assert.ok(retried.json().access_token);
+});

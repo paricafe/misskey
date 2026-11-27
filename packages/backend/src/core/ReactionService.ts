@@ -10,7 +10,7 @@ import { IdentifiableError } from '@/misc/identifiable-error.js';
 import type { MiRemoteUser, MiUser } from '@/models/User.js';
 import type { MiNote } from '@/models/Note.js';
 import { IdService } from '@/core/IdService.js';
-import type { MiNoteReaction } from '@/models/NoteReaction.js';
+import { MiNoteReaction } from '@/models/NoteReaction.js';
 import { isDuplicateKeyValueError } from '@/misc/is-duplicate-key-value-error.js';
 import { GlobalEventService } from '@/core/GlobalEventService.js';
 import { NotificationService } from '@/core/NotificationService.js';
@@ -192,23 +192,47 @@ export class ReactionService {
 			reaction,
 		};
 
-		try {
-			await this.noteReactionsRepository.insert(record);
-		} catch (e) {
-			if (isDuplicateKeyValueError(e)) {
-				const exists = await this.noteReactionsRepository.findOneByOrFail({
-					noteId: note.id,
-					userId: user.id,
-				});
-
-				if (exists.reaction !== reaction && options.replaceExisting !== false) {
-					await this.deleteLocked(user, note);
-					await this.noteReactionsRepository.insert(record);
-				} else {
+		if (typeof this.noteReactionsRepository.manager?.transaction === 'function') {
+			const replacedReaction = await this.noteReactionsRepository.manager.transaction(async em => {
+				const repo = em.getRepository(MiNoteReaction);
+				await repo.query(
+					'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
+					[JSON.stringify(['reaction', note.id, user.id])],
+				);
+				const exists = await repo.findOneBy({ noteId: note.id, userId: user.id });
+				if (exists != null) {
+					if (exists.reaction !== reaction && options.replaceExisting !== false) {
+						await repo.delete(exists.id);
+						await repo.insert(record);
+						return exists;
+					}
 					throw new IdentifiableError('51c42bb4-931a-456b-bff7-e5a8a70dd298');
 				}
-			} else {
-				throw e;
+				await repo.insert(record);
+				return null;
+			});
+			if (replacedReaction != null) {
+				await this.emitRemovedReactionSideEffects(user, replacedReaction, note);
+			}
+		} else {
+			try {
+				await this.noteReactionsRepository.insert(record);
+			} catch (e) {
+				if (isDuplicateKeyValueError(e)) {
+					const exists = await this.noteReactionsRepository.findOneByOrFail({
+						noteId: note.id,
+						userId: user.id,
+					});
+
+					if (exists.reaction !== reaction && options.replaceExisting !== false) {
+						await this.deleteLocked(user, note);
+						await this.noteReactionsRepository.insert(record);
+					} else {
+						throw new IdentifiableError('51c42bb4-931a-456b-bff7-e5a8a70dd298');
+					}
+				} else {
+					throw e;
+				}
 			}
 		}
 
@@ -324,6 +348,41 @@ export class ReactionService {
 		if (!await this.removeReaction(exist, note)) {
 			throw new IdentifiableError('60527ec9-b4cb-4a88-a6bd-32d3ad26817d', 'not reacted');
 		}
+
+		if (this.userEntityService.isLocalUser(user) && !note.localOnly) {
+			const content = this.apRendererService.addContext(this.apRendererService.renderUndo(await this.apRendererService.renderLike(exist, note), user));
+			const dm = this.apDeliverManagerService.createDeliverManager(user, content);
+			if (note.userHost !== null) {
+				const reactee = await this.usersRepository.findOneBy({ id: note.userId });
+				dm.addDirectRecipe(reactee as MiRemoteUser);
+			}
+			dm.addFollowersRecipe();
+			trackPromise(dm.execute());
+		}
+	}
+
+	private async emitRemovedReactionSideEffects(
+		user: { id: MiUser['id']; host: MiUser['host']; isBot: MiUser['isBot']; },
+		exist: MiNoteReaction,
+		note: MiNote,
+	): Promise<void> {
+		if (this.meta.enableReactionsBuffering) {
+			await this.reactionsBufferingService.delete(note.id, exist.userId, exist.reaction);
+		} else {
+			await this.notesRepository.createQueryBuilder().update()
+				.set({
+					reactions: () => `jsonb_set("reactions", ARRAY[:reaction], (COALESCE("reactions"->>:reaction, '0')::int - 1)::text::jsonb)`,
+					reactionAndUserPairCache: () => `array_remove("reactionAndUserPairCache", :pair)`,
+				})
+				.where('id = :id', { id: note.id })
+				.setParameters({ reaction: exist.reaction, pair: `${exist.userId}/${exist.reaction}` })
+				.execute();
+		}
+
+		this.globalEventService.publishNoteStream(note, 'unreacted', {
+			reaction: this.decodeReaction(exist.reaction).reaction,
+			userId: exist.userId,
+		});
 
 		if (this.userEntityService.isLocalUser(user) && !note.localOnly) {
 			const content = this.apRendererService.addContext(this.apRendererService.renderUndo(await this.apRendererService.renderLike(exist, note), user));

@@ -201,8 +201,8 @@ async function search(routes: Routes, c: RequestContext, version: number): Promi
 			const visible = await routes.statuses(page, c);
 			for (const note of visible) { if (skipped < offset) skipped++; else if (!notes.some(item => item.id === note.id)) notes.push(note); }
 			const sortedIds = page.map(item => string(item.id)).sort(compareIds);
-			const pageDescending = page.length >= 2 && compareIds(string(page[0].id), string(page.at(-1)!.id)) > 0;
-			if (forwardOnly && !pageDescending) {
+			const pageAscending = page.length >= 2 && compareIds(string(page[0].id), string(page.at(-1)!.id)) < 0;
+			if (forwardOnly && pageAscending) {
 				const cursor = sortedIds.at(-1)!;
 				if (sinceId && compareIds(cursor, sinceId) <= 0) break;
 				sinceId = cursor;
@@ -245,7 +245,7 @@ async function history(routes: Routes, c: RequestContext): Promise<Json[]> {
 async function translate(routes: Routes, c: RequestContext): Promise<Json> {
 	const note = await routes.note(c);
 	await routes.status(note, c);
-	const langPattern = /^[a-z]{2,3}(?:-[a-zA-Z]{2,4}){0,2}$/u;
+	const langPattern = /^[a-z]{2,3}(?:-(?:[a-zA-Z]{2,4}|\d{3})){0,2}$/u;
 	let language: string;
 	if (c.body.lang !== undefined) {
 		language = string(c.body.lang);

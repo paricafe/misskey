@@ -476,7 +476,9 @@ export class ImportNotesProcessorService {
 					const slashdex = file.url.lastIndexOf('/');
 					const name = file.url.substring(slashdex + 1);
 
-					const exists = await this.driveFilesRepository.findOneBy({ name: name, userId: user.id }) ?? await this.driveFilesRepository.findOneBy({ name: name, userId: user.id, folderId: keyFolder?.id });
+					const exists = keyFolder != null
+						? await this.driveFilesRepository.findOneBy({ name: name, userId: user.id, folderId: keyFolder.id })
+						: null;
 
 					if (!exists) {
 						try {
@@ -733,6 +735,7 @@ export class ImportNotesProcessorService {
 			return full_textedit;
 		}
 
+		let createdNote: MiNote | null = null;
 		try {
 			const date = safeImportDate(tweet.created_at);
 			const decodedText = tweet.full_text.replaceAll('&gt;', '>').replaceAll('&lt;', '<').replaceAll('&amp;', '&');
@@ -759,7 +762,9 @@ export class ImportNotesProcessorService {
 							const slashdex = targetVideoUrl.lastIndexOf('/');
 							const name = targetVideoUrl.substring(slashdex + 1);
 
-							const exists = await this.driveFilesRepository.findOneBy({ name: name, userId: user.id }) ?? await this.driveFilesRepository.findOneBy({ name: name, userId: user.id, folderId: twitFolder?.id });
+							const exists = twitFolder != null
+								? await this.driveFilesRepository.findOneBy({ name: name, userId: user.id, folderId: twitFolder.id })
+								: null;
 
 							if (!exists) {
 								try {
@@ -787,7 +792,9 @@ export class ImportNotesProcessorService {
 							const slashdex = file.media_url_https.lastIndexOf('/');
 							const name = file.media_url_https.substring(slashdex + 1);
 
-							const exists = await this.driveFilesRepository.findOneBy({ name: name, userId: user.id });
+							const exists = twitFolder != null
+								? await this.driveFilesRepository.findOneBy({ name: name, userId: user.id, folderId: twitFolder.id })
+								: null;
 
 							if (!exists) {
 								try {
@@ -813,10 +820,13 @@ export class ImportNotesProcessorService {
 					}
 				}
 			}
-			const createdNote = await this.noteCreateService.import(user, { createdAt: date, reply: parentNote, text: text, files: files });
-			if (tweet.childNotes) await this.queueService.createImportTweetsToDbJob({ id: user.id }, tweet.childNotes, createdNote.id);
+			createdNote = await this.noteCreateService.import(user, { createdAt: date, reply: parentNote, text: text, files: files });
 		} catch (e) {
 			this.logger.warn(`Error: ${e}`);
+			return;
+		}
+		if (createdNote && tweet.childNotes) {
+			await this.queueService.createImportTweetsToDbJob({ id: user.id }, tweet.childNotes, createdNote.id);
 		}
 	}
 

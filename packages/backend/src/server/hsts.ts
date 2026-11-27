@@ -11,8 +11,7 @@ export function makeHstsHook(host: string, preload: boolean = false): onRequestH
             if (
                 (request.host === host || request.hostname === host) &&
                 request.protocol === 'http') {
-                const redirectHost = request.host || request.hostname;
-                reply.redirect(`https://${redirectHost}${request.url}`, 301);
+                reply.redirect(`https://${host}${request.url}`, 301);
             } else {
                 reply.header('strict-transport-security', 'max-age=31536000; includeSubDomains; preload');
             }
