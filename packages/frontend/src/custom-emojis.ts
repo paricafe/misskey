@@ -35,35 +35,73 @@ watch(customEmojis, emojis => {
 	}
 }, { immediate: true });
 
+type EmojiMutation =
+	| { type: 'add'; emoji: Misskey.entities.EmojiSimple }
+	| { type: 'update'; emojis: Misskey.entities.EmojiSimple[] }
+	| { type: 'remove'; emojis: Misskey.entities.EmojiSimple[] };
+
+const activeFetchMutations = new Set<EmojiMutation[]>();
+
+function applyEmojiMutation(list: Misskey.entities.EmojiSimple[], mutation: EmojiMutation): Misskey.entities.EmojiSimple[] {
+	switch (mutation.type) {
+		case 'add':
+			return [mutation.emoji, ...list.filter(item => item.name !== mutation.emoji.name)];
+		case 'update':
+			return list.map(item => mutation.emojis.find(search => search.name === item.name) ?? item);
+		case 'remove':
+			return list.filter(item => !mutation.emojis.some(search => search.name === item.name));
+	}
+}
+
+function recordEmojiMutation(mutation: EmojiMutation) {
+	for (const queue of activeFetchMutations) {
+		queue.push(mutation);
+	}
+}
+
 export function addCustomEmoji(emoji: Misskey.entities.EmojiSimple) {
+	recordEmojiMutation({ type: 'add', emoji });
 	customEmojis.value = [emoji, ...customEmojis.value];
 	set('emojis', customEmojis.value);
 }
 
 export function updateCustomEmojis(emojis: Misskey.entities.EmojiSimple[]) {
+	recordEmojiMutation({ type: 'update', emojis });
 	customEmojis.value = customEmojis.value.map(item => emojis.find(search => search.name === item.name) ?? item);
 	set('emojis', customEmojis.value);
 }
 
 export function removeCustomEmojis(emojis: Misskey.entities.EmojiSimple[]) {
+	recordEmojiMutation({ type: 'remove', emojis });
 	customEmojis.value = customEmojis.value.filter(item => !emojis.some(search => search.name === item.name));
 	set('emojis', customEmojis.value);
 }
 
 export async function fetchCustomEmojis(force = false) {
 	const now = Date.now();
+	const mutations: EmojiMutation[] = [];
+	activeFetchMutations.add(mutations);
 
 	let res;
-	if (force) {
-		res = await misskeyApi('emojis', {});
-	} else {
-		const lastFetchedAt = await get('lastEmojisFetchedAt');
-		if (lastFetchedAt && (now - lastFetchedAt) < 1000 * 60 * 60) return;
-		res = await misskeyApiGet('emojis', {});
+	try {
+		if (force) {
+			res = await misskeyApi('emojis', {});
+		} else {
+			const lastFetchedAt = await get('lastEmojisFetchedAt');
+			if (lastFetchedAt && (now - lastFetchedAt) < 1000 * 60 * 60) return;
+			res = await misskeyApiGet('emojis', {});
+		}
+	} finally {
+		activeFetchMutations.delete(mutations);
 	}
 
-	customEmojis.value = res.emojis;
-	set('emojis', res.emojis);
+	let nextEmojis = res.emojis;
+	for (const mutation of mutations) {
+		nextEmojis = applyEmojiMutation(nextEmojis, mutation);
+	}
+
+	customEmojis.value = nextEmojis;
+	set('emojis', nextEmojis);
 	set('lastEmojisFetchedAt', now);
 }
 

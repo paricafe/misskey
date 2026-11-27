@@ -74,6 +74,9 @@ const timer = computed(() => i18n.tsx._poll[
 
 const cachedResults = inject(DI.notePollResults, null);
 const showResult = cachedResults?.get(props.noteId) ?? ref(props.readOnly || isVoted.value || closed.value);
+if (props.readOnly || isVoted.value || closed.value) {
+	showResult.value = true;
+}
 cachedResults?.set(props.noteId, showResult);
 
 if (!closed.value) {

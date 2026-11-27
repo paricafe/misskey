@@ -22,7 +22,7 @@ vi.mock('@/utility/drive.js', () => ({ chooseDriveFile: vi.fn() }));
 vi.mock('@/utility/achievements.js', () => ({ claimAchievement: vi.fn() }));
 vi.mock('@/utility/emoji-picker.js', () => ({ emojiPicker: {} }));
 vi.mock('@/utility/mfm-function-picker.js', () => ({ mfmFunctionPicker: {} }));
-vi.mock('@/plugin.js', () => ({ getPluginHandlers: () => [] }));
+vi.mock('@/plugin.js', () => ({ getPluginHandlers: () => [], waitPluginsReady: () => Promise.resolve() }));
 vi.mock('@/events.js', () => ({ globalEvents: { emit: vi.fn() } }));
 vi.mock('@/composables/use-note-capture.js', () => ({ noteEvents: { emit: vi.fn() } }));
 vi.mock('@/instance.js', () => ({ instance: { maxNoteTextLength: 3000 } }));

@@ -155,7 +155,7 @@ import { claimAchievement } from '@/utility/achievements.js';
 import { emojiPicker } from '@/utility/emoji-picker.js';
 import { mfmFunctionPicker } from '@/utility/mfm-function-picker.js';
 import { prefer } from '@/preferences.js';
-import { getPluginHandlers } from '@/plugin.js';
+import { getPluginHandlers, waitPluginsReady } from '@/plugin.js';
 import { DI } from '@/di.js';
 import { globalEvents } from '@/events.js';
 import { checkDragDataType, getDragData } from '@/drag-and-drop.js';
@@ -1126,6 +1126,7 @@ async function post(ev?: PointerEvent) {
 		}
 	}
 
+	await waitPluginsReady();
 	const notePostInterruptors = getPluginHandlers('note_post_interruptor');
 	if (notePostInterruptors.length > 0) {
 		for (const interruptor of notePostInterruptors) {

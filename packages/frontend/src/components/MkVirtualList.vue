@@ -4,7 +4,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 -->
 
 <template>
-<div ref="rootEl" data-virtual-list :data-total-items="items.length" :class="$style.root">
+<div ref="rootEl" data-virtual-list :data-total-items="items.length" :class="$style.root" @virtual-list-focus="onVirtualListFocus">
 	<template v-for="{ item, index, gapBefore } in visibleItems" :key="item.id">
 		<div v-if="gapBefore > 0" aria-hidden="true" :style="{ height: `${gapBefore}px` }"></div>
 		<div
@@ -27,6 +27,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 import { computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, shallowRef, useTemplateRef, watch } from 'vue';
 import type { ComponentPublicInstance } from 'vue';
 import { getScrollContainer } from '@@/js/scroll.js';
+import { focusOrScroll, isFocusable } from '@/utility/focus.js';
 import { VirtualListLayout } from '@/utility/virtual-list.js';
 
 const props = withDefaults(defineProps<{
@@ -71,6 +72,38 @@ const bottom = computed(() => layout.totalHeight - layout.offset((visibleItems.v
 function onFocusOut(event: FocusEvent) {
 	if (event.relatedTarget instanceof Node && (event.currentTarget as HTMLElement).contains(event.relatedTarget)) return;
 	focusedId.value = null;
+}
+
+function findFocusableInRow(row: HTMLElement): HTMLElement | null {
+	for (const child of Array.from(row.children)) {
+		if (isFocusable(child)) return child;
+	}
+	const candidate = row.querySelector<HTMLElement>('[tabindex="0"]');
+	return isFocusable(candidate) ? candidate : null;
+}
+
+async function onVirtualListFocus(event: Event) {
+	const customEvent = event as CustomEvent<{ fromId: string; direction: -1 | 1; scroll: boolean }>;
+	const detail = customEvent.detail;
+	if (!detail) return;
+	const currentIndex = props.items.findIndex(item => item.id === detail.fromId);
+	if (currentIndex < 0) return;
+
+	for (let index = currentIndex + detail.direction; index >= 0 && index < props.items.length; index += detail.direction) {
+		const target = props.items[index];
+		customEvent.preventDefault();
+		focusedId.value = target.id;
+		await nextTick();
+		if (!active) return;
+		const row = elements.get(target.id);
+		if (!row) continue;
+		const focusable = findFocusableInRow(row);
+		if (focusable) {
+			focusOrScroll(focusable, detail.scroll);
+			updateViewport();
+			return;
+		}
+	}
 }
 
 const elements = new Map<string, HTMLElement>();
@@ -202,6 +235,7 @@ function start() {
 	});
 	for (const el of elements.values()) observer.observe(el);
 	observer.observe(rootEl.value);
+	if (scrollContainer) observer.observe(scrollContainer);
 	(scrollContainer ?? window).addEventListener('scroll', scheduleViewport, { passive: true });
 	window.addEventListener('resize', scheduleViewport, { passive: true });
 	updateViewport();

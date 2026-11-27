@@ -14,6 +14,7 @@ export const DI = {
 	mock: Symbol() as InjectionKey<boolean>,
 	noteViewStateCache: Symbol() as InjectionKey<Map<string, NoteViewState>>,
 	notePollResults: Symbol() as InjectionKey<Map<string, Ref<boolean>>>,
+	noteMediaHidden: Symbol() as InjectionKey<Map<string, boolean>>,
 	pageMetadata: Symbol() as InjectionKey<Ref<PageMetadata | null>>,
 	viewId: Symbol() as InjectionKey<string>,
 	currentStickyTop: Symbol() as InjectionKey<Ref<number>>,

@@ -180,6 +180,8 @@ function getNoteEmbedCodeMenu(note: Misskey.entities.Note, text: string): MenuIt
 export function getNoteMenu(props: {
 	note: Misskey.entities.Note;
 	translation: Ref<Misskey.entities.NotesTranslateResponse | null>;
+	translationVersion?: Ref<string | null>;
+	getTranslationVersion?: () => string;
 	translating: Ref<boolean>;
 	currentClip?: Misskey.entities.Clip | null;
 	currentAntenna?: Misskey.entities.Antenna | null;
@@ -307,6 +309,13 @@ export function getNoteMenu(props: {
 
 	async function translate(): Promise<void> {
 		if (props.translation.value != null) return;
+		const getVersion = props.getTranslationVersion ?? (() => JSON.stringify([appearNote.updatedAt ?? null, appearNote.text ?? null, appearNote.cw ?? null]));
+		const requestVersion = getVersion();
+		const commitTranslation = (res: Misskey.entities.NotesTranslateResponse) => {
+			if (getVersion() !== requestVersion) return;
+			props.translation.value = res;
+			if (props.translationVersion) props.translationVersion.value = requestVersion;
+		};
 
 		let text = appearNote.text ?? '';
 		if (appearNote.cw != null) {
@@ -325,10 +334,10 @@ export function getNoteMenu(props: {
 				}
 
 				if (langResult[0]?.detectedLanguage === localStorageLang || langResult[0]?.detectedLanguage === navigator.language) {
-					props.translation.value = {
+					commitTranslation({
 						sourceLang: langResult[0]?.detectedLanguage ?? 'unknown',
 						text: text,
-					};
+					});
 					return;
 				}
 
@@ -338,21 +347,24 @@ export function getNoteMenu(props: {
 					targetLanguage: localStorageLang ?? navigator.language,
 				});
 				const translated = await translator.translate(text);
-				props.translation.value = {
+				commitTranslation({
 					sourceLang: langResult[0]?.detectedLanguage ?? 'unknown',
 					text: translated,
-				};
+				});
 			} finally {
 				props.translating.value = false;
 			}
 		} else if ($i?.policies.canUseTranslator && instance.translatorAvailable) {
 			props.translating.value = true;
-			const res = await misskeyApi('notes/translate', {
-				noteId: appearNote.id,
-				targetLang: miLocalStorage.getItem('lang') ?? navigator.language,
-			});
-			props.translating.value = false;
-			props.translation.value = res;
+			try {
+				const res = await misskeyApi('notes/translate', {
+					noteId: appearNote.id,
+					targetLang: miLocalStorage.getItem('lang') ?? navigator.language,
+				});
+				commitTranslation(res);
+			} finally {
+				props.translating.value = false;
+			}
 		}
 	}
 

@@ -127,16 +127,37 @@ async function uninstall(plugin: Plugin) {
 	os.success();
 }
 
-function reload(plugin: Plugin) {
-	reloadPlugin(plugin);
+async function reload(plugin: Plugin) {
+	try {
+		await reloadPlugin(plugin);
+	} catch (err) {
+		os.alert({
+			type: 'error',
+			text: String(err),
+		});
+	}
 }
 
 async function config(plugin: Plugin) {
-	await configPlugin(plugin);
+	try {
+		await configPlugin(plugin);
+	} catch (err) {
+		os.alert({
+			type: 'error',
+			text: String(err),
+		});
+	}
 }
 
-function changeActive(plugin: Plugin, active: boolean) {
-	changePluginActive(plugin, active);
+async function changeActive(plugin: Plugin, active: boolean) {
+	try {
+		await changePluginActive(plugin, active);
+	} catch (err) {
+		os.alert({
+			type: 'error',
+			text: String(err),
+		});
+	}
 }
 
 function timeToHhMmSs(unixtime: number) {

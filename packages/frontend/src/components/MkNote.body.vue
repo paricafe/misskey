@@ -275,6 +275,7 @@ const {
 	hardMuted,
 	collapsed,
 	renoteCollapsed,
+	inReplyToCollapsed,
 	parsed,
 	urls,
 	isLong,
@@ -312,7 +313,6 @@ provide(DI.mfmEmojiReactCallback, reactViaMfmEmoji);
 
 const showSoftWordMutedWord = computed(() => prefer.s.showSoftWordMutedWord);
 const disableReactionsViewer = ref(prefer.s.disableReactionsViewer);
-const inReplyToCollapsed = ref(prefer.s.collapseNotesRepliedTo);
 const enableTranslateButton = ref(prefer.s.enableTranslateButton);
 
 function handleToggleReact() {

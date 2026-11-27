@@ -39,8 +39,18 @@ export type AiScriptPluginMeta = {
 };
 
 let _parser: Parser | null = null;
+let pluginsLaunchPromise: Promise<void> | null = null;
 
 export const pluginsReady = ref(isSafeMode || !prefer.s.plugins.some(plugin => plugin.active));
+
+export async function waitPluginsReady(): Promise<void> {
+	if (pluginsReady.value) return;
+	if (pluginsLaunchPromise != null) {
+		await pluginsLaunchPromise;
+		return;
+	}
+	await launchPlugins();
+}
 
 async function getParser(): Promise<Parser> {
 	const { Parser } = await import('@syuilo/aiscript');
@@ -187,11 +197,17 @@ export async function installPlugin(code: string, meta?: AiScriptPluginMeta) {
 		src: code,
 	};
 
-	prefer.commit('plugins', prefer.s.plugins.concat(plugin));
-
 	await authorizePlugin(plugin);
 
-	await launchPlugin(installId);
+	prefer.commit('plugins', prefer.s.plugins.concat(plugin));
+
+	try {
+		await launchPlugin(installId);
+	} catch (err) {
+		abortPlugin(plugin);
+		prefer.commit('plugins', prefer.s.plugins.filter(x => x.installId !== installId));
+		throw err;
+	}
 }
 
 export async function uninstallPlugin(plugin: Plugin) {
@@ -264,19 +280,26 @@ function addPluginHandler<K extends keyof HandlerDef>(installId: Plugin['install
 	pluginHandlers.value = [...pluginHandlers.value, { pluginInstallId: installId, type, ctx }];
 }
 
-export async function launchPlugins(): Promise<void> {
-	try {
-		await Promise.allSettled(prefer.s.plugins.filter(plugin => plugin.active).map(async plugin => {
-			try {
-				await launchPlugin(plugin.installId);
-			} catch (error) {
-				abortPlugin(plugin, false);
-				console.error('Failed to launch plugin:', plugin.name, error);
-			}
-		}));
-	} finally {
-		pluginsReady.value = true;
-	}
+export function launchPlugins(): Promise<void> {
+	if (pluginsReady.value) return Promise.resolve();
+	if (pluginsLaunchPromise != null) return pluginsLaunchPromise;
+
+	pluginsLaunchPromise = (async () => {
+		try {
+			await Promise.allSettled(prefer.s.plugins.filter(plugin => plugin.active).map(async plugin => {
+				try {
+					await launchPlugin(plugin.installId);
+				} catch (error) {
+					console.error('Failed to launch plugin:', plugin.name, error);
+				}
+			}));
+		} finally {
+			pluginsReady.value = true;
+			pluginsLaunchPromise = null;
+		}
+	})();
+
+	return pluginsLaunchPromise;
 }
 
 async function launchPlugin(id: Plugin['installId']): Promise<void> {
@@ -347,6 +370,7 @@ async function launchPlugin(id: Plugin['installId']): Promise<void> {
 		(err) => {
 			console.error('Plugin install failed:', plugin.name, 'v' + plugin.version);
 			systemLog(`${err}`, true);
+			abortPlugin(plugin, false);
 			throw err;
 		},
 	);
@@ -354,17 +378,17 @@ async function launchPlugin(id: Plugin['installId']): Promise<void> {
 
 export function abortPlugin(plugin: Plugin, clearLogs = true): void {
 	const pluginContext = pluginContexts.get(plugin.installId);
-	if (!pluginContext) return;
-
-	pluginContext.abort();
-	pluginContexts.delete(plugin.installId);
+	if (pluginContext) {
+		pluginContext.abort();
+		pluginContexts.delete(plugin.installId);
+	}
 	if (clearLogs) pluginLogs.value.delete(plugin.installId);
 	pluginHandlers.value = pluginHandlers.value.filter(x => x.pluginInstallId !== plugin.installId);
 }
 
-export function reloadPlugin(plugin: Plugin): void {
+export async function reloadPlugin(plugin: Plugin): Promise<void> {
 	abortPlugin(plugin);
-	launchPlugin(plugin.installId);
+	await launchPlugin(plugin.installId);
 }
 
 export async function configPlugin(plugin: Plugin) {
@@ -382,14 +406,14 @@ export async function configPlugin(plugin: Plugin) {
 
 	prefer.commit('plugins', prefer.s.plugins.map(x => x.installId === plugin.installId ? { ...x, configData: result } : x));
 
-	reloadPlugin(plugin);
+	await reloadPlugin(plugin);
 }
 
-export function changePluginActive(plugin: Plugin, active: boolean) {
+export async function changePluginActive(plugin: Plugin, active: boolean): Promise<void> {
 	prefer.commit('plugins', prefer.s.plugins.map(x => x.installId === plugin.installId ? { ...x, active } : x));
 
 	if (active) {
-		launchPlugin(plugin.installId);
+		await launchPlugin(plugin.installId);
 	} else {
 		abortPlugin(plugin);
 	}

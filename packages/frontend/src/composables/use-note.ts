@@ -77,11 +77,13 @@ export type NoteViewState = {
 	showContent: boolean;
 	collapsed: boolean;
 	renoteCollapsed: boolean;
+	inReplyToCollapsed: boolean;
 	muted: WordMuteResult | 'sensitiveMute' | false;
 	translation: Ref<Misskey.entities.NotesTranslateResponse | null>;
 	translationVersion: Ref<string | null>;
 	translating: Ref<boolean>;
 	pollResults: Map<string, Ref<boolean>>;
+	mediaHidden: Map<string, boolean>;
 };
 
 export function checkNoteWordMute(
@@ -129,24 +131,25 @@ export function useNote(
 	const viewStateCache = options.onChildrenChanged ? null : providedCache;
 	const savedState = viewStateCache?.get(props.note.id);
 	let rawNote = savedState?.note ?? deepClone(props.note);
-	let hideByPlugin = savedState?.hideByPlugin ?? false;
-	const noteViewInterruptors = savedState ? [] : getPluginHandlers('note_view_interruptor');
-
-	if (noteViewInterruptors.length > 0) {
-		let result: Misskey.entities.Note | null = deepClone(rawNote);
+	const hideByPlugin = ref(savedState?.hideByPlugin ?? false);
+	const applyNoteViewInterruptors = (target: Misskey.entities.Note): Misskey.entities.Note | null => {
+		const noteViewInterruptors = getPluginHandlers('note_view_interruptor');
+		if (noteViewInterruptors.length === 0) return target;
+		let result: Misskey.entities.Note | null = deepClone(target);
 		for (const interruptor of noteViewInterruptors) {
 			try {
 				result = interruptor.handler(result!) as Misskey.entities.Note | null;
-
-				if (result == null) {
-					break;
-				}
+				if (result == null) break;
 			} catch (err) {
 				console.error(err);
 			}
 		}
+		return result;
+	};
+	if (!savedState) {
+		const result = applyNoteViewInterruptors(rawNote);
 		if (result == null) {
-			hideByPlugin = true;
+			hideByPlugin.value = true;
 		} else {
 			rawNote = result;
 		}
@@ -156,6 +159,31 @@ export function useNote(
 
 	const isRenote = Misskey.note.isPureRenote(rawNote);
 	const appearNote = getAppearNote(rawNote) ?? rawNote;
+	let syncedEditedFromProps = false;
+	if (savedState) {
+		const nextAppear = getAppearNote(props.note) ?? props.note;
+		const fileIdsChanged = JSON.stringify(nextAppear.fileIds ?? []) !== JSON.stringify(appearNote.fileIds ?? []);
+		const contentChanged = nextAppear.id === appearNote.id && (
+			nextAppear.updatedAt !== appearNote.updatedAt
+			|| nextAppear.text !== appearNote.text
+			|| nextAppear.cw !== appearNote.cw
+			|| fileIdsChanged
+		);
+		const isNewerOrEqual = nextAppear.updatedAt != null && (
+			appearNote.updatedAt == null || nextAppear.updatedAt >= appearNote.updatedAt
+		);
+		if (contentChanged && (isNewerOrEqual || (appearNote.updatedAt == null && nextAppear.updatedAt == null))) {
+			appearNote.text = nextAppear.text;
+			appearNote.cw = nextAppear.cw;
+			appearNote.updatedAt = nextAppear.updatedAt;
+			appearNote.files = nextAppear.files;
+			appearNote.fileIds = nextAppear.fileIds;
+			appearNote.emojis = nextAppear.emojis;
+			appearNote.mentions = nextAppear.mentions;
+			appearNote.tags = nextAppear.tags;
+			syncedEditedFromProps = true;
+		}
+	}
 
 	const capture = savedState?.capture ?? useNoteCapture({
 		note: appearNote,
@@ -179,9 +207,31 @@ export function useNote(
 	}
 	const pollResults = savedState?.pollResults ?? new Map<string, Ref<boolean>>();
 	provide(DI.notePollResults, pollResults);
+	const mediaHidden = savedState?.mediaHidden ?? new Map<string, boolean>();
+	provide(DI.noteMediaHidden, mediaHidden);
 
-	const muted = ref(savedState?.muted ?? ($i ? checkNoteWordMute(appearNote, $i, $i.mutedWords) || checkBuiltinSoftMute(appearNote, inTimeline && !tl_withSensitive.value) : false));
-	const hardMuted = props.withHardMute && $i ? checkNoteWordMute(appearNote, $i, $i.hardMutedWords) : false;
+	const computeSoftMute = () => ($i ? checkNoteWordMute(appearNote, $i, $i.mutedWords) || checkBuiltinSoftMute(appearNote, inTimeline && !tl_withSensitive.value) : false);
+	const computeHardMute = () => (props.withHardMute && $i ? checkNoteWordMute(appearNote, $i, $i.hardMutedWords) : false);
+	const muted = ref(savedState && !syncedEditedFromProps ? savedState.muted : computeSoftMute());
+	const hardMuted = ref(computeHardMute());
+	const inReplyToCollapsed = ref(savedState?.inReplyToCollapsed ?? prefer.s.collapseNotesRepliedTo);
+	const reapplyContentGuards = () => {
+		muted.value = computeSoftMute();
+		hardMuted.value = computeHardMute();
+		const interruptors = getPluginHandlers('note_view_interruptor');
+		if (interruptors.length > 0) {
+			const result = applyNoteViewInterruptors(rawNote);
+			if (result == null) {
+				hideByPlugin.value = true;
+			} else {
+				hideByPlugin.value = false;
+				const nextAppear = getAppearNote(result) ?? result;
+				if (nextAppear.text !== appearNote.text) appearNote.text = nextAppear.text;
+				if (nextAppear.cw !== appearNote.cw) appearNote.cw = nextAppear.cw;
+			}
+		}
+	};
+	if (syncedEditedFromProps) reapplyContentGuards();
 
 	const isMyRenote = $i != null && ($i.id === rawNote.userId);
 	const parsed = computed(() => appearNote.text ? mfm.parse(appearNote.text) : null);
@@ -212,24 +262,27 @@ export function useNote(
 		appearNote.tags = nextAppear.tags;
 	});
 
-	watch(() => [appearNote.text, appearNote.cw, appearNote.updatedAt], () => {
+	watch(() => [appearNote.text, appearNote.cw, appearNote.updatedAt, JSON.stringify(appearNote.fileIds ?? []), appearNote.files?.some(f => f.isSensitive) ?? false], () => {
 		translation.value = null;
 		translationVersion.value = null;
+		reapplyContentGuards();
 	});
 
 	if (viewStateCache) {
 		const save = () => viewStateCache.set(rawNote.id, {
 			note: rawNote,
 			capture,
-			hideByPlugin,
+			hideByPlugin: hideByPlugin.value,
 			showContent: showContent.value,
 			collapsed: collapsed.value,
 			renoteCollapsed: renoteCollapsed.value,
+			inReplyToCollapsed: inReplyToCollapsed.value,
 			muted: muted.value,
 			translation,
 			translationVersion,
 			translating,
 			pollResults,
+			mediaHidden,
 		});
 		save();
 		onBeforeUnmount(save);
@@ -446,6 +499,8 @@ export function useNote(
 				note: rawNote,
 				translating,
 				translation,
+				translationVersion,
+				getTranslationVersion,
 				currentClip: currentClip?.value,
 				currentAntenna: currentAntenna?.value ?? undefined,
 			});
@@ -459,6 +514,8 @@ export function useNote(
 			note: rawNote,
 			translating,
 			translation,
+			translationVersion,
+			getTranslationVersion,
 			currentClip: currentClip?.value,
 			currentAntenna: currentAntenna?.value ?? undefined,
 		});
@@ -561,6 +618,7 @@ export function useNote(
 		hardMuted,
 		collapsed,
 		renoteCollapsed,
+		inReplyToCollapsed,
 
 		isMyRenote,
 		parsed,

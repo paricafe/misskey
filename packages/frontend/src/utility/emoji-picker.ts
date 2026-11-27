@@ -37,6 +37,9 @@ class EmojiPicker {
 					return;
 				}
 				this.show(anchorElement, onChosen, onClosed);
+			}, (err) => {
+				onClosed?.(false);
+				console.error('Failed to load emoji picker:', err);
 			});
 		}
 		const anchorRef = shallowRef(anchorElement);

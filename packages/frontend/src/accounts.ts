@@ -186,17 +186,19 @@ export async function login(token: AccountWithToken['token'], redirect?: string)
 		closed: () => dispose(),
 	});
 
-	const me = await fetchAccount(token, undefined, true).catch(reason => {
+	let me: Misskey.entities.MeDetailed;
+	try {
+		me = await fetchAccount(token, undefined, true);
+		await addAccount(host, me, token);
+	} catch (reason) {
 		showing.value = false;
 		throw reason;
-	});
+	}
 
 	miLocalStorage.setItem('account', JSON.stringify({
 		...me,
 		token,
 	}));
-
-	await addAccount(host, me, token);
 
 	if (redirect) {
 		reloadChannel.postMessage(null);

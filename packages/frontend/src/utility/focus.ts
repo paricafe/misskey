@@ -26,9 +26,26 @@ export const isFocusable = (input: MaybeHTMLElement | null | undefined): input i
 	return true;
 };
 
+function tryVirtualListFocus(input: MaybeHTMLElement | null | undefined, direction: -1 | 1, scroll: boolean): boolean {
+	const el = getElementOrNull(input);
+	const row = el?.closest<HTMLElement>('[data-virtual-item]');
+	const fromId = row?.dataset.virtualItem;
+	if (!row || !fromId) return false;
+	const event = new CustomEvent('virtual-list-focus', {
+		bubbles: true,
+		cancelable: true,
+		detail: { fromId, direction, scroll },
+	});
+	row.dispatchEvent(event);
+	return event.defaultPrevented;
+}
+
 export const focusPrev = (input: MaybeHTMLElement | null | undefined, self = false, scroll = true) => {
 	const element = self ? input : getElementOrNull(input)?.previousElementSibling;
-	if (element == null) return;
+	if (element == null) {
+		if (!self) tryVirtualListFocus(input, -1, scroll);
+		return;
+	}
 	if (isFocusable(element)) {
 		focusOrScroll(element, scroll);
 	} else {
@@ -38,7 +55,10 @@ export const focusPrev = (input: MaybeHTMLElement | null | undefined, self = fal
 
 export const focusNext = (input: MaybeHTMLElement | null | undefined, self = false, scroll = true) => {
 	const element = self ? input : getElementOrNull(input)?.nextElementSibling;
-	if (element == null) return;
+	if (element == null) {
+		if (!self) tryVirtualListFocus(input, 1, scroll);
+		return;
+	}
 	if (isFocusable(element)) {
 		focusOrScroll(element, scroll);
 	} else {
@@ -56,7 +76,7 @@ export const focusParent = (input: MaybeHTMLElement | null | undefined, self = f
 	}
 };
 
-const focusOrScroll = (element: HTMLElement, scroll: boolean) => {
+export const focusOrScroll = (element: HTMLElement, scroll: boolean) => {
 	if (scroll) {
 		const scrollContainer = getScrollContainer(element) ?? window.document.documentElement;
 		const scrollContainerTop = getScrollPosition(scrollContainer);

@@ -105,4 +105,17 @@ describe('custom emoji bootstrap', () => {
 		await nextTick();
 		expect(customEmojis.value).toEqual(mocks.cache);
 	});
+
+	test('replays realtime emoji mutations that arrive while full refresh is in flight', async () => {
+		let resolveFetch!: (value: { emojis: Misskey.entities.EmojiSimple[] }) => void;
+		mocks.fetch.mockImplementationOnce(() => new Promise(resolve => { resolveFetch = resolve; }));
+		const { addCustomEmoji, customEmojis, fetchCustomEmojis } = await import('@/custom-emojis.js');
+		const pending = fetchCustomEmojis();
+		await nextTick();
+		const added = { ...emoji('https://example.com/added.png'), name: 'added' };
+		addCustomEmoji(added);
+		resolveFetch({ emojis: [emoji('https://example.com/snapshot.png')] });
+		await pending;
+		expect(customEmojis.value.map(x => x.name)).toEqual(['added', 'test']);
+	});
 });

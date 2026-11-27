@@ -62,13 +62,13 @@ SPDX-License-Identifier: AGPL-3.0-only
 			<div v-if="image.isSensitive" :class="$style.indicator" style="color: var(--MI_THEME-warn);" :title="i18n.ts.sensitive"><i class="ti ti-eye-exclamation"></i></div>
 		</div>
 		<button :class="[$style.menu, $style.menuBottom]" class="_button" @click.stop="showMenu"><i class="ti ti-dots" style="vertical-align: middle;" aria-hidden="true"></i></button>
-		<button :class="[$style.menu, $style.menuTop]" class="_button" @click.stop="hide = true"><i class="ti ti-eye-off" style="vertical-align: middle;" aria-hidden="true"></i></button>
+		<button :class="[$style.menu, $style.menuTop]" class="_button" @click.stop="setHide(true)"><i class="ti ti-eye-off" style="vertical-align: middle;" aria-hidden="true"></i></button>
 	</template>
 </div>
 </template>
 
 <script lang="ts" setup>
-import { watch, ref, computed } from 'vue';
+import { inject, watch, ref, computed } from 'vue';
 import * as Misskey from 'misskey-js';
 import type { MediaComponentExposes } from '@/types/media-component.js';
 import { getStaticImageUrl } from '@/utility/media-proxy.js';
@@ -79,6 +79,7 @@ import * as os from '@/os.js';
 import { prefer } from '@/preferences.js';
 import { shouldHideFileByDefault, canRevealFile } from '@/utility/sensitive-file.js';
 import { getFileMenu } from '@/utility/get-file-menu.js';
+import { DI } from '@/di.js';
 
 const props = withDefaults(defineProps<{
 	image: Misskey.entities.DriveFile;
@@ -97,7 +98,13 @@ const emit = defineEmits<{
 	(event: 'mediaClick', ev: PointerEvent): void;
 }>();
 
+const cachedMediaHidden = inject(DI.noteMediaHidden, null);
 const hide = ref(true);
+
+function setHide(value: boolean) {
+	hide.value = value;
+	cachedMediaHidden?.set(props.image.id, value);
+}
 
 const url = computed(() => (props.raw || prefer.s.loadRawImages)
 	? props.image.url
@@ -118,25 +125,26 @@ async function onClick(ev: PointerEvent) {
 			return;
 		}
 
-		hide.value = false;
+		setHide(false);
 	} else {
 		emit('mediaClick', ev);
 	}
 }
 
 watch(() => props.image, (newImage) => {
-	hide.value = shouldHideFileByDefault(newImage);
+	const cached = cachedMediaHidden?.get(newImage.id);
+	hide.value = cached ?? shouldHideFileByDefault(newImage);
 }, {
 	deep: true,
 	immediate: true,
 });
 
 function showMenu(ev: PointerEvent) {
-	os.popupMenu(getFileMenu(props.image, (newHide) => { hide.value = newHide; }), (ev.currentTarget ?? ev.target ?? undefined) as HTMLElement | undefined);
+	os.popupMenu(getFileMenu(props.image, (newHide) => { setHide(newHide); }), (ev.currentTarget ?? ev.target ?? undefined) as HTMLElement | undefined);
 }
 
 function onContextmenu(ev: PointerEvent) {
-	os.contextMenu(getFileMenu(props.image, (newHide) => { hide.value = newHide; }), ev);
+	os.contextMenu(getFileMenu(props.image, (newHide) => { setHide(newHide); }), ev);
 }
 
 defineExpose<MediaComponentExposes>({
