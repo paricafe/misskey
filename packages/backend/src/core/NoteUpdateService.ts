@@ -62,6 +62,9 @@ type Option = {
 	apHashtags?: string[] | null;
 	apEmojis?: string[] | null;
 	apMentions?: MiUser[];
+	apMentionRawCount?: number;
+	visibility?: MiNote['visibility'];
+	visibleUserIds?: MiNote['visibleUserIds'];
 };
 
 type PollSnapshot = {
@@ -178,19 +181,16 @@ export class NoteUpdateService {
 		const pollChoices = note.hasPoll && data.apMentions == null
 			? (await this.pollsRepository.findOneByOrFail({ noteId: note.id })).choices
 			: [];
+		const nextVisibility = data.visibility ?? note.visibility;
+		const nextVisibleUserIds = data.visibleUserIds ?? note.visibleUserIds;
 		const mentionTokens = [text, cw, ...pollChoices].flatMap(value => value ? mfm.parse(value) : []);
 		let mentionedUsers = data.apMentions ?? await resolveNoteMentions(user.host, mentionTokens, this.remoteUserResolveService.resolveUser);
-		const audienceIds = [...new Set([...(note.visibleUserIds ?? []), ...(note.replyUserId && note.replyUserId !== user.id ? [note.replyUserId] : [])])];
+		const audienceIds = [...new Set([...(nextVisibleUserIds ?? []), ...(note.replyUserId && note.replyUserId !== user.id ? [note.replyUserId] : [])])];
 		const missingAudienceIds = audienceIds.filter(id => !mentionedUsers.some(mentioned => mentioned.id === id));
 		if (missingAudienceIds.length > 0) mentionedUsers.push(...await this.usersRepository.findBy({ id: In(missingAudienceIds) }));
-		if (note.visibility === 'specified') mentionedUsers = mentionedUsers.filter(mentioned => audienceIds.includes(mentioned.id));
+		if (nextVisibility === 'specified') mentionedUsers = mentionedUsers.filter(mentioned => audienceIds.includes(mentioned.id));
 		const dedupedMentionedUsers = [...new Map(mentionedUsers.map(mentioned => [mentioned.id, mentioned])).values()];
-		if (user.host == null && this.roleService != null) {
-			const policies = await this.roleService.getUserPolicies(user.id);
-			if (dedupedMentionedUsers.length > policies.mentionLimit) {
-				throw new IdentifiableError(NOTE_TOO_MANY_MENTIONS_ERROR_ID, 'Too many mentions');
-			}
-		}
+		await this.assertMentionLimit(user.id, Math.max(dedupedMentionedUsers.length, data.apMentionRawCount ?? 0));
 		const mentions = dedupedMentionedUsers.map(mentioned => mentioned.id);
 		const mentionedRemoteUsers = JSON.stringify(dedupedMentionedUsers.filter(mentioned => mentioned.host != null).map(mentioned => ({
 			uri: mentioned.uri,
@@ -241,6 +241,8 @@ export class NoteUpdateService {
 				fileIds,
 				attachedFileTypes,
 				history,
+				...(data.visibility !== undefined ? { visibility: nextVisibility } : {}),
+				...(data.visibleUserIds !== undefined ? { visibleUserIds: nextVisibleUserIds } : {}),
 			};
 
 			await transactionalNotesRepository.update({ id: lockedNote.id }, {
@@ -254,6 +256,8 @@ export class NoteUpdateService {
 				emojis,
 				mentions,
 				mentionedRemoteUsers,
+				...(data.visibility !== undefined ? { visibility: nextVisibility } : {}),
+				...(data.visibleUserIds !== undefined ? { visibleUserIds: nextVisibleUserIds } : {}),
 			});
 
 			return { updatedNote: newNote, changed: true };
@@ -290,6 +294,14 @@ export class NoteUpdateService {
 		}
 
 		return updatedNote;
+	}
+
+	async assertMentionLimit(userId: MiUser['id'], mentionCount: number): Promise<void> {
+		if (this.roleService == null || mentionCount <= 0) return;
+		const policies = await this.roleService.getUserPolicies(userId);
+		if (mentionCount > policies.mentionLimit) {
+			throw new IdentifiableError(NOTE_TOO_MANY_MENTIONS_ERROR_ID, 'Too many mentions');
+		}
 	}
 
 	isUpdateAlreadyApplied(
@@ -428,6 +440,23 @@ export class NoteUpdateService {
 				for (const u of targetUsers.filter(u => this.userEntityService.isRemoteUser(u))) {
 					dm.addDirectRecipe(u as MiRemoteUser);
 				}
+			}
+		} else if (note.visibility === 'followers') {
+			if (note.mentions.length > 0) {
+				const mentionedUsers = await this.usersRepository.findBy({ id: In([...new Set(note.mentions)]) });
+				for (const u of mentionedUsers.filter(u => this.userEntityService.isRemoteUser(u))) {
+					dm.addDirectRecipe(u as MiRemoteUser);
+				}
+			}
+
+			if (note.replyUserId != null && note.replyUserHost != null) {
+				const u = await this.usersRepository.findOneBy({ id: note.replyUserId });
+				if (u && this.userEntityService.isRemoteUser(u)) dm.addDirectRecipe(u);
+			}
+
+			if (note.renoteUserId != null && note.renoteUserHost != null) {
+				const u = await this.usersRepository.findOneBy({ id: note.renoteUserId });
+				if (u && this.userEntityService.isRemoteUser(u)) dm.addDirectRecipe(u);
 			}
 		} else {
 			const legacyRevisions = (note.history ?? []).filter(revision => revision.mentions == null);

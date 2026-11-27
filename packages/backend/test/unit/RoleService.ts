@@ -12,6 +12,7 @@ import { mockDeep } from 'vitest-mock-extended';
 import { Test } from '@nestjs/testing';
 import * as lolex from '@sinonjs/fake-timers';
 import type { TestingModule } from '@nestjs/testing';
+import { EntityManager } from 'typeorm';
 import { GlobalModule } from '@/GlobalModule.js';
 import { RoleService } from '@/core/RoleService.js';
 import {
@@ -1118,19 +1119,23 @@ describe('RoleService', () => {
 	});
 
 	describe('assign', () => {
-		test('propagates the last-used update failure before returning', async () => {
+		test('rolls back assignment when last-used update fails', async () => {
 			const user = await createUser();
 			const role = await createRole();
-			vi.spyOn(rolesRepository, 'update').mockRejectedValueOnce(new Error('update failed'));
+			vi.spyOn(EntityManager.prototype, 'update').mockRejectedValueOnce(new Error('update failed'));
 			await expect(roleService.assign(user.id, role.id)).rejects.toThrow('update failed');
+			expect(await roleAssignmentsRepository.findOneBy({ userId: user.id, roleId: role.id })).toBeNull();
 		});
 
-		test('unassign awaits the last-used update', async () => {
+		test('rolls back unassign when last-used update fails so retry succeeds', async () => {
 			const user = await createUser();
 			const role = await createRole();
 			await roleService.assign(user.id, role.id);
-			vi.spyOn(rolesRepository, 'update').mockRejectedValueOnce(new Error('update failed'));
+			vi.spyOn(EntityManager.prototype, 'update').mockRejectedValueOnce(new Error('update failed'));
 			await expect(roleService.unassign(user.id, role.id)).rejects.toThrow('update failed');
+			expect(await roleAssignmentsRepository.findOneBy({ userId: user.id, roleId: role.id })).not.toBeNull();
+			await expect(roleService.unassign(user.id, role.id)).resolves.toBeUndefined();
+			expect(await roleAssignmentsRepository.findOneBy({ userId: user.id, roleId: role.id })).toBeNull();
 		});
 
 		test('公開ロールの場合は通知される', async () => {

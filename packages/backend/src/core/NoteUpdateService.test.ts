@@ -839,4 +839,49 @@ describe(NoteUpdateService, () => {
 			else expect(remoteUserResolveService.resolveUser).not.toHaveBeenCalled();
 		}
 	});
+
+	test('does not deliver followers-only edits to removed historical mentions', async () => {
+		const followersNote = {
+			...note,
+			visibility: 'followers' as const,
+			localOnly: false,
+			text: 'Hello @alice@remote.example',
+			mentions: ['removed-remote-user'],
+		} as MiNote;
+		const { service, userEntityService, deliverManager, usersRepository } = createService(followersNote);
+		userEntityService.isLocalUser.mockReturnValue(true);
+		Object.assign(userEntityService, { isRemoteUser: vi.fn((u: { host: string | null }) => u.host != null) });
+		usersRepository.findBy.mockResolvedValue([{ id: 'removed-remote-user', host: 'remote.example' }]);
+
+		await service.update(user, followersNote, {
+			text: 'Updated private followers note',
+			cw: null,
+			updatedAt: new Date('2025-02-01T00:00:00.000Z'),
+		});
+
+		await vi.waitFor(() => expect(deliverManager.execute).toHaveBeenCalledOnce());
+		expect(deliverManager.addDirectRecipe).not.toHaveBeenCalled();
+		expect(deliverManager.addFollowersRecipe).toHaveBeenCalledOnce();
+	});
+
+	test('updates visibility and visibleUserIds when remote audience narrows', async () => {
+		const remoteUser = { id: 'remote-author', uri: 'https://remote.example/users/alice', host: 'remote.example', isBot: false };
+		const remoteNote = { ...note, userId: remoteUser.id, userHost: remoteUser.host, visibility: 'public' as const } as MiNote;
+		const { service, notesRepository } = createService(remoteNote);
+
+		const updated = await service.update(remoteUser, remoteNote, {
+			text: 'Now followers only',
+			cw: null,
+			apMentions: [],
+			visibility: 'followers',
+			visibleUserIds: [],
+			updatedAt: new Date('2025-02-01T00:00:00.000Z'),
+		});
+
+		expect(updated.visibility).toBe('followers');
+		expect(notesRepository.update).toHaveBeenCalledWith(
+			{ id: remoteNote.id },
+			expect.objectContaining({ visibility: 'followers', visibleUserIds: [] }),
+		);
+	});
 });

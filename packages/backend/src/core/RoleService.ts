@@ -9,12 +9,11 @@ import { In } from 'typeorm';
 import { ModuleRef } from '@nestjs/core';
 import type {
 	MiMeta,
-	MiRole,
-	MiRoleAssignment,
 	RoleAssignmentsRepository,
 	RolesRepository,
 	UsersRepository,
 } from '@/models/_.js';
+import { MiRole, MiRoleAssignment } from '@/models/_.js';
 import { MemoryKVCache, MemorySingleCache } from '@/misc/cache.js';
 import type { MiUser } from '@/models/User.js';
 import type { Config } from '@/config.js';
@@ -531,31 +530,38 @@ export class RoleService implements OnApplicationShutdown, OnModuleInit {
 
 		const role = await this.rolesRepository.findOneByOrFail({ id: roleId });
 
-		const existing = await this.roleAssignmentsRepository.findOneBy({
-			roleId: roleId,
-			userId: userId,
-		});
+		const created = await this.roleAssignmentsRepository.manager.transaction(async em => {
+			const assignmentRepo = em.getRepository(MiRoleAssignment);
+			const roleRepo = em.getRepository(MiRole);
+			const current = await assignmentRepo.findOneBy({
+				roleId: roleId,
+				userId: userId,
+			});
 
-		if (existing) {
-			if (existing.expiresAt && (existing.expiresAt.getTime() < now)) {
-				await this.roleAssignmentsRepository.delete({
-					roleId: roleId,
-					userId: userId,
-				});
-			} else {
-				throw new RoleService.AlreadyAssignedError();
+			if (current) {
+				if (current.expiresAt && (current.expiresAt.getTime() < now)) {
+					await assignmentRepo.delete({
+						roleId: roleId,
+						userId: userId,
+					});
+				} else {
+					throw new RoleService.AlreadyAssignedError();
+				}
 			}
-		}
 
-		const created = await this.roleAssignmentsRepository.insertOne({
-			id: this.idService.gen(now),
-			expiresAt: expiresAt,
-			roleId: roleId,
-			userId: userId,
-		});
+			const assignment = assignmentRepo.create({
+				id: this.idService.gen(now),
+				expiresAt: expiresAt,
+				roleId: roleId,
+				userId: userId,
+			});
+			await assignmentRepo.insert(assignment);
 
-		await this.rolesRepository.update(roleId, {
-			lastUsedAt: new Date(),
+			await roleRepo.update(roleId, {
+				lastUsedAt: new Date(),
+			});
+
+			return assignment;
 		});
 
 		this.globalEventService.publishInternalEvent('userRoleAssigned', created);
@@ -584,21 +590,27 @@ export class RoleService implements OnApplicationShutdown, OnModuleInit {
 	public async unassign(userId: MiUser['id'], roleId: MiRole['id'], moderator?: MiUser): Promise<void> {
 		const now = new Date();
 
-		const existing = await this.roleAssignmentsRepository.findOneBy({ roleId, userId });
-		if (existing == null) {
-			throw new RoleService.NotAssignedError();
-		} else if (existing.expiresAt && (existing.expiresAt.getTime() < now.getTime())) {
-			await this.roleAssignmentsRepository.delete({
-				roleId: roleId,
-				userId: userId,
+		const existing = await this.roleAssignmentsRepository.manager.transaction(async em => {
+			const assignmentRepo = em.getRepository(MiRoleAssignment);
+			const roleRepo = em.getRepository(MiRole);
+			const current = await assignmentRepo.findOneBy({ roleId, userId });
+			if (current == null) {
+				throw new RoleService.NotAssignedError();
+			} else if (current.expiresAt && (current.expiresAt.getTime() < now.getTime())) {
+				await assignmentRepo.delete({
+					roleId: roleId,
+					userId: userId,
+				});
+				throw new RoleService.NotAssignedError();
+			}
+
+			await assignmentRepo.delete(current.id);
+
+			await roleRepo.update(roleId, {
+				lastUsedAt: now,
 			});
-			throw new RoleService.NotAssignedError();
-		}
 
-		await this.roleAssignmentsRepository.delete(existing.id);
-
-		await this.rolesRepository.update(roleId, {
-			lastUsedAt: now,
+			return current;
 		});
 
 		this.globalEventService.publishInternalEvent('userRoleUnassigned', existing);

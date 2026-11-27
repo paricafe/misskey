@@ -133,7 +133,7 @@ export class SigninApiService {
 			});
 		}
 
-		if (user.isSuspended) {
+		if (user.isSuspended || user.isDeleted) {
 			return error(403, {
 				id: 'e03a5f46-d309-4865-9b69-56282d94e1eb',
 			});

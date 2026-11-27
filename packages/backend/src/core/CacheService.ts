@@ -206,6 +206,7 @@ export class CacheService implements OnApplicationShutdown {
 					if (user == null) {
 						this.userByIdCache.delete(body.id);
 						this.localUserByIdCache.delete(body.id);
+						this.deleteNativeTokenCacheByUserId(body.id);
 						for (const [k, v] of this.uriPersonCache.entries) {
 							if (v.value?.id === body.id) {
 								this.uriPersonCache.delete(k);
@@ -219,16 +220,22 @@ export class CacheService implements OnApplicationShutdown {
 							}
 						}
 						if (this.userEntityService.isLocalUser(user)) {
-							this.localUserByNativeTokenCache.set(user.token!, user);
+							if (user.isDeleted) {
+								this.deleteNativeTokenCacheByUserId(user.id);
+							} else {
+								this.localUserByNativeTokenCache.set(user.token!, user);
+							}
 							this.localUserByIdCache.set(user.id, user);
 						}
 					}
 					break;
 				}
 				case 'userTokenRegenerated': {
-					const user = await this.usersRepository.findOneByOrFail({ id: body.id }) as MiLocalUser;
 					this.localUserByNativeTokenCache.delete(body.oldToken);
-					this.localUserByNativeTokenCache.set(body.newToken, user);
+					this.localUserByNativeTokenCache.delete(body.newToken);
+					this.deleteNativeTokenCacheByUserId(body.id);
+					this.userByIdCache.delete(body.id);
+					this.localUserByIdCache.delete(body.id);
 					break;
 				}
 				case 'follow': {
@@ -241,6 +248,14 @@ export class CacheService implements OnApplicationShutdown {
 				}
 				default:
 					break;
+			}
+		}
+	}
+
+	private deleteNativeTokenCacheByUserId(userId: MiUser['id']): void {
+		for (const [k, v] of this.localUserByNativeTokenCache.entries) {
+			if (v.value?.id === userId) {
+				this.localUserByNativeTokenCache.delete(k);
 			}
 		}
 	}

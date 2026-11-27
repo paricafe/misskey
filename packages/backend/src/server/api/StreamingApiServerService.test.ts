@@ -194,6 +194,37 @@ describe('native streaming shutdown', () => {
 		}
 	});
 
+	test('treats a single periodic auth timeout as transient and closes after 3 consecutive timeouts', async () => {
+		vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'setTimeout', 'clearTimeout'] });
+		const valid = [{ id: 'alice' }, { id: 'token', permission: ['read:account'] }];
+		const authenticate = vi.fn().mockResolvedValue(valid);
+		const { service, server, client } = await setup(undefined, authenticate, 'token');
+		try {
+			await once(client, 'open');
+			authenticate.mockImplementationOnce(() => new Promise(() => {})).mockResolvedValueOnce(valid);
+			await vi.advanceTimersByTimeAsync(10_000);
+			await vi.advanceTimersByTimeAsync(10_000);
+			expect(client.readyState).toBe(WebSocket.OPEN);
+
+			authenticate.mockImplementation(() => new Promise(() => {}));
+			const closed = once(client, 'close');
+			await vi.advanceTimersByTimeAsync(10_000);
+			await vi.advanceTimersByTimeAsync(10_000);
+			expect(client.readyState).toBe(WebSocket.OPEN);
+			await vi.advanceTimersByTimeAsync(10_000);
+			await vi.advanceTimersByTimeAsync(10_000);
+			expect(client.readyState).toBe(WebSocket.OPEN);
+			await vi.advanceTimersByTimeAsync(10_000);
+			await vi.advanceTimersByTimeAsync(10_000);
+			await closed;
+		} finally {
+			await service.detach();
+			vi.useRealTimers();
+			client.terminate();
+			await new Promise<void>(resolve => server.close(() => resolve()));
+		}
+	});
+
 	test('closes connected clients and removes listeners before resolving detach', async () => {
 		const { redis, stream, service, server, client } = await setup();
 		try {

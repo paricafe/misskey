@@ -7,6 +7,7 @@ import bcrypt from 'bcryptjs';
 import { Inject, Injectable } from '@nestjs/common';
 import { Endpoint } from '@/server/api/endpoint-base.js';
 import type { UsersRepository, UserProfilesRepository } from '@/models/_.js';
+import { MiUser } from '@/models/_.js';
 import { generateNativeUserToken } from '@/misc/token.js';
 import { GlobalEventService } from '@/core/GlobalEventService.js';
 import { DI } from '@/di-symbols.js';
@@ -37,9 +38,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 		private globalEventService: GlobalEventService,
 	) {
 		super(meta, paramDef, async (ps, me) => {
-			const freshUser = await this.usersRepository.findOneByOrFail({ id: me.id });
-			const oldToken = freshUser.token!;
-
 			const profile = await this.userProfilesRepository.findOneByOrFail({ userId: me.id });
 
 			const same = await bcrypt.compare(ps.password, profile.password!);
@@ -49,9 +47,19 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 			}
 
 			const newToken = generateNativeUserToken();
-
-			await this.usersRepository.update(me.id, {
-				token: newToken,
+			const oldToken = await this.usersRepository.manager.transaction(async em => {
+				const usersRepo = em.getRepository(MiUser);
+				const freshUser = await usersRepo.findOne({
+					where: { id: me.id },
+					lock: { mode: 'pessimistic_write' },
+				});
+				if (freshUser == null || freshUser.token == null) {
+					throw new Error('user not found');
+				}
+				await usersRepo.update(me.id, {
+					token: newToken,
+				});
+				return freshUser.token;
 			});
 
 			await this.globalEventService.publishInternalEvent('userTokenRegenerated', { id: me.id, oldToken, newToken });

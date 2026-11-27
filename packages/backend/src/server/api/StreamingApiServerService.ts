@@ -20,6 +20,13 @@ import type * as http from 'node:http';
 import type { Duplex } from 'node:stream';
 import type { EventEmitter } from 'node:events';
 
+class AuthorizationTimeoutError extends Error {
+	constructor() {
+		super('Authorization check timed out');
+		this.name = 'AuthorizationTimeoutError';
+	}
+}
+
 export function isNativeStreamingPath(url: string): boolean {
 	try {
 		return new URL(url, 'http://localhost').pathname === '/streaming';
@@ -239,7 +246,7 @@ export class StreamingApiServerService {
 		const check = Promise.race([
 			this.authenticateService.authenticate(token, { fresh: true, updateLastUsedAt: false }),
 			new Promise<never>((_, reject) => {
-				timeout = setTimeout(() => reject(new AuthenticationError('Authorization check timed out')), 10_000);
+				timeout = setTimeout(() => reject(new AuthorizationTimeoutError()), 10_000);
 				timeout.unref();
 			}),
 		]).finally(() => {

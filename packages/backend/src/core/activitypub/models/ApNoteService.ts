@@ -389,6 +389,9 @@ export class ApNoteService {
 			text = this.apMfmService.htmlToMfm(note.content, { tag: note.tag, hasQuote: !!(note._misskey_quote ?? note.quoteUrl) });
 		}
 
+		const apMentionRawCount = new Set(this.apMentionService.extractApMentionObjects(note.tag).map(x => x.href)).size;
+		await this.noteUpdateService.assertMentionLimit(actor.id, apMentionRawCount);
+
 		await this.noteUpdateService.prepareUpdate(actor, originNote);
 
 		let files: MiDriveFile[] | undefined;
@@ -409,6 +412,10 @@ export class ApNoteService {
 		const apEmojis = emojis.map(emoji => emoji.name);
 
 		resolver ??= await this.apResolverService.createResolver();
+		const hasAudience = Object.hasOwn(note, 'to') || Object.hasOwn(note, 'cc');
+		const noteAudience = hasAudience
+			? await this.apAudienceService.parseAudience(actor, note.to, note.cc, resolver)
+			: null;
 		const apMentions = await this.apMentionService.extractApMentions(note.tag, resolver);
 		await assertLockOwned();
 		await this.noteUpdateService.update(actor, originNote, {
@@ -418,6 +425,11 @@ export class ApNoteService {
 			apHashtags,
 			apEmojis,
 			apMentions,
+			apMentionRawCount,
+			...(noteAudience != null ? {
+				visibility: noteAudience.visibility,
+				visibleUserIds: noteAudience.visibleUsers.map(u => u.id),
+			} : {}),
 			updatedAt,
 		}, silent);
 		return undefined;

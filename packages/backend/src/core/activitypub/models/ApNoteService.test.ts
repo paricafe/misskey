@@ -21,6 +21,7 @@ function createService(originNoteOverrides: Record<string, unknown> = {}) {
 			updatedAt: Date,
 		) => NoteUpdateService.prototype.isUpdateAlreadyApplied(note as never, updatedAt)),
 		prepareUpdate: vi.fn().mockResolvedValue(preparedUpdate),
+		assertMentionLimit: vi.fn().mockResolvedValue(undefined),
 		update: vi.fn().mockResolvedValue(undefined),
 		withHistory: vi.fn(async (note: unknown) => note),
 	};
@@ -61,13 +62,20 @@ function createService(originNoteOverrides: Record<string, unknown> = {}) {
 		findOneBy: vi.fn().mockResolvedValue(originNote),
 	};
 	const apMfmService = { htmlToMfm: vi.fn().mockReturnValue('edited text') };
-	const apMentionService = { extractApMentions: vi.fn().mockResolvedValue([]) };
+	const apAudienceService = {
+		parseAudience: vi.fn().mockResolvedValue({ visibility: 'public', visibleUsers: [] }),
+	};
+	const apMentionService = {
+		extractApMentionObjects: vi.fn().mockReturnValue([]),
+		extractApMentions: vi.fn().mockResolvedValue([]),
+	};
 	const service = Object.create(ApNoteService.prototype) as ApNoteService;
 	Object.assign(service, {
 		config: { url: 'https://local.example' },
 		redisClient,
 		notesRepository,
 		apMfmService,
+		apAudienceService,
 		apPersonService,
 		apResolverService: { createResolver: vi.fn().mockResolvedValue({}) },
 		apMentionService,
@@ -84,6 +92,7 @@ function createService(originNoteOverrides: Record<string, unknown> = {}) {
 		noteUpdateService,
 		apImageService,
 		apPersonService,
+		apAudienceService,
 		apMentionService,
 		apMfmService,
 		extractEmojis,
@@ -491,6 +500,45 @@ describe(ApNoteService, () => {
 		} as never)).rejects.toThrow('Lost distributed lock');
 
 		expect(apImageService.resolveImage).toHaveBeenCalledOnce();
+		expect(noteUpdateService.update).not.toHaveBeenCalled();
+	});
+
+	test('parses updated audience fields and forwards them to NoteUpdateService', async () => {
+		const { service, noteUpdateService, apAudienceService } = createService();
+		apAudienceService.parseAudience.mockResolvedValueOnce({
+			visibility: 'followers',
+			visibleUsers: [{ id: 'visible-user' }],
+		});
+
+		await service.updateNote({
+			...update,
+			to: ['https://remote.example/users/alice/followers'],
+		} as never);
+
+		expect(apAudienceService.parseAudience).toHaveBeenCalledOnce();
+		expect(noteUpdateService.update).toHaveBeenCalledWith(
+			expect.objectContaining({ id: 'remote-user' }),
+			expect.anything(),
+			expect.objectContaining({ visibility: 'followers', visibleUserIds: ['visible-user'], apMentionRawCount: 0 }),
+			false,
+		);
+	});
+
+	test('rejects updates exceeding raw mention limit before resolving attachments or mentions', async () => {
+		const { service, noteUpdateService, apMentionService, apImageService } = createService();
+		apMentionService.extractApMentionObjects.mockReturnValueOnce([
+			{ href: 'https://remote.example/users/a' },
+			{ href: 'https://remote.example/users/b' },
+		]);
+		noteUpdateService.assertMentionLimit.mockRejectedValueOnce(new Error('Too many mentions'));
+
+		await expect(service.updateNote({
+			...update,
+			attachment: [{ type: 'Document', url: 'https://remote.example/files/new.png' }],
+		} as never)).rejects.toThrow('Too many mentions');
+
+		expect(apImageService.resolveImage).not.toHaveBeenCalled();
+		expect(apMentionService.extractApMentions).not.toHaveBeenCalled();
 		expect(noteUpdateService.update).not.toHaveBeenCalled();
 	});
 });
