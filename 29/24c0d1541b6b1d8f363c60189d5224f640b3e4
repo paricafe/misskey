@@ -1,0 +1,319 @@
+packages/backend/src/server/api/ApiCallService.ts
+  6dd8e916bb0b1c9b 380-397
+packages/mastodon-compat/src/scopes.ts
+  6dd8e916bb0b1c9b 26
+packages/mastodon-compat/test/gateway-lifecycle.test.ts
+  4c2cf32e259253d6 155-223
+  6dd8e916bb0b1c9b 114-154
+packages/backend/src/server/api/endpoints/notes/unrenote.test.ts
+  6dd8e916bb0b1c9b 1-39
+packages/mastodon-compat/test/streaming.test.ts
+  6dd8e916bb0b1c9b 169,571-633
+  4c2cf32e259253d6 634-648
+packages/backend/src/server/api/endpoints/users/reactions.test.ts
+  6dd8e916bb0b1c9b 1-40
+packages/mastodon-compat/test/entities.test.ts
+  6dd8e916bb0b1c9b 34-36,78-92,184-188,213,216,218-221,223-225
+packages/backend/src/server/ServerService.ts
+  6dd8e916bb0b1c9b 171-172,176-190
+packages/mastodon-compat/src/metadata.ts
+  6dd8e916bb0b1c9b 13-35,99,104-105,111-113,115-120
+  4c2cf32e259253d6 114
+packages/mastodon-compat/test/media-search.test.ts
+  6dd8e916bb0b1c9b 167-187,319-345
+packages/backend/src/server/api/ApiCallService.test.ts
+  6dd8e916bb0b1c9b 1-85
+packages/backend/src/server/api/endpoints/notes/search-by-tag.test.ts
+  6dd8e916bb0b1c9b 31-51
+packages/backend/src/server/api/endpoints/notes/search-by-tag.ts
+  6dd8e916bb0b1c9b 67,161-163
+packages/backend/src/server/api/endpoints/stats.test.ts
+  6dd8e916bb0b1c9b 1-35
+packages/mastodon-compat/src/streaming.ts
+  6dd8e916bb0b1c9b 9,13,16,93,99-111,147-198,219,238,240,251-266,319,386,388,422,425-426,482-492,496,534,626,656-658,661-671,674,676-707,721,724-725,727,730-731,748-760,762-769,771-777,779,781-782,787-809,811-814,820
+  4c2cf32e259253d6 81,86,423,770,778,780,783-786,810
+packages/backend/src/server/oauth/OAuth2ProviderService.ts
+  6dd8e916bb0b1c9b 14,478,483-489,491-493
+packages/mastodon-compat/src/media-search.ts
+  6dd8e916bb0b1c9b 14,36,42,51,107-113,117,126-130,137,143,145-150,169-181,183-189
+  4c2cf32e259253d6 7,16,18,31-35
+packages/backend/src/server/api/endpoints/notes/reactions.ts
+  6dd8e916bb0b1c9b 85-89
+packages/backend/src/server/api/endpoints/stats.ts
+  6dd8e916bb0b1c9b 7-8,47-50,78-79,96,100,110
+packages/mastodon-compat/src/index.ts
+  4c2cf32e259253d6 14,77,81
+  6dd8e916bb0b1c9b 19,23,66,111-116,121,129,131-134,136-146,148-153,157
+packages/mastodon-compat/test/routes.test.ts
+  6dd8e916bb0b1c9b 58,556-594,596-598,600,603,622-625,638-641,657-698,700,703,726-867,869-871,873-881,886-888,890-895
+  4c2cf32e259253d6 595,599,601-602,604-621,626-637,642-656,699,701-702,704-725,868,872,882-885,889
+packages/mastodon-compat/test/oauth.test.ts
+  6dd8e916bb0b1c9b 81,216,278-306
+packages/mastodon-compat/src/notifications-v2.ts
+  6dd8e916bb0b1c9b 100-101,108-130
+packages/backend/src/server/oauth/OAuth2ProviderService.test.ts
+  6dd8e916bb0b1c9b 1-51
+packages/mastodon-compat/src/oauth.ts
+  6dd8e916bb0b1c9b 180,189,202,205,208,280-289
+packages/backend/src/server/api/endpoints/notes/state.test.ts
+  6dd8e916bb0b1c9b 1-61
+packages/backend/src/server/api/endpoints/notes/state.ts
+  6dd8e916bb0b1c9b 10,30-43,69-72,74,89-100,106
+packages/backend/src/server/api/endpoints/notes/reactions.test.ts
+  6dd8e916bb0b1c9b 1-29
+packages/mastodon-compat/src/types.ts
+  6dd8e916bb0b1c9b 42
+packages/backend/src/server/api/endpoints/notes/unrenote.ts
+  6dd8e916bb0b1c9b 68-80
+packages/misskey-js/src/autogen/types.ts
+  6dd8e916bb0b1c9b 31648-31649,31891-31892,34770,37004
+  4c2cf32e259253d6 32320-32324,37239-37240,37244-37248
+packages/mastodon-compat/src/entities.ts
+  6dd8e916bb0b1c9b 119-125,140-143,151,225,227,231,233,259-260,367,389-407
+packages/mastodon-compat/src/routes.ts
+  6dd8e916bb0b1c9b 17-18,51-53,66-67,69,77,95-97,100-121,172,196-223,227-228,233-264,267-270,275,278-279,281,294-310,322,325,354-356,358,360-361,364-365,380-383,391-398,424,429,434-449,454,456-466,476-480,482,484,521-545,548,554-556,558-559,598,649-657
+  4c2cf32e259253d6 265-266,271-274,276-277,280,359,362-363,366-372,374-377,450-453,455
+packages/mastodon-compat/test/notifications-v2.test.ts
+  6dd8e916bb0b1c9b 39-44,269-274,323-337
+packages/backend/src/server/api/endpoints/users/reactions.ts
+  6dd8e916bb0b1c9b 53,113-121
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8-ntes.10",
+  "base_commit_sha": "2924c0d1541b6b1d8f363c60189d5224f640b3e4",
+  "prompts": {
+    "4c2cf32e259253d6": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a2239d-dcd4-7531-9eea-3c70593f78de",
+        "model": "gpt-6.2-astra"
+      },
+      "human_author": "Natsuki-Kaede",
+      "messages": [],
+      "total_additions": 230,
+      "total_deletions": 88,
+      "accepted_lines": 230,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "packages/mastodon-compat/src/media-search.ts": {
+          "additions": 8,
+          "deletions": 14,
+          "accepted_lines": 8
+        },
+        "packages/misskey-js/src/autogen/types.ts": {
+          "additions": 13,
+          "deletions": 2,
+          "accepted_lines": 13
+        },
+        "packages/mastodon-compat/test/streaming.test.ts": {
+          "additions": 15,
+          "accepted_lines": 15
+        },
+        "packages/mastodon-compat/src/routes.ts": {
+          "additions": 29,
+          "deletions": 26,
+          "accepted_lines": 29
+        },
+        "packages/mastodon-compat/test/routes.test.ts": {
+          "additions": 81,
+          "deletions": 32,
+          "accepted_lines": 81
+        },
+        "packages/mastodon-compat/src/metadata.ts": {
+          "additions": 1,
+          "deletions": 1,
+          "accepted_lines": 1
+        },
+        "packages/mastodon-compat/test/gateway-lifecycle.test.ts": {
+          "additions": 69,
+          "accepted_lines": 69
+        },
+        "packages/mastodon-compat/src/index.ts": {
+          "additions": 3,
+          "deletions": 2,
+          "accepted_lines": 3
+        },
+        "packages/mastodon-compat/src/streaming.ts": {
+          "additions": 11,
+          "deletions": 11,
+          "accepted_lines": 11
+        }
+      }
+    },
+    "6dd8e916bb0b1c9b": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a22390-6fcc-77f0-b703-d2f0dd8228f1",
+        "model": "gpt-6.2-astra"
+      },
+      "human_author": "Natsuki-Kaede",
+      "messages": [],
+      "total_additions": 1726,
+      "total_deletions": 180,
+      "accepted_lines": 1653,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "packages/backend/src/server/api/endpoints/users/reactions.test.ts": {
+          "additions": 40,
+          "accepted_lines": 40
+        },
+        "packages/mastodon-compat/test/routes.test.ts": {
+          "additions": 293,
+          "deletions": 1,
+          "accepted_lines": 261
+        },
+        "packages/backend/src/server/api/ApiCallService.test.ts": {
+          "additions": 85,
+          "accepted_lines": 85
+        },
+        "packages/mastodon-compat/src/metadata.ts": {
+          "additions": 36,
+          "deletions": 3,
+          "accepted_lines": 35
+        },
+        "packages/backend/src/server/oauth/OAuth2ProviderService.ts": {
+          "additions": 12,
+          "deletions": 2,
+          "accepted_lines": 12
+        },
+        "packages/mastodon-compat/src/streaming.ts": {
+          "additions": 232,
+          "deletions": 62,
+          "accepted_lines": 228
+        },
+        "packages/backend/src/server/api/endpoints/notes/state.ts": {
+          "additions": 34,
+          "deletions": 3,
+          "accepted_lines": 34
+        },
+        "packages/mastodon-compat/src/types.ts": {
+          "additions": 1,
+          "accepted_lines": 1
+        },
+        "packages/mastodon-compat/src/scopes.ts": {
+          "additions": 1,
+          "deletions": 1,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/server/api/endpoints/notes/reactions.test.ts": {
+          "additions": 29,
+          "accepted_lines": 29
+        },
+        "packages/backend/src/server/api/endpoints/notes/state.test.ts": {
+          "additions": 61,
+          "accepted_lines": 61
+        },
+        "packages/mastodon-compat/test/media-search.test.ts": {
+          "additions": 49,
+          "accepted_lines": 49
+        },
+        "packages/mastodon-compat/src/oauth.ts": {
+          "additions": 15,
+          "deletions": 4,
+          "accepted_lines": 15
+        },
+        "packages/backend/src/server/oauth/OAuth2ProviderService.test.ts": {
+          "additions": 51,
+          "accepted_lines": 51
+        },
+        "packages/backend/src/server/api/endpoints/notes/unrenote.ts": {
+          "additions": 13,
+          "deletions": 2,
+          "accepted_lines": 13
+        },
+        "packages/backend/src/server/api/endpoints/notes/unrenote.test.ts": {
+          "additions": 39,
+          "accepted_lines": 39
+        },
+        "packages/backend/src/server/api/ApiCallService.ts": {
+          "additions": 18,
+          "accepted_lines": 18
+        },
+        "packages/backend/src/server/api/endpoints/notes/search-by-tag.test.ts": {
+          "additions": 21,
+          "accepted_lines": 21
+        },
+        "packages/backend/src/server/api/endpoints/notes/reactions.ts": {
+          "additions": 5,
+          "deletions": 1,
+          "accepted_lines": 5
+        },
+        "packages/mastodon-compat/test/gateway-lifecycle.test.ts": {
+          "additions": 41,
+          "accepted_lines": 41
+        },
+        "packages/backend/src/server/api/endpoints/stats.test.ts": {
+          "additions": 35,
+          "accepted_lines": 35
+        },
+        "packages/backend/src/server/api/endpoints/notes/search-by-tag.ts": {
+          "additions": 6,
+          "accepted_lines": 6
+        },
+        "packages/mastodon-compat/src/notifications-v2.ts": {
+          "additions": 25,
+          "deletions": 4,
+          "accepted_lines": 25
+        },
+        "packages/backend/src/server/api/endpoints/users/reactions.ts": {
+          "additions": 11,
+          "accepted_lines": 11
+        },
+        "packages/misskey-js/src/autogen/types.ts": {
+          "additions": 6,
+          "accepted_lines": 6
+        },
+        "packages/backend/src/server/ServerService.ts": {
+          "additions": 17,
+          "deletions": 2,
+          "accepted_lines": 17
+        },
+        "packages/mastodon-compat/src/media-search.ts": {
+          "additions": 61,
+          "deletions": 14,
+          "accepted_lines": 49
+        },
+        "packages/mastodon-compat/test/oauth.test.ts": {
+          "additions": 32,
+          "accepted_lines": 32
+        },
+        "packages/mastodon-compat/test/streaming.test.ts": {
+          "additions": 65,
+          "deletions": 1,
+          "accepted_lines": 65
+        },
+        "packages/mastodon-compat/test/notifications-v2.test.ts": {
+          "additions": 28,
+          "deletions": 2,
+          "accepted_lines": 28
+        },
+        "packages/mastodon-compat/src/index.ts": {
+          "additions": 33,
+          "deletions": 8,
+          "accepted_lines": 33
+        },
+        "packages/backend/src/server/api/endpoints/stats.ts": {
+          "additions": 12,
+          "deletions": 1,
+          "accepted_lines": 12
+        },
+        "packages/mastodon-compat/src/entities.ts": {
+          "additions": 38,
+          "deletions": 34,
+          "accepted_lines": 38
+        },
+        "packages/mastodon-compat/test/entities.test.ts": {
+          "additions": 32,
+          "deletions": 3,
+          "accepted_lines": 32
+        },
+        "packages/mastodon-compat/src/routes.ts": {
+          "additions": 249,
+          "deletions": 32,
+          "accepted_lines": 225
+        }
+      }
+    }
+  }
+}
