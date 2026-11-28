@@ -13,7 +13,7 @@ import type { MiUser } from '@/models/User.js';
 import type { MiNote } from '@/models/Note.js';
 import type { MiPoll } from '@/models/Poll.js';
 import type { MiPollVote } from '@/models/PollVote.js';
-import type { UsersRepository, NotesRepository, FollowingsRepository, PollsRepository, PollVotesRepository, NoteReactionsRepository, ChannelsRepository, MiMeta } from '@/models/_.js';
+import type { MiChannel, UsersRepository, NotesRepository, FollowingsRepository, PollsRepository, PollVotesRepository, NoteReactionsRepository, ChannelsRepository, MiMeta } from '@/models/_.js';
 import { bindThis } from '@/decorators.js';
 import { DebounceLoader } from '@/misc/loader.js';
 import { IdService } from '@/core/IdService.js';
@@ -64,6 +64,11 @@ async function nullIfEntityNotFound<T>(promise: Promise<T>): Promise<T | null> {
 	}
 }
 
+type PendingMyReactionWaiter = {
+	resolve: (value: string | undefined) => void;
+	reject: (error: unknown) => void;
+};
+
 @Injectable()
 export class NoteEntityService implements OnModuleInit {
 	private userEntityService: UserEntityService;
@@ -74,6 +79,7 @@ export class NoteEntityService implements OnModuleInit {
 	private reactionsBufferingService: ReactionsBufferingService;
 	private idService: IdService;
 	private noteLoader = new DebounceLoader(this.findNoteOrFail);
+	#pendingMyReactionBatches = new Map<MiNote['id'], Map<MiUser['id'], PendingMyReactionWaiter[]>>();
 
 	constructor(
 		private moduleRef: ModuleRef,
@@ -244,6 +250,76 @@ export class NoteEntityService implements OnModuleInit {
 		return { ...note, poll, renote, reply };
 	}
 
+	#loadMyReactionBatched(noteId: MiNote['id'], meId: MiUser['id']): Promise<string | undefined> {
+		let byUser = this.#pendingMyReactionBatches.get(noteId);
+		const shouldSchedule = byUser == null;
+		if (byUser == null) {
+			byUser = new Map();
+			this.#pendingMyReactionBatches.set(noteId, byUser);
+		}
+
+		let waiters = byUser.get(meId);
+		if (waiters == null) {
+			waiters = [];
+			byUser.set(meId, waiters);
+		}
+
+		const promise = new Promise<string | undefined>((resolve, reject) => {
+			waiters.push({ resolve, reject });
+		});
+
+		if (shouldSchedule) {
+			queueMicrotask(() => {
+				void this.#flushMyReactionBatch(noteId);
+			});
+		}
+
+		return promise;
+	}
+
+	async #flushMyReactionBatch(noteId: MiNote['id']): Promise<void> {
+		const byUser = this.#pendingMyReactionBatches.get(noteId);
+		if (byUser == null) return;
+		this.#pendingMyReactionBatches.delete(noteId);
+
+		const userIds = [...byUser.keys()];
+		try {
+			if (userIds.length === 1) {
+				const userId = userIds[0];
+				const reaction = await this.noteReactionsRepository.findOneBy({
+					userId,
+					noteId,
+				});
+				const converted = reaction ? this.reactionService.convertLegacyReaction(reaction.reaction) : undefined;
+				for (const waiter of byUser.get(userId)!) {
+					waiter.resolve(converted);
+				}
+				return;
+			}
+
+			const reactions = await this.noteReactionsRepository.findBy({
+				noteId,
+				userId: In(userIds),
+			});
+			const reactionsByUserId = new Map<MiUser['id'], string>();
+			for (const reaction of reactions) {
+				reactionsByUserId.set(reaction.userId, this.reactionService.convertLegacyReaction(reaction.reaction));
+			}
+			for (const [userId, waiters] of byUser) {
+				const converted = reactionsByUserId.get(userId);
+				for (const waiter of waiters) {
+					waiter.resolve(converted);
+				}
+			}
+		} catch (error) {
+			for (const waiters of byUser.values()) {
+				for (const waiter of waiters) {
+					waiter.reject(error);
+				}
+			}
+		}
+	}
+
 	@bindThis
 	public async populateMyReaction(note: { id: MiNote['id']; reactions: MiNote['reactions']; reactionAndUserPairCache?: MiNote['reactionAndUserPairCache']; }, meId: MiUser['id'], _hint_?: {
 		myReactions: Map<MiNote['id'], string | null>;
@@ -272,16 +348,7 @@ export class NoteEntityService implements OnModuleInit {
 			return undefined;
 		}
 
-		const reaction = await this.noteReactionsRepository.findOneBy({
-			userId: meId,
-			noteId: note.id,
-		});
-
-		if (reaction) {
-			return this.reactionService.convertLegacyReaction(reaction.reaction);
-		}
-
-		return undefined;
+		return await this.#loadMyReactionBatched(note.id, meId);
 	}
 
 	@bindThis
@@ -323,19 +390,17 @@ export class NoteEntityService implements OnModuleInit {
 			} else if (note.mentions && note.mentions.some(id => meId === id)) {
 				return true;
 			} else {
-				const [blocked, following, user] = await Promise.all([
-					this.cacheService.userBlockingCache.fetch(meId).then((ids) => ids.has(note.userId)),
-					this.followingsRepository.count({
+				const [isFollowing, user] = await Promise.all([
+					this.followingsRepository.exists({
 						where: {
 							followeeId: note.userId,
 							followerId: meId,
 						},
-						take: 1,
 					}),
 					this.usersRepository.findOneByOrFail({ id: meId }),
 				]);
 
-				return following > 0 || (note.userHost != null && user.host != null);
+				return isFollowing || (note.userHost != null && user.host != null);
 			}
 		}
 
@@ -376,9 +441,11 @@ export class NoteEntityService implements OnModuleInit {
 				bufferedReactions: Map<MiNote['id'], BufferedReactions> | null;
 				myReactions: Map<MiNote['id'], string | null>;
 				packedFiles: Map<MiNote['fileIds'][number], Packed<'DriveFile'> | null>;
-				packedUsers: Map<MiUser['id'], Packed<'UserLite'>>
+				packedUsers: Map<MiUser['id'], Packed<'UserLite'>>;
 				polls?: Map<MiNote['id'], MiPoll>;
 				myVotes?: Map<MiNote['id'], MiPollVote[]>;
+				channels?: Map<MiChannel['id'], MiChannel | null>;
+				missingEmojiKeys?: ReadonlySet<string>;
 			};
 		},
 	): Promise<Packed<'Note'>> {
@@ -409,7 +476,9 @@ export class NoteEntityService implements OnModuleInit {
 		const channel = note.channelId
 			? note.channel
 				? note.channel
-				: await this.channelsRepository.findOneBy({ id: note.channelId })
+				: opts._hint_?.channels?.has(note.channelId)
+					? (opts._hint_.channels.get(note.channelId) ?? null)
+					: await this.channelsRepository.findOneBy({ id: note.channelId })
 			: null;
 
 		const reactionEmojiNames = Object.keys(reactions)
@@ -417,6 +486,7 @@ export class NoteEntityService implements OnModuleInit {
 			.map(x => this.reactionService.decodeReaction(x).reaction.replaceAll(':', ''));
 		const packedFiles = options?._hint_?.packedFiles;
 		const packedUsers = options?._hint_?.packedUsers;
+		const missingEmojiKeys = options?._hint_?.missingEmojiKeys;
 
 		const packed: Packed<'Note'> = await awaitAll({
 			id: note.id,
@@ -437,9 +507,15 @@ export class NoteEntityService implements OnModuleInit {
 			repliesCount: note.repliesCount,
 			reactionCount: Object.values(reactions).reduce((a, b) => a + b, 0),
 			reactions: reactions,
-			reactionEmojis: this.customEmojiService.populateEmojis(reactionEmojiNames, host),
+			reactionEmojis: missingEmojiKeys && missingEmojiKeys.size > 0
+				? this.customEmojiService.populateEmojis(reactionEmojiNames, host, missingEmojiKeys)
+				: this.customEmojiService.populateEmojis(reactionEmojiNames, host),
 			reactionAndUserPairCache: opts.withReactionAndUserPairCache ? reactionAndUserPairCache : undefined,
-			emojis: host != null ? this.customEmojiService.populateEmojis(note.emojis, host) : undefined,
+			emojis: host != null
+				? (missingEmojiKeys && missingEmojiKeys.size > 0
+					? this.customEmojiService.populateEmojis(note.emojis, host, missingEmojiKeys)
+					: this.customEmojiService.populateEmojis(note.emojis, host))
+				: undefined,
 			tags: note.tags.length > 0 ? note.tags : undefined,
 			fileIds: note.fileIds,
 			files: packedFiles != null ? this.packAttachedFiles(note.fileIds, packedFiles) : this.driveFileEntityService.packManyByIds(note.fileIds),
@@ -578,20 +654,66 @@ export class NoteEntityService implements OnModuleInit {
 				userId: meId,
 				noteId: In(Array.from(idsNeedFetchMyReaction)),
 			}) : [];
+			const myReactionsByNoteId = new Map(myReactions.map(reaction => [reaction.noteId, reaction.reaction]));
 
 			for (const id of idsNeedFetchMyReaction) {
-				myReactionsMap.set(id, myReactions.find(reaction => reaction.noteId === id)?.reaction ?? null);
+				myReactionsMap.set(id, myReactionsByNoteId.get(id) ?? null);
 			}
 		}
 
-		await this.customEmojiService.prefetchEmojis(this.aggregateNoteEmojis(notes));
+		const missingChannelIds = new Set<MiChannel['id']>();
+		const usersById = new Map<MiUser['id'], MiUser | MiUser['id']>();
+		const addUser = (user: MiUser | null | undefined, userId: MiUser['id'] | null | undefined) => {
+			if (user != null) {
+				usersById.set(user.id, user);
+			} else if (userId != null && !usersById.has(userId)) {
+				usersById.set(userId, userId);
+			}
+		};
+		const visitedForMeta = new Map<MiNote['id'], boolean>();
+		const collectNoteMeta = (note: MiNote, includeNested: boolean) => {
+			const prev = visitedForMeta.get(note.id);
+			if (prev === true || (prev === false && !includeNested)) return;
+			visitedForMeta.set(note.id, includeNested);
+			if (prev == null) {
+				addUser(note.user, note.userId);
+				if (note.channelId != null && note.channel == null) {
+					missingChannelIds.add(note.channelId);
+				}
+			}
+			if (includeNested) {
+				if (note.reply != null) {
+					collectNoteMeta(note.reply, false);
+				} else if (note.replyUserId != null) {
+					addUser(null, note.replyUserId);
+				}
+				if (note.renote != null) {
+					collectNoteMeta(note.renote, true);
+				} else if (note.renoteUserId != null) {
+					addUser(null, note.renoteUserId);
+				}
+			}
+		};
+		const includeNested = options?.detail !== false;
+		for (const note of notes) {
+			collectNoteMeta(note, includeNested);
+		}
+
+		const channels = new Map<MiChannel['id'], MiChannel | null>();
+		if (missingChannelIds.size > 0) {
+			const fetchedChannels = await this.channelsRepository.findBy({
+				id: In([...missingChannelIds]),
+			});
+			for (const id of missingChannelIds) channels.set(id, null);
+			for (const channel of fetchedChannels) channels.set(channel.id, channel);
+		}
+
+		const missingEmojiKeys = await this.customEmojiService.prefetchEmojis(
+			this.aggregateNoteEmojis(notes, bufferedReactions, includeNested),
+		);
 		const fileIds = notes.map(n => [n.fileIds, n.renote?.fileIds, n.reply?.fileIds]).flat(2).filter(x => x != null);
 		const packedFiles = fileIds.length > 0 ? await this.driveFileEntityService.packManyByIdsMap(fileIds) : new Map();
-		const users = [
-			...notes.map(({ user, userId }) => user ?? userId),
-			...notes.map(({ replyUserId }) => replyUserId).filter(x => x != null),
-			...notes.map(({ renoteUserId }) => renoteUserId).filter(x => x != null),
-		];
+		const users = [...usersById.values()];
 		const packedUsers = await this.userEntityService.packMany(users, me)
 			.then(users => new Map(users.map(u => [u.id, u])));
 
@@ -604,35 +726,67 @@ export class NoteEntityService implements OnModuleInit {
 				packedUsers,
 				polls,
 				myVotes,
+				channels,
+				missingEmojiKeys: missingEmojiKeys ?? undefined,
 			},
 		})));
 	}
 
 	@bindThis
-	public aggregateNoteEmojis(notes: MiNote[]) {
-		let emojis: { name: string | null; host: string | null; }[] = [];
-		for (const note of notes) {
-			emojis = emojis.concat(note.emojis
-				.map(e => this.customEmojiService.parseEmojiStr(e, note.userHost)));
-			if (note.renote) {
-				emojis = emojis.concat(note.renote.emojis
-					.map(e => this.customEmojiService.parseEmojiStr(e, note.renote!.userHost)));
-				if (note.renote.user) {
-					emojis = emojis.concat(note.renote.user.emojis
-						.map(e => this.customEmojiService.parseEmojiStr(e, note.renote!.userHost)));
+	public aggregateNoteEmojis(
+		notes: MiNote[],
+		bufferedReactions?: Map<MiNote['id'], BufferedReactions> | null,
+		includeNested = true,
+	) {
+		const emojis: { name: string; host: string; }[] = [];
+		const visited = new Map<MiNote['id'], boolean>();
+
+		const pushParsed = (emojiNames: string[] | undefined, host: string | null) => {
+			if (emojiNames == null || emojiNames.length === 0) return;
+			for (const e of emojiNames) {
+				const parsed = this.customEmojiService.parseEmojiStr(e, host);
+				if (parsed.name != null && parsed.host != null) {
+					emojis.push({ name: parsed.name, host: parsed.host });
 				}
 			}
-			const customReactions = Object.entries(note.reactions)
-				.filter(([, count]) => count > 0)
-				.map(([x]) => this.reactionService.decodeReaction(x))
-				.filter(x => x.name != null) as typeof emojis;
-			emojis = emojis.concat(customReactions);
-			if (note.user) {
-				emojis = emojis.concat(note.user.emojis
-					.map(e => this.customEmojiService.parseEmojiStr(e, note.userHost)));
+		};
+
+		const pushNoteReactions = (note: MiNote) => {
+			const buffered = bufferedReactions?.get(note.id);
+			const deltas = buffered ? this.reactionsBufferingService.getDeltas(note, buffered) : null;
+			const merged = deltas ? this.reactionsBufferingService.mergeReactions(note.reactions, deltas) : note.reactions;
+			for (const [reaction, count] of Object.entries(merged)) {
+				if (count <= 0) continue;
+				const decoded = this.reactionService.decodeReaction(reaction);
+				if (decoded.name != null && decoded.host != null) {
+					emojis.push({ name: decoded.name, host: decoded.host });
+				}
 			}
+		};
+
+		const visit = (note: MiNote, recurse: boolean) => {
+			const prev = visited.get(note.id);
+			if (prev === true || (prev === false && !recurse)) return;
+			visited.set(note.id, recurse);
+
+			if (prev == null) {
+				pushParsed(note.emojis, note.userHost);
+				pushNoteReactions(note);
+				if (note.user) {
+					pushParsed(note.user.emojis, note.userHost);
+				}
+			}
+
+			if (recurse) {
+				if (note.reply) visit(note.reply, false);
+				if (note.renote) visit(note.renote, true);
+			}
+		};
+
+		for (const note of notes) {
+			visit(note, includeNested);
 		}
-		return emojis.filter(x => x.name != null && x.host != null) as { name: string; host: string; }[];
+		return emojis;
 	}
 
 	@bindThis

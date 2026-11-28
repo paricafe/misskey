@@ -457,12 +457,18 @@ export class NoteCreateService implements OnApplicationShutdown {
 		if (data.channel != null) data.visibleUsers = [];
 		if (data.channel != null) data.localOnly = true;
 
+		let userRoles: Awaited<ReturnType<RoleService['getUserRoles']>> | null = null;
+		const getUserRoles = async () => {
+			userRoles ??= await this.roleService.getUserRoles(user.id);
+			return userRoles;
+		};
+
 		if (data.visibility === 'public' && data.channel == null) {
 			const sensitiveWords = this.meta.sensitiveWords;
 			const sensitiveWordsTarget = data.cw ?? data.text ?? '';
 			if (sensitiveWords.length > 0 && this.utilityService.isKeyWordIncluded([sensitiveWordsTarget, ...extractUrlsForKeyWordCheck(sensitiveWordsTarget)].join('\n'), sensitiveWords)) {
 				data.visibility = 'home';
-			} else if ((await this.roleService.getUserPolicies(user.id)).canPublicNote === false) {
+			} else if (this.roleService.getUserPolicyFromRoles(await getUserRoles(), 'canPublicNote') === false) {
 				data.visibility = 'followers';
 			}
 		}
@@ -602,7 +608,7 @@ export class NoteCreateService implements OnApplicationShutdown {
 		}
 
 		const effectiveMentionCount = Math.max(mentionedUsers.length, data.apMentionRawCount ?? 0);
-		if (effectiveMentionCount > 0 && effectiveMentionCount > (await this.roleService.getUserPolicies(user.id)).mentionLimit) {
+		if (effectiveMentionCount > 0 && effectiveMentionCount > this.roleService.getUserPolicyFromRoles(await getUserRoles(), 'mentionLimit')) {
 			throw new IdentifiableError('9f466dab-c856-48cd-9e65-ff90ff750580', 'Note contains too many mentions');
 		}
 
@@ -672,17 +678,25 @@ export class NoteCreateService implements OnApplicationShutdown {
 
 		if (mentionedUsers.length > 0) {
 			insert.mentions = mentionedUsers.map(u => u.id);
-			const profiles = await this.userProfilesRepository.findBy({ userId: In(insert.mentions) });
-			insert.mentionedRemoteUsers = JSON.stringify(mentionedUsers.filter(u => this.userEntityService.isRemoteUser(u)).map(u => {
-				const profile = profiles.find(p => p.userId === u.id);
-				const url = profile != null ? profile.url : null;
-				return {
-					uri: u.uri,
-					url: url ?? undefined,
-					username: u.username,
-					host: u.host,
-				} as IMentionedRemoteUsers[0];
-			}));
+			const remoteMentionedUsers = mentionedUsers.filter(u => this.userEntityService.isRemoteUser(u));
+			if (remoteMentionedUsers.length > 0) {
+				const profiles = await this.userProfilesRepository.findBy({
+					userId: In(remoteMentionedUsers.map(u => u.id)),
+				});
+				const profilesByUserId = new Map(profiles.map(p => [p.userId, p]));
+				insert.mentionedRemoteUsers = JSON.stringify(remoteMentionedUsers.map(u => {
+					const profile = profilesByUserId.get(u.id);
+					const url = profile != null ? profile.url : null;
+					return {
+						uri: u.uri,
+						url: url ?? undefined,
+						username: u.username,
+						host: u.host,
+					} as IMentionedRemoteUsers[0];
+				}));
+			} else {
+				insert.mentionedRemoteUsers = '[]';
+			}
 		}
 
 		try {
@@ -916,17 +930,25 @@ export class NoteCreateService implements OnApplicationShutdown {
 		}
 
 		if (data.channel) {
-			this.channelsRepository.increment({ id: data.channel.id }, 'notesCount', 1);
-			this.channelsRepository.update(data.channel.id, {
-				lastNotedAt: new Date(),
-			});
+			const channelId = data.channel.id;
+			this.channelsRepository.createQueryBuilder().update()
+				.set({
+					notesCount: () => '"notesCount" + 1',
+					lastNotedAt: new Date(),
+				})
+				.where('id = :id', { id: channelId })
+				.execute();
 
-			this.notesRepository.countBy({
-				userId: user.id,
-				channelId: data.channel.id,
-			}).then(count => {
-				if (count === 1) {
-					this.channelsRepository.increment({ id: data.channel!.id }, 'usersCount', 1);
+			this.notesRepository.find({
+				where: {
+					userId: user.id,
+					channelId,
+				},
+				select: { id: true },
+				take: 2,
+			}).then(rows => {
+				if (rows.length === 1) {
+					this.channelsRepository.increment({ id: channelId }, 'usersCount', 1);
 				}
 			});
 		}
@@ -1165,7 +1187,8 @@ export class NoteCreateService implements OnApplicationShutdown {
 			]);
 
 			if (note.visibility === 'followers') {
-				userListMemberships = userListMemberships.filter(x => x.userListUserId === user.id || followings.some(f => f.followerId === x.userListUserId));
+				const followerIds = new Set(followings.map(f => f.followerId));
+				userListMemberships = userListMemberships.filter(x => x.userListUserId === user.id || followerIds.has(x.userListUserId));
 			}
 
 			for (const following of followings) {

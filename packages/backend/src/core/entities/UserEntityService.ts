@@ -420,6 +420,7 @@ export class UserEntityService implements OnModuleInit {
 			userRelations?: Map<MiUser['id'], UserRelation>,
 			userMemos?: Map<MiUser['id'], string | null>,
 			pinNotes?: Map<MiUser['id'], MiUserNotePining[]>,
+			iAmModerator?: boolean,
 		},
 	): Promise<Packed<S>> {
 		const opts = {
@@ -433,7 +434,7 @@ export class UserEntityService implements OnModuleInit {
 		const isDetailed = opts.schema !== 'UserLite';
 		const meId = me ? me.id : null;
 		const isMe = meId === user.id;
-		const iAmModerator = me ? await this.roleService.isModerator(me as MiUser) : false;
+		const iAmModerator = opts.iAmModerator ?? (me ? await this.roleService.isModerator(me as MiUser) : false);
 
 		const profile = isDetailed
 			? (opts.userProfile ?? await this.userProfilesRepository.findOneByOrFail({ userId: user.id }))
@@ -695,15 +696,26 @@ export class UserEntityService implements OnModuleInit {
 
 		const schema = (options?.schema ?? 'UserLite') as S;
 
-		const _users = users.filter((user): user is MiUser => typeof user !== 'string');
-		if (_users.length !== users.length) {
+		const loadedById = new Map<MiUser['id'], MiUser>();
+		const missingIds = new Set<MiUser['id']>();
+		for (const user of users) {
+			if (typeof user === 'string') {
+				if (!loadedById.has(user)) missingIds.add(user);
+			} else {
+				loadedById.set(user.id, user);
+				missingIds.delete(user.id);
+			}
+		}
+		const _users = [...loadedById.values()];
+		if (missingIds.size > 0) {
 			_users.push(
 				...await this.usersRepository.findBy({
-					id: In(users.filter((user): user is string => typeof user === 'string')),
+					id: In([...missingIds]),
 				}),
 			);
 		}
 		const _userIds = _users.map(u => u.id);
+		const iAmModerator = me ? await this.roleService.isModerator(me as MiUser) : false;
 
 		let profilesMap: Map<MiUser['id'], MiUserProfile> = new Map();
 		let userRelations: Map<MiUser['id'], UserRelation> = new Map();
@@ -755,6 +767,7 @@ export class UserEntityService implements OnModuleInit {
 					userRelations: userRelations,
 					userMemos: userMemos,
 					pinNotes: pinNotes,
+					iAmModerator,
 				},
 			)),
 		);

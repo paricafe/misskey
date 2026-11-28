@@ -10,6 +10,7 @@ import type { ChannelFollowingsRepository, ChannelsRepository, MiUser } from '@/
 import { MiChannel } from '@/models/_.js';
 import { IdService } from '@/core/IdService.js';
 import { GlobalEvents, GlobalEventService } from '@/core/GlobalEventService.js';
+import { subscribeInternalEvent } from '@/misc/redis-pubsub-bus.js';
 import { bindThis } from '@/decorators.js';
 import type { MiLocalUser } from '@/models/User.js';
 import { RedisKVCache } from '@/misc/cache.js';
@@ -20,6 +21,7 @@ import { trackPromise } from '@/misc/promise-tracker.js';
 @Injectable()
 export class ChannelFollowingService implements OnModuleDestroy {
 	public userFollowingChannelsCache: RedisKVCache<Set<string>>;
+	private unsubscribeInternal?: () => void;
 
 	constructor(
 		@Inject(DI.redis)
@@ -44,7 +46,7 @@ export class ChannelFollowingService implements OnModuleDestroy {
 			fromRedisConverter: (value) => new Set(JSON.parse(value)),
 		});
 
-		this.redisForSub.on('message', this.onMessage);
+		this.unsubscribeInternal = subscribeInternalEvent(this.redisForSub, this.onInternalEvent);
 	}
 
 	onModuleDestroy() {
@@ -128,27 +130,24 @@ export class ChannelFollowingService implements OnModuleDestroy {
 	}
 
 	@bindThis
-	private async onMessage(_: string, data: string): Promise<void> {
-		const obj = JSON.parse(data);
-
-		if (obj.channel === 'internal') {
-			const { type, body } = obj.message as GlobalEvents['internal']['payload'];
-			switch (type) {
-				case 'followChannel': {
-					trackPromise(this.userFollowingChannelsCache.refresh(body.userId));
-					break;
-				}
-				case 'unfollowChannel': {
-					trackPromise(this.userFollowingChannelsCache.delete(body.userId));
-					break;
-				}
+	private async onInternalEvent(event: GlobalEvents['internal']['payload']): Promise<void> {
+		const { type, body } = event;
+		switch (type) {
+			case 'followChannel': {
+				trackPromise(this.userFollowingChannelsCache.refresh(body.userId));
+				break;
+			}
+			case 'unfollowChannel': {
+				trackPromise(this.userFollowingChannelsCache.delete(body.userId));
+				break;
 			}
 		}
 	}
 
 	@bindThis
 	public dispose(): void {
-		this.redisForSub.off('message', this.onMessage);
+		this.unsubscribeInternal?.();
+		this.unsubscribeInternal = undefined;
 		this.userFollowingChannelsCache.dispose();
 	}
 

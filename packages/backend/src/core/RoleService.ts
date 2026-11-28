@@ -24,6 +24,7 @@ import type { RoleCondFormulaValue } from '@/models/Role.js';
 import { UserEntityService } from '@/core/entities/UserEntityService.js';
 import type { GlobalEvents } from '@/core/GlobalEventService.js';
 import { GlobalEventService } from '@/core/GlobalEventService.js';
+import { subscribeInternalEvent } from '@/misc/redis-pubsub-bus.js';
 import { IdService } from '@/core/IdService.js';
 import { ModerationLogService } from '@/core/ModerationLogService.js';
 import type { Packed } from '@/misc/json-schema.js';
@@ -130,6 +131,7 @@ export class RoleService implements OnApplicationShutdown, OnModuleInit {
 	private rolesCache: MemorySingleCache<MiRole[]>;
 	private roleAssignmentByUserIdCache: MemoryKVCache<MiRoleAssignment[]>;
 	private notificationService: NotificationService;
+	private unsubscribeInternal?: () => void;
 
 	public static AlreadyAssignedError = class extends Error {};
 	public static NotAssignedError = class extends Error {};
@@ -168,7 +170,7 @@ export class RoleService implements OnApplicationShutdown, OnModuleInit {
 		this.rolesCache = new MemorySingleCache<MiRole[]>(1000 * 60 * 60);
 		this.roleAssignmentByUserIdCache = new MemoryKVCache<MiRoleAssignment[]>(1000 * 60 * 5);
 
-		this.redisForSub.on('message', this.onMessage);
+		this.unsubscribeInternal = subscribeInternalEvent(this.redisForSub, this.onInternalEvent);
 	}
 
 	async onModuleInit() {
@@ -176,66 +178,62 @@ export class RoleService implements OnApplicationShutdown, OnModuleInit {
 	}
 
 	@bindThis
-	private async onMessage(_: string, data: string): Promise<void> {
-		const obj = JSON.parse(data);
-
-		if (obj.channel === 'internal') {
-			const { type, body } = obj.message as GlobalEvents['internal']['payload'];
-			switch (type) {
-				case 'roleCreated': {
-					const cached = this.rolesCache.get();
-					if (cached) {
-						cached.push({
+	private async onInternalEvent(event: GlobalEvents['internal']['payload']): Promise<void> {
+		const { type, body } = event;
+		switch (type) {
+			case 'roleCreated': {
+				const cached = this.rolesCache.get();
+				if (cached) {
+					cached.push({
+						...body,
+						updatedAt: new Date(body.updatedAt),
+						lastUsedAt: new Date(body.lastUsedAt),
+					});
+				}
+				break;
+			}
+			case 'roleUpdated': {
+				const cached = this.rolesCache.get();
+				if (cached) {
+					const i = cached.findIndex(x => x.id === body.id);
+					if (i > -1) {
+						cached[i] = {
 							...body,
 							updatedAt: new Date(body.updatedAt),
 							lastUsedAt: new Date(body.lastUsedAt),
-						});
+						};
 					}
-					break;
 				}
-				case 'roleUpdated': {
-					const cached = this.rolesCache.get();
-					if (cached) {
-						const i = cached.findIndex(x => x.id === body.id);
-						if (i > -1) {
-							cached[i] = {
-								...body,
-								updatedAt: new Date(body.updatedAt),
-								lastUsedAt: new Date(body.lastUsedAt),
-							};
-						}
-					}
-					break;
-				}
-				case 'roleDeleted': {
-					const cached = this.rolesCache.get();
-					if (cached) {
-						this.rolesCache.set(cached.filter(x => x.id !== body.id));
-					}
-					break;
-				}
-				case 'userRoleAssigned': {
-					const cached = this.roleAssignmentByUserIdCache.get(body.userId);
-					if (cached) {
-						cached.push({
-							...body,
-							expiresAt: body.expiresAt ? new Date(body.expiresAt) : null,
-							user: null,
-							role: null,
-						});
-					}
-					break;
-				}
-				case 'userRoleUnassigned': {
-					const cached = this.roleAssignmentByUserIdCache.get(body.userId);
-					if (cached) {
-						this.roleAssignmentByUserIdCache.set(body.userId, cached.filter(x => x.id !== body.id));
-					}
-					break;
-				}
-				default:
-					break;
+				break;
 			}
+			case 'roleDeleted': {
+				const cached = this.rolesCache.get();
+				if (cached) {
+					this.rolesCache.set(cached.filter(x => x.id !== body.id));
+				}
+				break;
+			}
+			case 'userRoleAssigned': {
+				const cached = this.roleAssignmentByUserIdCache.get(body.userId);
+				if (cached) {
+					cached.push({
+						...body,
+						expiresAt: body.expiresAt ? new Date(body.expiresAt) : null,
+						user: null,
+						role: null,
+					});
+				}
+				break;
+			}
+			case 'userRoleUnassigned': {
+				const cached = this.roleAssignmentByUserIdCache.get(body.userId);
+				if (cached) {
+					this.roleAssignmentByUserIdCache.set(body.userId, cached.filter(x => x.id !== body.id));
+				}
+				break;
+			}
+			default:
+				break;
 		}
 	}
 
@@ -326,7 +324,8 @@ export class RoleService implements OnApplicationShutdown, OnModuleInit {
 	public async getUserRoles(userId: MiUser['id']) {
 		const roles = await this.rolesCache.fetch(() => this.rolesRepository.findBy({}));
 		const assigns = await this.getUserAssigns(userId);
-		const assignedRoles = roles.filter(r => assigns.map(x => x.roleId).includes(r.id));
+		const assignedRoleIds = new Set(assigns.map(x => x.roleId));
+		const assignedRoles = roles.filter(r => assignedRoleIds.has(r.id));
 		const user = roles.some(r => r.target === 'conditional') ? await this.cacheService.findUserById(userId) : null;
 		const matchedCondRoles = roles.filter(r => r.target === 'conditional' && this.evalCond(user!, assignedRoles, r.condFormula));
 		return [...assignedRoles, ...matchedCondRoles];
@@ -338,7 +337,8 @@ export class RoleService implements OnApplicationShutdown, OnModuleInit {
 		let assigns = await this.roleAssignmentByUserIdCache.fetch(userId, () => this.roleAssignmentsRepository.findBy({ userId }));
 		assigns = assigns.filter(a => a.expiresAt == null || (a.expiresAt.getTime() > now));
 		const roles = await this.rolesCache.fetch(() => this.rolesRepository.findBy({}));
-		const assignedRoles = roles.filter(r => assigns.map(x => x.roleId).includes(r.id));
+		const assignedRoleIds = new Set(assigns.map(x => x.roleId));
+		const assignedRoles = roles.filter(r => assignedRoleIds.has(r.id));
 		const assignedBadgeRoles = assignedRoles.filter(r => r.asBadge);
 		const badgeCondRoles = roles.filter(r => r.asBadge && (r.target === 'conditional'));
 		if (badgeCondRoles.length > 0) {
@@ -350,6 +350,69 @@ export class RoleService implements OnApplicationShutdown, OnModuleInit {
 		}
 	}
 
+	private getBasePolicyValue<K extends keyof RolePolicies>(name: K): RolePolicies[K] {
+		const metaPolicies = this.meta.policies as Partial<RolePolicies> | undefined;
+		return (metaPolicies && name in metaPolicies ? metaPolicies[name] : DEFAULT_POLICIES[name]) as RolePolicies[K];
+	}
+
+	private calcPolicyFromRoles<K extends keyof RolePolicies>(
+		roles: MiRole[],
+		name: K,
+		baseValue: RolePolicies[K],
+		aggregate: (values: RolePolicies[K][]) => RolePolicies[K],
+	): RolePolicies[K] {
+		if (roles.length === 0) return aggregate([baseValue]);
+
+		const policies = roles.map(role => role.policies[name] ?? { priority: 0, useDefault: true });
+
+		const p2 = policies.filter(policy => policy.priority === 2);
+		if (p2.length > 0) return aggregate(p2.map(policy => policy.useDefault ? baseValue : policy.value));
+
+		const p1 = policies.filter(policy => policy.priority === 1);
+		if (p1.length > 0) return aggregate(p1.map(policy => policy.useDefault ? baseValue : policy.value));
+
+		return aggregate(policies.map(policy => policy.useDefault ? baseValue : policy.value));
+	}
+
+	@bindThis
+	public getUserPolicyFromRoles<K extends keyof RolePolicies>(roles: MiRole[], name: K): RolePolicies[K] {
+		const baseValue = this.getBasePolicyValue(name);
+		if (name === 'chatAvailability') {
+			return this.calcPolicyFromRoles(roles, name, baseValue, (vs => {
+				if (vs.some(v => v === 'available')) return 'available';
+				if (vs.some(v => v === 'readonly')) return 'readonly';
+				return 'unavailable';
+			}) as (values: RolePolicies[K][]) => RolePolicies[K]);
+		}
+		if (name === 'uploadableFileTypes') {
+			return this.calcPolicyFromRoles(roles, name, baseValue, (vs => {
+				const set = new Set<string>();
+				for (const v of vs as string[][]) {
+					for (const type of v) {
+						if (type.trim() === '') continue;
+						set.add(type.trim());
+					}
+				}
+				return [...set];
+			}) as (values: RolePolicies[K][]) => RolePolicies[K]);
+		}
+		if (name === 'maxFileSizeMb') {
+			const serverMaxFileSizeMb = Math.floor(this.config.maxFileSize / (1024 * 1024));
+			return this.calcPolicyFromRoles(roles, name, baseValue, (vs => Math.min(serverMaxFileSizeMb, Math.max(...(vs as number[])))) as (values: RolePolicies[K][]) => RolePolicies[K]);
+		}
+		if (typeof DEFAULT_POLICIES[name] === 'boolean') {
+			return this.calcPolicyFromRoles(roles, name, baseValue, (vs => (vs as boolean[]).some(v => v === true)) as (values: RolePolicies[K][]) => RolePolicies[K]);
+		}
+		return this.calcPolicyFromRoles(roles, name, baseValue, (vs => Math.max(...(vs as number[]))) as (values: RolePolicies[K][]) => RolePolicies[K]);
+	}
+
+	@bindThis
+	public async getUserPolicy<K extends keyof RolePolicies>(userId: MiUser['id'] | null, name: K): Promise<RolePolicies[K]> {
+		if (userId == null) return this.getBasePolicyValue(name);
+		const roles = await this.getUserRoles(userId);
+		return this.getUserPolicyFromRoles(roles, name);
+	}
+
 	@bindThis
 	public async getUserPolicies(userId: MiUser['id'] | null): Promise<RolePolicies> {
 		const basePolicies = { ...DEFAULT_POLICIES, ...this.meta.policies };
@@ -358,19 +421,8 @@ export class RoleService implements OnApplicationShutdown, OnModuleInit {
 
 		const roles = await this.getUserRoles(userId);
 
-		function calc<T extends keyof RolePolicies>(name: T, aggregate: (values: RolePolicies[T][]) => RolePolicies[T]) {
-			if (roles.length === 0) return aggregate([basePolicies[name]]);
-
-			const policies = roles.map(role => role.policies[name] ?? { priority: 0, useDefault: true });
-
-			const p2 = policies.filter(policy => policy.priority === 2);
-			if (p2.length > 0) return aggregate(p2.map(policy => policy.useDefault ? basePolicies[name] : policy.value));
-
-			const p1 = policies.filter(policy => policy.priority === 1);
-			if (p1.length > 0) return aggregate(p1.map(policy => policy.useDefault ? basePolicies[name] : policy.value));
-
-			return aggregate(policies.map(policy => policy.useDefault ? basePolicies[name] : policy.value));
-		}
+		const calc = <T extends keyof RolePolicies>(name: T, aggregate: (values: RolePolicies[T][]) => RolePolicies[T]) =>
+			this.calcPolicyFromRoles(roles, name, basePolicies[name], aggregate);
 
 		function aggregateChatAvailability(vs: RolePolicies['chatAvailability'][]) {
 			if (vs.some(v => v === 'available')) return 'available';
@@ -633,6 +685,7 @@ export class RoleService implements OnApplicationShutdown, OnModuleInit {
 	@bindThis
 	public async addNoteToRoleTimeline(note: Packed<'Note'>): Promise<void> {
 		const roles = await this.getUserRoles(note.userId);
+		if (roles.length === 0) return;
 
 		const redisPipeline = this.redisForTimelines.pipeline();
 
@@ -715,7 +768,8 @@ export class RoleService implements OnApplicationShutdown, OnModuleInit {
 
 	@bindThis
 	public dispose(): void {
-		this.redisForSub.off('message', this.onMessage);
+		this.unsubscribeInternal?.();
+		this.unsubscribeInternal = undefined;
 		this.roleAssignmentByUserIdCache.dispose();
 	}
 

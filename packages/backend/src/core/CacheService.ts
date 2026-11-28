@@ -12,6 +12,7 @@ import { DI } from '@/di-symbols.js';
 import { UserEntityService } from '@/core/entities/UserEntityService.js';
 import { bindThis } from '@/decorators.js';
 import type { GlobalEvents } from '@/core/GlobalEventService.js';
+import { subscribeInternalEvent } from '@/misc/redis-pubsub-bus.js';
 import { HttpRequestService } from '@/core/HttpRequestService.js';
 import type { Config } from '@/config.js';
 import type { OnApplicationShutdown } from '@nestjs/common';
@@ -38,6 +39,7 @@ export class CacheService implements OnApplicationShutdown {
 	public renoteMutingsCache: RedisKVCache<Set<string>>;
 	public userFollowingsCache: RedisKVCache<Record<string, Pick<MiFollowing, 'withReplies'> | undefined>>;
 	public pariRemoteUserDecorationsCache: RedisKVCache<PariRemoteUserDecorationsCacheType>;
+	private unsubscribeInternal?: () => void;
 
 	constructor(
 		@Inject(DI.redis)
@@ -180,75 +182,71 @@ export class CacheService implements OnApplicationShutdown {
 			fromRedisConverter: (value) => JSON.parse(value),
 		});
 
-		this.redisForSub.on('message', this.onMessage);
+		this.unsubscribeInternal = subscribeInternalEvent(this.redisForSub, this.onInternalEvent);
 	}
 
 	@bindThis
-	private async onMessage(_: string, data: string): Promise<void> {
-		const obj = JSON.parse(data);
-
-		if (obj.channel === 'internal') {
-			const { type, body } = obj.message as GlobalEvents['internal']['payload'];
-			switch (type) {
-				case 'blockingCreated':
-				case 'blockingDeleted': {
-					await Promise.all([
-						this.userBlockingCache.delete(body.blockerId),
-						this.userBlockedCache.delete(body.blockeeId),
-					]);
-					break;
-				}
-				case 'userChangeSuspendedState':
-				case 'userChangeDeletedState':
-				case 'remoteUserUpdated':
-				case 'localUserUpdated': {
-					const user = await this.usersRepository.findOneBy({ id: body.id });
-					if (user == null) {
-						this.userByIdCache.delete(body.id);
-						this.localUserByIdCache.delete(body.id);
-						this.deleteNativeTokenCacheByUserId(body.id);
-						for (const [k, v] of this.uriPersonCache.entries) {
-							if (v.value?.id === body.id) {
-								this.uriPersonCache.delete(k);
-							}
-						}
-					} else {
-						this.userByIdCache.set(user.id, user);
-						for (const [k, v] of this.uriPersonCache.entries) {
-							if (v.value?.id === user.id) {
-								this.uriPersonCache.set(k, user);
-							}
-						}
-						if (this.userEntityService.isLocalUser(user)) {
-							if (user.isDeleted) {
-								this.deleteNativeTokenCacheByUserId(user.id);
-							} else {
-								this.localUserByNativeTokenCache.set(user.token!, user);
-							}
-							this.localUserByIdCache.set(user.id, user);
-						}
-					}
-					break;
-				}
-				case 'userTokenRegenerated': {
-					this.localUserByNativeTokenCache.delete(body.oldToken);
-					this.localUserByNativeTokenCache.delete(body.newToken);
-					this.deleteNativeTokenCacheByUserId(body.id);
+	private async onInternalEvent(event: GlobalEvents['internal']['payload']): Promise<void> {
+		const { type, body } = event;
+		switch (type) {
+			case 'blockingCreated':
+			case 'blockingDeleted': {
+				await Promise.all([
+					this.userBlockingCache.delete(body.blockerId),
+					this.userBlockedCache.delete(body.blockeeId),
+				]);
+				break;
+			}
+			case 'userChangeSuspendedState':
+			case 'userChangeDeletedState':
+			case 'remoteUserUpdated':
+			case 'localUserUpdated': {
+				const user = await this.usersRepository.findOneBy({ id: body.id });
+				if (user == null) {
 					this.userByIdCache.delete(body.id);
 					this.localUserByIdCache.delete(body.id);
-					break;
+					this.deleteNativeTokenCacheByUserId(body.id);
+					for (const [k, v] of this.uriPersonCache.entries) {
+						if (v.value?.id === body.id) {
+							this.uriPersonCache.delete(k);
+						}
+					}
+				} else {
+					this.userByIdCache.set(user.id, user);
+					for (const [k, v] of this.uriPersonCache.entries) {
+						if (v.value?.id === user.id) {
+							this.uriPersonCache.set(k, user);
+						}
+					}
+					if (this.userEntityService.isLocalUser(user)) {
+						if (user.isDeleted) {
+							this.deleteNativeTokenCacheByUserId(user.id);
+						} else {
+							this.localUserByNativeTokenCache.set(user.token!, user);
+						}
+						this.localUserByIdCache.set(user.id, user);
+					}
 				}
-				case 'follow': {
-					const follower = this.userByIdCache.get(body.followerId);
-					if (follower) follower.followingCount++;
-					const followee = this.userByIdCache.get(body.followeeId);
-					if (followee) followee.followersCount++;
-					this.userFollowingsCache.delete(body.followerId);
-					break;
-				}
-				default:
-					break;
+				break;
 			}
+			case 'userTokenRegenerated': {
+				this.localUserByNativeTokenCache.delete(body.oldToken);
+				this.localUserByNativeTokenCache.delete(body.newToken);
+				this.deleteNativeTokenCacheByUserId(body.id);
+				this.userByIdCache.delete(body.id);
+				this.localUserByIdCache.delete(body.id);
+				break;
+			}
+			case 'follow': {
+				const follower = this.userByIdCache.get(body.followerId);
+				if (follower) follower.followingCount++;
+				const followee = this.userByIdCache.get(body.followeeId);
+				if (followee) followee.followersCount++;
+				this.userFollowingsCache.delete(body.followerId);
+				break;
+			}
+			default:
+				break;
 		}
 	}
 
@@ -267,7 +265,8 @@ export class CacheService implements OnApplicationShutdown {
 
 	@bindThis
 	public dispose(): void {
-		this.redisForSub.off('message', this.onMessage);
+		this.unsubscribeInternal?.();
+		this.unsubscribeInternal = undefined;
 		this.userByIdCache.dispose();
 		this.localUserByNativeTokenCache.dispose();
 		this.localUserByIdCache.dispose();

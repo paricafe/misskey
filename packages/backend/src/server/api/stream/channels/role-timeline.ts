@@ -14,6 +14,8 @@ import type { JsonObject } from '@/misc/json-value.js';
 import Channel, { type ChannelRequest } from '../channel.js';
 import { REQUEST } from '@nestjs/core';
 
+const pendingRoleAvailability = new WeakMap<RolesRepository, Map<string, Promise<boolean>>>();
+
 @Injectable({ scope: Scope.TRANSIENT })
 export class RoleTimelineChannel extends Channel {
 	public readonly chName = 'roleTimeline';
@@ -46,10 +48,34 @@ export class RoleTimelineChannel extends Channel {
 	}
 
 	@bindThis
-	private async isAvailable() {
-		return await this.rolesRepository.exists({
-			where: { id: this.roleId, isPublic: true, isExplorable: true },
+	private isAvailable(): Promise<boolean> {
+		const repo = this.rolesRepository;
+		let byRole = pendingRoleAvailability.get(repo);
+		if (byRole == null) {
+			byRole = new Map();
+			pendingRoleAvailability.set(repo, byRole);
+		}
+
+		const roleId = this.roleId;
+		const existing = byRole.get(roleId);
+		if (existing != null) return existing;
+
+		const check = new Promise<boolean>((resolve, reject) => {
+			queueMicrotask(() => {
+				if (byRole.get(roleId) === check) {
+					byRole.delete(roleId);
+				}
+				try {
+					repo.exists({
+						where: { id: roleId, isPublic: true, isExplorable: true },
+					}).then(resolve, reject);
+				} catch (error) {
+					reject(error);
+				}
+			});
 		});
+		byRole.set(roleId, check);
+		return check;
 	}
 
 	@bindThis

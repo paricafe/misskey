@@ -133,4 +133,21 @@ describe('inbox failure retry classification', () => {
 		await expect(service.process(job as never)).rejects.toBe(error);
 		expect(performActivity).not.toHaveBeenCalled();
 	});
+
+	test('skips activity JSON.stringify when debug logging is disabled', async () => {
+		const { service, job } = createService();
+		const stringifySpy = vi.spyOn(JSON, 'stringify');
+		const debug = vi.fn();
+		Object.assign(service, { logger: { debug, info: vi.fn(), warn: vi.fn() } });
+
+		await expect(service.process(job as never)).resolves.toBe('ok');
+
+		expect(debug).toHaveBeenCalledOnce();
+		expect(typeof debug.mock.calls[0][0]).toBe('function');
+		expect(stringifySpy).not.toHaveBeenCalled();
+		const formatted = (debug.mock.calls[0][0] as () => string)();
+		expect(formatted).toContain('"type": "Create"');
+		expect(formatted).not.toContain('@context');
+		stringifySpy.mockRestore();
+	});
 });

@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { In } from 'typeorm';
 import { Inject, Injectable } from '@nestjs/common';
 import { DI } from '@/di-symbols.js';
 import type { EmojisRepository, NoteReactionsRepository, UsersRepository, NotesRepository, NoteThreadMutingsRepository, MiMeta } from '@/models/_.js';
@@ -320,9 +321,14 @@ export class ReactionService {
 			if (['public', 'home', 'followers'].includes(note.visibility)) {
 				dm.addFollowersRecipe();
 			} else if (note.visibility === 'specified') {
-				const visibleUsers = await Promise.all(note.visibleUserIds.map(id => this.usersRepository.findOneBy({ id })));
-				for (const u of visibleUsers.filter(u => u && this.userEntityService.isRemoteUser(u))) {
-					dm.addDirectRecipe(u as MiRemoteUser);
+				const visibleUserIds = [...new Set(note.visibleUserIds)];
+				if (visibleUserIds.length > 0) {
+					const visibleUsers = await this.usersRepository.findBy({ id: In(visibleUserIds) });
+					for (const u of visibleUsers) {
+						if (this.userEntityService.isRemoteUser(u)) {
+							dm.addDirectRecipe(u as MiRemoteUser);
+						}
+					}
 				}
 			}
 

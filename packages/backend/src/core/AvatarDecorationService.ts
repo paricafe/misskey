@@ -12,11 +12,13 @@ import { DI } from '@/di-symbols.js';
 import { bindThis } from '@/decorators.js';
 import { MemorySingleCache } from '@/misc/cache.js';
 import type { GlobalEvents } from '@/core/GlobalEventService.js';
+import { subscribeInternalEvent } from '@/misc/redis-pubsub-bus.js';
 import { ModerationLogService } from '@/core/ModerationLogService.js';
 
 @Injectable()
 export class AvatarDecorationService implements OnApplicationShutdown {
 	public cache: MemorySingleCache<MiAvatarDecoration[]>;
+	private unsubscribeInternal?: () => void;
 
 	constructor(
 		@Inject(DI.redisForSub)
@@ -31,25 +33,20 @@ export class AvatarDecorationService implements OnApplicationShutdown {
 	) {
 		this.cache = new MemorySingleCache<MiAvatarDecoration[]>(1000 * 60 * 30);
 
-		this.redisForSub.on('message', this.onMessage);
+		this.unsubscribeInternal = subscribeInternalEvent(this.redisForSub, this.onInternalEvent);
 	}
 
 	@bindThis
-	private async onMessage(_: string, data: string): Promise<void> {
-		const obj = JSON.parse(data);
-
-		if (obj.channel === 'internal') {
-			const { type, body: _ } = obj.message as GlobalEvents['internal']['payload'];
-			switch (type) {
-				case 'avatarDecorationCreated':
-				case 'avatarDecorationUpdated':
-				case 'avatarDecorationDeleted': {
-					this.cache.delete();
-					break;
-				}
-				default:
-					break;
+	private async onInternalEvent(event: GlobalEvents['internal']['payload']): Promise<void> {
+		switch (event.type) {
+			case 'avatarDecorationCreated':
+			case 'avatarDecorationUpdated':
+			case 'avatarDecorationDeleted': {
+				this.cache.delete();
+				break;
 			}
+			default:
+				break;
 		}
 	}
 
@@ -119,7 +116,8 @@ export class AvatarDecorationService implements OnApplicationShutdown {
 
 	@bindThis
 	public dispose(): void {
-		this.redisForSub.off('message', this.onMessage);
+		this.unsubscribeInternal?.();
+		this.unsubscribeInternal = undefined;
 	}
 
 	@bindThis

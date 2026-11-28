@@ -9,7 +9,8 @@ import * as Redis from 'ioredis';
 import sanitizeHtml from 'sanitize-html';
 import { DI } from '@/di-symbols.js';
 import { bindThis } from '@/decorators.js';
-import { GlobalEvents, GlobalEventService } from '@/core/GlobalEventService.js';
+import { GlobalEventService } from '@/core/GlobalEventService.js';
+import { subscribeInternalEvent } from '@/misc/redis-pubsub-bus.js';
 import type {
 	AbuseReportNotificationRecipientRepository,
 	MiAbuseReportNotificationRecipient,
@@ -27,6 +28,8 @@ import { IdService } from './IdService.js';
 
 @Injectable()
 export class AbuseReportNotificationService implements OnApplicationShutdown {
+	private unsubscribeInternal?: () => void;
+
 	constructor(
 		@Inject(DI.meta)
 		private meta: MiMeta,
@@ -45,7 +48,7 @@ export class AbuseReportNotificationService implements OnApplicationShutdown {
 		private globalEventService: GlobalEventService,
 		private userEntityService: UserEntityService,
 	) {
-		this.redisForSub.on('message', this.onMessage);
+		this.unsubscribeInternal = subscribeInternalEvent(this.redisForSub, this.onInternalEvent);
 	}
 
 	@bindThis
@@ -326,13 +329,8 @@ export class AbuseReportNotificationService implements OnApplicationShutdown {
 	}
 
 	@bindThis
-	private async onMessage(_: string, data: string): Promise<void> {
-		const obj = JSON.parse(data);
-		if (obj.channel !== 'internal') {
-			return;
-		}
-
-		const { type } = obj.message as GlobalEvents['internal']['payload'];
+	private async onInternalEvent(event: import('@/core/GlobalEventService.js').GlobalEvents['internal']['payload']): Promise<void> {
+		const { type } = event;
 		switch (type) {
 			case 'roleUpdated':
 			case 'roleDeleted':
@@ -353,7 +351,8 @@ export class AbuseReportNotificationService implements OnApplicationShutdown {
 
 	@bindThis
 	public dispose(): void {
-		this.redisForSub.off('message', this.onMessage);
+		this.unsubscribeInternal?.();
+		this.unsubscribeInternal = undefined;
 	}
 
 	@bindThis

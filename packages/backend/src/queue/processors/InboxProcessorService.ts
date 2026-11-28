@@ -73,9 +73,11 @@ export class InboxProcessorService implements OnApplicationShutdown {
 		const signature = job.data.signature;
 		let activity = job.data.activity;
 
-		const info = Object.assign({}, activity);
-		delete info['@context'];
-		this.logger.debug(JSON.stringify(info, null, 2));
+		this.logger.debug(() => {
+			const info = Object.assign({}, activity);
+			delete info['@context'];
+			return JSON.stringify(info, null, 2);
+		});
 
 		const host = this.utilityService.toPuny(new URL(signature.keyId).hostname);
 
@@ -167,9 +169,11 @@ export class InboxProcessorService implements OnApplicationShutdown {
 					throw new Bull.UnrecoverableError(`skip: ${error}`);
 				}
 
-				const compactedInfo = Object.assign({}, activity);
-				delete compactedInfo['@context'];
-				this.logger.debug(`compacted: ${JSON.stringify(compactedInfo, null, 2)}`);
+				this.logger.debug(() => {
+					const compactedInfo = Object.assign({}, activity);
+					delete compactedInfo['@context'];
+					return `compacted: ${JSON.stringify(compactedInfo, null, 2)}`;
+				});
 
 				activity.signature = ldSignature;
 

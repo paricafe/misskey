@@ -10,6 +10,7 @@ import { MiWebhook, WebhookEventTypes } from '@/models/Webhook.js';
 import { DI } from '@/di-symbols.js';
 import { bindThis } from '@/decorators.js';
 import { GlobalEvents } from '@/core/GlobalEventService.js';
+import { subscribeInternalEvent } from '@/misc/redis-pubsub-bus.js';
 import type { Packed } from '@/misc/json-schema.js';
 import { QueueService } from '@/core/QueueService.js';
 import type { OnApplicationShutdown } from '@nestjs/common';
@@ -29,6 +30,7 @@ export type UserWebhookPayload<T extends WebhookEventTypes> =
 export class UserWebhookService implements OnApplicationShutdown {
 	private activeWebhooksFetched = false;
 	private activeWebhooks: MiWebhook[] = [];
+	private unsubscribeInternal?: () => void;
 
 	constructor(
 		@Inject(DI.redisForSub)
@@ -37,7 +39,7 @@ export class UserWebhookService implements OnApplicationShutdown {
 		private webhooksRepository: WebhooksRepository,
 		private queueService: QueueService,
 	) {
-		this.redisForSub.on('message', this.onMessage);
+		this.unsubscribeInternal = subscribeInternalEvent(this.redisForSub, this.onInternalEvent);
 	}
 
 	@bindThis
@@ -90,13 +92,8 @@ export class UserWebhookService implements OnApplicationShutdown {
 	}
 
 	@bindThis
-	private async onMessage(_: string, data: string): Promise<void> {
-		const obj = JSON.parse(data);
-		if (obj.channel !== 'internal') {
-			return;
-		}
-
-		const { type, body } = obj.message as GlobalEvents['internal']['payload'];
+	private async onInternalEvent(event: GlobalEvents['internal']['payload']): Promise<void> {
+		const { type, body } = event;
 		switch (type) {
 			case 'webhookCreated': {
 				if (body.active) {
@@ -140,7 +137,8 @@ export class UserWebhookService implements OnApplicationShutdown {
 
 	@bindThis
 	public dispose(): void {
-		this.redisForSub.off('message', this.onMessage);
+		this.unsubscribeInternal?.();
+		this.unsubscribeInternal = undefined;
 	}
 
 	@bindThis

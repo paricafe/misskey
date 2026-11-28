@@ -106,8 +106,8 @@ function createFixture() {
 		moderationLogService,
 		setFailNextProfileRead: (v: boolean) => { failNextProfileRead = v; },
 		setFailNextIsDeletedUpdate: (v: boolean) => { failNextIsDeletedUpdate = v; },
-		decline: () => declineEndpoint.exec({ userId: 'u1' }, me),
-		approve: () => approveEndpoint.exec({ userId: 'u1' }, me),
+		decline: () => declineEndpoint.exec({ userId: 'u1' }, me, null),
+		approve: () => approveEndpoint.exec({ userId: 'u1' }, me, null),
 	};
 }
 

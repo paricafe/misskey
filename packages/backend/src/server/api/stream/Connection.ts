@@ -65,6 +65,7 @@ export default class Connection {
 	public userIdsWhoBlockingMe: Set<string> = new Set();
 	public userIdsWhoMeMutingRenotes: Set<string> = new Set();
 	public userMutedInstances: Set<string> = new Set();
+	private lastMutedInstances: string[] | null = null;
 	private fetchIntervalId: NodeJS.Timeout | null = null;
 
 	constructor(
@@ -109,7 +110,16 @@ export default class Connection {
 		this.userIdsWhoMeMuting = userIdsWhoMeMuting;
 		this.userIdsWhoBlockingMe = userIdsWhoBlockingMe;
 		this.userIdsWhoMeMutingRenotes = userIdsWhoMeMutingRenotes;
-		this.userMutedInstances = new Set(userProfile.mutedInstances);
+		const nextMutedInstances = userProfile.mutedInstances;
+		if (
+			this.lastMutedInstances !== nextMutedInstances &&
+			(this.lastMutedInstances == null ||
+				this.lastMutedInstances.length !== nextMutedInstances.length ||
+				nextMutedInstances.some((host, idx) => host !== this.lastMutedInstances![idx]))
+		) {
+			this.lastMutedInstances = nextMutedInstances;
+			this.userMutedInstances = new Set(nextMutedInstances);
+		}
 	}
 
 	@bindThis

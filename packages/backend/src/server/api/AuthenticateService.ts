@@ -21,9 +21,12 @@ export class AuthenticationError extends Error {
 	}
 }
 
+const LAST_USED_AT_UPDATE_INTERVAL_MS = 60 * 1000;
+
 @Injectable()
 export class AuthenticateService implements OnApplicationShutdown {
 	private appCache: MemoryKVCache<MiApp>;
+	private lastUsedAtCache: MemoryKVCache<number>;
 
 	constructor(
 		@Inject(DI.usersRepository)
@@ -38,6 +41,7 @@ export class AuthenticateService implements OnApplicationShutdown {
 		private cacheService: CacheService,
 	) {
 		this.appCache = new MemoryKVCache<MiApp>(1000 * 60 * 60 * 24 * 7);
+		this.lastUsedAtCache = new MemoryKVCache<number>(LAST_USED_AT_UPDATE_INTERVAL_MS);
 	}
 
 	@bindThis
@@ -69,9 +73,17 @@ export class AuthenticateService implements OnApplicationShutdown {
 			}
 
 			if (options.updateLastUsedAt !== false) {
-				this.accessTokensRepository.update(accessToken.id, {
-					lastUsedAt: new Date(),
-				});
+				const now = Date.now();
+				const lastRecorded = Math.max(
+					accessToken.lastUsedAt?.getTime() ?? 0,
+					this.lastUsedAtCache.get(accessToken.id) ?? 0,
+				);
+				if (lastRecorded === 0 || now - lastRecorded >= LAST_USED_AT_UPDATE_INTERVAL_MS) {
+					this.lastUsedAtCache.set(accessToken.id, now);
+					this.accessTokensRepository.update(accessToken.id, {
+						lastUsedAt: new Date(now),
+					});
+				}
 			}
 
 			const findUser = () => this.usersRepository.findOneBy({ id: accessToken.userId }) as Promise<MiLocalUser>;
@@ -95,6 +107,7 @@ export class AuthenticateService implements OnApplicationShutdown {
 	@bindThis
 	public dispose(): void {
 		this.appCache.dispose();
+		this.lastUsedAtCache.dispose();
 	}
 
 	@bindThis

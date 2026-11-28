@@ -362,7 +362,7 @@ export class ApiCallService implements OnApplicationShutdown {
 				(limit as any).key = ep.name;
 			}
 
-			const factor = user ? (await this.roleService.getUserPolicies(user.id)).rateLimitFactor : 1;
+			const factor = user ? await this.roleService.getUserPolicy(user.id, 'rateLimitFactor') : 1;
 
 			if (limitActor != null && factor > 0) {
 				const rateLimit = await this.rateLimiterService.limit(limit as IEndpointMeta['limit'] & { key: NonNullable<string> }, limitActor, factor);
@@ -435,8 +435,10 @@ export class ApiCallService implements OnApplicationShutdown {
 
 		if (ep.meta.requiredRolePolicy != null && (user == null || this.meta.rootUserId !== user.id)) {
 			const myRoles = user != null ? await this.roleService.getUserRoles(user.id) : [];
-			const policies = await this.roleService.getUserPolicies(user?.id ?? null);
-			if (!policies[ep.meta.requiredRolePolicy] && !myRoles.some(r => r.isAdministrator)) {
+			const allowed = user != null
+				? this.roleService.getUserPolicyFromRoles(myRoles, ep.meta.requiredRolePolicy)
+				: await this.roleService.getUserPolicy(null, ep.meta.requiredRolePolicy);
+			if (!allowed && !myRoles.some(r => r.isAdministrator)) {
 				throw new ApiError({
 					message: 'You are not assigned to a required role.',
 					code: 'ROLE_PERMISSION_DENIED',

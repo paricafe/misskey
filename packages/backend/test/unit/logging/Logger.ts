@@ -8,11 +8,13 @@ import type { LogRecordInput } from '@/logging/types.js';
 
 const mocks = vi.hoisted(() => ({
 	write: vi.fn<(input: LogRecordInput) => void>(),
+	isLevelEnabled: vi.fn(() => true),
 }));
 
 vi.mock('@/logging/logging-runtime.js', () => ({
 	logManager: {
 		write: mocks.write,
+		isLevelEnabled: mocks.isLevelEnabled,
 	},
 }));
 
@@ -21,6 +23,8 @@ import Logger from '@/logger.js';
 describe('Logger', () => {
 	beforeEach(() => {
 		mocks.write.mockReset();
+		mocks.isLevelEnabled.mockReset();
+		mocks.isLevelEnabled.mockReturnValue(true);
 	});
 
 	test('passes immutable multi-level root-to-leaf context to the manager', () => {
@@ -200,6 +204,24 @@ describe('Logger', () => {
 			level: 'info',
 			message: 'bound',
 			context: [{ name: 'root', color: undefined }],
+		}));
+	});
+
+	test('evaluates lazy debug message factories only when debug level is enabled', () => {
+		const logger = new Logger('queue').createSubLogger('inbox');
+		const factory = vi.fn(() => 'expensive-payload');
+
+		mocks.isLevelEnabled.mockReturnValue(false);
+		logger.debug(factory);
+		expect(factory).not.toHaveBeenCalled();
+		expect(mocks.write).not.toHaveBeenCalled();
+
+		mocks.isLevelEnabled.mockReturnValue(true);
+		logger.debug(factory);
+		expect(factory).toHaveBeenCalledOnce();
+		expect(mocks.write).toHaveBeenCalledWith(expect.objectContaining({
+			level: 'debug',
+			message: 'expensive-payload',
 		}));
 	});
 });

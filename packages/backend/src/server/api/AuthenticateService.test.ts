@@ -3,8 +3,8 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { describe, expect, test, vi } from 'vitest';
-import { AuthenticateService } from './AuthenticateService.js';
+import { afterEach, describe, expect, test, vi } from 'vitest';
+import { AuthenticateService, AuthenticationError } from './AuthenticateService.js';
 
 function setup() {
 	const users = { findOneBy: vi.fn().mockResolvedValue({ id: 'alice', isSuspended: true }) };
@@ -54,5 +54,84 @@ describe('fresh streaming authentication', () => {
 		} finally {
 			service.dispose();
 		}
+	});
+});
+
+describe('AuthenticateService lastUsedAt throttling', () => {
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
+	function createService() {
+		const tokenRecord = {
+			id: 'tok-1',
+			userId: 'u1',
+			token: 'secret-token',
+			hash: 'secret-token',
+			appId: null,
+			lastUsedAt: null as Date | null,
+		};
+		const accessTokensRepository = {
+			findOne: vi.fn().mockResolvedValue(tokenRecord),
+			update: vi.fn().mockResolvedValue(undefined),
+		};
+		const usersRepository = {
+			findOneBy: vi.fn().mockResolvedValue({ id: 'u1', host: null }),
+		};
+		const appsRepository = {
+			findOneByOrFail: vi.fn(),
+		};
+		const cacheService = {
+			localUserByNativeTokenCache: { fetch: vi.fn() },
+			localUserByIdCache: {
+				fetch: vi.fn(async (_id: string, fallback: () => Promise<unknown>) => fallback()),
+			},
+		};
+
+		const service = new AuthenticateService(
+			usersRepository as never,
+			accessTokensRepository as never,
+			appsRepository as never,
+			cacheService as never,
+		);
+
+		return { service, tokenRecord, accessTokensRepository };
+	}
+
+	test('throttles lastUsedAt updates within 60 seconds and updates again after 60 seconds', async () => {
+		vi.useFakeTimers();
+		vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'));
+
+		const { service, accessTokensRepository } = createService();
+
+		await service.authenticate('secret-token');
+		await service.authenticate('secret-token');
+		vi.advanceTimersByTime(59_999);
+		await service.authenticate('secret-token');
+
+		expect(accessTokensRepository.update).toHaveBeenCalledTimes(1);
+
+		vi.advanceTimersByTime(1);
+		await service.authenticate('secret-token');
+
+		expect(accessTokensRepository.update).toHaveBeenCalledTimes(2);
+		service.dispose();
+	});
+
+	test('skips lastUsedAt update when updateLastUsedAt is false and enforces immediate revocation', async () => {
+		vi.useFakeTimers();
+		vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'));
+
+		const { service, accessTokensRepository } = createService();
+
+		await service.authenticate('secret-token', { updateLastUsedAt: false });
+		expect(accessTokensRepository.update).not.toHaveBeenCalled();
+
+		await service.authenticate('secret-token');
+		expect(accessTokensRepository.update).toHaveBeenCalledTimes(1);
+
+		accessTokensRepository.findOne.mockResolvedValueOnce(null);
+		await expect(service.authenticate('secret-token')).rejects.toBeInstanceOf(AuthenticationError);
+		service.dispose();
 	});
 });

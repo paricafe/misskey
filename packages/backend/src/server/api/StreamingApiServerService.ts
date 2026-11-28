@@ -13,6 +13,7 @@ import { bindThis } from '@/decorators.js';
 import type { MiLocalUser } from '@/models/User.js';
 import { UserService } from '@/core/UserService.js';
 import type { GlobalEvents } from '@/core/GlobalEventService.js';
+import { subscribeRedisMessage } from '@/misc/redis-pubsub-bus.js';
 import { AuthenticateService, AuthenticationError } from './AuthenticateService.js';
 import MainStreamConnection, { ConnectionRequest } from './stream/Connection.js';
 import { ChannelEventBus } from './stream/ChannelEventBus.js';
@@ -45,7 +46,7 @@ export class StreamingApiServerService {
 	#authorizationChecks = new Map<string, Promise<[MiLocalUser | null, MiAccessToken | null]>>();
 	#server?: http.Server;
 	#upgradeListener?: (request: http.IncomingMessage, socket: Duplex, head: Buffer) => void;
-	#redisListener?: (channel: string, data: string) => void;
+	#unsubscribeRedis?: () => void;
 	#pendingUpgrades = new Set<Duplex>();
 	#pendingInitializations = new Set<Promise<void>>();
 	#detaching = false;
@@ -182,8 +183,7 @@ export class StreamingApiServerService {
 		};
 		server.on('upgrade', this.#upgradeListener);
 
-		this.#redisListener = (_: string, data: string) => {
-			const parsed = JSON.parse(data);
+		this.#unsubscribeRedis = subscribeRedisMessage(this.redisForSub, parsed => {
 			if (parsed.channel === 'internal') {
 				const event = parsed.message as GlobalEvents['internal']['payload'];
 				if (event.type === 'accessTokenRevoked') events.emit(`authorization:${event.body.userId}`, event);
@@ -194,8 +194,7 @@ export class StreamingApiServerService {
 				}
 			}
 			events.emit(parsed.channel, parsed.message);
-		};
-		this.redisForSub.on('message', this.#redisListener);
+		});
 
 		this.#wss.on('connection', async (connection: WebSocket.WebSocket, request: http.IncomingMessage, ctx: {
 			stream: MainStreamConnection,
@@ -291,7 +290,8 @@ export class StreamingApiServerService {
 		if (this.#detachPromise) return this.#detachPromise;
 		this.#detaching = true;
 		if (this.#upgradeListener) this.#server?.off('upgrade', this.#upgradeListener);
-		if (this.#redisListener) this.redisForSub.off('message', this.#redisListener);
+		this.#unsubscribeRedis?.();
+		this.#unsubscribeRedis = undefined;
 		if (this.#cleanConnectionsIntervalId) {
 			clearInterval(this.#cleanConnectionsIntervalId);
 			this.#cleanConnectionsIntervalId = null;

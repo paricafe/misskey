@@ -9,7 +9,6 @@ import { Inject, Injectable, OnApplicationShutdown } from '@nestjs/common';
 import { In } from 'typeorm';
 import { ReplyError } from 'ioredis';
 import { DI } from '@/di-symbols.js';
-import type { UsersRepository } from '@/models/_.js';
 import type { MiUser } from '@/models/User.js';
 import type { MiNotification } from '@/models/Notification.js';
 import { bindThis } from '@/decorators.js';
@@ -33,9 +32,6 @@ export class NotificationService implements OnApplicationShutdown {
 
 		@Inject(DI.redis)
 		private redisClient: Redis.Redis,
-
-		@Inject(DI.usersRepository)
-		private usersRepository: UsersRepository,
 
 		private notificationEntityService: NotificationEntityService,
 		private idService: IdService,
@@ -188,20 +184,9 @@ export class NotificationService implements OnApplicationShutdown {
 
 			this.globalEventService.publishMainStream(notifieeId, 'unreadNotification', packed);
 			this.pushNotificationService.pushNotification(notifieeId, 'notification', packed);
-
-			if (type === 'follow') this.emailNotificationFollow(notifieeId, await this.usersRepository.findOneByOrFail({ id: notifierId! }));
-			if (type === 'receiveFollowRequest') this.emailNotificationReceiveFollowRequest(notifieeId, await this.usersRepository.findOneByOrFail({ id: notifierId! }));
 		}, () => { });
 
 		return notification;
-	}
-
-	@bindThis
-	private async emailNotificationFollow(userId: MiUser['id'], follower: MiUser) {
-	}
-
-	@bindThis
-	private async emailNotificationReceiveFollowRequest(userId: MiUser['id'], follower: MiUser) {
 	}
 
 	@bindThis
@@ -240,10 +225,17 @@ export class NotificationService implements OnApplicationShutdown {
 			excludeTypes?: (MiNotification['type'] | string)[],
 		},
 	): Promise<MiNotification[]> {
+		if (limit <= 0) return [];
+
 		let sinceTime = sinceId ? this.toXListId(sinceId) : null;
 		let untilTime = untilId ? this.toXListId(untilId) : null;
 
-		let notifications: MiNotification[];
+		const includeTypeSet = includeTypes && includeTypes.length > 0 ? new Set(includeTypes) : null;
+		const excludeTypeSet = includeTypeSet == null && excludeTypes && excludeTypes.length > 0 ? new Set(excludeTypes) : null;
+		const hasTypeFilter = includeTypeSet != null || excludeTypeSet != null;
+		const scanCount = hasTypeFilter ? Math.max(limit, 64) : limit;
+		const collected: MiNotification[] = [];
+
 		for (; ;) {
 			let notificationsRes: [id: string, fields: string[]][];
 
@@ -252,28 +244,33 @@ export class NotificationService implements OnApplicationShutdown {
 					`notificationTimeline:${userId}`,
 					'(' + sinceTime,
 					'+',
-					'COUNT', limit);
+					'COUNT', scanCount);
 			} else {
 				notificationsRes = await this.redisClient.xrevrange(
 					`notificationTimeline:${userId}`,
 					untilTime ? '(' + untilTime : '+',
 					sinceTime ? '(' + sinceTime : '-',
-					'COUNT', limit);
+					'COUNT', scanCount);
 			}
 
 			if (notificationsRes.length === 0) {
-				return [];
+				break;
 			}
 
-			notifications = notificationsRes.map(x => JSON.parse(x[1][1])) as MiNotification[];
-
-			if (includeTypes && includeTypes.length > 0) {
-				notifications = notifications.filter(notification => includeTypes.includes(notification.type));
-			} else if (excludeTypes && excludeTypes.length > 0) {
-				notifications = notifications.filter(notification => !excludeTypes.includes(notification.type));
+			for (const entry of notificationsRes) {
+				const notification = JSON.parse(entry[1][1]) as MiNotification;
+				if (includeTypeSet != null) {
+					if (!includeTypeSet.has(notification.type)) continue;
+				} else if (excludeTypeSet != null) {
+					if (excludeTypeSet.has(notification.type)) continue;
+				}
+				collected.push(notification);
+				if (collected.length >= limit) {
+					return collected;
+				}
 			}
 
-			if (notifications.length !== 0) {
+			if (!hasTypeFilter || notificationsRes.length < scanCount) {
 				break;
 			}
 
@@ -284,7 +281,7 @@ export class NotificationService implements OnApplicationShutdown {
 			}
 		}
 
-		return notifications;
+		return collected;
 	}
 
 	@bindThis

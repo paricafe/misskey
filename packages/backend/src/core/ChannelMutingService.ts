@@ -10,12 +10,14 @@ import { DI } from '@/di-symbols.js';
 import type { ChannelMutingRepository, ChannelsRepository, MiChannel, MiChannelMuting, MiUser } from '@/models/_.js';
 import { IdService } from '@/core/IdService.js';
 import { GlobalEvents, GlobalEventService } from '@/core/GlobalEventService.js';
+import { subscribeInternalEvent } from '@/misc/redis-pubsub-bus.js';
 import { bindThis } from '@/decorators.js';
 import { RedisKVCache } from '@/misc/cache.js';
 
 @Injectable()
 export class ChannelMutingService {
 	public mutingChannelsCache: RedisKVCache<Set<string>>;
+	private unsubscribeInternal?: () => void;
 
 	constructor(
 		@Inject(DI.redis)
@@ -40,7 +42,7 @@ export class ChannelMutingService {
 			fromRedisConverter: (value) => new Set(JSON.parse(value)),
 		});
 
-		this.redisForSub.on('message', this.onMessage);
+		this.unsubscribeInternal = subscribeInternalEvent(this.redisForSub, this.onInternalEvent);
 	}
 
 	@bindThis
@@ -162,26 +164,24 @@ export class ChannelMutingService {
 	}
 
 	@bindThis
-	private async onMessage(_: string, data: string): Promise<void> {
-		const obj = JSON.parse(data);
-
-		if (obj.channel === 'internal') {
-			const { type, body } = obj.message as GlobalEvents['internal']['payload'];
-			switch (type) {
-				case 'muteChannel': {
-					this.mutingChannelsCache.refresh(body.userId).then();
-					break;
-				}
-				case 'unmuteChannel': {
-					this.mutingChannelsCache.delete(body.userId).then();
-					break;
-				}
+	private async onInternalEvent(event: GlobalEvents['internal']['payload']): Promise<void> {
+		const { type, body } = event;
+		switch (type) {
+			case 'muteChannel': {
+				this.mutingChannelsCache.refresh(body.userId).then();
+				break;
+			}
+			case 'unmuteChannel': {
+				this.mutingChannelsCache.delete(body.userId).then();
+				break;
 			}
 		}
 	}
 
 	@bindThis
 	public dispose(): void {
+		this.unsubscribeInternal?.();
+		this.unsubscribeInternal = undefined;
 		this.mutingChannelsCache.dispose();
 	}
 

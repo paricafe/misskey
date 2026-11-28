@@ -407,4 +407,26 @@ describe('LogManager', () => {
 		});
 		expect(write.mock.calls[1][0].attributes).toEqual(nested);
 	});
+
+	test('reports level enablement consistently with write filtering', () => {
+		const prod = createManager({ nodeEnv: 'production' });
+		expect(prod.manager.isLevelEnabled('debug', [{ name: 'queue' }, { name: 'inbox' }])).toBe(false);
+		expect(prod.manager.isLevelEnabled('info', [{ name: 'queue' }, { name: 'inbox' }])).toBe(true);
+
+		const scoped = createManager({
+			nodeEnv: 'production',
+			configuration: {
+				level: 'info',
+				domains: {
+					queue: 'off',
+					'queue.inbox': 'debug',
+				},
+			},
+		});
+		expect(scoped.manager.isLevelEnabled('error', [{ name: 'queue' }, { name: 'deliver' }])).toBe(false);
+		expect(scoped.manager.isLevelEnabled('debug', [{ name: 'queue' }, { name: 'inbox' }])).toBe(true);
+
+		const quiet = createManager({ quiet: true, verbose: true });
+		expect(quiet.manager.isLevelEnabled('fatal', [{ name: 'queue' }])).toBe(false);
+	});
 });

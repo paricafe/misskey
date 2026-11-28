@@ -192,11 +192,11 @@ export class NotificationEntityService implements OnModuleInit {
 	): Promise<T[]> {
 		if (notifications.length === 0) return [];
 
-		let validNotifications = notifications;
+		const filtered = await this.#filterValidNotifier(notifications, meId);
+		let validNotifications = filtered.notifications;
+		const usersById = filtered.usersById;
 
-		validNotifications = await this.#filterValidNotifier(validNotifications, meId);
-
-		const noteIds = validNotifications.map(x => 'noteId' in x ? x.noteId : null).filter(x => x != null);
+		const noteIds = [...new Set(validNotifications.map(x => 'noteId' in x ? x.noteId : null).filter(x => x != null))];
 		const notes = noteIds.length > 0 ? await this.notesRepository.find({
 			where: { id: In(noteIds) },
 			relations: {
@@ -216,24 +216,39 @@ export class NotificationEntityService implements OnModuleInit {
 
 		validNotifications = validNotifications.filter(x => !('noteId' in x) || packedNotes.has(x.noteId));
 
-		const userIds = [];
+		const userIdSet = new Set<MiUser['id']>();
 		for (const notification of validNotifications) {
-			if ('notifierId' in notification) userIds.push(notification.notifierId);
-			if (notification.type === 'reaction:grouped') userIds.push(...notification.reactions.map(x => x.userId));
-			if (notification.type === 'renote:grouped') userIds.push(...notification.userIds);
+			if ('notifierId' in notification) userIdSet.add(notification.notifierId);
+			if (notification.type === 'reaction:grouped') {
+				for (const reaction of notification.reactions) userIdSet.add(reaction.userId);
+			}
+			if (notification.type === 'renote:grouped') {
+				for (const userId of notification.userIds) userIdSet.add(userId);
+			}
 		}
-		const users = userIds.length > 0 ? await this.usersRepository.find({
-			where: { id: In(userIds) },
-		}) : [];
+		const missingUserIds = [...userIdSet].filter(id => !usersById.has(id));
+		if (missingUserIds.length > 0) {
+			const fetchedUsers = await this.usersRepository.find({
+				where: { id: In(missingUserIds) },
+			});
+			for (const user of fetchedUsers) usersById.set(user.id, user);
+		}
+		const users = [...userIdSet].map(id => usersById.get(id)).filter((u): u is MiUser => u != null);
 		const packedUsersArray = await this.userEntityService.packMany(users, { id: meId });
 		const packedUsers = new Map(packedUsersArray.map(p => [p.id, p]));
 
 		const followRequestNotifications = validNotifications.filter((x): x is FilterUnionByProperty<T, 'type', 'receiveFollowRequest'> => x.type === 'receiveFollowRequest');
 		if (followRequestNotifications.length > 0) {
+			const requesterIds = [...new Set(followRequestNotifications.map(x => x.notifierId))];
 			const reqs = await this.followRequestsRepository.find({
-				where: { followerId: In(followRequestNotifications.map(x => x.notifierId)) },
+				where: {
+					followeeId: meId,
+					followerId: In(requesterIds),
+				},
+				select: { followerId: true },
 			});
-			validNotifications = validNotifications.filter(x => (x.type !== 'receiveFollowRequest') || reqs.some(r => r.followerId === x.notifierId));
+			const activeRequesterIds = new Set(reqs.map(r => r.followerId));
+			validNotifications = validNotifications.filter(x => (x.type !== 'receiveFollowRequest') || activeRequesterIds.has(x.notifierId));
 		}
 
 		const packPromises = validNotifications.map(x => {
@@ -284,12 +299,12 @@ export class NotificationEntityService implements OnModuleInit {
 		notification: T,
 		userIdsWhoMeMuting: Set<MiUser['id']>,
 		userMutedInstances: Set<string>,
-		notifiers: MiUser[],
+		notifiersById: Map<MiUser['id'], MiUser>,
 	): boolean {
 		if (!('notifierId' in notification)) return true;
 		if (userIdsWhoMeMuting.has(notification.notifierId)) return false;
 
-		const notifier = notifiers.find(x => x.id === notification.notifierId) ?? null;
+		const notifier = notifiersById.get(notification.notifierId) ?? null;
 
 		if (notifier == null) return false;
 		if (notifier.host && userMutedInstances.has(notifier.host)) return false;
@@ -303,13 +318,13 @@ export class NotificationEntityService implements OnModuleInit {
 		notification: MiNotification | MiGroupedNotification,
 		meId: MiUser['id'],
 	): Promise<boolean> {
-		return (await this.#filterValidNotifier([notification], meId)).length === 1;
+		return (await this.#filterValidNotifier([notification], meId)).notifications.length === 1;
 	}
 
 	async #filterValidNotifier <T extends MiNotification | MiGroupedNotification> (
 		notifications: T[],
 		meId: MiUser['id'],
-	): Promise<T[]> {
+	): Promise<{ notifications: T[]; usersById: Map<MiUser['id'], MiUser>; }> {
 		const [
 			userIdsWhoMeMuting,
 			userMutedInstances,
@@ -318,16 +333,18 @@ export class NotificationEntityService implements OnModuleInit {
 			this.cacheService.userProfileCache.fetch(meId).then(p => new Set(p.mutedInstances)),
 		]);
 
-		const notifierIds = notifications.map(notification => 'notifierId' in notification ? notification.notifierId : null).filter(x => x != null);
+		const notifierIds = [...new Set(
+			notifications.map(notification => 'notifierId' in notification ? notification.notifierId : null).filter(x => x != null),
+		)];
 		const notifiers = notifierIds.length > 0 ? await this.usersRepository.find({
 			where: { id: In(notifierIds) },
 		}) : [];
+		const usersById = new Map(notifiers.map(u => [u.id, u]));
 
-		const filteredNotifications = ((await Promise.all(notifications.map(async (notification) => {
-			const isValid = this.#validateNotifier(notification, userIdsWhoMeMuting, userMutedInstances, notifiers);
-			return isValid ? notification : null;
-		}))) as [T | null] ).filter(x => x != null);
+		const filteredNotifications = notifications.filter(notification =>
+			this.#validateNotifier(notification, userIdsWhoMeMuting, userMutedInstances, usersById),
+		);
 
-		return filteredNotifications;
+		return { notifications: filteredNotifications, usersById };
 	}
 }

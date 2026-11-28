@@ -13,7 +13,7 @@ import { Config, loadConfig } from './config.js';
 import { createPostgresDataSource } from './postgres.js';
 import { RepositoryModule } from './models/RepositoryModule.js';
 import { allSettled } from './misc/promise-tracker.js';
-import { GlobalEvents } from './core/GlobalEventService.js';
+import { subscribeInternalEvent } from './misc/redis-pubsub-bus.js';
 import type { Provider, OnApplicationShutdown } from '@nestjs/common';
 
 const $config: Provider = {
@@ -126,26 +126,19 @@ const $meta: Provider = {
 			}
 		});
 
-		async function onMessage(_: string, data: string): Promise<void> {
-			const obj = JSON.parse(data);
-
-			if (obj.channel === 'internal') {
-				const { type, body } = obj.message as GlobalEvents['internal']['payload'];
-				switch (type) {
-					case 'metaUpdated': {
-						for (const key in body.after) {
-							(meta as any)[key] = (body.after as any)[key];
-						}
-						meta.rootUser = null;
-						break;
+		subscribeInternalEvent(redisForSub, ({ type, body }) => {
+			switch (type) {
+				case 'metaUpdated': {
+					for (const key in body.after) {
+						(meta as any)[key] = (body.after as any)[key];
 					}
-					default:
-						break;
+					meta.rootUser = null;
+					break;
 				}
+				default:
+					break;
 			}
-		}
-
-		redisForSub.on('message', onMessage);
+		});
 
 		return meta;
 	},

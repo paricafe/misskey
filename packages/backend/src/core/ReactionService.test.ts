@@ -134,4 +134,36 @@ describe('ReactionService conditional writes', () => {
 		expect(repository.delete).toHaveBeenCalledWith('original-reaction');
 		expect(buffering.delete).toHaveBeenCalledWith('note', 'actor', '👍');
 	});
+
+	test('batches visibleUserIds lookup into a single findBy query when federating Like on a specified note', async () => {
+		const { service, manager } = createService();
+		const usersRepository = {
+			findBy: vi.fn().mockResolvedValue([
+				{ id: 'local-1', host: null },
+				{ id: 'remote-1', host: 'remote.example' },
+				{ id: 'remote-2', host: 'other.example' },
+			]),
+			findOneBy: vi.fn(),
+		};
+		const addDirectRecipe = vi.fn();
+		Object.assign(manager, { addDirectRecipe });
+		Object.assign(service, {
+			usersRepository,
+			userEntityService: {
+				isLocalUser: (u: { host: string | null }) => u.host == null,
+				isRemoteUser: (u: { host: string | null }) => u.host != null,
+			},
+		});
+
+		await service.create(actor, {
+			...(note as Record<string, unknown>),
+			visibility: 'specified',
+			visibleUserIds: ['local-1', 'remote-1', 'remote-1', 'remote-2'],
+		} as never, '👍');
+
+		expect(usersRepository.findBy).toHaveBeenCalledTimes(1);
+		expect(usersRepository.findBy.mock.calls[0][0].id.value).toEqual(['local-1', 'remote-1', 'remote-2']);
+		expect(usersRepository.findOneBy).not.toHaveBeenCalled();
+		expect(addDirectRecipe).toHaveBeenCalledTimes(2);
+	});
 });

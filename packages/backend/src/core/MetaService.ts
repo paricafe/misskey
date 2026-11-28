@@ -11,6 +11,7 @@ import { MiMeta } from '@/models/Meta.js';
 import { GlobalEventService } from '@/core/GlobalEventService.js';
 import { bindThis } from '@/decorators.js';
 import type { GlobalEvents } from '@/core/GlobalEventService.js';
+import { subscribeInternalEvent } from '@/misc/redis-pubsub-bus.js';
 import { FeaturedService } from '@/core/FeaturedService.js';
 import type { OnApplicationShutdown } from '@nestjs/common';
 
@@ -18,6 +19,7 @@ import type { OnApplicationShutdown } from '@nestjs/common';
 export class MetaService implements OnApplicationShutdown {
 	private cache: MiMeta | undefined;
 	private intervalId: NodeJS.Timeout;
+	private unsubscribeInternal?: () => void;
 
 	constructor(
 		@Inject(DI.redisForSub)
@@ -37,26 +39,22 @@ export class MetaService implements OnApplicationShutdown {
 			}, 1000 * 60 * 5);
 		}
 
-		this.redisForSub.on('message', this.onMessage);
+		this.unsubscribeInternal = subscribeInternalEvent(this.redisForSub, this.onInternalEvent);
 	}
 
 	@bindThis
-	private async onMessage(_: string, data: string): Promise<void> {
-		const obj = JSON.parse(data);
-
-		if (obj.channel === 'internal') {
-			const { type, body } = obj.message as GlobalEvents['internal']['payload'];
-			switch (type) {
-				case 'metaUpdated': {
-					this.cache = {
-						...(body.after),
-						rootUser: null,
-					};
-					break;
-				}
-				default:
-					break;
+	private async onInternalEvent(event: GlobalEvents['internal']['payload']): Promise<void> {
+		const { type, body } = event;
+		switch (type) {
+			case 'metaUpdated': {
+				this.cache = {
+					...(body.after),
+					rootUser: null,
+				};
+				break;
 			}
+			default:
+				break;
 		}
 	}
 
@@ -147,7 +145,8 @@ export class MetaService implements OnApplicationShutdown {
 	@bindThis
 	public dispose(): void {
 		clearInterval(this.intervalId);
-		this.redisForSub.off('message', this.onMessage);
+		this.unsubscribeInternal?.();
+		this.unsubscribeInternal = undefined;
 	}
 
 	@bindThis

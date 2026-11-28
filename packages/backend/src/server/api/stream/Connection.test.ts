@@ -62,3 +62,42 @@ describe('streaming connection authorization', () => {
 		}
 	});
 });
+
+describe('Connection userMutedInstances Set reuse', () => {
+	test('reuses the Set reference when mutedInstances is unchanged and updates it on changes', async () => {
+		let currentMuted = ['a.example', 'b.example'];
+		const connection = Object.create(Connection.prototype) as Connection;
+		Object.assign(connection, {
+			user: { id: 'u1' },
+			cacheService: {
+				userProfileCache: { fetch: vi.fn(async () => ({ mutedInstances: currentMuted })) },
+				userFollowingsCache: { fetch: vi.fn().mockResolvedValue({}) },
+				userMutingsCache: { fetch: vi.fn().mockResolvedValue(new Set()) },
+				userBlockedCache: { fetch: vi.fn().mockResolvedValue(new Set()) },
+				renoteMutingsCache: { fetch: vi.fn().mockResolvedValue(new Set()) },
+			},
+			channelFollowingService: {
+				userFollowingChannelsCache: { fetch: vi.fn().mockResolvedValue(new Set()) },
+			},
+			channelMutingService: {
+				mutingChannelsCache: { fetch: vi.fn().mockResolvedValue(new Set()) },
+			},
+		});
+
+		await connection.fetch();
+		const firstSet = connection.userMutedInstances;
+		expect([...firstSet]).toEqual(['a.example', 'b.example']);
+
+		await connection.fetch();
+		expect(connection.userMutedInstances).toBe(firstSet);
+
+		currentMuted = ['a.example', 'b.example'];
+		await connection.fetch();
+		expect(connection.userMutedInstances).toBe(firstSet);
+
+		currentMuted = ['a.example', 'c.example'];
+		await connection.fetch();
+		expect(connection.userMutedInstances).not.toBe(firstSet);
+		expect([...connection.userMutedInstances]).toEqual(['a.example', 'c.example']);
+	});
+});

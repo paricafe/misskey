@@ -369,17 +369,20 @@ export class CustomEmojiService implements OnApplicationShutdown {
 	}
 
 	@bindThis
-	public async populateEmoji(emojiName: string, noteUserHost: string | null): Promise<string | null> {
+	public async populateEmoji(emojiName: string, noteUserHost: string | null, missingKeys?: ReadonlySet<string>): Promise<string | null> {
 		const { name, host } = this.parseEmojiStr(emojiName, noteUserHost);
 		if (name == null) return null;
 		if (host == null) return null;
+
+		const cacheKey = `${name} ${host}`;
+		if (missingKeys?.has(cacheKey)) return null;
 
 		const queryOrNull = async () => (await this.emojisRepository.findOneBy({
 			name,
 			host,
 		})) ?? null;
 
-		const emoji = await this.emojisCache.fetch(`${name} ${host}`, queryOrNull);
+		const emoji = await this.emojisCache.fetch(cacheKey, queryOrNull);
 
 		if (emoji == null) return null;
 		const url = emoji.publicUrl || emoji.originalUrl; // || emoji.originalUrl してるのは後方互換性のため（publicUrlはstringなので??はだめ）
@@ -389,8 +392,8 @@ export class CustomEmojiService implements OnApplicationShutdown {
 	}
 
 	@bindThis
-	public async populateEmojis(emojiNames: string[], noteUserHost: string | null): Promise<Record<string, string>> {
-		const emojis = await Promise.all(emojiNames.map(x => this.populateEmoji(x, noteUserHost)));
+	public async populateEmojis(emojiNames: string[], noteUserHost: string | null, missingKeys?: ReadonlySet<string>): Promise<Record<string, string>> {
+		const emojis = await Promise.all(emojiNames.map(x => this.populateEmoji(x, noteUserHost, missingKeys)));
 		const res = {} as Record<string, string>;
 		for (let i = 0; i < emojiNames.length; i++) {
 			const resolvedEmoji = emojis[i];
@@ -402,17 +405,25 @@ export class CustomEmojiService implements OnApplicationShutdown {
 	}
 
 	@bindThis
-	public async prefetchEmojis(emojis: { name: string; host: string | null; }[]): Promise<void> {
-		const notCachedEmojis = emojis.filter(emoji => this.emojisCache.get(`${emoji.name} ${emoji.host}`) == null);
-		const emojisQuery: any[] = [];
-		const hosts = new Set(notCachedEmojis.map(e => e.host));
-		for (const host of hosts) {
-			if (host == null) continue;
-			emojisQuery.push({
-				name: In(notCachedEmojis.filter(e => e.host === host).map(e => e.name)),
-				host: host,
-			});
+	public async prefetchEmojis(emojis: { name: string; host: string | null; }[]): Promise<Set<string>> {
+		const namesByHost = new Map<string, Set<string>>();
+		const queriedKeys = new Set<string>();
+		for (const emoji of emojis) {
+			if (emoji.host == null) continue;
+			const key = `${emoji.name} ${emoji.host}`;
+			if (this.emojisCache.get(key) != null) continue;
+			queriedKeys.add(key);
+			let hostNames = namesByHost.get(emoji.host);
+			if (hostNames == null) {
+				hostNames = new Set();
+				namesByHost.set(emoji.host, hostNames);
+			}
+			hostNames.add(emoji.name);
 		}
+		const emojisQuery = [...namesByHost.entries()].map(([host, names]) => ({
+			name: In([...names]),
+			host,
+		}));
 		const _emojis = emojisQuery.length > 0 ? await this.emojisRepository.find({
 			where: emojisQuery,
 			select: {
@@ -423,8 +434,11 @@ export class CustomEmojiService implements OnApplicationShutdown {
 			},
 		}) : [];
 		for (const emoji of _emojis) {
-			this.emojisCache.set(`${emoji.name} ${emoji.host}`, emoji);
+			const key = `${emoji.name} ${emoji.host}`;
+			this.emojisCache.set(key, emoji);
+			queriedKeys.delete(key);
 		}
+		return queriedKeys;
 	}
 
 	@bindThis

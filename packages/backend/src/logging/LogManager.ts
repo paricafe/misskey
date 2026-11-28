@@ -21,6 +21,7 @@ import type {
 	AccessLogStatusClass,
 	LogLevel,
 	LogLevelSetting,
+	LoggerContext,
 	LogRecord,
 	LogRecordInput,
 	LogTraceContext,
@@ -290,10 +291,20 @@ export class LogManager {
 		return threshold === 'off' || !this.dependencies.isVerbose() ? threshold : 'debug';
 	}
 
-	private shouldWrite(input: LogRecordInput, loggerName: string): boolean {
+	private isThresholdSatisfied(level: LogLevel, loggerName: string): boolean {
 		const threshold = this.getThreshold(loggerName);
 		if (threshold === 'off') return false;
-		return logLevelOrder[input.level] >= logLevelOrder[threshold];
+		return logLevelOrder[level] >= logLevelOrder[threshold];
+	}
+
+	public isLevelEnabled(level: LogLevel, context: readonly LoggerContext[]): boolean {
+		if (this.dependencies.isQuiet()) return false;
+		const loggerName = context.map(segment => segment.name).join('.');
+		return this.isThresholdSatisfied(level, loggerName);
+	}
+
+	private shouldWrite(input: LogRecordInput, loggerName: string): boolean {
+		return this.isThresholdSatisfied(input.level, loggerName);
 	}
 
 	public write(input: LogRecordInput): void {

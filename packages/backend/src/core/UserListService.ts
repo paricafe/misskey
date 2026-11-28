@@ -14,6 +14,7 @@ import type { MiUserListMembership } from '@/models/UserListMembership.js';
 import { IdService } from '@/core/IdService.js';
 import type { GlobalEvents } from '@/core/GlobalEventService.js';
 import { GlobalEventService } from '@/core/GlobalEventService.js';
+import { subscribeInternalEvent } from '@/misc/redis-pubsub-bus.js';
 import { DI } from '@/di-symbols.js';
 import { UserEntityService } from '@/core/entities/UserEntityService.js';
 import { bindThis } from '@/decorators.js';
@@ -28,6 +29,7 @@ export class UserListService implements OnApplicationShutdown, OnModuleInit {
 
 	public membersCache: RedisKVCache<Set<string>>;
 	private roleService: RoleService;
+	private unsubscribeInternal?: () => void;
 
 	constructor(
 		private moduleRef: ModuleRef,
@@ -58,7 +60,7 @@ export class UserListService implements OnApplicationShutdown, OnModuleInit {
 			fromRedisConverter: (value) => new Set(JSON.parse(value)),
 		});
 
-		this.redisForSub.on('message', this.onMessage);
+		this.unsubscribeInternal = subscribeInternalEvent(this.redisForSub, this.onInternalEvent);
 	}
 
 	async onModuleInit() {
@@ -66,20 +68,16 @@ export class UserListService implements OnApplicationShutdown, OnModuleInit {
 	}
 
 	@bindThis
-	private async onMessage(_: string, data: string): Promise<void> {
-		const obj = JSON.parse(data);
-
-		if (obj.channel === 'internal') {
-			const { type, body } = obj.message as GlobalEvents['internal']['payload'];
-			switch (type) {
-				case 'userListMemberAdded':
-				case 'userListMemberRemoved': {
-					await this.membersCache.delete(body.userListId);
-					break;
-				}
-				default:
-					break;
+	private async onInternalEvent(event: GlobalEvents['internal']['payload']): Promise<void> {
+		const { type, body } = event;
+		switch (type) {
+			case 'userListMemberAdded':
+			case 'userListMemberRemoved': {
+				await this.membersCache.delete(body.userListId);
+				break;
 			}
+			default:
+				break;
 		}
 	}
 
@@ -245,7 +243,8 @@ export class UserListService implements OnApplicationShutdown, OnModuleInit {
 
 	@bindThis
 	public dispose(): void {
-		this.redisForSub.off('message', this.onMessage);
+		this.unsubscribeInternal?.();
+		this.unsubscribeInternal = undefined;
 		this.membersCache.dispose();
 	}
 

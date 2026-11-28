@@ -93,12 +93,26 @@ export default class Logger {
 		this.log('info', message, data, important, 'success');
 	}
 
+	@bindThis
+	public isLevelEnabled(level: LogLevel): boolean {
+		return logManager.isLevelEnabled(level, this.context);
+	}
+
+	@bindThis
+	public isDebugEnabled(): boolean {
+		return this.isLevelEnabled('debug');
+	}
+
 	public debug(input: LogEntryInput): void;
 	public debug(message: string): void;
 	public debug(message: string, data?: LegacyData, important?: boolean): void;
+	public debug(messageFactory: () => string, data?: LegacyData, important?: boolean): void;
 	@bindThis
-	public debug(inputOrMessage: LogEntryInput | string, data?: LegacyData, important = false): void {
-		if (typeof inputOrMessage === 'string') {
+	public debug(inputOrMessage: LogEntryInput | string | (() => string), data?: LegacyData, important = false): void {
+		if (typeof inputOrMessage === 'function') {
+			if (!this.isDebugEnabled()) return;
+			this.log('debug', inputOrMessage(), data, important);
+		} else if (typeof inputOrMessage === 'string') {
 			this.log('debug', inputOrMessage, data, important);
 		} else {
 			this.logStructured('debug', inputOrMessage);

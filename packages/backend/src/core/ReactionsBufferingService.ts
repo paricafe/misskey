@@ -13,6 +13,7 @@ import type { MiUser, NotesRepository } from '@/models/_.js';
 import type { Config } from '@/config.js';
 import { PER_NOTE_REACTION_USER_PAIR_CACHE_MAX } from '@/const.js';
 import type { GlobalEvents } from '@/core/GlobalEventService.js';
+import { subscribeInternalEvent } from '@/misc/redis-pubsub-bus.js';
 import { LoggerService } from '@/core/LoggerService.js';
 import type Logger from '@/logger.js';
 import type { OnApplicationShutdown } from '@nestjs/common';
@@ -106,6 +107,7 @@ function pairsToMap(entries: string[]): Map<string, string> {
 export class ReactionsBufferingService implements OnApplicationShutdown {
 	private logger: Logger;
 	private pendingBake: Promise<void> | undefined;
+	private unsubscribeInternal?: () => void;
 
 	constructor(
 		@Inject(DI.config)
@@ -123,14 +125,12 @@ export class ReactionsBufferingService implements OnApplicationShutdown {
 		private loggerService: LoggerService,
 	) {
 		this.logger = this.loggerService.getLogger('reactions-buffer');
-		this.redisForSub.on('message', this.onMessage);
+		this.unsubscribeInternal = subscribeInternalEvent(this.redisForSub, this.onInternalEvent);
 	}
 
 	@bindThis
-	private async onMessage(_: string, data: string) {
-		const obj = JSON.parse(data);
-		if (obj.channel !== 'internal') return;
-		const { type, body } = obj.message as GlobalEvents['internal']['payload'];
+	private async onInternalEvent(event: GlobalEvents['internal']['payload']) {
+		const { type, body } = event;
 		if (type === 'metaUpdated' && body.before?.enableReactionsBuffering && !body.after.enableReactionsBuffering) {
 			await this.bake().catch(error => this.logger.error('Failed to bake buffered reactions', error));
 		}
@@ -288,7 +288,8 @@ export class ReactionsBufferingService implements OnApplicationShutdown {
 
 	@bindThis
 	public dispose(): void {
-		this.redisForSub.off('message', this.onMessage);
+		this.unsubscribeInternal?.();
+		this.unsubscribeInternal = undefined;
 	}
 
 	@bindThis
