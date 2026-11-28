@@ -1,0 +1,417 @@
+packages/backend/src/server/api/endpoints/notes/hybrid-timeline.ts
+  173902b0d76f1a2f 263,273,283
+packages/backend/src/server/api/endpoints/notes/user-list-timeline.ts
+  173902b0d76f1a2f 207,217,227,237
+packages/backend/src/server/api/stream/channels/role-timeline.ts
+  49a2ae6364b809ac 17,51-53,56,59-60,63-75
+  173902b0d76f1a2f 18,54-55,57-58,61-62,77-78
+packages/backend/src/GlobalModule.ts
+  173902b0d76f1a2f 16,129-133,135-136,138-139,141
+packages/backend/src/core/CustomEmojiService.prefetch.test.ts
+  173902b0d76f1a2f 1-57
+packages/backend/src/server/api/stream/Connection.ts
+  173902b0d76f1a2f 68,113-122
+packages/backend/src/core/UserWebhookService.ts
+  173902b0d76f1a2f 13,33,42,95-96,140-141
+packages/backend/src/core/RoleService.policy.test.ts
+  173902b0d76f1a2f 1-82
+packages/backend/src/core/ChannelMutingService.ts
+  173902b0d76f1a2f 13,20,45,167-172,174-176,183-184
+packages/backend/src/queue/processors/InboxProcessorService.ts
+  173902b0d76f1a2f 76-80,172-176
+packages/backend/src/core/SystemWebhookService.ts
+  173902b0d76f1a2f 12,56,68,200-201,233-234
+packages/backend/src/core/RoleService.ts
+  173902b0d76f1a2f 27,134,173,181-200,204,207-212,214-224,226-231,233,235-236,327-328,340-341,353-404,406-413,424-425,688,771-772
+packages/backend/src/core/entities/ChatEntityService.ts
+  173902b0d76f1a2f 78-80,85-108,116-120,122,126-130,135,137,174-176,187,225-227,238-243,245-247,252,254,274-283,304-315,319,327,332-357,393-398,400
+packages/backend/src/core/MetaService.ts
+  173902b0d76f1a2f 14,22,42,46-54,56-57,148-149
+packages/backend/src/core/NotificationService.ts
+  173902b0d76f1a2f 228-229,233-237,247,253,257,260-270,273,284
+packages/backend/src/core/SystemAccountService.ts
+  173902b0d76f1a2f 16,29,54,58-66,69,71-72,201-202
+packages/backend/src/core/AntennaService.ts
+  173902b0d76f1a2f 12,25-42,47-48,71,75-95,104-109,113-123,126-131,133-135,137-148,151-156,159-164,177-178,181-230,233,235,237-239,242-253,255,257,259-260,263,265-266,268-271,273-275,278-286,336-337
+packages/backend/test/unit/logging/Logger.ts
+  173902b0d76f1a2f 11,17,26-27,209-224
+packages/backend/src/core/NotificationService.test.ts
+  173902b0d76f1a2f 1-103
+packages/backend/src/core/entities/ChatEntityService.test.ts
+  173902b0d76f1a2f 1-144
+packages/backend/src/core/entities/NoteEntityService.batch.test.ts
+  173902b0d76f1a2f 1-215
+packages/backend/src/core/entities/NotificationEntityService.test.ts
+  173902b0d76f1a2f 1-109
+packages/backend/src/core/NoteCreateService.perf.test.ts
+  173902b0d76f1a2f 1-110
+packages/backend/src/misc/redis-pubsub-bus.test.ts
+  173902b0d76f1a2f 1-84
+packages/backend/src/core/CacheService.ts
+  173902b0d76f1a2f 15,42,185,189-211,213-218,220-225,227,230-246,248-249,268-269
+packages/backend/src/server/api/stream/channels/role-timeline.test.ts
+  49a2ae6364b809ac 12,21-22,24,36-37,48-49,51-53,60-69,71-75,77-79,82-96,98-99,101,103-109,111
+  173902b0d76f1a2f 1-11,13-20,23,25-35,38-47,50,54-59,70,76,80-81,97,100,102,110,112-113
+packages/backend/src/core/entities/UserListEntityService.ts
+  173902b0d76f1a2f 6,50-109
+packages/backend/src/core/entities/NotificationEntityService.ts
+  173902b0d76f1a2f 195-197,199,219,221-227,229-236,242,244-248,250-251,302,307,321,327,336-338,342,344-346,348
+packages/backend/src/core/UserListService.ts
+  173902b0d76f1a2f 17,32,63,71-77,79-80,246-247
+packages/backend/src/server/api/AuthenticateService.test.ts
+  173902b0d76f1a2f 6-7,59-135
+packages/backend/src/server/api/endpoints/users/lists/list.ts
+  173902b0d76f1a2f 85
+packages/backend/src/server/api/endpoints/users/notes.ts
+  173902b0d76f1a2f 228
+packages/backend/src/core/AbuseReportNotificationService.ts
+  173902b0d76f1a2f 12-13,31-32,51,332-333,354-355
+packages/backend/src/server/api/StreamingApiServerService.ts
+  173902b0d76f1a2f 16,49,186,197,293-294
+packages/backend/src/core/AntennaService.test.ts
+  173902b0d76f1a2f 1-155
+packages/backend/src/core/entities/NoteEntityService.ts
+  173902b0d76f1a2f 16,67-71,82,253-320,351,393-394,403,444,447-448,479-481,489,510-512,514-518,657,660,664-713,716,729-730,736-776,779-782,784-787,789
+packages/backend/src/server/api/stream/Connection.test.ts
+  173902b0d76f1a2f 65-103
+packages/backend/src/core/ReactionService.ts
+  173902b0d76f1a2f 6,324-331
+packages/backend/src/server/api/ApiCallService.ts
+  173902b0d76f1a2f 365,438-441
+packages/backend/src/core/NoteCreateService.ts
+  173902b0d76f1a2f 460-465,471,611,681-699,933-940,942-951,1190-1191
+packages/backend/src/logger.ts
+  173902b0d76f1a2f 96-105,109,111-115
+packages/backend/src/core/ChannelFollowingService.ts
+  173902b0d76f1a2f 13,24,49,133-142,149-150
+packages/backend/src/logging/LogManager.ts
+  173902b0d76f1a2f 24,294,297-307
+packages/backend/src/core/entities/UserListEntityService.test.ts
+  173902b0d76f1a2f 1-82
+packages/backend/src/core/ReactionsBufferingService.ts
+  173902b0d76f1a2f 16,110,128,132-133,291-292
+packages/backend/src/core/ReactionService.test.ts
+  173902b0d76f1a2f 137-168
+packages/backend/src/queue/processors/InboxProcessorService.test.ts
+  173902b0d76f1a2f 136-152
+packages/backend/src/server/api/endpoints/notes/global-timeline.ts
+  173902b0d76f1a2f 94
+packages/backend/src/server/api/endpoints/notes/timeline.ts
+  173902b0d76f1a2f 217,227,237,251
+packages/backend/test/unit/logging/LogManager.ts
+  173902b0d76f1a2f 410-431
+packages/backend/src/server/api/AuthenticateService.ts
+  173902b0d76f1a2f 24-25,29,44,76-86,110
+packages/backend/src/misc/redis-pubsub-bus.ts
+  173902b0d76f1a2f 1-96
+packages/backend/src/core/AvatarDecorationService.ts
+  173902b0d76f1a2f 15,21,36,40-46,48-49,119-120
+packages/backend/src/core/entities/UserEntityService.ts
+  173902b0d76f1a2f 423,437,699-710,713,718,770
+packages/backend/src/core/CustomEmojiService.ts
+  173902b0d76f1a2f 372,377-379,385,395-396,408-421,423-426,437-439,441
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8-ntes.10",
+  "base_commit_sha": "2dd6001a3164a03030e1bc118b440282eb9caabe",
+  "prompts": {
+    "173902b0d76f1a2f": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a22318-31d5-7991-9e21-a32ffad99469",
+        "model": "gpt-6.2-astra"
+      },
+      "human_author": "Natsuki-Kaede",
+      "messages": [],
+      "total_additions": 2703,
+      "total_deletions": 620,
+      "accepted_lines": 2661,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "packages/backend/src/core/AvatarDecorationService.ts": {
+          "additions": 14,
+          "deletions": 16,
+          "accepted_lines": 14
+        },
+        "packages/backend/src/core/ChannelMutingService.ts": {
+          "additions": 15,
+          "deletions": 15,
+          "accepted_lines": 15
+        },
+        "packages/backend/src/core/ReactionService.test.ts": {
+          "additions": 32,
+          "accepted_lines": 32
+        },
+        "packages/backend/src/GlobalModule.ts": {
+          "additions": 11,
+          "deletions": 18,
+          "accepted_lines": 11
+        },
+        "packages/backend/src/core/NotificationService.test.ts": {
+          "additions": 103,
+          "accepted_lines": 103
+        },
+        "packages/backend/src/misc/redis-pubsub-bus.ts": {
+          "additions": 96,
+          "accepted_lines": 96
+        },
+        "packages/backend/src/core/entities/UserListEntityService.ts": {
+          "additions": 63,
+          "accepted_lines": 63
+        },
+        "packages/backend/src/server/api/AuthenticateService.ts": {
+          "additions": 16,
+          "deletions": 3,
+          "accepted_lines": 16
+        },
+        "packages/backend/src/server/api/AuthenticateService.test.ts": {
+          "additions": 81,
+          "deletions": 2,
+          "accepted_lines": 81
+        },
+        "packages/backend/src/core/AntennaService.test.ts": {
+          "additions": 155,
+          "accepted_lines": 155
+        },
+        "packages/backend/src/core/ReactionService.ts": {
+          "additions": 9,
+          "deletions": 3,
+          "accepted_lines": 9
+        },
+        "packages/backend/src/core/SystemAccountService.ts": {
+          "additions": 17,
+          "deletions": 18,
+          "accepted_lines": 17
+        },
+        "packages/backend/src/server/api/endpoints/notes/timeline.ts": {
+          "additions": 4,
+          "deletions": 4,
+          "accepted_lines": 4
+        },
+        "packages/backend/src/server/api/endpoints/users/notes.ts": {
+          "additions": 1,
+          "deletions": 1,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/core/NotificationService.ts": {
+          "additions": 24,
+          "deletions": 27,
+          "accepted_lines": 24
+        },
+        "packages/backend/src/server/api/endpoints/notes/user-list-timeline.ts": {
+          "additions": 4,
+          "deletions": 4,
+          "accepted_lines": 4
+        },
+        "packages/backend/src/queue/processors/InboxProcessorService.ts": {
+          "additions": 10,
+          "deletions": 6,
+          "accepted_lines": 10
+        },
+        "packages/backend/src/server/api/stream/Connection.ts": {
+          "additions": 11,
+          "deletions": 1,
+          "accepted_lines": 11
+        },
+        "packages/backend/src/core/entities/NoteEntityService.batch.test.ts": {
+          "additions": 215,
+          "accepted_lines": 215
+        },
+        "packages/backend/src/logger.ts": {
+          "additions": 16,
+          "deletions": 2,
+          "accepted_lines": 16
+        },
+        "packages/backend/src/core/UserWebhookService.ts": {
+          "additions": 7,
+          "deletions": 9,
+          "accepted_lines": 7
+        },
+        "packages/backend/src/server/api/stream/channels/role-timeline.ts": {
+          "additions": 20,
+          "deletions": 2,
+          "accepted_lines": 9
+        },
+        "packages/backend/src/server/api/endpoints/notes/global-timeline.ts": {
+          "additions": 1,
+          "deletions": 1,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/core/NoteCreateService.perf.test.ts": {
+          "additions": 110,
+          "accepted_lines": 110
+        },
+        "packages/backend/src/core/RoleService.ts": {
+          "additions": 122,
+          "deletions": 68,
+          "accepted_lines": 122
+        },
+        "packages/backend/src/core/entities/ChatEntityService.test.ts": {
+          "additions": 144,
+          "accepted_lines": 144
+        },
+        "packages/backend/src/misc/redis-pubsub-bus.test.ts": {
+          "additions": 84,
+          "accepted_lines": 84
+        },
+        "packages/backend/src/core/CustomEmojiService.prefetch.test.ts": {
+          "additions": 57,
+          "accepted_lines": 57
+        },
+        "packages/backend/src/core/ChannelFollowingService.ts": {
+          "additions": 15,
+          "deletions": 16,
+          "accepted_lines": 15
+        },
+        "packages/backend/src/core/entities/NotificationEntityService.ts": {
+          "additions": 41,
+          "deletions": 24,
+          "accepted_lines": 41
+        },
+        "packages/backend/test/unit/logging/LogManager.ts": {
+          "additions": 22,
+          "accepted_lines": 22
+        },
+        "packages/backend/src/core/entities/NotificationEntityService.test.ts": {
+          "additions": 109,
+          "accepted_lines": 109
+        },
+        "packages/backend/src/server/api/StreamingApiServerService.ts": {
+          "additions": 6,
+          "deletions": 6,
+          "accepted_lines": 6
+        },
+        "packages/backend/src/server/api/stream/Connection.test.ts": {
+          "additions": 39,
+          "accepted_lines": 39
+        },
+        "packages/backend/src/logging/LogManager.ts": {
+          "additions": 13,
+          "deletions": 2,
+          "accepted_lines": 13
+        },
+        "packages/backend/src/core/NoteCreateService.ts": {
+          "additions": 48,
+          "deletions": 25,
+          "accepted_lines": 48
+        },
+        "packages/backend/src/core/AntennaService.ts": {
+          "additions": 190,
+          "deletions": 105,
+          "accepted_lines": 190
+        },
+        "packages/backend/src/core/entities/NoteEntityService.ts": {
+          "additions": 201,
+          "deletions": 47,
+          "accepted_lines": 201
+        },
+        "packages/backend/src/server/api/endpoints/notes/hybrid-timeline.ts": {
+          "additions": 3,
+          "deletions": 3,
+          "accepted_lines": 3
+        },
+        "packages/backend/src/core/AbuseReportNotificationService.ts": {
+          "additions": 9,
+          "deletions": 10,
+          "accepted_lines": 9
+        },
+        "packages/backend/src/server/api/endpoints/users/lists/list.ts": {
+          "additions": 1,
+          "deletions": 1,
+          "accepted_lines": 1
+        },
+        "packages/backend/src/core/CacheService.ts": {
+          "additions": 60,
+          "deletions": 61,
+          "accepted_lines": 60
+        },
+        "packages/backend/src/server/api/ApiCallService.ts": {
+          "additions": 5,
+          "deletions": 3,
+          "accepted_lines": 5
+        },
+        "packages/backend/test/unit/logging/Logger.ts": {
+          "additions": 22,
+          "accepted_lines": 22
+        },
+        "packages/backend/src/core/UserListService.ts": {
+          "additions": 14,
+          "deletions": 15,
+          "accepted_lines": 14
+        },
+        "packages/backend/src/core/MetaService.ts": {
+          "additions": 16,
+          "deletions": 17,
+          "accepted_lines": 16
+        },
+        "packages/backend/src/core/RoleService.policy.test.ts": {
+          "additions": 82,
+          "accepted_lines": 82
+        },
+        "packages/backend/src/queue/processors/InboxProcessorService.test.ts": {
+          "additions": 17,
+          "accepted_lines": 17
+        },
+        "packages/backend/src/core/entities/UserListEntityService.test.ts": {
+          "additions": 82,
+          "accepted_lines": 82
+        },
+        "packages/backend/src/core/SystemWebhookService.ts": {
+          "additions": 7,
+          "deletions": 9,
+          "accepted_lines": 7
+        },
+        "packages/backend/src/core/ReactionsBufferingService.ts": {
+          "additions": 7,
+          "deletions": 6,
+          "accepted_lines": 7
+        },
+        "packages/backend/src/core/entities/UserEntityService.ts": {
+          "additions": 17,
+          "deletions": 4,
+          "accepted_lines": 17
+        },
+        "packages/backend/src/server/api/stream/channels/role-timeline.test.ts": {
+          "additions": 89,
+          "accepted_lines": 58
+        },
+        "packages/backend/src/core/entities/ChatEntityService.ts": {
+          "additions": 117,
+          "deletions": 51,
+          "accepted_lines": 117
+        },
+        "packages/backend/src/core/CustomEmojiService.ts": {
+          "additions": 29,
+          "deletions": 15,
+          "accepted_lines": 29
+        }
+      }
+    },
+    "49a2ae6364b809ac": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a2231c-2318-76c3-b2ad-790bbfed6c07",
+        "model": "gpt-6.2-astra"
+      },
+      "human_author": "Natsuki-Kaede",
+      "messages": [],
+      "total_additions": 75,
+      "total_deletions": 43,
+      "accepted_lines": 75,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "packages/backend/src/server/api/stream/channels/role-timeline.ts": {
+          "additions": 20,
+          "deletions": 12,
+          "accepted_lines": 20
+        },
+        "packages/backend/src/server/api/stream/channels/role-timeline.test.ts": {
+          "additions": 55,
+          "deletions": 31,
+          "accepted_lines": 55
+        }
+      }
+    }
+  }
+}
