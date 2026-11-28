@@ -55,7 +55,7 @@ async function fixture(t: TestContext, options: { store?: CompatStore; handler?:
 			return response({ createdNote: created });
 		}
 		if (endpoint === 'notes/update') { Object.assign(notes.find(item => item.id === body.noteId)!, body); return response({}); }
-		if (endpoint === 'notes/unrenote') { for (let index = notes.length - 1; index >= 0; index--) if (notes[index].renoteId === body.noteId) notes.splice(index, 1); return response({}); }
+		if (endpoint === 'notes/unrenote') { for (let index = notes.length - 1; index >= 0; index--) if (notes[index].renoteId === body.noteId && notes[index].text == null && notes[index].cw == null && !notes[index].files?.length && !notes[index].poll && notes[index].replyId == null) notes.splice(index, 1); return response({}); }
 		if (endpoint === 'notes/thread-muting/create') { muted.add(body.noteId); return response({}); }
 		if (endpoint === 'notes/thread-muting/delete') { muted.delete(body.noteId); return response({}); }
 		if (endpoint === 'notifications/mark-all-as-read') return response({});
@@ -552,4 +552,345 @@ test('direct status mentions preserve hyphenated usernames and normalize the loc
 	]);
 	const created = f.calls.find(call => call.endpoint === 'notes/create');
 	assert.deepEqual(created?.body.visibleUserIds, ['remote-foobar', 'local-bob']);
+});
+
+test('timeline statuses batch-resolve native mentions without dropping implicit reply recipients', async t => {
+	const f = await fixture(t, { handler: async (endpoint, body) => {
+		if (endpoint === 'users/show' && Array.isArray(body.userIds)) {
+			const catalog: Record<string, Json> = {
+				alice: user('alice', { pinnedNotes: [] }),
+				bob: user('bob', { host: 'remote.example', url: 'https://remote.example/@bob', pinnedNotes: [] }),
+				carol: user('carol', { pinnedNotes: [] }),
+			};
+			return response(body.userIds.flatMap((id: string) => catalog[id] ? [catalog[id]] : []));
+		}
+		return undefined;
+	} });
+	f.notes.push(note('100', { text: 'Reply to @bob and @nonexistent', mentions: ['bob', 'carol'], replyId: '99', reply: { id: '99', userId: 'carol', user: user('carol') } }));
+	const res = await f.request('GET', '/api/v1/timelines/home');
+	assert.equal(res.statusCode, 200, res.body);
+	assert.deepEqual(res.json()[0].mentions, [
+		{ id: 'bob', username: 'bob', acct: 'bob@remote.example', url: 'https://remote.example/@bob' },
+		{ id: 'carol', username: 'carol', acct: 'carol', url: 'https://social.test/@carol' },
+	]);
+	assert.equal(f.calls.filter(call => call.endpoint === 'users/show').length, 1);
+});
+
+test('unreblog preserves quote posts of the same target status', async t => {
+	const f = await fixture(t);
+	const target = note('100', { userId: 'bob', user: user('bob'), text: 'Original' });
+	f.notes.push(target);
+	const quote = await f.request('POST', '/api/v1/statuses', { status: 'My quote', quoted_status_id: '100' });
+	assert.equal(quote.statusCode, 200, quote.body);
+	const boost = await f.request('POST', '/api/v1/statuses/100/reblog', {});
+	assert.equal(boost.statusCode, 200, boost.body);
+	const unboost = await f.request('POST', '/api/v1/statuses/100/unreblog', {});
+	assert.equal(unboost.statusCode, 200, unboost.body);
+	assert.equal(unboost.json().reblogged, false);
+	const stillThere = await f.request('GET', `/api/v1/statuses/${quote.json().id}`);
+	assert.equal(stillThere.statusCode, 200, stillThere.body);
+	assert.equal(stillThere.json().quote.quoted_status.id, '100');
+});
+
+test('editing a media status accepts echoed and updated media_attributes with write:statuses only and keeps edits atomic', async t => {
+	const files = new Map<string, Json>([
+		['file-1', { id: 'file-1', userId: 'alice', type: 'image/png', url: 'https://social.test/file-1.png', comment: 'Initial alt' }],
+	]);
+	let failNextUpdate = false;
+	const f = await fixture(t, { handler: async (endpoint, body) => {
+		if (endpoint === 'drive/files/show' || endpoint === 'drive/files/update') {
+			return response({ error: { code: 'PERMISSION_DENIED', message: 'Drive scope not granted' } }, 403);
+		}
+		if (endpoint === 'notes/update') {
+			if (failNextUpdate) {
+				failNextUpdate = false;
+				return response({ error: { code: 'NOTE_HISTORY_LIMIT_EXCEEDED', message: 'Limit' } }, 422);
+			}
+			if (Array.isArray(body.fileIds) && body.fileIds.includes('foreign-file')) {
+				return response({ error: { code: 'NO_SUCH_FILE', message: 'Missing' } }, 400);
+			}
+			const target = f.notes.find(item => item.id === body.noteId)!;
+			target.text = body.text;
+			target.cw = body.cw;
+			if (Array.isArray(body.fileComments)) {
+				for (const entry of body.fileComments) {
+					const file = files.get(entry.fileId);
+					if (file) file.comment = entry.comment;
+				}
+			}
+			return response({ updatedNote: target });
+		}
+		return undefined;
+	} });
+	f.notes.push(note('100', { files: [files.get('file-1')!] }));
+	const statusOnlyAuth = `Bearer ${await f.token(['read:statuses', 'write:statuses'])}`;
+
+	const updated = await f.app.inject({
+		method: 'PUT',
+		url: '/api/v1/statuses/100',
+		headers: { authorization: statusOnlyAuth },
+		payload: {
+			status: 'Updated alt and focus',
+			visibility: 'public',
+			media_ids: ['file-1'],
+			media_attributes: [{ id: 'file-1', description: 'Revised alt', focus: '0.25,-0.5' }],
+		},
+	});
+	assert.equal(updated.statusCode, 200, updated.body);
+	assert.equal(updated.json().media_attachments[0].description, 'Revised alt');
+	assert.deepEqual(updated.json().media_attachments[0].meta.focus, { x: 0.25, y: -0.5 });
+	assert.equal(f.calls.some(call => call.endpoint.startsWith('drive/files/')), false);
+
+	failNextUpdate = true;
+	const failed = await f.app.inject({
+		method: 'PUT',
+		url: '/api/v1/statuses/100',
+		headers: { authorization: statusOnlyAuth },
+		payload: {
+			status: 'Should fail',
+			media_ids: ['file-1'],
+			media_attributes: [{ id: 'file-1', description: 'Must not persist' }],
+		},
+	});
+	assert.equal(failed.statusCode, 422, failed.body);
+	assert.equal(files.get('file-1')!.comment, 'Revised alt');
+
+	const foreign = await f.request('PUT', '/api/v1/statuses/100', {
+		status: 'Steal',
+		media_ids: ['foreign-file'],
+		media_attributes: [{ id: 'foreign-file', description: 'Hijack' }],
+	});
+	assert.equal(foreign.statusCode, 404, foreign.body);
+
+	const changedVisibility = await f.request('PUT', '/api/v1/statuses/100', {
+		status: 'Change visibility',
+		visibility: 'private',
+	});
+	assert.equal(changedVisibility.statusCode, 422, changedVisibility.body);
+});
+
+test('directory maps order=new and order=active to descending native sort keys', async t => {
+	const sorts: string[] = [];
+	const f = await fixture(t, { handler: async (endpoint, body) => {
+		if (endpoint === 'users') { sorts.push(body.sort); return response([]); }
+		return undefined;
+	} });
+	assert.equal((await f.request('GET', '/api/v1/directory?order=new')).statusCode, 200);
+	assert.equal((await f.request('GET', '/api/v1/directory?order=active')).statusCode, 200);
+	assert.deepEqual(sorts, ['+createdAt', '+updatedAt']);
+});
+
+test('account search forwards offset, searches combined origin by default, and resolves remote handles', async t => {
+	const searchCalls: Json[] = [];
+	const f = await fixture(t, { handler: async (endpoint, body) => {
+		if (endpoint === 'users/search') { searchCalls.push(body); return response([user('alice')]); }
+		if (endpoint === 'users/show' && body.username === 'bob' && body.host === 'remote.example') return response(user('bob', { host: 'remote.example' }));
+		return undefined;
+	} });
+	const paged = await f.request('GET', '/api/v1/accounts/search?q=alice&offset=40&limit=10');
+	assert.equal(paged.statusCode, 200, paged.body);
+	assert.equal(searchCalls[0].offset, 40);
+	assert.equal(searchCalls[0].origin, 'combined');
+	const resolved = await f.request('GET', '/api/v1/accounts/search?q=%40bob%40remote.example&resolve=true');
+	assert.equal(resolved.statusCode, 200, resolved.body);
+	assert.equal(resolved.json()[0].id, 'bob');
+});
+
+test('account statuses scans across pages for only_media without skipping items across max_id or min_id pagination', async t => {
+	const f = await fixture(t);
+	for (let i = 1; i <= 40; i++) {
+		f.notes.push(note(String(1000 + i), { files: [{ id: `media-${i}`, type: 'image/png', url: `https://social.test/m${i}.png` }] }));
+	}
+	const first = await f.request('GET', '/api/v1/accounts/alice/statuses?only_media=true&limit=20');
+	assert.equal(first.statusCode, 200, first.body);
+	const firstIds = first.json().map((item: Json) => item.id);
+	assert.equal(firstIds.length, 20);
+	assert.equal(firstIds[0], '1040');
+	assert.equal(firstIds.at(-1), '1021');
+	assert.match(String(first.headers.link), /max_id=1021[^>]*>; rel="next"/u);
+
+	const second = await f.request('GET', '/api/v1/accounts/alice/statuses?only_media=true&limit=20&max_id=1021');
+	assert.equal(second.statusCode, 200, second.body);
+	const secondIds = second.json().map((item: Json) => item.id);
+	assert.equal(secondIds.length, 20);
+	assert.equal(secondIds[0], '1020');
+	assert.equal(secondIds.at(-1), '1001');
+
+	const forward = await f.request('GET', '/api/v1/accounts/alice/statuses?only_media=true&limit=20&min_id=1000');
+	assert.equal(forward.statusCode, 200, forward.body);
+	const forwardIds = forward.json().map((item: Json) => item.id);
+	assert.equal(forwardIds.length, 20);
+	assert.equal(forwardIds[0], '1020');
+	assert.equal(forwardIds.at(-1), '1001');
+	assert.match(String(forward.headers.link), /min_id=1020[^>]*>; rel="prev"/u);
+});
+
+test('following a locked account with explicit notify skips following/update while pending', async t => {
+	const f = await fixture(t, { handler: async (endpoint, body) => {
+		if (endpoint === 'following/create') return response({});
+		if (endpoint === 'users/show' && body.userId === 'locked') return response(user('locked', { isFollowing: false, hasPendingFollowRequestFromYou: true }));
+		if (endpoint === 'following/update') return response({ error: { code: 'NOT_FOLLOWING', message: 'Not following' } }, 400);
+		return undefined;
+	} });
+	const res = await f.request('POST', '/api/v1/accounts/locked/follow', { notify: false });
+	assert.equal(res.statusCode, 200, res.body);
+	assert.equal(res.json().requested, true);
+	assert.equal(f.calls.some(call => call.endpoint === 'following/update'), false);
+});
+
+test('list creation and update share policy validation for JSON and form strings', async t => {
+	const f = await fixture(t, { handler: async endpoint => {
+		if (endpoint === 'users/lists/create' || endpoint === 'users/lists/update') return response({ id: 'list-1', name: 'Friends' });
+		return undefined;
+	} });
+	assert.equal((await f.request('POST', '/api/v1/lists', { title: 'Friends', exclusive: true })).statusCode, 422);
+	assert.equal((await f.request('POST', '/api/v1/lists', { title: 'Friends', replies_policy: 'none' })).statusCode, 422);
+	assert.equal((await f.request('PUT', '/api/v1/lists/list-1', { title: 'Friends', exclusive: 'true' })).statusCode, 422);
+	assert.equal((await f.request('POST', '/api/v1/lists', { title: 'Friends', exclusive: false, replies_policy: 'list' })).statusCode, 200);
+});
+
+test('hashtag timeline requests publicOnly and excludes unlisted statuses', async t => {
+	const f = await fixture(t, { handler: async (endpoint, body) => {
+		if (endpoint !== 'notes/search-by-tag') return undefined;
+		assert.equal(body.publicOnly, true);
+		return response([note('102', { visibility: 'home' }), note('101', { visibility: 'public' })]);
+	} });
+	const res = await f.request('GET', '/api/v1/timelines/tag/news');
+	assert.equal(res.statusCode, 200, res.body);
+	assert.deepEqual(res.json().map((item: Json) => item.id), ['101']);
+});
+
+test('follow reblogs toggles native renote-mute only when state differs', async t => {
+	let renoteMuted = false;
+	const f = await fixture(t, { handler: async (endpoint, body) => {
+		if (endpoint === 'following/create') return response({});
+		if (endpoint === 'renote-mute/create') { renoteMuted = true; return response({}); }
+		if (endpoint === 'renote-mute/delete') { renoteMuted = false; return response({}); }
+		if (endpoint === 'users/show' && body.userId === 'bob') return response(user('bob', { isFollowing: true, isRenoteMuted: renoteMuted }));
+		return undefined;
+	} });
+	const hide = await f.request('POST', '/api/v1/accounts/bob/follow', { reblogs: false });
+	assert.equal(hide.statusCode, 200, hide.body);
+	assert.equal(hide.json().showing_reblogs, false);
+	assert.equal(f.calls.filter(call => call.endpoint === 'renote-mute/create').length, 1);
+
+	const unchanged = await f.request('POST', '/api/v1/accounts/bob/follow', { reblogs: false });
+	assert.equal(unchanged.statusCode, 200, unchanged.body);
+	assert.equal(f.calls.filter(call => call.endpoint === 'renote-mute/create').length, 1);
+
+	const show = await f.request('POST', '/api/v1/accounts/bob/follow', { reblogs: true });
+	assert.equal(show.statusCode, 200, show.body);
+	assert.equal(show.json().showing_reblogs, true);
+	assert.equal(f.calls.filter(call => call.endpoint === 'renote-mute/delete').length, 1);
+});
+
+test('muting an already-muted thread is idempotent on ALREADY_MUTING', async t => {
+	const f = await fixture(t, { handler: async endpoint => {
+		if (endpoint === 'notes/thread-muting/create') return response({ error: { code: 'ALREADY_MUTING', message: 'Already muting' } }, 400);
+		return undefined;
+	} });
+	f.notes.push(note('100'));
+	const res = await f.request('POST', '/api/v1/statuses/100/mute', {});
+	assert.equal(res.statusCode, 200, res.body);
+	assert.equal(res.json().muted, true);
+});
+
+test('favourited_by and favourites pass heart type filter to native reaction endpoints', async t => {
+	const seen: Array<{ endpoint: string; body: Json }> = [];
+	const f = await fixture(t, { handler: async (endpoint, body) => {
+		if (endpoint === 'notes/reactions') {
+			seen.push({ endpoint, body });
+			return response([{ id: 'r1', type: '❤', user: user('bob') }, { id: 'r2', type: '👍', user: user('carol') }]);
+		}
+		if (endpoint === 'users/reactions') {
+			seen.push({ endpoint, body });
+			return response([{ id: 'r3', type: '❤️', note: note('100') }]);
+		}
+		return undefined;
+	} });
+	f.notes.push(note('100'));
+	const by = await f.request('GET', '/api/v1/statuses/100/favourited_by');
+	assert.equal(by.statusCode, 200, by.body);
+	assert.deepEqual(by.json().map((item: Json) => item.id), ['bob']);
+	const favs = await f.request('GET', '/api/v1/favourites');
+	assert.equal(favs.statusCode, 200, favs.body);
+	assert.deepEqual(favs.json().map((item: Json) => item.id), ['100']);
+	assert.equal(seen[0].body.type, '❤');
+	assert.equal(seen[1].body.type, '❤');
+});
+
+test('notes/state myRenoteId hydrates native boosts, avoids duplicate reblogs, and clears stale hints', async t => {
+	let myRenoteId: string | null = 'web-boost-1';
+	const f = await fixture(t, { handler: async (endpoint, body) => {
+		if (endpoint === 'notes/state' && body.noteId === '100') return response({ isFavorited: false, isMutedThread: false, myRenoteId });
+		return undefined;
+	} });
+	const original = note('100', { userId: 'bob', user: user('bob'), text: 'Hello' });
+	const webBoost = note('web-boost-1', { userId: 'alice', user: user('alice'), text: null, renoteId: '100', renote: original });
+	f.notes.push(original, webBoost);
+
+	const read = await f.request('GET', '/api/v1/statuses/100');
+	assert.equal(read.statusCode, 200, read.body);
+	assert.equal(read.json().reblogged, true);
+
+	const reblog = await f.request('POST', '/api/v1/statuses/100/reblog', {});
+	assert.equal(reblog.statusCode, 200, reblog.body);
+	assert.equal(reblog.json().id, 'web-boost-1');
+	assert.equal(f.calls.some(call => call.endpoint === 'notes/create'), false);
+
+	myRenoteId = null;
+	const afterUnboost = await f.request('GET', '/api/v1/statuses/100');
+	assert.equal(afterUnboost.statusCode, 200, afterUnboost.body);
+	assert.equal(afterUnboost.json().reblogged, false);
+	assert.equal(await f.store.get('reblog', 'alice', '100'), undefined);
+});
+
+test('accounts/lookup normalizes uppercase local host and direct status tolerates unresolved mentions when a valid recipient exists', async t => {
+	const f = await fixture(t, { handler: async (endpoint, body) => {
+		if (endpoint === 'users/show' && body.username === 'missing') return response({ error: { code: 'NO_SUCH_USER', message: 'Not found' } }, 404);
+		if (endpoint === 'users/show' && body.username === 'bob' && body.host === null) return response(user('bob'));
+		if (endpoint === 'users/show' && body.username === 'alice' && body.host === null) return response(user('alice'));
+		return undefined;
+	} });
+	const lookup = await f.request('GET', '/api/v1/accounts/lookup?acct=alice@SOCIAL.TEST');
+	assert.equal(lookup.statusCode, 200, lookup.body);
+	assert.equal(lookup.json().id, 'alice');
+
+	const dm = await f.request('POST', '/api/v1/statuses', { status: '@missing @bob hi', visibility: 'direct' });
+	assert.equal(dm.statusCode, 200, dm.body);
+	const createCall = f.calls.find(call => call.endpoint === 'notes/create')!;
+	assert.deepEqual(createCall.body.visibleUserIds, ['bob']);
+
+	const emptyDm = await f.request('POST', '/api/v1/statuses', { status: '@missing hi', visibility: 'direct' });
+	assert.equal(emptyDm.statusCode, 422, emptyDm.body);
+});
+
+test('POST /api/v1/reports returns native report ID and rejects oversized evidence with 422', async t => {
+	const reports: Json[] = [];
+	const f = await fixture(t, { handler: async (endpoint, body) => {
+		if (endpoint === 'users/show' && body.userId === 'bob') return response(user('bob'));
+		if (endpoint === 'users/report-abuse') { reports.push(body); return response({ id: '9xreport001' }); }
+		return undefined;
+	} });
+	const denied = await f.app.inject({
+		method: 'POST',
+		url: '/api/v1/reports',
+		headers: { authorization: `Bearer ${await f.token(['read'])}` },
+		payload: { account_id: 'bob', category: 'spam' },
+	});
+	assert.equal(denied.statusCode, 403, denied.body);
+
+	const tooLong = await f.request('POST', '/api/v1/reports', { account_id: 'bob', category: 'spam', comment: 'a'.repeat(2050) });
+	assert.equal(tooLong.statusCode, 422, tooLong.body);
+	assert.equal(reports.length, 0);
+
+	const res = await f.request('POST', '/api/v1/reports', { account_id: 'bob', category: 'spam', comment: 'Sending spam', status_ids: ['100'] });
+	assert.equal(res.statusCode, 200, res.body);
+	assert.equal(res.json().id, '9xreport001');
+	assert.equal(res.json().category, 'spam');
+	assert.equal(res.json().target_account.id, 'bob');
+	assert.equal(reports.length, 1);
+	assert.equal(reports[0].userId, 'bob');
+	assert.match(reports[0].comment, /\[spam\]/u);
+	assert.match(reports[0].comment, /100/u);
 });

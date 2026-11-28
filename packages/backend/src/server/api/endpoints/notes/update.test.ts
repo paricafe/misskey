@@ -4,7 +4,7 @@
  */
 
 import { describe, expect, test, vi } from 'vitest';
-import { NOTE_HISTORY_LIMIT_ERROR_ID } from '@/core/NoteUpdateService.js';
+import { NOTE_FILE_NOT_FOUND_ERROR_ID, NOTE_HISTORY_LIMIT_ERROR_ID } from '@/core/NoteUpdateService.js';
 import { IdentifiableError } from '@/misc/identifiable-error.js';
 import NoteUpdateEndpoint, { meta } from './update.js';
 
@@ -128,5 +128,61 @@ describe('api:notes/update', () => {
 		}, { id: 'userid' } as never, null);
 
 		expect(noteUpdateService.update.mock.calls[0]?.[2].files).toEqual([]);
+	});
+
+	test('forwards changed fileComments even when text, cw, and fileIds are unchanged and rejects foreign or unattached files', async () => {
+		const note = {
+			id: '9x00000001',
+			userId: '9x00000002',
+			text: 'old',
+			cw: null,
+			fileIds: ['9x00000010'],
+		};
+		const driveQuery = {
+			where: vi.fn().mockReturnThis(),
+			getMany: vi.fn().mockResolvedValue([{ id: '9x00000010', userId: '9x00000002', comment: 'old alt' }]),
+		};
+		const noteUpdateService = {
+			update: vi.fn().mockResolvedValue(note),
+		};
+		const endpoint = new NoteUpdateEndpoint(
+			{ findOneByOrFail: vi.fn().mockResolvedValue({ id: note.userId }) } as never,
+			{ createQueryBuilder: vi.fn().mockReturnValue(driveQuery) } as never,
+			{ getNote: vi.fn().mockResolvedValue(note) } as never,
+			{ pack: vi.fn().mockResolvedValue({ id: note.id }) } as never,
+			noteUpdateService as never,
+		);
+
+		await endpoint.exec({
+			noteId: note.id,
+			text: 'old',
+			cw: null,
+			fileComments: [{ fileId: '9x00000010', comment: 'old alt' }],
+		}, { id: note.userId } as never, null);
+		expect(noteUpdateService.update).not.toHaveBeenCalled();
+
+		await endpoint.exec({
+			noteId: note.id,
+			text: 'old',
+			cw: null,
+			fileComments: [{ fileId: '9x00000010', comment: 'new alt' }],
+		}, { id: note.userId } as never, null);
+		expect(noteUpdateService.update).toHaveBeenCalledOnce();
+		expect(noteUpdateService.update.mock.calls[0]?.[2].fileComments).toEqual([{ fileId: '9x00000010', comment: 'new alt' }]);
+
+		await expect(endpoint.exec({
+			noteId: note.id,
+			text: 'old',
+			cw: null,
+			fileComments: [{ fileId: '9x00000099', comment: 'unattached' }],
+		}, { id: note.userId } as never, null)).rejects.toMatchObject({ code: 'NO_SUCH_FILE' });
+
+		noteUpdateService.update.mockRejectedValueOnce(new IdentifiableError(NOTE_FILE_NOT_FOUND_ERROR_ID, 'Some files are not found.'));
+		await expect(endpoint.exec({
+			noteId: note.id,
+			text: 'new text',
+			cw: null,
+			fileComments: [{ fileId: '9x00000010', comment: 'new alt' }],
+		}, { id: note.userId } as never, null)).rejects.toMatchObject({ code: 'NO_SUCH_FILE' });
 	});
 });

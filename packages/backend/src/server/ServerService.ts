@@ -168,11 +168,26 @@ export class ServerService implements OnApplicationShutdown {
 				store,
 				maxFileSize: this.config.maxFileSize,
 				transport: async request => {
-					if (request.context?.signal?.aborted) throw request.context.signal.reason ?? new Error('The native request was aborted');
+					const signal = request.context?.signal;
+					if (signal?.aborted) throw signal.reason ?? new Error('The native request was aborted');
 					const payload = typeof request.body === 'string'
 						? request.body
 						: Buffer.from(request.body.buffer, request.body.byteOffset, request.body.byteLength);
-					const result = await fastify.inject({ method: 'POST', url: new URL(request.url).pathname, headers: request.headers, payload, remoteAddress: request.context?.ip });
+					const pending = fastify.inject({ method: 'POST', url: new URL(request.url).pathname, headers: request.headers, payload, remoteAddress: request.context?.ip });
+					const result = signal
+						? await new Promise<Awaited<typeof pending>>((resolve, reject) => {
+							const onAbort = () => {
+								pending.catch(() => undefined);
+								reject(signal.reason ?? new Error('The native request was aborted'));
+							};
+							if (signal.aborted) { onAbort(); return; }
+							signal.addEventListener('abort', onAbort, { once: true });
+							pending.then(
+								value => { signal.removeEventListener('abort', onAbort); resolve(value); },
+								error => { signal.removeEventListener('abort', onAbort); reject(error); },
+							);
+						})
+						: await pending;
 					return { status: result.statusCode, body: result.body, headers: Object.fromEntries(Object.entries(result.headers).filter((entry): entry is [string, string] => typeof entry[1] === 'string')) };
 				},
 			});

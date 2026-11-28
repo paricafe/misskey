@@ -50,6 +50,7 @@ export const paramDef = {
 	type: 'object',
 	properties: {
 		userId: { type: 'string', format: 'misskey:id' },
+		type: { type: 'string', nullable: true },
 		limit: { type: 'integer', minimum: 1, maximum: 100, default: 10 },
 		sinceId: { type: 'string', format: 'misskey:id' },
 		untilId: { type: 'string', format: 'misskey:id' },
@@ -108,6 +109,16 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 			this.queryService.generateVisibilityQuery(query, me);
 			this.queryService.generateBlockedHostQueryForNote(query);
 			this.queryService.generateSuspendedUserQueryForNote(query);
+
+			if (ps.type) {
+				const suffix = '@.:';
+				const type = ps.type.endsWith(suffix) ? ps.type.slice(0, ps.type.length - suffix.length) + ':' : ps.type;
+				if (type === '❤' || type === '❤️') {
+					query.andWhere('reaction.reaction IN (:...heartTypes)', { heartTypes: ['❤', '❤️'] });
+				} else {
+					query.andWhere('reaction.reaction = :type', { type });
+				}
+			}
 
 			const reactions = (await query
 				.limit(ps.limit)

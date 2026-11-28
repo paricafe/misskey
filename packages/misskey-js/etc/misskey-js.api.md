@@ -2210,6 +2210,7 @@ declare namespace entities {
         UsersRelationRequest,
         UsersRelationResponse,
         UsersReportAbuseRequest,
+        UsersReportAbuseResponse,
         UsersSearchRequest,
         UsersSearchResponse,
         UsersSearchByUsernameAndHostRequest,
@@ -3766,6 +3767,9 @@ type UsersRelationResponse = operations['users___relation']['responses']['200'][
 
 // @public (undocumented)
 type UsersReportAbuseRequest = operations['users___report-abuse']['requestBody']['content']['application/json'];
+
+// @public (undocumented)
+type UsersReportAbuseResponse = operations['users___report-abuse']['responses']['200']['content']['application/json'];
 
 // @public (undocumented)
 type UsersRequest = operations['users']['requestBody']['content']['application/json'];

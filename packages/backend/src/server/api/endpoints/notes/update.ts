@@ -14,6 +14,7 @@ import { ApiError } from '@/server/api/error.js';
 import { NoteEntityService } from '@/core/entities/NoteEntityService.js';
 import {
 	NOTE_CANNOT_EDIT_RENOTE_ERROR_ID,
+	NOTE_FILE_NOT_FOUND_ERROR_ID,
 	NOTE_HISTORY_LIMIT_ERROR_ID,
 	NOTE_NO_CONTENT_ERROR_ID,
 	NOTE_NOT_FOUND_ERROR_ID,
@@ -136,6 +137,19 @@ export const paramDef = {
 			items: { type: 'string', format: 'misskey:id' },
 		},
 		cw: { type: 'string', nullable: true, minLength: 1, maxLength: 100 },
+		fileComments: {
+			type: 'array',
+			minItems: 0,
+			maxItems: MAX_NOTE_FILES,
+			items: {
+				type: 'object',
+				properties: {
+					fileId: { type: 'string', format: 'misskey:id' },
+					comment: { type: 'string', maxLength: 512, nullable: true },
+				},
+				required: ['fileId', 'comment'],
+			},
+		},
 	},
 	required: ['noteId', 'text', 'cw'],
 } as const;
@@ -194,11 +208,43 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				throw new ApiError(meta.errors.noContent);
 			}
 
+			let changedFileComments: Array<{ fileId: MiDriveFile['id']; comment: string | null }> = [];
+			if (ps.fileComments != null && ps.fileComments.length > 0) {
+				const commentFileIds = ps.fileComments.map(entry => entry.fileId);
+				if (
+					new Set(commentFileIds).size !== commentFileIds.length ||
+					commentFileIds.some(fileId => !finalFileIds.includes(fileId))
+				) {
+					throw new ApiError(meta.errors.noSuchFile);
+				}
+
+				const targetFiles = files != null
+					? files
+					: await this.driveFilesRepository.createQueryBuilder('file')
+						.where('file.userId = :userId AND file.id IN (:...commentFileIds)', {
+							userId: me.id,
+							commentFileIds,
+						})
+						.getMany();
+				const fileById = new Map(targetFiles.map(file => [file.id, file]));
+				if (commentFileIds.some(fileId => !fileById.has(fileId))) {
+					throw new ApiError(meta.errors.noSuchFile);
+				}
+
+				changedFileComments = ps.fileComments
+					.map(entry => ({
+						fileId: entry.fileId,
+						comment: entry.comment != null && entry.comment.length > 0 ? entry.comment : null,
+					}))
+					.filter(entry => (fileById.get(entry.fileId)!.comment ?? null) !== entry.comment);
+			}
+
 			if (
 				note.text === normalizedText &&
 				note.cw === normalizedCw &&
 				note.fileIds.length === finalFileIds.length &&
-				note.fileIds.every((fileId, index) => fileId === finalFileIds[index])
+				note.fileIds.every((fileId, index) => fileId === finalFileIds[index]) &&
+				changedFileComments.length === 0
 			) {
 				return {
 					updatedNote: await this.noteEntityService.pack(note, me),
@@ -210,6 +256,7 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				cw: normalizedCw,
 				updatedAt: new Date(),
 				files,
+				...(changedFileComments.length > 0 ? { fileComments: changedFileComments } : {}),
 			}, false, me).catch(error => {
 				if (error instanceof IdentifiableError) {
 					if (error.id === NOTE_HISTORY_LIMIT_ERROR_ID) throw new ApiError(meta.errors.historyLimitExceeded);
@@ -219,6 +266,7 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 					if (error.id === NOTE_NO_CONTENT_ERROR_ID) throw new ApiError(meta.errors.noContent);
 					if (error.id === NOTE_CANNOT_EDIT_RENOTE_ERROR_ID) throw new ApiError(meta.errors.cannotEditRenote);
 					if (error.id === NOTE_TOO_MANY_MENTIONS_ERROR_ID) throw new ApiError(meta.errors.tooManyMentions);
+					if (error.id === NOTE_FILE_NOT_FOUND_ERROR_ID) throw new ApiError(meta.errors.noSuchFile);
 				}
 				throw error;
 			});

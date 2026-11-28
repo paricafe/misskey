@@ -78,6 +78,7 @@ test('MiAuth callback yields a one-time authorization code and an isolated beare
 	assert.deepEqual(f.calls, [`miauth/${completed.nativeUrl.pathname.split('/').at(-1)}/check`]);
 	const location = new URL(String(completed.response.headers.location));
 	assert.equal(location.searchParams.get('state'), 'client-state');
+	assert.equal(location.searchParams.get('iss'), 'https://social.example');
 	const code = location.searchParams.get('code')!;
 	assert.ok(code);
 	const body = { ...client, grant_type: 'authorization_code', code, redirect_uri: 'testapp://callback' };
@@ -212,6 +213,7 @@ test('OOB displays the code without redirecting to a URN and denied MiAuth retur
 	const result = await denied.complete(deniedClient.client_id, { state: 'preserved' });
 	const uri = new URL(String(result.response.headers.location));
 	assert.equal(uri.searchParams.get('error'), 'access_denied');
+	assert.equal(uri.searchParams.get('iss'), 'https://social.example');
 	assert.equal(uri.searchParams.get('state'), 'preserved');
 });
 
@@ -272,4 +274,34 @@ test('transient store failure during grant creation does not consume a valid aut
 	});
 	assert.equal(retried.statusCode, 200, retried.body);
 	assert.ok(retried.json().access_token);
+});
+
+test('apps verify_credentials rejects suspended or revoked user tokens while accepting app tokens', async t => {
+	const { NativeError } = await import('../src/native-client.js');
+	let pingError: Error | null = null;
+	const f = await fixture(t);
+	const client = await f.app('read');
+	const { response } = await f.complete(client.client_id);
+	const code = new URL(String(response.headers.location)).searchParams.get('code')!;
+	const userToken = (await f.server.inject({
+		method: 'POST',
+		url: '/oauth/token',
+		payload: { grant_type: 'authorization_code', client_id: client.client_id, client_secret: client.client_secret, redirect_uri: 'testapp://callback', code },
+	})).json().access_token as string;
+	const server = Fastify();
+	const deps = {
+		store: f.store, publicUrl: 'https://social.example', nativeUrl: 'http://127.0.0.1:3000',
+		native: { async call<T>(): Promise<T> { if (pingError) throw pingError; return { pong: 1 } as T; } },
+	};
+	server.route({ method: 'GET', url: '/api/v1/apps/verify_credentials', handler: (req, rep) => dispatchHandler(req, rep, deps) });
+	t.after(() => server.close());
+	assert.equal((await server.inject({ method: 'GET', url: '/api/v1/apps/verify_credentials', headers: { authorization: `Bearer ${userToken}` } })).statusCode, 200);
+	pingError = new NativeError(403, 'YOUR_ACCOUNT_SUSPENDED', 'Your account has been suspended.');
+	const suspended = await server.inject({ method: 'GET', url: '/api/v1/apps/verify_credentials', headers: { authorization: `Bearer ${userToken}` } });
+	assert.equal(suspended.statusCode, 403);
+	assert.equal(suspended.json().error, 'access_denied');
+	pingError = new NativeError(401, 'AUTHENTICATION_FAILED', 'Revoked');
+	const revoked = await server.inject({ method: 'GET', url: '/api/v1/apps/verify_credentials', headers: { authorization: `Bearer ${userToken}` } });
+	assert.equal(revoked.statusCode, 401);
+	assert.equal(revoked.json().error, 'invalid_token');
 });

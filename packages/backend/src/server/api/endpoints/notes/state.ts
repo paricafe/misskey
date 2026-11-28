@@ -7,6 +7,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import type { NotesRepository, NoteThreadMutingsRepository, NoteFavoritesRepository } from '@/models/_.js';
 import { Endpoint } from '@/server/api/endpoint-base.js';
 import { DI } from '@/di-symbols.js';
+import { ApiError } from '../../error.js';
 
 export const meta = {
 	tags: ['notes'],
@@ -26,6 +27,20 @@ export const meta = {
 				type: 'boolean',
 				optional: false, nullable: false,
 			},
+			myRenoteId: {
+				type: 'string',
+				format: 'misskey:id',
+				optional: true, nullable: true,
+			},
+		},
+	},
+
+	errors: {
+		noSuchNote: {
+			message: 'No such note.',
+			code: 'NO_SUCH_NOTE',
+			id: 'f4b8c3d1-7e29-4a15-9c6b-8e4a2d1f7c30',
+			httpStatusCode: 404,
 		},
 	},
 } as const;
@@ -51,9 +66,12 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 		private noteFavoritesRepository: NoteFavoritesRepository,
 	) {
 		super(meta, paramDef, async (ps, me) => {
-			const note = await this.notesRepository.findOneByOrFail({ id: ps.noteId });
+			const note = await this.notesRepository.findOneBy({ id: ps.noteId });
+			if (note == null) {
+				throw new ApiError(meta.errors.noSuchNote);
+			}
 
-			const [favorite, threadMuting] = await Promise.all([
+			const [favorite, threadMuting, myRenote] = await Promise.all([
 				this.noteFavoritesRepository.count({
 					where: {
 						userId: me.id,
@@ -68,11 +86,24 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 					},
 					take: 1,
 				}),
+				this.notesRepository.createQueryBuilder('renote')
+					.select('renote.id')
+					.where('renote.userId = :userId', { userId: me.id })
+					.andWhere('renote.renoteId = :noteId', { noteId: note.id })
+					.andWhere('renote.replyId IS NULL')
+					.andWhere('renote.text IS NULL')
+					.andWhere('renote.cw IS NULL')
+					.andWhere('renote.hasPoll = FALSE')
+					.andWhere('renote.fileIds = \'{}\'')
+					.orderBy('renote.id', 'DESC')
+					.limit(1)
+					.getOne(),
 			]);
 
 			return {
 				isFavorited: favorite !== 0,
 				isMutedThread: threadMuting !== 0,
+				myRenoteId: myRenote?.id ?? null,
 			};
 		});
 	}

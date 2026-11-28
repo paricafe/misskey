@@ -82,7 +82,11 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 			if (ps.type) {
 				const suffix = '@.:';
 				const type = ps.type.endsWith(suffix) ? ps.type.slice(0, ps.type.length - suffix.length) + ':' : ps.type;
-				query.andWhere('reaction.reaction = :type', { type });
+				if (type === '❤' || type === '❤️') {
+					query.andWhere('reaction.reaction IN (:...heartTypes)', { heartTypes: ['❤', '❤️'] });
+				} else {
+					query.andWhere('reaction.reaction = :type', { type });
+				}
 			}
 
 			const reactions = await query.limit(ps.limit).getMany();

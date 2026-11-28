@@ -11,15 +11,16 @@ import { NativeClient, NativeError } from './native-client.js';
 import { EntityConverter } from './entities.js';
 import { CompatStore } from './store.js';
 import { dispatchHandler, handlesOAuth } from './oauth.js';
-import { formParameters, HttpError, parameters } from './parameters.js';
+import { appendFormField, formParameters, HttpError, parameters } from './parameters.js';
 import { registerRoutes } from './routes.js';
 import { registerMediaSearch } from './media-search.js';
 import { registerFeatures } from './features.js';
 import { registerNotifications } from './notifications-v2.js';
-import { attachStreaming } from './streaming.js';
+import { attachStreaming, type StreamingController } from './streaming.js';
 import type { NativeTransport } from './types.js';
 
 export { NativeClient, NativeError, EntityConverter, CompatStore };
+export { SUPPORTED_SCOPES } from './scopes.js';
 export { createPostgresStore } from './store.js';
 export type { NativeTransport } from './types.js';
 
@@ -62,7 +63,7 @@ function registerPruning(app: FastifyInstance, store: CompatStore): () => Promis
 	};
 }
 
-async function setup(app: FastifyInstance, options: GatewayOptions, deps: ReturnType<typeof dependencies>): Promise<void> {
+async function setup(app: FastifyInstance, options: GatewayOptions, deps: ReturnType<typeof dependencies>, streaming: StreamingController): Promise<void> {
 	await app.register(cors, { origin: '*', methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'], exposedHeaders: ['Link', 'X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-RateLimit-Reset', 'Retry-After'] });
 	await app.register(multipart, { limits: { fileSize: options.maxFileSize ?? 32 * 1024 * 1024, files: 2, fields: 128, fieldSize: 65536 } });
 	app.addContentTypeParser('application/x-www-form-urlencoded', { parseAs: 'string' }, (_request, value, done) => {
@@ -73,10 +74,11 @@ async function setup(app: FastifyInstance, options: GatewayOptions, deps: Return
 		if (!request.isMultipart()) request.body = parameters(request.body);
 		else if (!['/api/v1/media', '/api/v2/media', '/api/v1/media/:id', '/api/v1/accounts/update_credentials', '/api/v1/apps', '/oauth/token', '/oauth/revoke'].includes(request.routeOptions.url ?? '')) {
 			const body: Record<string, unknown> = Object.create(null);
+			const groups = new Map<string, Array<Set<string>>>();
 			for await (const part of request.parts()) {
 				if (part.type === 'file') { part.file.resume(); throw new HttpError(422, 'Files are not accepted here'); }
 				if (part.valueTruncated) throw new HttpError(422, 'Parameter is too large');
-				body[part.fieldname] = body[part.fieldname] === undefined ? part.value : [body[part.fieldname], part.value].flat();
+				appendFormField(body, groups, part.fieldname, part.value, true);
 			}
 			request.body = parameters(body);
 		}
@@ -106,10 +108,17 @@ async function setup(app: FastifyInstance, options: GatewayOptions, deps: Return
 	registerMediaSearch(routes);
 	registerFeatures(routes);
 	registerNotifications(routes);
+	streaming.registerHttp(app);
+	for (const version of [1, 2]) {
+		app.all(`/api/v${version}/*`, async () => {
+			throw new HttpError(404, 'Record not found');
+		});
+	}
 }
 
 export function installGateway(app: FastifyInstance, options: GatewayOptions): { close(): Promise<void> } {
 	const deps = dependencies(options);
+	const streaming = attachStreaming(app.server, deps);
 	app.addHook('onRoute', route => {
 		if (!['/oauth/authorize', '/oauth/token', '/oauth/token/'].includes(route.url)) return;
 		const original = route.handler;
@@ -117,18 +126,35 @@ export function installGateway(app: FastifyInstance, options: GatewayOptions): {
 			return handlesOAuth(request) ? dispatchHandler(request, reply, deps) : original.call(this, request, reply);
 		};
 	});
-	app.addHook('preParsing', async (request, _reply, payload) => {
+	app.addHook('preParsing', async (request, reply, payload) => {
 		if (request.method !== 'POST' || new URL(request.url, 'http://localhost').pathname.replace(/\/$/u, '') !== '/oauth/token' || !request.headers['content-type']?.startsWith('multipart/form-data')) return payload;
+		const sendOAuthError = (status: number, description: string) => {
+			reply.code(status).header('Cache-Control', 'no-store').header('Pragma', 'no-cache').send({ error: 'invalid_request', error_description: description });
+			return reply;
+		};
 		const chunks: Buffer[] = []; let size = 0;
-		for await (const chunk of payload) { size += chunk.length; if (size > 65536) throw new HttpError(413, 'OAuth body is too large'); chunks.push(Buffer.from(chunk)); }
-		const data = await new Request('http://localhost', { method: 'POST', headers: { 'content-type': request.headers['content-type'] }, body: Buffer.concat(chunks) }).formData();
+		for await (const chunk of payload) {
+			size += chunk.length;
+			if (size > 65536) return sendOAuthError(413, 'OAuth body is too large');
+			chunks.push(Buffer.from(chunk));
+		}
+		let data: FormData;
+		try {
+			data = await new Request('http://localhost', { method: 'POST', headers: { 'content-type': request.headers['content-type'] }, body: Buffer.concat(chunks) }).formData();
+		} catch {
+			return sendOAuthError(400, 'Invalid OAuth form');
+		}
 		const body: Record<string, string> = Object.create(null);
-		for (const [key, value] of data.entries()) { if (typeof value !== 'string' || body[key] !== undefined || ['__proto__', 'constructor', 'prototype'].includes(key)) throw new HttpError(422, 'Invalid OAuth form'); body[key] = value; }
+		for (const [key, value] of data.entries()) {
+			if (typeof value !== 'string' || body[key] !== undefined || ['__proto__', 'constructor', 'prototype'].includes(key)) {
+				return sendOAuthError(400, 'Invalid OAuth form');
+			}
+			body[key] = value;
+		}
 		const encoded = JSON.stringify(body); request.headers['content-type'] = 'application/json'; request.headers['content-length'] = String(Buffer.byteLength(encoded));
 		return Readable.from([encoded]);
 	});
-	app.register(async scope => setup(scope, options, deps));
-	const streaming = attachStreaming(app.server, deps);
+	app.register(async scope => setup(scope, options, deps, streaming));
 	const stopPruning = registerPruning(app, deps.store);
 	app.addHook('preClose', async () => { await Promise.all([stopPruning(), streaming.close()]); });
 	app.addHook('onClose', async () => { await deps.store.close(); });

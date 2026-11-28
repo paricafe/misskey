@@ -64,6 +64,7 @@ export const paramDef = {
 			type: 'object',
 			properties: {
 				localHostOnly: { type: 'boolean', default: false },
+				publicOnly: { type: 'boolean', default: false },
 				reply: { type: 'boolean', nullable: true, default: null },
 				renote: { type: 'boolean', nullable: true, default: null },
 				withFiles: {
@@ -155,6 +156,11 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 
 			if (ps.localHostOnly) {
 				query.andWhere('note.userHost IS NULL');
+			}
+
+			if (ps.publicOnly) {
+				query.andWhere('note.visibility = \'public\'');
+				query.andWhere('note.channelId IS NULL');
 			}
 
 			const notes = await query.limit(ps.limit).getMany();

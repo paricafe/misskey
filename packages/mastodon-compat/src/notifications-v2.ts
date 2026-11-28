@@ -97,16 +97,37 @@ async function readPage(routes: Routes, c: RequestContext, limit: number, query 
 		if (candidates.length) {
 			const dismissedEntries = await routes.deps.store.getMany(candidates.map(row => ({ namespace: 'dismissed-notification', owner: c.userId, key: string(row.id) })));
 			const dismissed = new Set(dismissedEntries.map(entry => entry.key));
+			const matched: Array<{ row: Json; preview: Json }> = [];
+			const remaining = limit - notifications.length;
 			for (const row of candidates) {
 				const id = string(row.id);
 				cursors.push(row);
 				if ((cleared && compareIds(id, cleared) <= 0) || dismissed.has(id)) continue;
 				const preview = routes.deps.entities.notification(row, { viewerId: c.userId || null, allowLocalOnly: true });
 				if (!preview || (types.length && !types.includes(preview.type)) || excluded.includes(preview.type) || (accountId && preview.account.id !== accountId)) continue;
-				const notification = hydrate ? await convert(routes, c, row, true) : preview;
-				if (!notification) continue;
-				notifications.push(notification);
-				if (notifications.length === limit) break;
+				matched.push({ row, preview });
+				if (matched.length === remaining) break;
+			}
+			if (!hydrate) {
+				for (const item of matched) notifications.push(item.preview);
+			} else if (matched.length) {
+				const uniqueNotes = new Map<string, Json>();
+				for (const item of matched) {
+					if (item.preview.status && item.row.note && typeof item.row.note.id === 'string') {
+						uniqueNotes.set(item.row.note.id, item.row.note);
+					}
+				}
+				const hydratedList = uniqueNotes.size ? await routes.statuses([...uniqueNotes.values()], c) : [];
+				const hydratedById = new Map(hydratedList.map(status => [string(status.id), status]));
+				for (const item of matched) {
+					if (!item.preview.status) {
+						notifications.push(item.preview);
+						continue;
+					}
+					const hydratedStatus = hydratedById.get(string(item.preview.status.id));
+					if (!hydratedStatus) continue;
+					notifications.push({ ...item.preview, status: hydratedStatus });
+				}
 			}
 		}
 		if (crossedBound || notifications.length === limit) break;

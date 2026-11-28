@@ -10,6 +10,29 @@ import { NativeError } from './native-client.js';
 export type StatusStore = Pick<CompatStore, 'get' | 'list' | 'delete'>;
 const storeKey = (key: StoreKey): string => JSON.stringify([key.namespace, key.owner, key.key]);
 
+export function collectNoteUserIds(notes: Json[]): { authors: string[]; mentions: string[] } {
+	const authors = new Set<string>();
+	const mentions = new Set<string>();
+	const seen = new Set<string>();
+	const visit = (note: unknown, depth: number) => {
+		if (!note || typeof note !== 'object' || Array.isArray(note) || depth > 8) return;
+		const item = note as Json;
+		if (item.isHidden === true || item.isDeleted === true || item.deletedAt != null) return;
+		const noteId = typeof item.id === 'string' ? item.id : '';
+		if (noteId) {
+			if (seen.has(noteId)) return;
+			seen.add(noteId);
+		}
+		if (item.user && typeof item.user === 'object' && typeof item.user.id === 'string' && item.user.id) authors.add(item.user.id);
+		if (Array.isArray(item.mentions)) {
+			for (const id of item.mentions) if (typeof id === 'string' && id) mentions.add(id);
+		}
+		if (item.renote) visit(item.renote, depth + 1);
+	};
+	for (const note of notes) visit(note, 0);
+	return { authors: [...authors], mentions: [...mentions] };
+}
+
 export function statusStoreKeys(statuses: Json[], userId: string | undefined): { keys: StoreKey[]; authors: string[] } {
 	const keys = new Map<string, StoreKey>();
 	const authors = new Set<string>();
@@ -73,18 +96,28 @@ export async function liveReblog(store: Pick<CompatStore, 'get' | 'delete'>, use
 
 export async function hydrateStatus(store: Pick<CompatStore, 'get' | 'delete'>, status: Json, userId: string | undefined, canReadAccount: boolean, call: NativeRead): Promise<Json> {
 	const result = { ...status };
+	let nativeRenoteState: 'yes' | 'no' | 'unknown' = 'unknown';
 	if (userId && canReadAccount) {
 		const state = await call('notes/state', { noteId: status.id });
 		result.bookmarked = state.isFavorited === true;
 		result.muted = state.isMutedThread === true;
+		if (typeof state.myRenoteId === 'string' && state.myRenoteId) nativeRenoteState = 'yes';
+		else if (state.myRenoteId === null) nativeRenoteState = 'no';
 	} else {
 		delete result.bookmarked;
 		delete result.muted;
 	}
 	if (userId) {
-		const reblog = await liveReblog(store, userId, status.id, call);
-		if (reblog || status.reblogged === true) result.reblogged = true;
-		else delete result.reblogged;
+		if (nativeRenoteState === 'yes') {
+			result.reblogged = true;
+		} else if (nativeRenoteState === 'no') {
+			if (await store.get('reblog', userId, status.id) !== undefined) await store.delete('reblog', userId, status.id);
+			result.reblogged = false;
+		} else {
+			const reblog = await liveReblog(store, userId, status.id, call);
+			if (reblog || status.reblogged === true) result.reblogged = true;
+			else delete result.reblogged;
+		}
 	} else delete result.reblogged;
 	let author: Json | undefined;
 	try {

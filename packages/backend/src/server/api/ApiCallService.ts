@@ -377,6 +377,24 @@ export class ApiCallService implements OnApplicationShutdown {
 			}
 		}
 
+		if (user != null && token != null) {
+			if (user.isSuspended) {
+				throw new ApiError({
+					message: 'Your account has been suspended.',
+					code: 'YOUR_ACCOUNT_SUSPENDED',
+					kind: 'permission',
+					id: 'a8c724b3-6e9c-4b46-b1a8-bc3ed6258370',
+				});
+			} else if (user.isDeleted) {
+				throw new ApiError({
+					message: 'Your account has been deleted.',
+					code: 'YOUR_ACCOUNT_DELETED',
+					kind: 'permission',
+					id: 'c4a1d6f2-9b83-4c7e-8a21-5f9e3d2b7a10',
+				});
+			}
+		}
+
 		if (ep.meta.requireCredential || ep.meta.requireModerator || ep.meta.requireAdmin) {
 			if (user == null) {
 				throw new ApiError({

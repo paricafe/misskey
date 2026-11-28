@@ -11,6 +11,7 @@ import ipaddr from 'ipaddr.js';
 import fastifyCors from '@fastify/cors';
 import { verifyChallenge } from 'pkce-challenge';
 import { permissions as kinds } from 'misskey-js';
+import { SUPPORTED_SCOPES } from '@pari/mastodon-compat';
 import {
 	AccessDeniedError,
 	InvalidGrantError,
@@ -474,13 +475,22 @@ export class OAuth2ProviderService implements OnApplicationShutdown {
 	}
 
 	public generateRFC8414() {
+		const mastodonEnabled = this.config.enableMastodonApi === true;
 		return {
 			issuer: this.config.url,
 			authorization_endpoint: new URL('/oauth/authorize', this.config.url),
 			token_endpoint: new URL('/oauth/token', this.config.url),
-			scopes_supported: kinds,
+			...(mastodonEnabled ? {
+				app_registration_endpoint: new URL('/api/v1/apps', this.config.url),
+				revocation_endpoint: new URL('/oauth/revoke', this.config.url),
+			} : {}),
+			scopes_supported: mastodonEnabled
+				? [...new Set([...kinds, ...SUPPORTED_SCOPES])]
+				: kinds,
 			response_types_supported: ['code'],
-			grant_types_supported: ['authorization_code'],
+			grant_types_supported: mastodonEnabled
+				? ['authorization_code', 'client_credentials']
+				: ['authorization_code'],
 			service_documentation: 'https://misskey-hub.net',
 			code_challenge_methods_supported: ['S256'],
 			authorization_response_iss_parameter_supported: true,

@@ -9,7 +9,8 @@ import { In } from 'typeorm';
 import * as mfm from 'mfm-js';
 import type { MiUser, MiLocalUser, MiRemoteUser } from '@/models/User.js';
 import { MiNote } from '@/models/Note.js';
-import type { InstancesRepository, MiDriveFile, NotesRepository, PollsRepository, PollVotesRepository, UsersRepository } from '@/models/_.js';
+import { MiDriveFile } from '@/models/DriveFile.js';
+import type { InstancesRepository, NotesRepository, PollsRepository, PollVotesRepository, UsersRepository } from '@/models/_.js';
 import { RelayService } from '@/core/RelayService.js';
 import { FederatedInstanceService } from '@/core/FederatedInstanceService.js';
 import { DI } from '@/di-symbols.js';
@@ -53,11 +54,13 @@ export const NOTE_NOT_FOUND_ERROR_ID = '512d8fe8-453e-463c-bf87-5b795293dc0c';
 export const NOTE_NO_CONTENT_ERROR_ID = '238ea885-ef3d-489f-8a93-76b4709c3b5e';
 export const NOTE_CANNOT_EDIT_RENOTE_ERROR_ID = 'a1b94f1c-4d23-4b88-9c10-2c3f6a7d8e11';
 export const NOTE_TOO_MANY_MENTIONS_ERROR_ID = 'b7e34a90-2e12-4a61-8f5d-9b0c1d2e3f44';
+export const NOTE_FILE_NOT_FOUND_ERROR_ID = 'c8d45b91-3f24-4c72-9a6e-1c0d2e3f4a55';
 
 type Option = {
 	updatedAt?: Date | null;
 	text: string | null;
 	files?: MiDriveFile[] | null;
+	fileComments?: ReadonlyArray<{ fileId: MiDriveFile['id']; comment: string | null }>;
 	cw: string | null;
 	apHashtags?: string[] | null;
 	apEmojis?: string[] | null;
@@ -226,9 +229,24 @@ export class NoteUpdateService {
 			if ((text == null || text.length === 0) && fileIds.length === 0 && !lockedNote.hasPoll) {
 				throw new IdentifiableError(NOTE_NO_CONTENT_ERROR_ID, 'Note must have text, files, or a poll');
 			}
+			if (data.fileComments?.some(entry => !fileIds.includes(entry.fileId))) {
+				throw new IdentifiableError(NOTE_FILE_NOT_FOUND_ERROR_ID, 'Some files are not found.');
+			}
 
 			const preparedUpdate = await this.prepareUpdate(user, lockedNote);
 			const history = [...preparedUpdate.history];
+			if (data.fileComments?.length) {
+				const transactionalDriveFilesRepository = transactionalEntityManager.getRepository(MiDriveFile);
+				for (const entry of data.fileComments) {
+					const updatedFile = await transactionalDriveFilesRepository.update(
+						{ id: entry.fileId, userId: user.id },
+						{ comment: entry.comment },
+					);
+					if (updatedFile?.affected === 0) {
+						throw new IdentifiableError(NOTE_FILE_NOT_FOUND_ERROR_ID, 'Some files are not found.');
+					}
+				}
+			}
 			const newNote: MiNote = {
 				...lockedNote,
 				text,

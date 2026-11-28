@@ -29,11 +29,38 @@ export function parameters(input: unknown): Json {
 	return result;
 }
 
+export function appendFormField(
+	target: Record<string, unknown>,
+	groups: Map<string, Array<Set<string>>>,
+	key: string,
+	value: unknown,
+	allowDuplicateScalar: boolean,
+): void {
+	const match = /^([A-Za-z0-9_]+)\[\]\[([^\]]+)\]$/u.exec(key);
+	if (match) {
+		const [, prefix, subfield] = match;
+		let entries = groups.get(prefix);
+		if (!entries) {
+			entries = [];
+			groups.set(prefix, entries);
+		}
+		if (!entries.length || entries.at(-1)!.has(subfield)) entries.push(new Set());
+		entries.at(-1)!.add(subfield);
+		const indexedKey = `${prefix}[${entries.length - 1}][${subfield}]`;
+		if (Object.hasOwn(target, indexedKey)) throw new HttpError(422, 'Conflicting parameter');
+		target[indexedKey] = value;
+		return;
+	}
+	if (target[key] === undefined) target[key] = value;
+	else if (allowDuplicateScalar) target[key] = [...array(target[key]), value];
+	else throw new HttpError(422, 'Duplicate parameter');
+}
+
 export function formParameters(value: string): Json {
-	const input: Json = Object.create(null);
+	const input: Record<string, unknown> = Object.create(null);
+	const groups = new Map<string, Array<Set<string>>>();
 	for (const [key, item] of new URLSearchParams(value)) {
-		if (input[key] === undefined) input[key] = item;
-		else input[key] = [...array(input[key]), item];
+		appendFormField(input, groups, key, item, true);
 	}
 	return parameters(input);
 }

@@ -31,6 +31,9 @@ test('produces complete account and credential-account JSON from a public user D
 	assert.deepEqual(account.fields, []);
 	assert.deepEqual(account.source.fields, []);
 	assert.equal(account.source.note, '');
+	assert.deepEqual(account.role, { id: '-99', name: '', color: '', permissions: '0', highlighted: false });
+	assert.equal(entities.account({ ...user, isAdmin: true }, true).role.name, 'Admin');
+	assert.equal(entities.account({ ...user, isModerator: true }, true).role.name, 'Moderator');
 	const preferences = entities.account({ ...user, alwaysMarkNsfw: true, lang: 'ja' }, true).source;
 	assert.equal(preferences.sensitive, true);
 	assert.equal(preferences.language, 'ja');
@@ -70,6 +73,21 @@ test('supplies required status defaults instead of undefined fields', () => {
 	assert.equal(status.url, 'https://social.example/notes/18446744073709551617');
 	assert.equal(status.content, '<p>Hello</p>');
 	assertNoUndefined(status);
+});
+
+test('resolves mentions from native user IDs without dropping or mispairing implicit recipients', () => {
+	const bob = { id: 'user-bob', username: 'bob', host: 'remote.example', url: 'https://remote.example/@bob' };
+	const carol = { id: 'user-carol', username: 'carol', host: null };
+	const reply = { ...baseNote, text: 'Hi @ghost', mentions: [bob.id, carol.id], replyId: 'parent', reply: { id: 'parent', userId: carol.id, user: carol } };
+	const status = entities.status(reply, { mentionUsers: new Map<string, Json>([[bob.id, bob], [carol.id, carol]]) })!;
+	assert.deepEqual(status.mentions, [
+		{ id: 'user-bob', username: 'bob', acct: 'bob@remote.example', url: 'https://remote.example/@bob' },
+		{ id: 'user-carol', username: 'carol', acct: 'carol', url: 'https://social.example/@carol' },
+	]);
+	const equalCountMispair = entities.status({ ...baseNote, text: 'Hi @ghost', mentions: [carol.id], replyId: 'parent', reply: { id: 'parent', userId: carol.id, user: carol } })!;
+	assert.deepEqual(equalCountMispair.mentions, [
+		{ id: 'user-carol', username: 'carol', acct: 'carol', url: 'https://social.example/@carol' },
+	]);
 });
 
 test('maps only Unicode hearts to favourites, never another native emoji', () => {
@@ -163,6 +181,11 @@ test('filters non-favourite emoji notifications and notifications whose required
 	assert.equal(entities.notification({ id: 'notification', type: 'mention', user, note: { ...baseNote, isHidden: true } }), null);
 	assert.equal(entities.notification({ id: 'notification', type: 'reaction', reaction: '❤', user, note: baseNote })?.type, 'favourite');
 	assert.equal(entities.notification({ id: 'notification', type: 'app', user }), null);
+	const pollEnded = entities.notification({ id: 'poll-notif', type: 'pollEnded', note: baseNote, createdAt: '2026-09-11T00:00:00Z' });
+	assert.equal(pollEnded?.type, 'poll');
+	assert.equal(pollEnded?.account.id, user.id);
+	assert.equal(pollEnded?.status.id, baseNote.id);
+	assert.equal(entities.notification({ id: 'poll-hidden', type: 'pollEnded', note: { ...baseNote, isHidden: true } }), null);
 });
 
 test('handles minimal attachments without dereferencing missing native properties', () => {
@@ -187,13 +210,19 @@ test('maps native relationship state without claiming unsupported settings', () 
 
 test('provides both instance entity versions with complete collection fields', () => {
 	const meta = { name: 'Pari', version: 'test', description: 'A server', serverRules: ['Be kind'], disableRegistration: true };
-	const first = entities.instance(meta, { originalUsersCount: 12, originalNotesCount: 50, instancesCount: 3 }, 1);
+	const first = entities.instance(meta, { originalUsersCount: 12, originalNotesCount: 50, instances: 7, activeUsersCount: 5 }, 1);
 	assert.equal(first.uri, 'social.example');
 	assert.equal(first.stats.user_count, 12);
+	assert.equal(first.stats.domain_count, 7);
 	assert.equal(first.registrations, false);
-	assert.equal(first.urls.streaming_api, 'wss://social.example/api/v1/streaming');
-	const second = entities.instance(meta, {}, 2);
+	assert.equal(first.urls.streaming_api, 'wss://social.example');
+	assert.equal(first.configuration.urls.streaming, 'wss://social.example');
+	assert.equal(first.configuration.accounts.max_featured_tags, 0);
+	const second = entities.instance(meta, { instances: 7, activeUsersCount: 5 }, 2);
 	assert.equal(second.domain, 'social.example');
+	assert.equal(second.usage.users.active_month, 5);
+	assert.equal(second.configuration.urls.streaming, 'wss://social.example');
+	assert.equal(second.configuration.accounts.max_featured_tags, 0);
 	assert.equal(second.registrations.enabled, false);
 	assert.equal(typeof second.thumbnail.url, 'string');
 	assert.deepEqual(second.languages, []);

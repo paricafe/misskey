@@ -5,10 +5,12 @@
 
 import { describe, expect, test, vi } from 'vitest';
 import type { MiNote } from '@/models/Note.js';
+import { MiDriveFile } from '@/models/DriveFile.js';
 import { UtilityService } from '@/core/UtilityService.js';
 import {
 	MAX_NOTE_HISTORY_BYTES,
 	MAX_NOTE_HISTORY_REVISIONS,
+	NOTE_FILE_NOT_FOUND_ERROR_ID,
 	NOTE_HISTORY_LIMIT_ERROR_ID,
 	NOTE_NO_CONTENT_ERROR_ID,
 	NOTE_PROHIBITED_WORDS_ERROR_ID,
@@ -47,10 +49,13 @@ function createService(lockedNote: MiNote = note, meta: { prohibitedWords?: stri
 		findOne: vi.fn().mockResolvedValue(lockedNote),
 		update: notesRepository.update,
 	};
+	const transactionalDriveFilesRepository = {
+		update: vi.fn().mockResolvedValue({ affected: 1 }),
+	};
 	Object.assign(notesRepository, {
 		manager: {
-			transaction: vi.fn(async (callback: (manager: { getRepository: () => typeof lockedNotesRepository }) => Promise<unknown>) =>
-				callback({ getRepository: () => lockedNotesRepository })),
+			transaction: vi.fn(async (callback: (manager: { getRepository: (entity?: unknown) => typeof lockedNotesRepository | typeof transactionalDriveFilesRepository }) => Promise<unknown>) =>
+				callback({ getRepository: (entity?: unknown) => entity === MiDriveFile ? transactionalDriveFilesRepository : lockedNotesRepository })),
 		},
 	});
 	const pollsRepository = {
@@ -177,6 +182,7 @@ function createService(lockedNote: MiNote = note, meta: { prohibitedWords?: stri
 	return {
 		service,
 		notesRepository,
+		transactionalDriveFilesRepository,
 		pollsRepository,
 		pollVotesRepository,
 		noteEntityService,
@@ -883,5 +889,49 @@ describe(NoteUpdateService, () => {
 			{ id: remoteNote.id },
 			expect.objectContaining({ visibility: 'followers', visibleUserIds: [] }),
 		);
+	});
+
+	test('updates attached fileComments atomically after prepareUpdate and leaves drive files untouched on history limit error', async () => {
+		const mediaNote = { ...note, fileIds: ['old-file'] } as MiNote;
+		const ok = createService(mediaNote);
+		await ok.service.update(user, mediaNote, {
+			text: mediaNote.text,
+			cw: null,
+			fileComments: [{ fileId: 'old-file', comment: 'new alt' }],
+			updatedAt: new Date('2025-02-01T00:00:00.000Z'),
+		});
+		expect(ok.notesRepository.update).toHaveBeenCalledOnce();
+		expect(ok.transactionalDriveFilesRepository.update).toHaveBeenCalledWith(
+			{ id: 'old-file', userId: 'user-id' },
+			{ comment: 'new alt' },
+		);
+
+		const maxedNote = {
+			...mediaNote,
+			history: Array.from({ length: MAX_NOTE_HISTORY_REVISIONS }, (_, i) => ({
+				createdAt: new Date(Date.UTC(2025, 0, 1, 0, i)).toISOString(),
+				text: `rev-${i}`,
+				cw: null,
+			})),
+		} as MiNote;
+		const full = createService(maxedNote);
+		await expect(full.service.update(user, maxedNote, {
+			text: maxedNote.text,
+			cw: null,
+			fileComments: [{ fileId: 'old-file', comment: 'should not save' }],
+			updatedAt: new Date('2025-02-02T00:00:00.000Z'),
+		})).rejects.toMatchObject({ id: NOTE_HISTORY_LIMIT_ERROR_ID });
+		expect(full.transactionalDriveFilesRepository.update).not.toHaveBeenCalled();
+
+		const detachedLockedNote = { ...mediaNote, fileIds: [] } as MiNote;
+		const concurrent = createService(detachedLockedNote);
+		await expect(concurrent.service.update(user, mediaNote, {
+			text: 'edited text after concurrent detach',
+			cw: null,
+			fileComments: [{ fileId: 'old-file', comment: 'new alt' }],
+			updatedAt: new Date('2025-02-03T00:00:00.000Z'),
+		})).rejects.toMatchObject({ id: NOTE_FILE_NOT_FOUND_ERROR_ID });
+		expect(concurrent.notesRepository.update).not.toHaveBeenCalled();
+		expect(concurrent.transactionalDriveFilesRepository.update).not.toHaveBeenCalled();
 	});
 });

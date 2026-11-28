@@ -28,4 +28,25 @@ describe('notes/search-by-tag query groups', () => {
 		expect(parameters).toEqual([['alpha'], ['beta'], ['gamma']]);
 		expect(sql).toContain('($1 <@ note.tags AND $2 <@ note.tags) OR ($3 <@ note.tags)');
 	});
+
+	test('restricts to public non-channel notes when publicOnly is true', async () => {
+		const query = new DataSource({ type: 'postgres' }).createQueryBuilder().select('note.*').from('note', 'note');
+		vi.spyOn(query, 'innerJoinAndSelect').mockReturnValue(query);
+		vi.spyOn(query, 'leftJoinAndSelect').mockReturnValue(query);
+		vi.spyOn(query, 'getMany').mockResolvedValue([]);
+		const endpoint = new SearchByTagEndpoint(
+			{ createQueryBuilder: () => query } as never,
+			{ packMany: vi.fn().mockResolvedValue([]) } as never,
+			{
+				makePaginationQuery: () => query,
+				generateVisibilityQuery: vi.fn(),
+				generateUgcVisibilityQueryForVisitor: vi.fn(),
+				generateBaseNoteFilteringQuery: vi.fn(),
+			} as never,
+		);
+		await endpoint.exec({ tag: 'news', publicOnly: true, limit: 10 }, null, null);
+		const [sql] = query.getQueryAndParameters();
+		expect(sql).toContain("note.visibility = 'public'");
+		expect(sql).toContain('note.channelId IS NULL');
+	});
 });

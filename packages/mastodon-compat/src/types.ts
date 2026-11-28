@@ -39,4 +39,5 @@ export type StatusOptions = {
 	allowLocalOnly?: boolean;
 	votersCount?: number | ReadonlyMap<string, number>;
 	maxDepth?: number;
+	mentionUsers?: ReadonlyMap<string, Json>;
 };

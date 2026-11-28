@@ -23,7 +23,7 @@ const NATIVE_PERMISSIONS: Readonly<Record<string, readonly string[]>> = {
 	'write:conversations': ['write:account'],
 	'write:favourites': ['write:reactions'],
 	'write:filters': [],
-	'write:follows': ['write:following'],
+	'write:follows': ['write:following', 'write:mutes'],
 	'write:lists': ['write:account'],
 	'write:media': ['read:drive', 'write:drive'],
 	'write:mutes': ['write:mutes', 'write:account'],

@@ -31645,6 +31645,8 @@ export interface operations {
                 }) & {
                     /** @default false */
                     localHostOnly?: boolean;
+                    /** @default false */
+                    publicOnly?: boolean;
                     /** @default null */
                     reply?: boolean | null;
                     /** @default null */
@@ -31886,6 +31888,8 @@ export interface operations {
                     'application/json': {
                         isFavorited: boolean;
                         isMutedThread: boolean;
+                        /** Format: misskey:id */
+                        myRenoteId?: string | null;
                     };
                 };
             };
@@ -32313,6 +32317,11 @@ export interface operations {
                     fileIds?: string[];
                     mediaIds?: string[];
                     cw: string | null;
+                    fileComments?: {
+                        /** Format: misskey:id */
+                        fileId: string;
+                        comment: string | null;
+                    }[];
                 };
             };
         };
@@ -34758,6 +34767,7 @@ export interface operations {
                         originalUsersCount: number;
                         reactionsCount: number;
                         instances: number;
+                        activeUsersCount?: number;
                         driveUsageLocal: number;
                         driveUsageRemote: number;
                     };
@@ -36991,6 +37001,7 @@ export interface operations {
                 'application/json': {
                     /** Format: misskey:id */
                     userId: string;
+                    type?: string | null;
                     /** @default 10 */
                     limit?: number;
                     /** Format: misskey:id */
@@ -37225,10 +37236,16 @@ export interface operations {
             };
         };
         responses: {
-            /** @description OK (without any results) */
-            204: {
+            /** @description OK (with results) */
+            200: {
                 headers: {
                     [name: string]: unknown;
+                };
+                content: {
+                    'application/json': {
+                        /** Format: misskey:id */
+                        id: string;
+                    };
                 };
             };
             /** @description Client error */

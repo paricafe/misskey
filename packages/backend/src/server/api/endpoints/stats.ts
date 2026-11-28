@@ -4,7 +4,8 @@
  */
 
 import { Inject, Injectable } from '@nestjs/common';
-import type { InstancesRepository, NoteReactionsRepository } from '@/models/_.js';
+import { IsNull, MoreThan } from 'typeorm';
+import type { InstancesRepository, NoteReactionsRepository, UsersRepository } from '@/models/_.js';
 import { Endpoint } from '@/server/api/endpoint-base.js';
 import { DI } from '@/di-symbols.js';
 import NotesChart from '@/core/chart/charts/notes.js';
@@ -43,6 +44,10 @@ export const meta = {
 				type: 'number',
 				optional: false, nullable: false,
 			},
+			activeUsersCount: {
+				type: 'number',
+				optional: true, nullable: false,
+			},
 			driveUsageLocal: {
 				type: 'number',
 				optional: false, nullable: false,
@@ -70,6 +75,9 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 		@Inject(DI.noteReactionsRepository)
 		private noteReactionsRepository: NoteReactionsRepository,
 
+		@Inject(DI.usersRepository)
+		private usersRepository: UsersRepository,
+
 		private notesChart: NotesChart,
 		private usersChart: UsersChart,
 	) {
@@ -85,9 +93,11 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 			const [
 				reactionsCount,
 				instances,
+				activeUsersCount,
 			] = await Promise.all([
 				this.noteReactionsRepository.count({ cache: 3600000 }),
 				this.instancesRepository.count({ cache: 3600000 }),
+				this.usersRepository.count({ where: { host: IsNull(), lastActiveDate: MoreThan(new Date(Date.now() - 2592000000)) }, cache: 3600000 }),
 			]);
 
 			return {
@@ -97,6 +107,7 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				originalUsersCount,
 				reactionsCount,
 				instances,
+				activeUsersCount,
 				driveUsageLocal: 0,
 				driveUsageRemote: 0,
 			};

@@ -164,6 +164,27 @@ test('invalid profile preferences reject a multipart request before uploading an
 	assert.equal(f.calls.length, 0);
 });
 
+test('concurrent profile preference updates merge source fields without losing private visibility', async t => {
+	let calls = 0;
+	let release!: () => void;
+	const gate = new Promise<void>(resolve => { release = resolve; });
+	const f = await fixture(t, async (endpoint, body) => {
+		if (endpoint === 'i' || endpoint === 'i/update') {
+			if (++calls === 2) release();
+			await gate;
+			return { ...alice, ...body };
+		}
+		return alice;
+	});
+	const [first, second] = await Promise.all([
+		f.app.inject({ method: 'PATCH', url: '/api/v1/accounts/update_credentials', headers: { authorization: f.authorization }, payload: { source: { privacy: 'private' } } }),
+		f.app.inject({ method: 'PATCH', url: '/api/v1/accounts/update_credentials', headers: { authorization: f.authorization }, payload: { source: { language: 'fr' } } }),
+	]);
+	assert.equal(first.statusCode, 200, first.body);
+	assert.equal(second.statusCode, 200, second.body);
+	assert.deepEqual(await f.store.get('account-source', 'alice', 'defaults'), { privacy: 'private', language: 'fr' });
+});
+
 test('search returns the requested category and the correct hashtag entity version', async t => {
 	const f = await fixture(t, (endpoint, body) => { assert.equal(endpoint, 'hashtags/search'); assert.equal(body.query, 'tag'); return ['tag', 'tag2']; });
 	for (const version of [1, 2]) {
@@ -294,4 +315,32 @@ test('translation accepts BCP-47 numeric region codes from Accept-Language', asy
 	});
 	assert.equal(response.statusCode, 200, response.body);
 	assert.equal(response.json().language, 'es-419');
+});
+
+test('profile update accepts unindexed multipart fields_attributes and falls back when i/update rejects an unsupported language', async t => {
+	const f = await fixture(t, (endpoint, body) => {
+		if (endpoint === 'i/update') {
+			if (body.lang === 'xx-YY') throw new NativeError(400, 'INVALID_PARAM', 'Invalid lang');
+			return { ...alice, ...body };
+		}
+		return alice;
+	});
+	const data = new FormData();
+	data.append('display_name', 'Fallback User');
+	data.append('source[language]', 'xx-yy');
+	data.append('fields_attributes[][name]', 'Blog');
+	data.append('fields_attributes[][value]', 'https://blog.example');
+	data.append('fields_attributes[][name]', 'Repo');
+	data.append('fields_attributes[][value]', 'https://code.example');
+	const multi = await encoded(data);
+	const response = await f.app.inject({ method: 'PATCH', url: '/api/v1/accounts/update_credentials', ...multi, headers: { ...multi.headers, authorization: f.authorization } });
+	assert.equal(response.statusCode, 200, response.body);
+	assert.equal(response.json().source.language, 'xx-yy');
+	assert.deepEqual(f.calls.map(call => call.endpoint), ['i/update', 'i/update']);
+	assert.equal(f.calls[0].body.lang, 'xx-YY');
+	assert.equal(f.calls[1].body.lang, undefined);
+	assert.deepEqual(f.calls[1].body.fields, [
+		{ name: 'Blog', value: 'https://blog.example' },
+		{ name: 'Repo', value: 'https://code.example' },
+	]);
 });

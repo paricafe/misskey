@@ -116,7 +116,13 @@ export class EntityConverter {
 				attribution_domains: [],
 				quote_policy: 'public',
 			};
-			result.role = null;
+			result.role = {
+				id: '-99',
+				name: user.isAdmin === true ? 'Admin' : user.isModerator === true ? 'Moderator' : '',
+				color: '',
+				permissions: '0',
+				highlighted: false,
+			};
 		}
 		return result;
 	}
@@ -131,7 +137,10 @@ export class EntityConverter {
 			reaction: 'favourite', follow: 'follow', followRequestAccepted: 'follow', receiveFollowRequest: 'follow_request', pollEnded: 'poll',
 		};
 		const type = types[text(notification.type)];
-		if (type == null || !object(notification.user)) return null;
+		const actor = object(notification.user)
+			? notification.user
+			: (type === 'poll' && object(notification.note) && object(notification.note.user) ? notification.note.user : null);
+		if (type == null || actor == null) return null;
 		if (notification.type === 'reaction' && !isFavouriteReaction(notification.reaction)) return null;
 		const status = object(notification.note) ? this.status(notification.note, options) : null;
 		if (['mention', 'quote', 'status', 'reblog', 'favourite', 'poll'].includes(type) && status == null) return null;
@@ -139,7 +148,7 @@ export class EntityConverter {
 			id: id(notification.id),
 			type,
 			created_at: date(notification.createdAt, epoch),
-			account: this.account(notification.user),
+			account: this.account(actor),
 			...(status == null ? {} : { status }),
 		};
 	}
@@ -213,14 +222,15 @@ export class EntityConverter {
 	}
 
 	instance(meta: Json, stats: Json = {}, version: 1 | 2 = 2, versionStyle: 'compatible' | 'neodb' = 'compatible'): Json {
-		const streaming = new URL('/api/v1/streaming', this.publicUrl);
+		const streaming = new URL(this.publicUrl);
 		streaming.protocol = streaming.protocol === 'https:' ? 'wss:' : 'ws:';
+		const streamingUrl = streaming.origin;
 		const image = this.safeUrl(meta.bannerUrl) ?? this.safeUrl(meta.iconUrl) ?? new URL('/favicon.ico', this.publicUrl).toString();
 		const rules = Array.isArray(meta.serverRules) ? meta.serverRules.filter((rule: unknown): rule is string => typeof rule === 'string').map((rule: string, index: number) => ({ id: `${index + 1}`, text: rule, hint: '' })) : [];
 		const configuration = {
-			urls: { streaming: streaming.toString() },
+			urls: { streaming: streamingUrl },
 			vapid: { public_key: text(meta.vapidPublicKey) },
-			accounts: { max_pinned_statuses: count(meta.policies?.pinLimit) || 5 },
+			accounts: { max_featured_tags: 0, max_pinned_statuses: count(meta.policies?.pinLimit) || 5 },
 			statuses: { max_characters: count(meta.maxNoteTextLength) || 3000, max_media_attachments: count(meta.maxNoteFiles) || 16, characters_reserved_per_url: 23 },
 			media_attachments: {
 				supported_mime_types: ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'audio/mpeg', 'audio/ogg', 'video/mp4', 'video/webm'],
@@ -246,8 +256,8 @@ export class EntityConverter {
 			uri: this.host,
 			short_description: text(meta.description),
 			email: text(meta.maintainerEmail),
-			urls: { streaming_api: streaming.toString() },
-			stats: { user_count: count(stats.originalUsersCount ?? stats.usersCount), status_count: count(stats.originalNotesCount ?? stats.notesCount), domain_count: count(stats.instancesCount) },
+			urls: { streaming_api: streamingUrl },
+			stats: { user_count: count(stats.originalUsersCount ?? stats.usersCount), status_count: count(stats.originalNotesCount ?? stats.notesCount), domain_count: count(stats.instancesCount ?? stats.instances) },
 			thumbnail: image,
 			registrations: meta.disableRegistration !== true,
 			approval_required: meta.approvalRequiredForSignup === true,
@@ -354,7 +364,7 @@ export class EntityConverter {
 			application: null,
 			account: this.account(note.user),
 			media_attachments: files.map(file => this.attachment(file)),
-			mentions: this.mentions(note),
+			mentions: this.mentions(note, options),
 			tags: Array.isArray(note.tags) ? note.tags.filter((tag: unknown): tag is string => typeof tag === 'string').map((tag: string) => ({ name: tag, url: new URL(`/tags/${encodeURIComponent(tag)}`, this.publicUrl).toString() })) : [],
 			emojis: this.emojis(note.emojis),
 			card: null,
@@ -376,31 +386,25 @@ export class EntityConverter {
 		return true;
 	}
 
-	private mentions(note: Json): Json[] {
-		const ids: string[] = Array.isArray(note.mentions) ? note.mentions.filter((value: unknown): value is string => typeof value === 'string' && value !== '') : [];
-		const mentions: Array<{ username: string; host: string | null }> = [];
-		const seen = new Set<string>();
-		const visit = (nodes: MfmNode[]): void => {
-			for (const node of nodes) {
-				if (node.type === 'mention') {
-					const host = this.validHost(node.props.host) ?? this.validHost(note.user?.host);
-					const key = `${node.props.username.toLowerCase()}@${host ?? this.host}`;
-					if (!seen.has(key)) mentions.push({ username: node.props.username, host });
-					seen.add(key);
-				}
-				if (node.children) visit(node.children);
-			}
-		};
-		try { visit(parseMfm(text(note.text), { nestLimit: 12 })); } catch { return []; }
-		if (ids.length !== mentions.length) return [];
-		return ids.map((mentionId, index) => {
-			const mention = mentions[index]!;
-			return {
-				id: mentionId,
-				username: mention.username,
-				acct: mention.host == null ? mention.username : `${mention.username}@${mention.host}`,
-				url: new URL(`/@${encodeURIComponent(mention.username)}`, mention.host == null ? this.publicUrl : `https://${mention.host}`).toString(),
-			};
+	private mentions(note: Json, options: StatusOptions = {}): Json[] {
+		const ids = [...new Set(Array.isArray(note.mentions) ? note.mentions.filter((value: unknown): value is string => typeof value === 'string' && value !== '') : [])];
+		if (!ids.length) return [];
+		const users = new Map<string, Json>();
+		if (options.mentionUsers) {
+			for (const [userId, user] of options.mentionUsers) if (object(user)) users.set(userId, user);
+		}
+		if (object(note.user) && typeof note.user.id === 'string' && !users.has(note.user.id)) users.set(note.user.id, note.user);
+		if (object(note.reply) && note.reply.isHidden !== true && object(note.reply.user) && typeof note.reply.user.id === 'string' && !users.has(note.reply.user.id)) {
+			users.set(note.reply.user.id, note.reply.user);
+		}
+		return ids.flatMap(mentionId => {
+			const user = users.get(mentionId);
+			if (!user) return [];
+			const host = this.validHost(user.host);
+			const username = text(user.username, mentionId);
+			const acct = host == null ? username : `${username}@${host}`;
+			const profile = this.safeUrl(user.url) ?? new URL(`/@${encodeURIComponent(username)}`, host == null ? this.publicUrl : `https://${host}`).toString();
+			return [{ id: mentionId, username, acct, url: profile }];
 		});
 	}
 

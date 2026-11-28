@@ -36,7 +36,12 @@ async function fixture(t: TestContext, events: Json[]) {
 		calls.push({ endpoint, body });
 		if (endpoint === 'notifications/mark-all-as-read') { markedRead++; return { status: 204, body: '' }; }
 		if (endpoint === 'notes/state') return { status: 200, body: '{"isFavorited":false,"isMutedThread":false}' };
-		if (endpoint === 'users/show') return { status: 200, body: JSON.stringify({ ...(body.userId === 'alice' ? alice : bob), pinnedNoteIds: [] }) };
+		if (endpoint === 'users/show') {
+			if (Array.isArray(body.userIds)) {
+				return { status: 200, body: JSON.stringify(body.userIds.map((id: string) => ({ ...(id === 'alice' ? alice : { ...bob, id }), pinnedNoteIds: [] }))) };
+			}
+			return { status: 200, body: JSON.stringify({ ...(body.userId === 'alice' ? alice : bob), pinnedNoteIds: [] }) };
+		}
 		assert.equal(endpoint, 'i/notifications');
 		assert.equal(body.markAsRead, false, 'Listing must not mark native notifications as read');
 		assert.ok(body.limit >= 1 && body.limit <= 100);
@@ -261,7 +266,12 @@ test('v1 and v2 detail lookup finds historical MEIDG notifications with hex carr
 		const body = JSON.parse(String(request.body));
 		calls.push({ endpoint, body });
 		if (endpoint === 'notes/state') return { status: 200, body: '{"isFavorited":false,"isMutedThread":false}' };
-		if (endpoint === 'users/show') return { status: 200, body: JSON.stringify({ ...bob, pinnedNoteIds: [] }) };
+		if (endpoint === 'users/show') {
+			if (Array.isArray(body.userIds)) {
+				return { status: 200, body: JSON.stringify(body.userIds.map((id: string) => ({ ...bob, id, pinnedNoteIds: [] }))) };
+			}
+			return { status: 200, body: JSON.stringify({ ...bob, pinnedNoteIds: [] }) };
+		}
 		assert.equal(endpoint, 'i/notifications');
 		if (body.untilId && !parseMeidg(body.untilId)) return { status: 200, body: '[]' };
 		if (body.sinceId && !parseMeidg(body.sinceId)) return { status: 200, body: '[]' };
@@ -309,4 +319,20 @@ test('filtered unread_count with limit=1 scans beyond 10 non-matching native not
 	const response = await f.app.inject({ url: '/api/v1/notifications/unread_count?limit=1&types[]=mention', headers: { authorization: f.authorization } });
 	assert.equal(response.statusCode, 200, response.body);
 	assert.deepEqual(response.json(), { count: 1 });
+});
+
+test('batches status hydration across multiple distinct notes in a single notification page', async t => {
+	const carol = { id: 'carol', username: 'carol', createdAt: '2026-01-01T00:00:00Z' };
+	const dave = { id: 'dave', username: 'dave', createdAt: '2026-01-01T00:00:00Z' };
+	const f = await fixture(t, [
+		event(1, { type: 'mention', user: bob, note: { ...status, id: 'note-1', userId: 'bob', user: bob } }),
+		event(2, { type: 'mention', user: carol, note: { ...status, id: 'note-2', userId: 'carol', user: carol } }),
+		event(3, { type: 'mention', user: dave, note: { ...status, id: 'note-3', userId: 'dave', user: dave } }),
+	]);
+	const response = await f.app.inject({ url: '/api/v1/notifications?limit=10', headers: { authorization: f.authorization } });
+	assert.equal(response.statusCode, 200, response.body);
+	assert.equal(response.json().length, 3);
+	const userShowCalls = f.calls.filter(call => call.endpoint === 'users/show');
+	assert.equal(userShowCalls.length, 1);
+	assert.deepEqual([...userShowCalls[0].body.userIds].sort(), ['bob', 'carol', 'dave']);
 });

@@ -18,6 +18,18 @@ export const meta = {
 
 	description: 'File a report.',
 
+	res: {
+		type: 'object',
+		optional: false, nullable: false,
+		properties: {
+			id: {
+				type: 'string',
+				format: 'misskey:id',
+				optional: false, nullable: false,
+			},
+		},
+	},
+
 	errors: {
 		noSuchUser: {
 			message: 'No such user.',
@@ -69,13 +81,15 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				throw new ApiError(meta.errors.cannotReportAdmin);
 			}
 
-			await this.abuseReportService.report([{
+			const [report] = await this.abuseReportService.report([{
 				targetUserId: targetUser.id,
 				targetUserHost: targetUser.host,
 				reporterId: me.id,
 				reporterHost: null,
 				comment: ps.comment,
 			}]);
+
+			return { id: report.id };
 		});
 	}
 }

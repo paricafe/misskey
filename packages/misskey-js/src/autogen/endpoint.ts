@@ -660,6 +660,7 @@ import type {
 	UsersRelationRequest,
 	UsersRelationResponse,
 	UsersReportAbuseRequest,
+	UsersReportAbuseResponse,
 	UsersSearchRequest,
 	UsersSearchResponse,
 	UsersSearchByUsernameAndHostRequest,
@@ -1109,7 +1110,7 @@ export type Endpoints = {
 	'users/reactions': { req: UsersReactionsRequest; res: UsersReactionsResponse };
 	'users/recommendation': { req: UsersRecommendationRequest; res: UsersRecommendationResponse };
 	'users/relation': { req: UsersRelationRequest; res: UsersRelationResponse };
-	'users/report-abuse': { req: UsersReportAbuseRequest; res: EmptyResponse };
+	'users/report-abuse': { req: UsersReportAbuseRequest; res: UsersReportAbuseResponse };
 	'users/search': { req: UsersSearchRequest; res: UsersSearchResponse };
 	'users/search-by-username-and-host': { req: UsersSearchByUsernameAndHostRequest; res: UsersSearchByUsernameAndHostResponse };
 	'users/show': { req: UsersShowRequest; res: UsersShowResponse };

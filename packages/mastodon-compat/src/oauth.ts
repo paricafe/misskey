@@ -177,7 +177,7 @@ async function beginAuthorization(query: Parameters, reply: FastifyReply, deps: 
 
 const escapeHtml = (value: string): string => value.replace(/[&<>"']/gu, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]!);
 
-function authorizationResult(reply: FastifyReply, state: AuthorizationState, result: { code: string } | { error: string; error_description: string }): unknown {
+function authorizationResult(reply: FastifyReply, state: AuthorizationState, result: { code: string } | { error: string; error_description: string }, issuer: string): unknown {
 	if (state.redirectUri === OOB) {
 		const accepted = 'code' in result;
 		const content = accepted ? `<label>Authorization code<input readonly value="${escapeHtml(result.code)}"></label>` : `<p>${escapeHtml(result.error_description)}</p>`;
@@ -186,6 +186,7 @@ function authorizationResult(reply: FastifyReply, state: AuthorizationState, res
 	}
 	const url = new URL(state.redirectUri);
 	for (const [key, value] of Object.entries(result)) url.searchParams.set(key, value);
+	url.searchParams.set('iss', issuer);
 	if (state.clientState !== undefined) url.searchParams.set('state', state.clientState);
 	return reply.redirect(url.toString());
 }
@@ -198,13 +199,13 @@ async function callback(query: Parameters, reply: FastifyReply, deps: OAuthDepen
 	if (query.session !== undefined && query.session !== state.session) throw new OAuthError(400, 'invalid_request', 'The MiAuth session does not match');
 	let result: { ok?: boolean; token?: string; user?: { id?: string } };
 	try { result = await deps.native.call(`miauth/${state.session}/check`, {}); } catch {
-		return authorizationResult(reply, state, { error: 'server_error', error_description: 'The native authorization result could not be checked' });
+		return authorizationResult(reply, state, { error: 'server_error', error_description: 'The native authorization result could not be checked' }, deps.publicUrl);
 	}
 	if (!result.ok || typeof result.token !== 'string' || !result.token || typeof result.user?.id !== 'string' || !result.user.id) {
-		return authorizationResult(reply, state, { error: 'access_denied', error_description: 'The application was not authorized' });
+		return authorizationResult(reply, state, { error: 'access_denied', error_description: 'The application was not authorized' }, deps.publicUrl);
 	}
 	const code = await deps.store.issueCode({ clientId: state.clientId, redirectUri: state.redirectUri, scopes: state.scopes, userId: result.user.id, nativeToken: result.token, codeChallenge: state.codeChallenge }, now + CODE_TTL);
-	return authorizationResult(reply, state, { code });
+	return authorizationResult(reply, state, { code }, deps.publicUrl);
 }
 
 function verifyPkce(code: AuthorizationCode, body: Parameters): void {
@@ -276,6 +277,16 @@ export async function dispatchHandler(request: FastifyRequest, reply: FastifyRep
 			const grant = await getAuthorization(request, deps.store);
 			const client = grant && await deps.store.getClient(grant.clientId);
 			if (!client) throw new OAuthError(401, 'invalid_token', 'An application token is required');
+			if (grant.kind === 'user' && grant.nativeToken) {
+				try {
+					await deps.native.call('ping', {}, grant.nativeToken);
+				} catch (error) {
+					if (error instanceof NativeError && (error.status === 401 || error.status === 403)) {
+						throw new OAuthError(error.status, error.status === 403 ? 'access_denied' : 'invalid_token', error.message);
+					}
+					throw error;
+				}
+			}
 			return reply.send(application(client));
 		}
 		if (request.method === 'GET' && route === '/oauth/authorize') return await beginAuthorization(object(request.query), reply, deps);

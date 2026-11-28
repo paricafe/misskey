@@ -663,6 +663,7 @@ export type UsersRecommendationResponse = operations['users___recommendation']['
 export type UsersRelationRequest = operations['users___relation']['requestBody']['content']['application/json'];
 export type UsersRelationResponse = operations['users___relation']['responses']['200']['content']['application/json'];
 export type UsersReportAbuseRequest = operations['users___report-abuse']['requestBody']['content']['application/json'];
+export type UsersReportAbuseResponse = operations['users___report-abuse']['responses']['200']['content']['application/json'];
 export type UsersSearchRequest = operations['users___search']['requestBody']['content']['application/json'];
 export type UsersSearchResponse = operations['users___search']['responses']['200']['content']['application/json'];
 export type UsersSearchByUsernameAndHostRequest = operations['users___search-by-username-and-host']['requestBody']['content']['application/json'];

@@ -166,7 +166,7 @@ async function fixture() {
 		});
 	};
 	return {
-		store, client, token, grant, notes, states, users, calls, connect, failedUpgrade, gateway, gatewayUrl, bridge,
+		store, client, token, grant, notes, states, users, calls, connect, failedUpgrade, gateway, gatewayUrl, nativeUrl, nativeSessions, bridge,
 		setBeforeCall(callback: typeof beforeCall) { beforeCall = callback; },
 		revokeNative() { validNativeToken = false; },
 		async close() {
@@ -567,4 +567,83 @@ test('rechecks authorization after an in-flight native read before emitting an e
 	resume.resolve();
 	assert.equal((await closed)[0], 1008);
 	assert.equal(c.messages.received.length, 0);
+});
+
+test('authenticates via Sec-WebSocket-Protocol and rejects conflicting or multiple subprotocols', async t => {
+	const f = await fixture();
+	t.after(() => f.close());
+	const socket = new WebSocket(`${f.gatewayUrl}?stream=public`, [f.token]);
+	t.after(() => socket.terminate());
+	await once(socket, 'open');
+	assert.equal(socket.protocol, f.token);
+
+	const mismatch = new WebSocket(`${f.gatewayUrl}?access_token=${encodeURIComponent(f.token)}&stream=public`, ['other-token']);
+	mismatch.on('error', () => undefined);
+	t.after(() => mismatch.terminate());
+	const [, mismatchResponse] = await once(mismatch, 'unexpected-response');
+	assert.equal(mismatchResponse.statusCode, 401);
+
+	const multiple = new WebSocket(`${f.gatewayUrl}?stream=public`, [f.token, 'extra']);
+	multiple.on('error', () => undefined);
+	t.after(() => multiple.terminate());
+	const [, multipleResponse] = await once(multiple, 'unexpected-response');
+	assert.equal(multipleResponse.statusCode, 401);
+});
+
+test('HTTP SSE streaming endpoints authenticate, emit events, and close on shutdown', async t => {
+	const { default: Fastify } = await import('fastify');
+	const f = await fixture();
+	t.after(() => f.close());
+	const sseApp = Fastify();
+	const native = new NativeClient({ baseUrl: f.nativeUrl, publicUrl: 'https://social.example' });
+	const controller = attachStreaming(sseApp.server, { native, entities: new EntityConverter('https://social.example'), store: f.store, publicUrl: 'https://social.example' });
+	controller.registerHttp(sseApp);
+	await sseApp.listen({ host: '127.0.0.1', port: 0 });
+	t.after(async () => { await controller.close(); await sseApp.close(); });
+	const base = `http://127.0.0.1:${(sseApp.server.address() as AddressInfo).port}`;
+
+	const unauth = await fetch(`${base}/api/v1/streaming/user`);
+	assert.equal(unauth.status, 401);
+
+	const abort = new AbortController();
+	t.after(() => abort.abort());
+	const res = await fetch(`${base}/api/v1/streaming/public`, {
+		headers: { authorization: `Bearer ${f.token}` },
+		signal: abort.signal,
+	});
+	assert.equal(res.status, 200);
+	assert.match(res.headers.get('content-type') ?? '', /^text\/event-stream/u);
+	const reader = res.body!.getReader();
+	const decoder = new TextDecoder();
+	let buffer = '';
+	const readUntil = async (pattern: string) => {
+		while (!buffer.includes(pattern)) {
+			const { value, done } = await reader.read();
+			if (done) break;
+			buffer += decoder.decode(value, { stream: true });
+		}
+	};
+	await readUntil(':thump\n\n');
+	const nativeSession = f.nativeSessions.at(-1)!;
+	const global = await channel(nativeSession, 'globalTimeline');
+	f.notes.set('sse-note', note('sse-note'));
+	emit(nativeSession, global, 'note', { id: 'sse-note' });
+	await readUntil('event: update\n');
+	assert.ok(buffer.includes('"id":"sse-note"'));
+	abort.abort();
+
+	const statusesToken = (await f.grant(['read:statuses'])).token;
+	const listsOnlyToken = (await f.grant(['read:lists'])).token;
+	const listDenied = await fetch(`${base}/api/v1/streaming/list?list=list-one`, {
+		headers: { authorization: `Bearer ${listsOnlyToken}` },
+	});
+	assert.equal(listDenied.status, 403);
+	const listAbort = new AbortController();
+	t.after(() => listAbort.abort());
+	const listAllowed = await fetch(`${base}/api/v1/streaming/list?list=list-one`, {
+		headers: { authorization: `Bearer ${statusesToken}` },
+		signal: listAbort.signal,
+	});
+	assert.equal(listAllowed.status, 200);
+	listAbort.abort();
 });

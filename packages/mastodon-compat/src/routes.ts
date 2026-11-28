@@ -14,7 +14,8 @@ import { CompatStore, type Grant } from './store.js';
 import { array, boolean, compareIds, HttpError, integer, pageRows, pagination, string, strings } from './parameters.js';
 import type { Json } from './types.js';
 import { applyFilters, type FilterContext } from './features.js';
-import { decorateStatus, hydrateStatus, liveReblog, preloadedStatusStore, statusStoreKeys, type StatusStore } from './metadata.js';
+import { description as mediaDescription, focalPoint as mediaFocalPoint } from './media-search.js';
+import { collectNoteUserIds, decorateStatus, hydrateStatus, liveReblog, preloadedStatusStore, statusStoreKeys, type StatusStore } from './metadata.js';
 
 export interface RouteDependencies { native: NativeClient; entities: EntityConverter; store: CompatStore; publicUrl: string; }
 export interface RequestContext {
@@ -47,7 +48,9 @@ export class Routes {
 		} });
 	}
 	async status(note: Json, context: RequestContext): Promise<Json> {
-		const status = this.deps.entities.status(note, { viewerId: context.userId || null, allowLocalOnly: true });
+		const { mentions } = collectNoteUserIds([note]);
+		const mentionUsers = mentions.length ? await this.prefetchUsers(context, mentions) : undefined;
+		const status = this.deps.entities.status(note, { viewerId: context.userId || null, allowLocalOnly: true, mentionUsers });
 		if (!status) throw new HttpError(404, 'Record not found');
 		return this.completeStatus(status, context, this.deps.store);
 	}
@@ -60,8 +63,10 @@ export class Routes {
 		return applyFilters(store, context.userId, hydrated, filterContext);
 	}
 	async statuses(notes: Json[], context: RequestContext): Promise<Json[]> {
+		const { authors: rawAuthors, mentions } = collectNoteUserIds(notes);
+		const mentionUsers = mentions.length ? await this.prefetchUsers(context, [...new Set([...rawAuthors, ...mentions])]) : undefined;
 		const statuses = notes.flatMap(note => {
-			const status = this.deps.entities.status(note, { viewerId: context.userId || null, allowLocalOnly: true });
+			const status = this.deps.entities.status(note, { viewerId: context.userId || null, allowLocalOnly: true, mentionUsers });
 			return status ? [status] : [];
 		});
 		if (statuses.length === 0) return [];
@@ -69,7 +74,7 @@ export class Routes {
 		const [entries, filters] = await Promise.all([
 			this.deps.store.getMany(keys),
 			context.userId ? this.deps.store.list('filter', context.userId) : [],
-			this.prefetchAuthors(context, authors),
+			mentionUsers ? Promise.resolve() : this.prefetchUsers(context, authors),
 		]);
 		const store = preloadedStatusStore(this.deps.store, entries, filters);
 		const result: Array<Json | null> = Array(statuses.length).fill(null);
@@ -87,12 +92,33 @@ export class Routes {
 		}));
 		return result.filter((status): status is Json => status !== null);
 	}
-	private async prefetchAuthors(context: RequestContext, ids: string[]): Promise<void> {
-		if (!ids.length) return;
-		const users = await context.call<Json[]>('users/show', { userIds: ids });
+	private async prefetchUsers(context: RequestContext, ids: string[]): Promise<Map<string, Json>> {
+		const resolved = new Map<string, Json>();
+		if (!ids.length) return resolved;
 		let cache = this.readCache.get(context);
 		if (!cache) { cache = new Map(); this.readCache.set(context, cache); }
-		for (const user of users) cache.set(`users/show:${JSON.stringify({ userId: user.id })}`, Promise.resolve(user));
+		const missing: string[] = [];
+		const cachedPromises: Array<[string, Promise<Json>]> = [];
+		for (const id of new Set(ids)) {
+			const existing = cache.get(`users/show:${JSON.stringify({ userId: id })}`);
+			if (existing) cachedPromises.push([id, existing]);
+			else missing.push(id);
+		}
+		if (cachedPromises.length) {
+			await Promise.all(cachedPromises.map(async ([id, promise]) => {
+				try { resolved.set(id, await promise); } catch {}
+			}));
+		}
+		for (let offset = 0; offset < missing.length; offset += 100) {
+			const chunk = missing.slice(offset, offset + 100);
+			const users = await context.call<Json[]>('users/show', { userIds: chunk });
+			for (const user of users) {
+				const uid = String(user.id);
+				resolved.set(uid, user);
+				cache.set(`users/show:${JSON.stringify({ userId: uid })}`, Promise.resolve(user));
+			}
+		}
+		return resolved;
 	}
 	page(context: RequestContext, source: Json[], results: Json[], cursor = (item: Json) => item.id): Json[] {
 		if (source.length) {
@@ -143,7 +169,7 @@ export function registerRoutes(app: FastifyInstance, deps: RouteDependencies): R
 	add('GET', '/api/v1/custom_emojis', undefined, async () => array((await native.call<Json>('emojis', {})).emojis).map(item => ({ shortcode: item.name, url: item.url, static_url: item.url, visible_in_picker: true, category: item.category ?? '' })), true);
 	if (!app.hasRoute({ method: 'GET', url: '/api/v1/instance/peers' })) add('GET', '/api/v1/instance/peers', undefined, async c => (await c.call<Json[]>('federation/instances', { limit: 100 })).map(item => item.host), true);
 	add('GET', '/api/v1/streaming/health', undefined, () => 'OK', true);
-	add('GET', '/api/v1/directory', undefined, async c => (await c.call<Json[]>('users', { limit: integer(c.query.limit, 40, 1, 80), offset: integer(c.query.offset, 0), sort: c.query.order === 'new' ? '-createdAt' : '-updatedAt', state: 'alive', origin: boolean(c.query.local) ? 'local' : 'combined' })).map(account), true);
+	add('GET', '/api/v1/directory', undefined, async c => (await c.call<Json[]>('users', { limit: integer(c.query.limit, 40, 1, 80), offset: integer(c.query.offset, 0), sort: c.query.order === 'new' ? '+createdAt' : '+updatedAt', state: 'alive', origin: boolean(c.query.local) ? 'local' : 'combined' })).map(account), true);
 	for (const path of ['/api/v1/trends', '/api/v1/trends/tags']) add('GET', path, undefined, async c => (await c.call<Json[]>('hashtags/trend')).map(item => tag(item.tag)), true);
 	add('GET', '/api/v1/trends/statuses', 'read:statuses', async c => routes.statuses(await c.call('notes/featured', { limit: integer(c.query.limit, 20, 1, 40) }), c), true);
 	for (const version of [1, 2] as const) add('GET', `/api/v${version}/suggestions`, 'read:accounts', async c => (await c.call<Json[]>('users/recommendation', { limit: integer(c.query.limit, 40, 1, 80), offset: 0 })).map(user => version === 1 ? account(user) : { source: 'global', sources: ['most_followed'], account: account(user) }));
@@ -167,19 +193,92 @@ export function registerRoutes(app: FastifyInstance, deps: RouteDependencies): R
 			return user ? [{ ...entities.relationship(user), note: noteMap.get(id) ?? '' }] : [];
 		});
 	});
-	add('GET', '/api/v1/accounts/search', 'read:accounts', async c => (await c.call<Json[]>('users/search', { query: string(c.query.q), limit: integer(c.query.limit, 40, 1, 80), origin: boolean(c.query.resolve) ? 'combined' : 'local', detail: true })).map(account));
+	add('GET', '/api/v1/accounts/search', 'read:accounts', async c => {
+		const q = string(c.query.q).trim();
+		if (!q) return [];
+		const limit = integer(c.query.limit, 40, 1, 80);
+		const offset = integer(c.query.offset, 0, 0, 1000);
+		const resolve = boolean(c.query.resolve);
+		const following = boolean(c.query.following);
+		const localHost = new URL(publicUrl).host.toLowerCase();
+		const resolveSafe = async (call: () => Promise<Json>): Promise<Json | undefined> => {
+			try { return await call(); } catch (error) {
+				if (error instanceof NativeError && ['NO_SUCH_USER', 'NO_SUCH_OBJECT', 'URI_INVALID', 'REQUEST_FAILED', 'FAILED_TO_RESOLVE_REMOTE_USER'].includes(error.code)) return undefined;
+				throw error;
+			}
+		};
+		if (resolve && /^https?:\/\//iu.test(q)) {
+			if (offset > 0) return [];
+			const resolved = await resolveSafe(() => c.call('ap/show', { uri: q }));
+			return resolved?.type === 'User' && (!following || resolved.object.isFollowing === true) ? [account(resolved.object)] : [];
+		}
+		let users = await c.call<Json[]>('users/search', { query: q, offset, limit, origin: 'combined', detail: true });
+		if (resolve && offset === 0 && /^@?[^@\s]+@[^@\s]+$/u.test(q)) {
+			const [username, rawHost] = q.replace(/^@/u, '').split('@');
+			const host = rawHost && rawHost.toLowerCase() !== localHost ? rawHost : null;
+			const resolved = await resolveSafe(() => c.call('users/show', { username, host }));
+			if (resolved && !users.some(item => item.id === resolved.id)) users = [resolved, ...users].slice(0, limit);
+		}
+		if (following) users = users.filter(item => item.isFollowing === true);
+		return users.map(account);
+	});
 	add('GET', '/api/v1/accounts/lookup', 'read:accounts', async c => {
 		const [username, host] = string(c.query.acct).replace(/^@/u, '').split('@');
-		return account(await c.call('users/show', { username, host: host && host !== new URL(publicUrl).host ? host : null }));
+		const localHost = new URL(publicUrl).host.toLowerCase();
+		return account(await c.call('users/show', { username, host: host && host.toLowerCase() !== localHost ? host : null }));
 	}, true);
 	add('GET', '/api/v1/accounts/:id', 'read:accounts', async c => account(await c.call('users/show', { userId: c.params.id })), true);
 	add('GET', '/api/v1/accounts/:id/statuses', 'read:statuses', async c => {
 		const onlyMedia = boolean(c.query.only_media), excludeReplies = boolean(c.query.exclude_replies), excludeReblogs = boolean(c.query.exclude_reblogs);
-		const notes = boolean(c.query.pinned)
-			? pageRows(array((await c.call('users/show', { userId: c.params.id })).pinnedNotes), c.query)
-			: await routes.readPage(c, 'users/notes', { userId: c.params.id, withReplies: !excludeReplies, withRenotes: !excludeReblogs, withFiles: onlyMedia && excludeReplies });
-		const filtered = notes.filter(item => (!excludeReplies || !item.replyId) && (!excludeReblogs || !item.renoteId || item.text || item.cw || array(item.files).length || item.poll) && (!onlyMedia || array(item.files).length) && (!c.query.tagged || array(item.tags).includes(c.query.tagged)));
-		return routes.page(c, notes, await routes.statuses(filtered, c));
+		const tagged = c.query.tagged ? string(c.query.tagged).replace(/^#/u, '').normalize('NFKC').toLowerCase() : '';
+		const matches = (item: Json) => (!excludeReplies || !item.replyId)
+			&& (!excludeReblogs || !item.renoteId || item.text || item.cw || array(item.files).length || item.poll)
+			&& (!onlyMedia || array(item.files).length)
+			&& (!tagged || array(item.tags).some((value: unknown) => typeof value === 'string' && value.normalize('NFKC').toLowerCase() === tagged));
+		if (boolean(c.query.pinned)) {
+			const notes = pageRows(array((await c.call('users/show', { userId: c.params.id })).pinnedNotes), c.query);
+			return routes.page(c, notes, await routes.statuses(notes.filter(matches), c));
+		}
+		const needsScan = (onlyMedia && !excludeReplies) || Boolean(tagged);
+		if (!needsScan) {
+			const notes = await routes.readPage(c, 'users/notes', { userId: c.params.id, withReplies: !excludeReplies, withRenotes: !excludeReblogs, withFiles: onlyMedia && excludeReplies });
+			return routes.page(c, notes, await routes.statuses(notes.filter(matches), c));
+		}
+		const targetLimit = integer(c.query.limit, 20, 1, 80);
+		const forwardOnly = Boolean(c.query.min_id);
+		let cursorQuery: Json = { ...c.query };
+		const scanned: Json[] = [];
+		const matched: Json[] = [];
+		const seenIds = new Set<string>();
+		for (let page = 0; page < 10 && matched.length < targetLimit; page++) {
+			const batchSize = Math.min(80, Math.max(targetLimit - matched.length, 40));
+			const rows = await c.call<Json[]>('users/notes', {
+				...pagination({ ...cursorQuery, limit: batchSize }, batchSize, 80),
+				userId: c.params.id,
+				withReplies: !excludeReplies,
+				withRenotes: !excludeReblogs,
+				withFiles: onlyMedia && excludeReplies,
+			});
+			if (!rows.length) break;
+			const ordered = pageRows(rows, { ...cursorQuery, limit: batchSize }, item => string(item.id), batchSize, 80);
+			if (!ordered.length) break;
+			const stream = forwardOnly ? [...ordered].reverse() : ordered;
+			for (const item of stream) {
+				const itemId = string(item.id);
+				if (seenIds.has(itemId)) continue;
+				seenIds.add(itemId);
+				scanned.push(item);
+				if (matches(item)) {
+					matched.push(item);
+					if (matched.length >= targetLimit) break;
+				}
+			}
+			if (matched.length >= targetLimit || rows.length < batchSize) break;
+			const boundary = string(stream.at(-1)!.id);
+			cursorQuery = forwardOnly ? { ...cursorQuery, min_id: boundary } : { ...cursorQuery, max_id: boundary };
+		}
+		matched.sort((a, b) => compareIds(string(b.id), string(a.id)));
+		return routes.page(c, scanned, await routes.statuses(matched, c));
 	}, true);
 	for (const direction of ['followers', 'following']) add('GET', `/api/v1/accounts/:id/${direction}`, 'read:follows', async c => {
 		const rows = await routes.readPage(c, `users/${direction}`, { userId: c.params.id });
@@ -192,7 +291,23 @@ export function registerRoutes(app: FastifyInstance, deps: RouteDependencies): R
 		await c.call(endpoint, { userId: c.params.id, ...(muteDuration > 0 ? { expiresAt: Date.now() + muteDuration * 1000 } : {}) }).catch(error => {
 			if (!(error instanceof NativeError && ['ALREADY_FOLLOWING', 'ALREADY_BLOCKING', 'ALREADY_MUTING', 'NOT_FOLLOWING', 'NOT_BLOCKING', 'NOT_MUTING'].includes(error.code))) throw error;
 		});
-		if (action === 'follow' && c.body.notify !== undefined) await c.call('following/update', { userId: c.params.id, notify: boolean(c.body.notify) ? 'normal' : 'none' });
+		if (action === 'follow' && (c.body.notify !== undefined || c.body.reblogs !== undefined)) {
+			const relation = await c.call('users/show', { userId: c.params.id });
+			if (c.body.notify !== undefined && relation.isFollowing === true) {
+				await c.call('following/update', { userId: c.params.id, notify: boolean(c.body.notify) ? 'normal' : 'none' }).catch(error => {
+					if (!(error instanceof NativeError && error.code === 'NOT_FOLLOWING')) throw error;
+				});
+			}
+			if (c.body.reblogs !== undefined) {
+				const showReblogs = boolean(c.body.reblogs);
+				const currentlyShowing = relation.isRenoteMuted !== true;
+				if (showReblogs !== currentlyShowing) {
+					await c.call(showReblogs ? 'renote-mute/delete' : 'renote-mute/create', { userId: c.params.id }).catch(error => {
+						if (!(error instanceof NativeError && ['ALREADY_MUTING', 'NOT_MUTING'].includes(error.code))) throw error;
+					});
+				}
+			}
+		}
 		return routes.relationship(c);
 	});
 	add('POST', '/api/v1/accounts/:id/note', 'write:accounts', async c => { await c.call('users/show', { userId: c.params.id }); await store.put('account-note', c.userId, c.params.id, string(c.body.comment)); return routes.relationship(c); });
@@ -204,10 +319,10 @@ export function registerRoutes(app: FastifyInstance, deps: RouteDependencies): R
 
 	for (const [path, endpoint, scope] of [['home', 'notes/timeline', 'statuses'], ['public', 'notes/global-timeline', 'statuses'], ['tag/:tag', 'notes/search-by-tag', 'statuses'], ['list/:id', 'notes/user-list-timeline', 'lists']]) {
 		add('GET', `/api/v1/timelines/${path}`, `read:${scope}`, async c => {
-			const parameters = { ...(path.startsWith('tag') ? { tag: c.params.tag, localHostOnly: boolean(c.query.local) } : {}), ...(path.startsWith('list') ? { listId: c.params.id } : {}), withFiles: boolean(c.query.only_media) };
+			const parameters = { ...(path.startsWith('tag') ? { tag: c.params.tag, localHostOnly: boolean(c.query.local), publicOnly: true } : {}), ...(path.startsWith('list') ? { listId: c.params.id } : {}), withFiles: boolean(c.query.only_media) };
 			const selected = path === 'public' && boolean(c.query.local) ? 'notes/local-timeline' : endpoint;
 			const notes = await routes.readPage(c, selected, parameters);
-			const filtered = notes.filter(note => (!boolean(c.query.remote) || note.user?.host) && (!boolean(c.query.only_media) || array(note.files).length));
+			const filtered = notes.filter(note => (!path.startsWith('tag') || note.visibility === 'public') && (!boolean(c.query.remote) || note.user?.host) && (!boolean(c.query.only_media) || array(note.files).length));
 			return routes.page(c, notes, await routes.statuses(filtered, c));
 		}, path === 'public' || path.startsWith('tag'));
 	}
@@ -236,12 +351,36 @@ export function registerRoutes(app: FastifyInstance, deps: RouteDependencies): R
 		const prepared = prepareStatusInput(c.body, undefined, true);
 		const note = await routes.note(c);
 		if (note.userId !== c.userId) throw new HttpError(403, 'You do not own this status');
+		if (c.body.visibility !== undefined && visibility(c.body.visibility) !== note.visibility) throw new HttpError(422, 'This status property cannot be edited');
+		if (c.body.in_reply_to_id !== undefined && (c.body.in_reply_to_id === null || c.body.in_reply_to_id === '' ? null : string(c.body.in_reply_to_id)) !== (note.replyId ?? null)) throw new HttpError(422, 'This status property cannot be edited');
+		if (c.body.local_only !== undefined && boolean(c.body.local_only) !== (note.localOnly === true)) throw new HttpError(422, 'This status property cannot be edited');
 		validateQuoteApprovalPolicy(c.body.quote_approval_policy, note.visibility);
-		const body = { noteId: note.id, text: c.body.status === undefined ? note.text : prepared.native.text, cw: c.body.spoiler_text === undefined ? note.cw : prepared.native.cw, ...(c.body.media_ids !== undefined ? { fileIds: prepared.native.fileIds ?? [] } : {}) };
+		const targetFileIds = c.body.media_ids !== undefined ? (prepared.native.fileIds ?? []) : array(note.files).map((file: Json) => string(file.id));
+		const fileComments: Array<{ fileId: string; comment: string | null }> = [];
+		for (const attr of prepared.mediaAttributes) {
+			if (!targetFileIds.includes(attr.id)) throw new HttpError(422, 'media_attributes must reference attached media');
+			if (attr.description !== undefined) {
+				fileComments.push({ fileId: attr.id, comment: attr.description.length > 0 ? attr.description : null });
+			}
+		}
+		const body = {
+			noteId: note.id,
+			text: c.body.status === undefined ? note.text : prepared.native.text,
+			cw: c.body.spoiler_text === undefined ? note.cw : prepared.native.cw,
+			...(c.body.media_ids !== undefined ? { fileIds: prepared.native.fileIds ?? [] } : {}),
+			...(fileComments.length ? { fileComments } : {}),
+		};
 		if (note.renoteId && !body.text?.trim() && !(body.fileIds ?? note.files)?.length && !note.poll) body.text = (await quoteTarget(routes, c, note.renoteId)).url;
-		await c.call('notes/update', body);
+		await c.call('notes/update', body).catch(error => {
+			if (error instanceof NativeError && error.code === 'NO_SUCH_FILE') throw new HttpError(404, 'Record not found');
+			throw error;
+		});
 		await store.transaction(async () => {
 			await store.put('status', c.userId, note.id, { ...await store.get<Json>('status', c.userId, note.id), ...prepared.metadata });
+			for (const attr of prepared.mediaAttributes) {
+				if (attr.focus === null) await store.delete('media', c.userId, attr.id);
+				else if (attr.focus !== undefined) await store.put('media', c.userId, attr.id, { focus: attr.focus });
+			}
 		});
 		return routes.status(await routes.note(c), c);
 	});
@@ -249,7 +388,14 @@ export function registerRoutes(app: FastifyInstance, deps: RouteDependencies): R
 		const selectedVisibility = action === 'reblog' ? visibility(c.body.visibility) : undefined;
 		const note = await routes.note(c);
 		if (action === 'reblog') {
-			const existing = await liveReblog(store, c.userId, note.id, c.call);
+			let existing = await liveReblog(store, c.userId, note.id, c.call);
+			if (!existing && c.grant && toNativePermissions(c.grant.scopes).includes('read:account')) {
+				const state = await c.call('notes/state', { noteId: note.id });
+				if (typeof state.myRenoteId === 'string' && state.myRenoteId) {
+					existing = state.myRenoteId;
+					await store.put('reblog', c.userId, note.id, existing);
+				}
+			}
 			let reblogNote: Json;
 			if (existing) {
 				reblogNote = await routes.note(c, existing);
@@ -275,17 +421,49 @@ export function registerRoutes(app: FastifyInstance, deps: RouteDependencies): R
 	});
 	for (const [action, endpoint, field, scope] of [['bookmark', 'notes/favorites/create', 'bookmarked', 'bookmarks'], ['unbookmark', 'notes/favorites/delete', 'bookmarked', 'bookmarks'], ['pin', 'i/pin', 'pinned', 'accounts'], ['unpin', 'i/unpin', 'pinned', 'accounts'], ['mute', 'notes/thread-muting/create', 'muted', 'mutes'], ['unmute', 'notes/thread-muting/delete', 'muted', 'mutes']]) add('POST', `/api/v1/statuses/:id/${action}`, `write:${scope}`, async c => {
 		await routes.note(c);
-		await c.call(endpoint, { noteId: c.params.id }).catch(error => { if (!(error instanceof NativeError && ['ALREADY_FAVORITED', 'NOT_FAVORITED', 'ALREADY_PINNED', 'NOT_PINNED', 'ALREADY_MUTED', 'NOT_MUTED'].includes(error.code))) throw error; });
+		await c.call(endpoint, { noteId: c.params.id }).catch(error => { if (!(error instanceof NativeError && ['ALREADY_FAVORITED', 'NOT_FAVORITED', 'ALREADY_PINNED', 'NOT_PINNED', 'ALREADY_MUTED', 'ALREADY_MUTING', 'NOT_MUTED'].includes(error.code))) throw error; });
 		return { ...await routes.status(await routes.note(c), c), [field]: !action.startsWith('un') };
 	});
 	for (const [suffix, endpoint] of [['reblogged_by', 'notes/renotes'], ['favourited_by', 'notes/reactions']]) add('GET', `/api/v1/statuses/:id/${suffix}`, 'read:statuses', async c => {
 		await routes.note(c);
-		const rows = await routes.readPage(c, endpoint, { noteId: c.params.id });
+		const rows = await routes.readPage(c, endpoint, { noteId: c.params.id, ...(suffix === 'favourited_by' ? { type: '❤' } : {}) });
 		const filtered = suffix === 'favourited_by' ? rows.filter(item => ['❤', '❤️'].includes(item.type)) : rows;
 		return routes.page(c, rows, filtered.map(item => account(item.user)));
 	}, true);
 	add('GET', '/api/v1/bookmarks', 'read:bookmarks', async c => { const rows = await routes.readPage(c, 'i/favorites'); return routes.page(c, rows, (await routes.statuses(rows.map(item => item.note), c)).map(status => ({ ...status, bookmarked: true }))); });
-	add('GET', '/api/v1/favourites', 'read:favourites', async c => { const rows = await routes.readPage(c, 'users/reactions', { userId: c.userId }); return routes.page(c, rows, await routes.statuses(rows.filter(row => ['❤', '❤️'].includes(row.type)).map(row => row.note), c)); });
+	add('GET', '/api/v1/favourites', 'read:favourites', async c => { const rows = await routes.readPage(c, 'users/reactions', { userId: c.userId, type: '❤' }); return routes.page(c, rows, await routes.statuses(rows.filter(row => ['❤', '❤️'].includes(row.type)).map(row => row.note), c)); });
+	add('POST', '/api/v1/reports', 'write:reports', async c => {
+		const accountId = string(c.body.account_id).trim();
+		if (!accountId) throw new HttpError(422, 'account_id is required');
+		const category = string(c.body.category, 'other');
+		if (!['spam', 'legal', 'violation', 'other'].includes(category)) throw new HttpError(422, 'Invalid report category');
+		const rawComment = string(c.body.comment).trim();
+		const statusIds = strings(c.body.status_ids).filter(Boolean);
+		const ruleIds = strings(c.body.rule_ids).filter(Boolean);
+		const target = await c.call('users/show', { userId: accountId });
+		const parts = [
+			`[${category}]`,
+			rawComment,
+			statusIds.length ? `Statuses: ${statusIds.join(', ')}` : '',
+			ruleIds.length ? `Rules: ${ruleIds.join(', ')}` : '',
+		].filter(Boolean);
+		const reportComment = parts.join('\n') || 'Reported via Mastodon API';
+		if (reportComment.length > 2048) throw new HttpError(422, 'Report comment exceeds maximum length');
+		const created = await c.call<Json>('users/report-abuse', { userId: target.id, comment: reportComment });
+		if (!created || typeof created.id !== 'string' || !created.id) throw new NativeError(502, 'INVALID_NATIVE_RESPONSE', 'The native API did not return the created report');
+		return {
+			id: created.id,
+			action_taken: false,
+			action_taken_at: null,
+			category,
+			comment: rawComment,
+			forwarded: false,
+			created_at: new Date().toISOString(),
+			status_ids: statusIds.length ? statusIds : null,
+			rule_ids: ruleIds.length ? ruleIds : null,
+			target_account: account(target),
+		};
+	});
 	add('GET', '/api/v1/polls/:id', 'read:statuses', async c => { const note = await routes.note(c); if (!note.poll) throw new HttpError(404, 'Record not found'); return entities.poll(note); }, true);
 	add('POST', '/api/v1/polls/:id/votes', 'write:statuses', async c => {
 		const note = await routes.note(c); if (!note.poll) throw new HttpError(404, 'Record not found');
@@ -295,10 +473,15 @@ export function registerRoutes(app: FastifyInstance, deps: RouteDependencies): R
 		if (pending.length) await c.call('notes/polls/vote', { noteId: note.id, choices: pending });
 		return entities.poll(await routes.note(c));
 	});
+	const validateListPolicy = (body: Json): void => {
+		if ((body.exclusive !== undefined && body.exclusive !== '' && boolean(body.exclusive)) || (body.replies_policy !== undefined && body.replies_policy !== '' && string(body.replies_policy) !== 'list')) {
+			throw new HttpError(422, 'This list policy is unavailable');
+		}
+	};
 	add('GET', '/api/v1/lists', 'read:lists', async c => (await c.call<Json[]>('users/lists/list')).map(list));
-	add('POST', '/api/v1/lists', 'write:lists', async c => list(await c.call('users/lists/create', { name: string(c.body.title) })));
+	add('POST', '/api/v1/lists', 'write:lists', async c => { validateListPolicy(c.body); return list(await c.call('users/lists/create', { name: string(c.body.title) })); });
 	add('GET', '/api/v1/lists/:id', 'read:lists', async c => list(await c.call('users/lists/show', { listId: c.params.id })));
-	add('PUT', '/api/v1/lists/:id', 'write:lists', async c => { if (c.body.exclusive === true || (c.body.replies_policy && c.body.replies_policy !== 'list')) throw new HttpError(422, 'This list policy is unavailable'); return list(await c.call('users/lists/update', { listId: c.params.id, name: string(c.body.title) })); });
+	add('PUT', '/api/v1/lists/:id', 'write:lists', async c => { validateListPolicy(c.body); return list(await c.call('users/lists/update', { listId: c.params.id, name: string(c.body.title) })); });
 	add('DELETE', '/api/v1/lists/:id', 'write:lists', async c => { await c.call('users/lists/delete', { listId: c.params.id }); return {}; });
 	add('GET', '/api/v1/lists/:id/accounts', 'read:lists', async c => {
 		const item = await c.call('users/lists/show', { listId: c.params.id });
@@ -335,16 +518,45 @@ function validateQuoteApprovalPolicy(value: unknown, nativeVisibility: string): 
 	if (policy !== 'public' && !['followers', 'specified'].includes(nativeVisibility)) throw new HttpError(422, 'Only public quote approval is supported for public or unlisted statuses');
 }
 
-function prepareStatusInput(input: Json, defaults: Json = {}, editing = false): { native: Json; metadata: Json } {
+type MediaAttributePatch = { id: string; description?: string; focus?: { x: number; y: number } | null };
+
+function parseMediaAttributes(value: unknown): MediaAttributePatch[] {
+	if (value == null || value === '') return [];
+	if (typeof value !== 'object') throw new HttpError(422, 'Invalid media_attributes');
+	const raw = Array.isArray(value)
+		? value
+		: Object.entries(value as Json).sort(([a], [b]) => Number(a) - Number(b)).map(([, item]) => item);
+	if (raw.length > 16) throw new HttpError(422, 'Too many media_attributes');
+	const seen = new Set<string>();
+	return raw.map(item => {
+		if (item == null || typeof item !== 'object' || Array.isArray(item)) throw new HttpError(422, 'Invalid media_attributes entry');
+		const id = string((item as Json).id);
+		if (!id || seen.has(id)) throw new HttpError(422, 'Invalid media_attributes id');
+		seen.add(id);
+		if ((item as Json).thumbnail !== undefined) throw new HttpError(422, 'Custom thumbnails are unavailable');
+		const patch: MediaAttributePatch = { id };
+		if ((item as Json).description !== undefined) {
+			patch.description = (item as Json).description === null ? '' : mediaDescription((item as Json).description);
+		}
+		if ((item as Json).focus !== undefined) {
+			patch.focus = (item as Json).focus === null || (item as Json).focus === '' ? null : mediaFocalPoint((item as Json).focus);
+		}
+		return patch;
+	});
+}
+
+function prepareStatusInput(input: Json, defaults: Json = {}, editing = false): { native: Json; metadata: Json; mediaAttributes: MediaAttributePatch[] } {
 	const text = (value: unknown, name: string): string | null => {
 		if (value == null || value === '') return null;
 		if (typeof value !== 'string') throw new HttpError(422, `${name} must be a string`);
 		return value;
 	};
-	for (const name of ['scheduled_at', 'media_attributes']) {
-		if (input[name] != null && input[name] !== '' && (!Array.isArray(input[name]) || input[name].length)) throw new HttpError(422, `${name} is unavailable through this gateway`);
+	if (input.scheduled_at != null && input.scheduled_at !== '') throw new HttpError(422, 'scheduled_at is unavailable through this gateway');
+	if (!editing && input.media_attributes != null && input.media_attributes !== '' && (!Array.isArray(input.media_attributes) || input.media_attributes.length)) {
+		throw new HttpError(422, 'media_attributes is unavailable through this gateway');
 	}
-	if (editing && ['visibility', 'in_reply_to_id', 'poll', 'local_only'].some(name => input[name] !== undefined)) throw new HttpError(422, 'This status property cannot be edited');
+	const mediaAttributes = editing ? parseMediaAttributes(input.media_attributes) : [];
+	if (editing && input.poll !== undefined) throw new HttpError(422, 'This status property cannot be edited');
 	const native: Json = { text: text(input.status, 'status'), cw: text(input.spoiler_text, 'spoiler_text') };
 	const quotedStatusId = text(input.quoted_status_id, 'quoted_status_id');
 	const quoteId = text(input.quote_id, 'quote_id');
@@ -383,7 +595,7 @@ function prepareStatusInput(input: Json, defaults: Json = {}, editing = false): 
 		if (native.fileIds?.length) throw new HttpError(422, 'A poll cannot be combined with media');
 	}
 	if (!editing && !native.text && !native.fileIds?.length && !native.poll && !native.renoteId) throw new HttpError(422, 'A status needs text, media, a poll, or a quote');
-	return { native, metadata };
+	return { native, metadata, mediaAttributes };
 }
 
 function canonicalJson(value: unknown): string {
@@ -434,7 +646,15 @@ async function createStatus(routes: Routes, c: RequestContext): Promise<Json> {
 				seen.add(key);
 				return true;
 			});
-		const ids = await Promise.all(uniqueMentions.map(async m => (await c.call('users/show', { username: m.username, host: m.host })).id));
+		const resolvedMentions = await Promise.all(uniqueMentions.map(async m => {
+			try {
+				return string((await c.call('users/show', { username: m.username, host: m.host })).id);
+			} catch (error) {
+				if (error instanceof NativeError && ['NO_SUCH_USER', 'FAILED_TO_RESOLVE_REMOTE_USER'].includes(error.code)) return null;
+				throw error;
+			}
+		}));
+		const ids = resolvedMentions.filter((id): id is string => id !== null);
 		if (quoted && quoted.account.id !== c.userId && !ids.includes(quoted.account.id)) throw new HttpError(422, 'A direct quote must explicitly mention the quoted author');
 		if (body.replyId) { const reply = await routes.note(c, body.replyId); ids.push(reply.userId); }
 		body.visibleUserIds = [...new Set(ids)].filter(id => id !== c.userId);

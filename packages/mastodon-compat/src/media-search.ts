@@ -4,17 +4,18 @@
  */
 
 import { NativeError } from './native-client.js';
-import { array, boolean, HttpError, integer, parameters, string } from './parameters.js';
+import { appendFormField, array, boolean, HttpError, integer, parameters, string } from './parameters.js';
 import type { RequestContext, Routes } from './routes.js';
 import type { Json } from './types.js';
 
 interface Upload { blob: Blob; name: string; }
 interface MultipartInput { fields: Json; files: Map<string, Upload>; }
 
-async function input(c: RequestContext, acceptedFiles: readonly string[]): Promise<MultipartInput> {
+async function input(c: RequestContext, acceptedFiles: readonly string[], allowUnindexedFields = false): Promise<MultipartInput> {
 	if (!c.request.isMultipart()) return { fields: c.body, files: new Map() };
-	const fields: Json = Object.create(null);
+	const fields: Record<string, unknown> = Object.create(null);
 	const files = new Map<string, Upload>();
+	const groups = new Map<string, Array<Set<string>>>();
 	for await (const part of c.request.parts()) {
 		if (part.type === 'file') {
 			if (!acceptedFiles.includes(part.fieldname) || files.has(part.fieldname)) {
@@ -27,14 +28,18 @@ async function input(c: RequestContext, acceptedFiles: readonly string[]): Promi
 			files.set(part.fieldname, { blob: new Blob([new Uint8Array(bytes)], { type: part.mimetype }), name: part.filename || 'upload' });
 		} else {
 			if (part.valueTruncated || part.fieldnameTruncated) throw new HttpError(422, 'Parameter is too large');
-			if (Object.hasOwn(fields, part.fieldname)) throw new HttpError(422, 'Duplicate parameter');
-			fields[part.fieldname] = part.value;
+			if (allowUnindexedFields && /^fields_attributes\[\]\[[^\]]+\]$/u.test(part.fieldname)) {
+				appendFormField(fields, groups, part.fieldname, part.value, false);
+			} else {
+				if (Object.hasOwn(fields, part.fieldname)) throw new HttpError(422, 'Duplicate parameter');
+				fields[part.fieldname] = part.value;
+			}
 		}
 	}
 	return { fields: parameters(fields), files };
 }
 
-function focalPoint(value: unknown): { x: number; y: number } | undefined {
+export function focalPoint(value: unknown): { x: number; y: number } | undefined {
 	if (value === undefined) return undefined;
 	const parts = string(value).split(',');
 	if (parts.length !== 2 || parts.some(item => !item.trim())) throw new HttpError(422, 'Focus must contain two coordinates');
@@ -43,7 +48,7 @@ function focalPoint(value: unknown): { x: number; y: number } | undefined {
 	return { x, y };
 }
 
-function description(value: unknown): string | undefined {
+export function description(value: unknown): string | undefined {
 	if (value === undefined) return undefined;
 	const result = string(value);
 	if (result.length > 512) throw new HttpError(422, 'Media descriptions cannot exceed 512 characters');
@@ -99,8 +104,17 @@ export function registerMediaSearch(routes: Routes): void {
 	routes.add('POST', '/api/v1/statuses/:id/translate', 'read:statuses', c => translate(routes, c));
 }
 
+function canonicalizeLanguageTag(value: string): string {
+	return value.split('-').map((segment, index) => {
+		if (index === 0) return segment.toLowerCase();
+		if (segment.length === 2) return segment.toUpperCase();
+		if (segment.length === 4) return segment[0].toUpperCase() + segment.slice(1).toLowerCase();
+		return segment;
+	}).join('-');
+}
+
 async function updateProfile(routes: Routes, c: RequestContext): Promise<Json> {
-	const { fields, files } = await input(c, ['avatar', 'header']);
+	const { fields, files } = await input(c, ['avatar', 'header'], true);
 	const body: Json = {};
 	for (const [source, target] of [['display_name', 'name'], ['note', 'description']]) if (fields[source] !== undefined) body[target] = string(fields[source]) || null;
 	for (const [source, target] of [['locked', 'isLocked'], ['bot', 'isBot'], ['discoverable', 'isExplorable']]) if (fields[source] !== undefined) body[target] = boolean(fields[source]);
@@ -109,24 +123,32 @@ async function updateProfile(routes: Routes, c: RequestContext): Promise<Json> {
 	if (fields.fields_attributes !== undefined) {
 		const attributes = fields.fields_attributes;
 		if (attributes == null || typeof attributes !== 'object') throw new HttpError(422, 'Invalid profile fields');
-		const entries = Array.isArray(attributes) ? attributes : Object.entries(attributes).sort(([a], [b]) => Number(a) - Number(b)).map(([, value]) => value);
+		const entries = Array.isArray(attributes)
+			? attributes
+			: !Array.isArray(attributes) && ('name' in attributes || 'value' in attributes) && (Array.isArray(attributes.name) || Array.isArray(attributes.value) || typeof attributes.name === 'string' || typeof attributes.value === 'string')
+				? Array.from({ length: Math.max(array(attributes.name).length, array(attributes.value).length) }, (_, i) => ({ name: array(attributes.name)[i] ?? '', value: array(attributes.value)[i] ?? '' }))
+				: Object.entries(attributes).sort(([a], [b]) => Number(a) - Number(b)).map(([, value]) => value);
 		if (entries.length > 16) throw new HttpError(422, 'Too many profile fields');
 		body.fields = entries.map(item => {
 			if (item == null || typeof item !== 'object' || Array.isArray(item)) throw new HttpError(422, 'Invalid profile field');
 			return { name: string(item.name), value: string(item.value) };
 		}).filter(item => item.name || item.value);
 	}
-	const oldSource = await routes.deps.store.get<Json>('account-source', c.userId, 'defaults') ?? {};
-	const source: Json = { ...oldSource };
+	const sourcePatch: Json = {};
 	if (fields.source !== undefined) {
 		if (fields.source == null || typeof fields.source !== 'object' || Array.isArray(fields.source)) throw new HttpError(422, 'Invalid source preferences');
 		if (fields.source.privacy !== undefined) {
 			const value = string(fields.source.privacy);
 			if (!['public', 'unlisted', 'private', 'direct'].includes(value)) throw new HttpError(422, 'Invalid default visibility');
-			source.privacy = value;
+			sourcePatch.privacy = value;
 		}
-		if (fields.source.sensitive !== undefined) source.sensitive = body.alwaysMarkNsfw = boolean(fields.source.sensitive);
-		if (fields.source.language !== undefined) source.language = body.lang = string(fields.source.language) || null;
+		if (fields.source.sensitive !== undefined) sourcePatch.sensitive = body.alwaysMarkNsfw = boolean(fields.source.sensitive);
+		if (fields.source.language !== undefined) {
+			const rawLanguage = string(fields.source.language).trim();
+			if (rawLanguage && !/^[a-z]{2,3}(?:-[a-z0-9]{2,8})*$/iu.test(rawLanguage)) throw new HttpError(422, 'Invalid language');
+			sourcePatch.language = rawLanguage || null;
+			body.lang = rawLanguage ? canonicalizeLanguageTag(rawLanguage) : null;
+		}
 	}
 	for (const [field, target] of [['avatar', 'avatarId'], ['header', 'bannerId']]) {
 		if (fields[field] !== undefined) {
@@ -144,8 +166,27 @@ async function updateProfile(routes: Routes, c: RequestContext): Promise<Json> {
 		const file = files.get(field);
 		if (file) body[target] = (await upload(routes, c, file)).id;
 	}
-	const user = Object.keys(body).length ? await c.call('i/update', body) : await c.call('i');
-	if (fields.source !== undefined) await routes.deps.store.put('account-source', c.userId, 'defaults', source);
+	let user: Json;
+	if (Object.keys(body).length) {
+		try {
+			user = await c.call('i/update', body);
+		} catch (error) {
+			if (body.lang != null && error instanceof NativeError && error.status === 400 && error.code === 'INVALID_PARAM') {
+				const fallbackBody = { ...body };
+				delete fallbackBody.lang;
+				user = Object.keys(fallbackBody).length ? await c.call('i/update', fallbackBody) : await c.call('i');
+			} else throw error;
+		}
+	} else {
+		user = await c.call('i');
+	}
+	const source = fields.source !== undefined
+		? await routes.deps.store.transaction(async () => {
+			const merged = { ...await routes.deps.store.get<Json>('account-source', c.userId, 'defaults'), ...sourcePatch };
+			await routes.deps.store.put('account-source', c.userId, 'defaults', merged);
+			return merged;
+		})
+		: await routes.deps.store.get<Json>('account-source', c.userId, 'defaults') ?? {};
 	const result = routes.deps.entities.account(user, true);
 	Object.assign(result.source, source);
 	return result;
