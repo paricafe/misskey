@@ -28,28 +28,21 @@ SPDX-License-Identifier: AGPL-3.0-only
 				</div>
 			</div>
 
-			<div v-else ref="timelineEl" class="_gaps">
+			<div v-else ref="timelineEl" class="_gaps" :class="$style.timeline">
 				<div v-if="canFetchMore">
 					<MkButton :class="$style.more" :wait="moreFetching" primary rounded @click="fetchMore">{{ i18n.ts.loadMore }}</MkButton>
 				</div>
 
-				<TransitionGroup
-					:enterActiveClass="prefer.s.animation ? $style.transition_x_enterActive : ''"
-					:leaveActiveClass="prefer.s.animation ? $style.transition_x_leaveActive : ''"
-					:enterFromClass="prefer.s.animation ? $style.transition_x_enterFrom : ''"
-					:leaveToClass="prefer.s.animation ? $style.transition_x_leaveTo : ''"
-					:moveClass="prefer.s.animation ? $style.transition_x_move : ''"
-					tag="div" class="_gaps"
-				>
-					<template v-for="item in timeline.toReversed()" :key="item.id">
-						<XMessage v-if="item.type === 'item'" :message="item.data"/>
-						<div v-else-if="item.type === 'date'" :class="$style.dateDivider">
-							<span><i class="ti ti-chevron-up"></i> {{ item.nextText }}</span>
+				<MkVirtualList v-slot="{ item: message, index: i }" :items="messages" :reversed="true" :estimatedHeight="96" :gap="16">
+					<div :class="{ '_gaps': i > 0 && isSeparatorNeeded(messages[i - 1].createdAt, message.createdAt) }">
+						<div v-if="i > 0 && isSeparatorNeeded(messages[i - 1].createdAt, message.createdAt)" :class="$style.dateDivider">
+							<span><i class="ti ti-chevron-up"></i> {{ getSeparatorInfo(messages[i - 1].createdAt, message.createdAt)?.prevText }}</span>
 							<span style="height: 1em; width: 1px; background: var(--MI_THEME-divider);"></span>
-							<span>{{ item.prevText }} <i class="ti ti-chevron-down"></i></span>
+							<span>{{ getSeparatorInfo(messages[i - 1].createdAt, message.createdAt)?.nextText }} <i class="ti ti-chevron-down"></i></span>
 						</div>
-					</template>
-				</TransitionGroup>
+						<XMessage :message="message"/>
+					</div>
+				</MkVirtualList>
 			</div>
 
 			<div v-if="user && (!user.canChat || user.host !== null)">
@@ -90,7 +83,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 </template>
 
 <script lang="ts" setup>
-import { ref, useTemplateRef, computed, onMounted, onBeforeUnmount, onDeactivated, onActivated } from 'vue';
+import { ref, shallowRef, nextTick, useTemplateRef, computed, onMounted, onBeforeUnmount, onDeactivated, onActivated } from 'vue';
 import * as Misskey from 'misskey-js';
 import { getScrollContainer } from '@@/js/scroll.js';
 import XMessage from './XMessage.vue';
@@ -107,12 +100,11 @@ import { i18n } from '@/i18n.js';
 import { ensureSignin } from '@/i.js';
 import { misskeyApi } from '@/utility/misskey-api.js';
 import { definePage } from '@/page.js';
-import { prefer } from '@/preferences.js';
 import MkButton from '@/components/MkButton.vue';
+import MkVirtualList from '@/components/MkVirtualList.vue';
 import { useRouter } from '@/router.js';
-import { useMutationObserver } from '@/composables/use-mutation-observer.js';
 import MkInfo from '@/components/MkInfo.vue';
-import { makeDateSeparatedTimelineComputedRef } from '@/utility/timeline-date-separate.js';
+import { isSeparatorNeeded, getSeparatorInfo } from '@/utility/timeline-date-separate.js';
 
 const $i = ensureSignin();
 const router = useRouter();
@@ -133,30 +125,26 @@ const initializing = ref(false);
 const initialized = ref(false);
 const fetchError = ref<'notFound' | 'error' | null>(null);
 const moreFetching = ref(false);
-const messages = ref<NormalizedChatMessage[]>([]);
+const messages = shallowRef<NormalizedChatMessage[]>([]);
 const canFetchMore = ref(false);
 const user = ref<Misskey.entities.UserDetailed | null>(null);
 const room = ref<Misskey.entities.ChatRoom | null>(null);
 const connection = ref<Misskey.IChannelConnection<Misskey.Channels['chatUser']> | Misskey.IChannelConnection<Misskey.Channels['chatRoom']> | null>(null);
 const showIndicator = ref(false);
 const timelineEl = useTemplateRef('timelineEl');
-const timeline = makeDateSeparatedTimelineComputedRef(messages);
 
 const SCROLL_HEAD_THRESHOLD = 200;
 
-useMutationObserver(timelineEl, {
-	subtree: true,
-	childList: true,
-	attributes: false,
-}, () => {
-	const scrollContainer = getScrollContainer(timelineEl.value)!;
-	if (-scrollContainer.scrollTop < SCROLL_HEAD_THRESHOLD) {
+function scrollToBottomIfNearHead() {
+	if (timelineEl.value == null) return;
+	const scrollContainer = getScrollContainer(timelineEl.value);
+	if (scrollContainer && -scrollContainer.scrollTop < SCROLL_HEAD_THRESHOLD) {
 		scrollContainer.scrollTo({
 			top: 0,
 			behavior: 'instant',
 		});
 	}
-});
+}
 
 function normalizeMessage(message: Misskey.entities.ChatMessageLite | Misskey.entities.ChatMessage): NormalizedChatMessage {
 	return {
@@ -200,7 +188,7 @@ async function initialize() {
 		const [u, m] = result;
 
 		user.value = u;
-		messages.value = m.map(x => normalizeMessage(x));
+		messages.value = m.map(x => normalizeMessage(x)).reverse();
 
 		if (messages.value.length === LIMIT) {
 			canFetchMore.value = true;
@@ -254,7 +242,7 @@ async function initialize() {
 		const m = mResult.value as Misskey.entities.ChatMessagesRoomTimelineResponse;
 
 		room.value = r;
-		messages.value = m.map(x => normalizeMessage(x));
+		messages.value = m.map(x => normalizeMessage(x)).reverse();
 
 		if (messages.value.length === LIMIT) {
 			canFetchMore.value = true;
@@ -287,20 +275,22 @@ onDeactivated(() => {
 
 async function fetchMore() {
 	const LIMIT = 30;
+	const oldest = messages.value[0];
+	if (oldest == null) return;
 
 	moreFetching.value = true;
 
 	const newMessages = props.userId ? await misskeyApi('chat/messages/user-timeline', {
 		userId: user.value!.id,
 		limit: LIMIT,
-		untilId: messages.value[messages.value.length - 1].id,
+		untilId: oldest.id,
 	}) : await misskeyApi('chat/messages/room-timeline', {
 		roomId: room.value!.id,
 		limit: LIMIT,
-		untilId: messages.value[messages.value.length - 1].id,
+		untilId: oldest.id,
 	});
 
-	messages.value.push(...newMessages.map(x => normalizeMessage(x)));
+	messages.value = [...newMessages.map(x => normalizeMessage(x)).reverse(), ...messages.value];
 
 	canFetchMore.value = newMessages.length === LIMIT;
 	moreFetching.value = false;
@@ -309,50 +299,57 @@ async function fetchMore() {
 function onMessage(message: Misskey.entities.ChatMessageLite) {
 	sound.playMisskeySfx('chatMessage');
 
-	messages.value.unshift(normalizeMessage(message));
+	const shouldStickToBottom = (() => {
+		if (timelineEl.value == null) return false;
+		const scrollContainer = getScrollContainer(timelineEl.value);
+		return scrollContainer != null && -scrollContainer.scrollTop < SCROLL_HEAD_THRESHOLD;
+	})();
+
+	messages.value = [...messages.value, normalizeMessage(message)];
+
+	if (shouldStickToBottom) {
+		nextTick(() => {
+			scrollToBottomIfNearHead();
+		});
+	}
 
 	if (message.fromUserId !== $i.id && !window.document.hidden && isActivated) {
 		connection.value?.send('read', {
 			id: message.id,
 		});
 	}
-
-	if (message.fromUserId !== $i.id) {
-	}
 }
 
 function onDeleted(id: string) {
 	const index = messages.value.findIndex(m => m.id === id);
 	if (index !== -1) {
-		messages.value.splice(index, 1);
+		messages.value = messages.value.toSpliced(index, 1);
 	}
 }
 
 function onReact(ctx: Parameters<Misskey.Channels['chatUser']['events']['react']>[0] | Parameters<Misskey.Channels['chatRoom']['events']['react']>[0]) {
-	const message = messages.value.find(m => m.id === ctx.messageId);
-	if (message) {
-		if (room.value == null) {
-			message.reactions.push({
-				reaction: ctx.reaction,
-				user: message.fromUserId === $i.id ? user.value! : $i,
-			});
-		} else {
-			message.reactions.push({
-				reaction: ctx.reaction,
-				user: ctx.user!,
-			});
-		}
-	}
+	const index = messages.value.findIndex(m => m.id === ctx.messageId);
+	if (index === -1) return;
+	const message = messages.value[index];
+	const added = room.value == null
+		? { reaction: ctx.reaction, user: message.fromUserId === $i.id ? user.value! : $i }
+		: { reaction: ctx.reaction, user: ctx.user! };
+	messages.value = messages.value.with(index, {
+		...message,
+		reactions: [...message.reactions, added],
+	});
 }
 
 function onUnreact(ctx: Parameters<Misskey.Channels['chatUser']['events']['unreact']>[0] | Parameters<Misskey.Channels['chatRoom']['events']['unreact']>[0]) {
-	const message = messages.value.find(m => m.id === ctx.messageId);
-	if (message) {
-		const index = message.reactions.findIndex(r => r.reaction === ctx.reaction && r.user.id === ctx.user!.id);
-		if (index !== -1) {
-			message.reactions.splice(index, 1);
-		}
-	}
+	const index = messages.value.findIndex(m => m.id === ctx.messageId);
+	if (index === -1) return;
+	const message = messages.value[index];
+	const reactionIndex = message.reactions.findIndex(r => r.reaction === ctx.reaction && r.user.id === ctx.user!.id);
+	if (reactionIndex === -1) return;
+	messages.value = messages.value.with(index, {
+		...message,
+		reactions: message.reactions.toSpliced(reactionIndex, 1),
+	});
 }
 
 function onIndicatorClick() {
@@ -493,18 +490,8 @@ definePage(computed(() => {
 </script>
 
 <style lang="scss" module>
-.transition_x_move,
-.transition_x_enterActive,
-.transition_x_leaveActive {
-	transition: opacity 0.2s cubic-bezier(0,.5,.5,1), transform 0.2s cubic-bezier(0,.5,.5,1) !important;
-}
-.transition_x_enterFrom,
-.transition_x_leaveTo {
-	opacity: 0;
-	transform: translateY(80px);
-}
-.transition_x_leaveActive {
-	position: absolute;
+.timeline {
+	overflow-anchor: none;
 }
 
 .root {

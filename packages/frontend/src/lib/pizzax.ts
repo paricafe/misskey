@@ -97,9 +97,14 @@ export class Pizzax<T extends StateDef> {
 	private async init(): Promise<void> {
 		await this.migrate();
 
-		const deviceState: State<T> = await get(this.deviceStateKeyName) || {};
-		const deviceAccountState = $i ? await get(this.deviceAccountStateKeyName) || {} : {};
-		const registryCache = $i ? await get(this.registryCacheKeyName) || {} : {};
+		const [rawDeviceState, rawDeviceAccountState, rawRegistryCache] = await Promise.all([
+			get(this.deviceStateKeyName),
+			$i ? get(this.deviceAccountStateKeyName) : Promise.resolve(null),
+			$i ? get(this.registryCacheKeyName) : Promise.resolve(null),
+		]);
+		const deviceState: State<T> = rawDeviceState || {};
+		const deviceAccountState = rawDeviceAccountState || {};
+		const registryCache = rawRegistryCache || {};
 
 		for (const [k, v] of Object.entries(this.def) as [keyof T, T[keyof T]['default']][]) {
 			if (v.where === 'device' && Object.prototype.hasOwnProperty.call(deviceState, k)) {

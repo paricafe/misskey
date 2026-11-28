@@ -4,7 +4,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 -->
 
 <template>
-<div ref="root" :class="['chromatic-ignore', $style.root, { [$style.cover]: cover }]" :title="title ?? ''">
+<div :class="['chromatic-ignore', $style.root, { [$style.cover]: cover }]" :title="title ?? ''">
 	<TransitionGroup
 		:duration="prefer.s.animation && props.transition?.duration || undefined"
 		:enterActiveClass="prefer.s.animation && props.transition?.enterActiveClass || undefined"
@@ -81,11 +81,8 @@ const props = withDefaults(defineProps<{
 	onlyAvgColor: false,
 });
 
-const root = useTemplateRef('root');
 const img = useTemplateRef('img');
 const loaded = ref(false);
-const imgWidth = ref(props.width);
-const imgHeight = ref(props.height);
 const hide = computed(() => !loaded.value || props.forceBlurhash);
 
 function waitForDecode() {
@@ -101,15 +98,6 @@ function waitForDecode() {
 		loaded.value = false;
 	}
 }
-
-watch([() => props.width, () => props.height, root], () => {
-	const ratio = props.width / props.height;
-	const clientWidth = root.value?.clientWidth ?? 300;
-	imgWidth.value = clientWidth;
-	imgHeight.value = Math.round(clientWidth / ratio);
-}, {
-	immediate: true,
-});
 
 watch(() => props.src, () => {
 	waitForDecode();

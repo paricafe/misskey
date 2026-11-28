@@ -328,4 +328,112 @@ describe('MkVirtualList', () => {
 			app.unmount();
 		}
 	});
+
+	test('skips slot re-rendering while scrolling within an unchanged visible range', async () => {
+		let slotCalls = 0;
+		const items = ref(Array.from({ length: 50 }, (_, i) => ({ id: `note-${i}` })));
+		const app = createApp({
+			render: () => h(MkVirtualList, { items: items.value, estimatedHeight: 100, overscan: 200 }, {
+				default: ({ item }: { item: { id: string } }) => {
+					slotCalls++;
+					return h('button', item.id);
+				},
+			}),
+		});
+		app.mount(scrollContainer);
+		try {
+			await flush();
+			const initialCalls = slotCalls;
+			for (let px = 1; px <= 10; px++) {
+				scrollContainer.scrollTop = px;
+				scrollContainer.dispatchEvent(new Event('scroll'));
+				await flush();
+			}
+			expect(slotCalls).toBe(initialCalls);
+		} finally {
+			app.unmount();
+		}
+	});
+
+	test('updates layout when ResizeObserver reports borderBoxSize changes', async () => {
+		const { app } = mountList(200);
+		try {
+			await flush();
+			const root = scrollContainer.querySelector<HTMLElement>('[data-virtual-list]')!;
+			const bottomSpacer = () => root.lastElementChild as HTMLElement;
+			const beforeBottom = parseFloat(bottomSpacer().style.height);
+			const first = scrollContainer.querySelector<HTMLElement>('[data-virtual-item="note-0"]')!;
+			heights.set('note-0', 180);
+			const observer = observers.at(-1)!;
+			(observer as unknown as { callback: ResizeObserverCallback }).callback(
+				[{ target: first, borderBoxSize: [{ inlineSize: 100, blockSize: 180 }] } as unknown as ResizeObserverEntry],
+				observer as unknown as ResizeObserver,
+			);
+			await flush();
+			expect(parseFloat(bottomSpacer().style.height)).toBe(beforeBottom + 100);
+		} finally {
+			app.unmount();
+		}
+	});
+
+	test('reversed mode keeps reading anchor on older prepend and bottom append while staying pinned at bottom', async () => {
+		const items = ref(Array.from({ length: 100 }, (_, i) => ({ id: `msg-${i}` })));
+		const reversedContainer = document.createElement('div');
+		reversedContainer.style.overflowY = 'auto';
+		Object.defineProperty(reversedContainer, 'clientHeight', { value: 300 });
+		document.body.append(reversedContainer);
+		const rectSpy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+			if (this === reversedContainer) {
+				return { x: 0, y: 20, top: 20, bottom: 320, left: 0, right: 100, width: 100, height: 300, toJSON: () => ({}) } as DOMRect;
+			}
+			if (this.hasAttribute('data-virtual-list')) {
+				let totalHeight = 0;
+				for (const child of Array.from(this.children)) {
+					const el = child as HTMLElement;
+					totalHeight += el.hasAttribute('data-virtual-item') ? 100 : parseFloat(el.style.height) || 0;
+				}
+				const top = 320 - totalHeight - reversedContainer.scrollTop;
+				return { x: 0, y: top, top, bottom: top + totalHeight, left: 0, right: 100, width: 100, height: totalHeight, toJSON: () => ({}) } as DOMRect;
+			}
+			return { x: 0, y: 0, top: 0, bottom: 100, left: 0, right: 100, width: 100, height: 100, toJSON: () => ({}) } as DOMRect;
+		});
+		const app = createApp({
+			render: () => h(MkVirtualList, { items: items.value, estimatedHeight: 100, overscan: 200, reversed: true }, {
+				default: ({ item }: { item: { id: string } }) => h('div', item.id),
+			}),
+		});
+		app.mount(reversedContainer);
+		const ids = () => Array.from(reversedContainer.querySelectorAll<HTMLElement>('[data-virtual-item]'), el => el.dataset.virtualItem!);
+		try {
+			await flush();
+			expect(ids()).toContain('msg-99');
+			expect(ids()).not.toContain('msg-0');
+
+			items.value = [...items.value, { id: 'msg-100' }];
+			await flush();
+			expect(reversedContainer.scrollTop).toBe(0);
+			expect(ids()).toContain('msg-100');
+
+			reversedContainer.scrollTop = -5000;
+			reversedContainer.dispatchEvent(new Event('scroll'));
+			await flush();
+			expect(ids()).toContain('msg-48');
+
+			items.value = [
+				...Array.from({ length: 10 }, (_, i) => ({ id: `older-${i}` })),
+				...items.value,
+			];
+			await flush();
+			expect(reversedContainer.scrollTop).toBe(-5000);
+			expect(ids()).toContain('msg-48');
+
+			items.value = [...items.value, { id: 'msg-101' }];
+			await flush();
+			expect(reversedContainer.scrollTop).toBe(-5100);
+		} finally {
+			app.unmount();
+			rectSpy.mockRestore();
+			reversedContainer.remove();
+		}
+	});
 });

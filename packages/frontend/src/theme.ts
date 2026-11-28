@@ -52,6 +52,7 @@ class ThemeManager extends EventEmitter<ThemeManagerEvents> {
 	public updateTheme(newTheme: Theme) {
 		if (newTheme.id === this.theme?.id && version === miLocalStorage.getItem('themeCachedVersion')) return;
 
+		const isInitialApply = this._theme == null;
 		this.isPreviewMode = false;
 
 		this._theme = deepClone(newTheme);
@@ -61,7 +62,7 @@ class ThemeManager extends EventEmitter<ThemeManagerEvents> {
 		this._currentTheme = deepClone(this.theme);
 		this._currentCompiledTheme = deepClone(compiled);
 
-		this.applyTheme();
+		this.applyTheme(!isInitialApply);
 	}
 
 	public previewTheme(theme: Theme) {
@@ -93,10 +94,10 @@ class ThemeManager extends EventEmitter<ThemeManagerEvents> {
 		return compile(_theme);
 	}
 
-	private applyTheme() {
+	private applyTheme(animate = true) {
 		if (this.currentTheme == null || this.currentCompiledTheme == null) return;
 
-		if (window.document.startViewTransition != null && window.document.visibilityState === 'visible') {
+		if (animate && window.document.startViewTransition != null && window.document.visibilityState === 'visible') {
 			window.document.documentElement.classList.add('_themeChanging_');
 			try {
 				window.document.startViewTransition(async () => {

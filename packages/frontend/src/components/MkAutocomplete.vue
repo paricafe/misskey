@@ -21,12 +21,11 @@ SPDX-License-Identifier: AGPL-3.0-only
 		</li>
 	</ol>
 	<ol v-else-if="type === 'emoji' || type === 'emojiComplete' && emojis.length > 0" ref="suggests" :class="$style.list">
-		<li v-for="emoji in emojis" :key="emoji.emoji" :class="$style.item" tabindex="-1" @click="complete(type, emoji.emoji)" @keydown="onKeydown">
+		<li v-for="{ emoji, highlight } in emojiItems" :key="emoji.emoji" :class="$style.item" tabindex="-1" @click="complete(type, emoji.emoji)" @keydown="onKeydown">
 			<MkCustomEmoji v-if="'isCustomEmoji' in emoji && emoji.isCustomEmoji" :name="emoji.emoji" :class="$style.emoji" :fallbackToImage="true"/>
 			<MkEmoji v-else :emoji="emoji.emoji" :class="$style.emoji"/>
-			<!-- eslint-disable-next-line vue/no-v-html -->
-			<span v-if="q != null && typeof q === 'string'" :class="$style.emojiName" v-html="sanitizeHtml(emoji.name.replace(q, `<b>${q}</b>`))"></span>
-			<span v-else v-text="emoji.name"></span>
+			<span v-if="highlight" :class="$style.emojiName">{{ highlight[0] }}<b>{{ highlight[1] }}</b>{{ highlight[2] }}</span>
+			<span v-else :class="$style.emojiName">{{ emoji.name }}</span>
 			<span v-if="emoji.aliasOf" :class="$style.emojiAlias">({{ emoji.aliasOf }})</span>
 		</li>
 	</ol>
@@ -46,7 +45,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 <script lang="ts">
 import { markRaw, ref, useTemplateRef, computed, onUpdated, onMounted, onBeforeUnmount, nextTick, watch } from 'vue';
 import * as Misskey from 'misskey-js';
-import sanitizeHtml from 'sanitize-html';
 import { emojilist, getEmojiName } from '@@/js/emojilist.js';
 import { char2twemojiFilePath, char2fluentEmojiFilePath } from '@@/js/emoji-base.js';
 import { MFM_TAGS, MFM_PARAMS } from '@@/js/const.js';
@@ -177,11 +175,38 @@ const fetching = ref(true);
 const users = ref<Misskey.entities.User[]>([]);
 const hashtags = ref<string[]>([]);
 const emojis = ref<EmojiDef[]>([]);
+const emojiItems = computed(() => {
+	const query = typeof props.q === 'string' && props.q.length > 0 ? props.q : null;
+	return emojis.value.map((emoji) => {
+		if (query == null) return { emoji, highlight: null as [string, string, string] | null };
+		const index = emoji.name.indexOf(query);
+		if (index === -1) return { emoji, highlight: null as [string, string, string] | null };
+		return {
+			emoji,
+			highlight: [
+				emoji.name.slice(0, index),
+				emoji.name.slice(index, index + query.length),
+				emoji.name.slice(index + query.length),
+			] as [string, string, string],
+		};
+	});
+});
 const items = ref<Element[] | HTMLCollection>([]);
 const mfmTags = ref<string[]>([]);
 const mfmParams = ref<string[]>([]);
 const select = ref(-1);
 const zIndex = os.claimZIndex('high');
+const REMOTE_SEARCH_DEBOUNCE_MS = 150;
+let remoteSearchTimer: number | null = null;
+let requestSeq = 0;
+
+function cancelPendingRemoteSearch() {
+	if (remoteSearchTimer != null) {
+		window.clearTimeout(remoteSearchTimer);
+		remoteSearchTimer = null;
+	}
+	requestSeq++;
+}
 
 function completeMfmParam(param: string) {
 	if (props.type !== 'mfmParam') throw new Error('Invalid type');
@@ -216,6 +241,7 @@ function setPosition() {
 }
 
 function exec() {
+	cancelPendingRemoteSearch();
 	select.value = -1;
 	if (suggests.value) {
 		for (const el of Array.from(items.value)) {
@@ -236,17 +262,27 @@ function exec() {
 			users.value = JSON.parse(cache);
 			fetching.value = false;
 		} else {
-			const [username, host] = props.q.toString().split('@');
-			misskeyApi('users/search-by-username-and-host', {
-				username: username,
-				host: host,
-				limit: 10,
-				detail: false,
-			}).then(searchedUsers => {
-				users.value = searchedUsers;
-				fetching.value = false;
-				sessionStorage.setItem(cacheKey, JSON.stringify(searchedUsers));
-			});
+			fetching.value = true;
+			const seq = requestSeq;
+			const query = props.q.toString();
+			remoteSearchTimer = window.setTimeout(() => {
+				remoteSearchTimer = null;
+				const [username, host] = query.split('@');
+				misskeyApi('users/search-by-username-and-host', {
+					username: username,
+					host: host,
+					limit: 10,
+					detail: false,
+				}).then(searchedUsers => {
+					sessionStorage.setItem(cacheKey, JSON.stringify(searchedUsers));
+					if (seq !== requestSeq) return;
+					users.value = searchedUsers;
+					fetching.value = false;
+				}).catch(() => {
+					if (seq !== requestSeq) return;
+					fetching.value = false;
+				});
+			}, REMOTE_SEARCH_DEBOUNCE_MS);
 		}
 	} else if (props.type === 'hashtag') {
 		if (!props.q || props.q === '') {
@@ -256,18 +292,28 @@ function exec() {
 			const cacheKey = `autocomplete:hashtag:${props.q}`;
 			const cache = sessionStorage.getItem(cacheKey);
 			if (cache) {
-				const hashtags = JSON.parse(cache);
-				hashtags.value = hashtags;
+				const cachedHashtags = JSON.parse(cache);
+				hashtags.value = cachedHashtags;
 				fetching.value = false;
 			} else {
-				misskeyApi('hashtags/search', {
-					query: props.q,
-					limit: 30,
-				}).then(searchedHashtags => {
-					hashtags.value = searchedHashtags;
-					fetching.value = false;
-					sessionStorage.setItem(cacheKey, JSON.stringify(searchedHashtags));
-				});
+				fetching.value = true;
+				const seq = requestSeq;
+				const query = props.q;
+				remoteSearchTimer = window.setTimeout(() => {
+					remoteSearchTimer = null;
+					misskeyApi('hashtags/search', {
+						query,
+						limit: 30,
+					}).then(searchedHashtags => {
+						sessionStorage.setItem(cacheKey, JSON.stringify(searchedHashtags));
+						if (seq !== requestSeq) return;
+						hashtags.value = searchedHashtags;
+						fetching.value = false;
+					}).catch(() => {
+						if (seq !== requestSeq) return;
+						fetching.value = false;
+					});
+				}, REMOTE_SEARCH_DEBOUNCE_MS);
 			}
 		}
 	} else if (props.type === 'emoji') {
@@ -409,6 +455,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+	cancelPendingRemoteSearch();
 	props.textarea.removeEventListener('keydown', onKeydown);
 
 	window.document.body.removeEventListener('mousedown', onMousedown);

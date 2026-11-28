@@ -15,48 +15,13 @@ SPDX-License-Identifier: AGPL-3.0-only
 ></canvas>
 </template>
 
-<script lang="ts">
-import DrawBlurhash from '@/workers/draw-blurhash?worker';
-import TestWebGL2 from '@/workers/test-webgl2?worker';
-import { WorkerMultiDispatch } from '@@/js/worker-multi-dispatch.js';
-
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-expect-error
-const isTest = (import.meta.env.MODE === 'test' || window.isPlaywright);
-
-const canvasPromise = new Promise<WorkerMultiDispatch | HTMLCanvasElement>(resolve => {
-	if (isTest) {
-		const canvas = window.document.createElement('canvas');
-		canvas.width = 64;
-		canvas.height = 64;
-		resolve(canvas);
-		return;
-	}
-
-	const testWorker = new TestWebGL2();
-	testWorker.addEventListener('message', event => {
-		if (event.data.result) {
-			const workers = new WorkerMultiDispatch(
-				() => new DrawBlurhash(),
-				Math.min(navigator.hardwareConcurrency - 1, 4),
-			);
-			resolve(workers);
-		} else {
-			const canvas = window.document.createElement('canvas');
-			canvas.width = 64;
-			canvas.height = 64;
-			resolve(canvas);
-		}
-		testWorker.terminate();
-	});
-});
-
-</script>
-
 <script lang="ts" setup>
 import { watch, ref, shallowRef, useTemplateRef, onMounted, onUnmounted } from 'vue';
 import { genId } from '@/utility/id.js';
 import { extractAvgColorFromBlurhash } from '@@/js/extract-avg-color-from-blurhash.js';
+import { defaultBlurhashRenderer } from '@/utility/blurhash-renderer.js';
+
+const isTest = Boolean(import.meta.env.MODE === 'test' || (window as Window & { isPlaywright?: boolean }).isPlaywright);
 
 const props = withDefaults(defineProps<{
 	blurhash: string | null;
@@ -76,6 +41,9 @@ const canvasWidth = ref(64);
 const canvasHeight = ref(64);
 const viewId = genId();
 const bitmapTmp = shallowRef<CanvasImageSource | undefined>();
+let requestSeq = 0;
+let activeRequestId: string | null = null;
+let unmounted = false;
 
 watch([() => props.width, () => props.height, canvas], () => {
 	const ratio = props.width / props.height;
@@ -93,20 +61,31 @@ watch([() => props.width, () => props.height, canvas], () => {
 	immediate: true,
 });
 
-watch(() => props.blurhash, () => {
+watch([() => props.blurhash, () => props.onlyAvgColor], () => {
 	draw();
 });
 
+function closeTempBitmap() {
+	if (bitmapTmp.value && 'close' in bitmapTmp.value && typeof bitmapTmp.value.close === 'function') {
+		bitmapTmp.value.close();
+	}
+	bitmapTmp.value = undefined;
+}
+
 function drawImage(bitmap: CanvasImageSource) {
 	if (!canvas.value) {
+		closeTempBitmap();
 		bitmapTmp.value = bitmap;
 		return;
 	}
 
-	bitmapTmp.value = undefined;
+	closeTempBitmap();
 	const ctx = canvas.value.getContext('2d');
 	if (!ctx) return;
 	ctx.drawImage(bitmap, 0, 0, canvasWidth.value, canvasHeight.value);
+	if ('close' in bitmap && typeof bitmap.close === 'function') {
+		bitmap.close();
+	}
 }
 
 function drawAvg() {
@@ -122,59 +101,49 @@ function drawAvg() {
 	ctx.fillRect(0, 0, canvasWidth.value, canvasHeight.value);
 }
 
+function cancelActiveRequest() {
+	if (activeRequestId != null) {
+		defaultBlurhashRenderer.cancel(activeRequestId);
+		activeRequestId = null;
+	}
+}
+
 async function draw() {
+	cancelActiveRequest();
 	if (isTest && props.blurhash == null) return;
 
 	drawAvg();
 
-	if (props.blurhash == null) return;
+	if (props.blurhash == null || props.onlyAvgColor) return;
 
-	if (props.onlyAvgColor) return;
+	const seq = ++requestSeq;
+	const requestId = `${viewId}:${seq}`;
+	activeRequestId = requestId;
+	const hash = props.blurhash;
 
-	const work = await canvasPromise;
-	if (work instanceof WorkerMultiDispatch) {
-		work.postMessage(
-			{
-				id: viewId,
-				hash: props.blurhash,
-			},
-			undefined,
-		);
-	} else {
-		try {
-			const { render } = await import('buraha');
-			render(props.blurhash, work);
-			drawImage(work);
-		} catch (error) {
-			console.error('Error occurred during drawing blurhash', error);
-		}
-	}
+	await defaultBlurhashRenderer.render(
+		requestId,
+		hash,
+		(image) => {
+			if (activeRequestId === requestId) activeRequestId = null;
+			drawImage(image);
+		},
+		() => unmounted || seq !== requestSeq,
+	);
 }
-
-function workerOnMessage(event: MessageEvent) {
-	if (event.data.id !== viewId) return;
-	drawImage(event.data.bitmap as ImageBitmap);
-}
-
-canvasPromise.then(work => {
-	if (work instanceof WorkerMultiDispatch) {
-		work.addListener(workerOnMessage);
-	}
-
-	draw();
-});
 
 onMounted(() => {
 	if (bitmapTmp.value) {
 		drawImage(bitmapTmp.value);
+	} else {
+		draw();
 	}
 });
 
 onUnmounted(() => {
-	canvasPromise.then(work => {
-		if (work instanceof WorkerMultiDispatch) {
-			work.removeListener(workerOnMessage);
-		}
-	});
+	unmounted = true;
+	requestSeq++;
+	cancelActiveRequest();
+	closeTempBitmap();
 });
 </script>

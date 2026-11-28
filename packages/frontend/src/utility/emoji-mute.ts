@@ -51,6 +51,8 @@ export function unmute(emoji:string) {
 	prefer.commit('mutingEmojis', mutedEmojis.filter((e) => e !== emojiMuteKey));
 }
 
+const mutingEmojiSet = computed(() => new Set(prefer.r.mutingEmojis.value));
+
 export function checkMuted(emoji: MaybeRefOrGetter<string>) {
 	return computed(() => {
 		const target = toValue(emoji);
@@ -58,6 +60,6 @@ export function checkMuted(emoji: MaybeRefOrGetter<string>) {
 		const emojiMuteKey = isCustomEmoji ?
 			makeEmojiMuteKey({ name: extractCustomEmojiName(target), host: extractCustomEmojiHost(target) }) :
 			target;
-		return prefer.r.mutingEmojis.value.includes(emojiMuteKey);
+		return mutingEmojiSet.value.has(emojiMuteKey);
 	});
 }

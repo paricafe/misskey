@@ -20,7 +20,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 			:key="emoji"
 			:data-emoji="emoji"
 			class="_button item"
-			:disabled="disabledEmojis?.value.includes(emoji)"
+			:disabled="isDisabled(emoji)"
 			@pointerenter="computeButtonTitle"
 			@click="emit('chosen', emoji, $event)"
 		>
@@ -38,7 +38,8 @@ SPDX-License-Identifier: AGPL-3.0-only
 			v-for="child in customEmojiTree"
 			:key="`custom:${child.value}`"
 			:initialShown="initialShown"
-			:emojis="computed(() => customEmojis.filter(e => e.category === child.category).map(e => `:${e.name}:`))"
+			:emojis="getCategoryEmojiNames(child.category)"
+			:disabledEmojis="disabledEmojis"
 			:hasChildSection="child.children.length !== 0"
 			:customEmojiTree="child.children"
 			@chosen="nestedChosen"
@@ -52,7 +53,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 			:key="emoji"
 			:data-emoji="emoji"
 			class="_button item"
-			:disabled="disabledEmojis?.value.includes(emoji)"
+			:disabled="isDisabled(emoji)"
 			@pointerenter="computeButtonTitle"
 			@click="emit('chosen', emoji, $event)"
 		>
@@ -69,12 +70,14 @@ import { getEmojiName } from '@@/js/emojilist.js';
 import type { Ref } from 'vue';
 import type { CustomEmojiFolderTree } from '@@/js/emojilist.js';
 import { i18n } from '@/i18n.js';
-import { customEmojis } from '@/custom-emojis.js';
+import { customEmojiNamesByCategory } from '@/custom-emojis.js';
 import MkEmojiPickerSection from '@/components/MkEmojiPicker.section.vue';
+
+const EMPTY_EMOJI_LIST: string[] = [];
 
 const props = defineProps<{
 	emojis: string[] | Ref<string[]>;
-	disabledEmojis?: Ref<string[]>;
+	disabledEmojis?: Ref<ReadonlySet<string>>;
 	initialShown?: boolean;
 	hasChildSection?: boolean;
 	customEmojiTree?: CustomEmojiFolderTree[];
@@ -88,6 +91,14 @@ const emojis = computed(() => Array.isArray(props.emojis) ? props.emojis : props
 const emojiExample = computed(() => emojis.value.at(0));
 
 const shown = ref(!!props.initialShown);
+
+function getCategoryEmojiNames(category: string) {
+	return computed(() => customEmojiNamesByCategory.value.get(category) ?? EMPTY_EMOJI_LIST);
+}
+
+function isDisabled(emoji: string): boolean {
+	return props.disabledEmojis?.value.has(emoji) ?? false;
+}
 
 function computeButtonTitle(ev: PointerEvent): void {
 	const elm = ev.target as HTMLElement;

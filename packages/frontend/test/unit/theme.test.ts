@@ -184,4 +184,22 @@ describe('ThemeManager', () => {
 			'themeChanged',
 		]);
 	});
+
+	test('skips startViewTransition on initial cold apply and uses it on subsequent theme switches', async () => {
+		const startViewTransition = vi.fn((cb: () => Promise<void>) => {
+			void cb();
+			return { finished: Promise.resolve() };
+		});
+		Object.defineProperty(document, 'startViewTransition', {
+			configurable: true,
+			value: startViewTransition,
+		});
+		const { themeManager } = await loadThemeModule();
+
+		themeManager.updateTheme(primaryTheme);
+		assert.strictEqual(startViewTransition.mock.calls.length, 0);
+
+		themeManager.updateTheme(replacementTheme);
+		assert.strictEqual(startViewTransition.mock.calls.length, 1);
+	});
 });

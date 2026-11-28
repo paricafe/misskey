@@ -486,16 +486,16 @@ if (prefer.s.keepCw && replyTargetNote.value && replyTargetNote.value.cw) {
 }
 
 function watchForDraft() {
-	watch(text, () => saveDraft());
-	watch(useCw, () => saveDraft());
-	watch(cw, () => saveDraft());
-	watch(poll, () => saveDraft());
-	watch(files, () => saveDraft(), { deep: true });
-	watch(visibility, () => saveDraft());
-	watch(localOnly, () => saveDraft());
-	watch(quoteId, () => saveDraft());
-	watch(reactionAcceptance, () => saveDraft());
-	watch(scheduledAt, () => saveDraft());
+	watch(text, () => scheduleSaveDraft());
+	watch(useCw, () => scheduleSaveDraft());
+	watch(cw, () => scheduleSaveDraft());
+	watch(poll, () => scheduleSaveDraft());
+	watch(files, () => scheduleSaveDraft(), { deep: true });
+	watch(visibility, () => scheduleSaveDraft());
+	watch(localOnly, () => scheduleSaveDraft());
+	watch(quoteId, () => scheduleSaveDraft());
+	watch(reactionAcceptance, () => scheduleSaveDraft());
+	watch(scheduledAt, () => scheduleSaveDraft());
 }
 
 function MFMWindow() {
@@ -957,6 +957,31 @@ type StoredDrafts = {
 	};
 };
 
+const DRAFT_SAVE_DEBOUNCE_MS = 300;
+let draftSaveTimer: number | null = null;
+
+function cancelScheduledDraftSave() {
+	if (draftSaveTimer != null) {
+		window.clearTimeout(draftSaveTimer);
+		draftSaveTimer = null;
+	}
+}
+
+function scheduleSaveDraft() {
+	if (props.instant || props.mock || props.updateMode) return;
+	cancelScheduledDraftSave();
+	draftSaveTimer = window.setTimeout(() => {
+		draftSaveTimer = null;
+		saveDraft();
+	}, DRAFT_SAVE_DEBOUNCE_MS);
+}
+
+function flushDraftSave() {
+	if (draftSaveTimer == null) return;
+	cancelScheduledDraftSave();
+	saveDraft();
+}
+
 function saveDraft() {
 	if (props.instant || props.mock || props.updateMode) return;
 
@@ -983,6 +1008,7 @@ function saveDraft() {
 }
 
 function deleteDraft() {
+	cancelScheduledDraftSave();
 	if (props.updateMode) return;
 
 	const draftsData = JSON.parse(miLocalStorage.getItem('drafts') ?? '{}') as StoredDrafts;
@@ -1590,9 +1616,12 @@ onMounted(() => {
 		nextTick(() => textareaEl.value && autosize(textareaEl.value));
 		nextTick(() => cwInputEl.value && autosize(cwInputEl.value));
 	});
+	window.addEventListener('pagehide', flushDraftSave);
 });
 
 onBeforeUnmount(() => {
+	window.removeEventListener('pagehide', flushDraftSave);
+	flushDraftSave();
 	uploader.abortAll();
 	if (textAutocomplete) {
 		textAutocomplete.detach();

@@ -27,7 +27,6 @@ import { computed, inject, onMounted, useTemplateRef, watch } from 'vue';
 import * as Misskey from 'misskey-js';
 import { getUnicodeEmojiOrNull } from '@@/js/emojilist.js';
 import { getEmojiNameFromReaction, isLocalCustomEmojiReaction } from '@@/js/emoji-name.js';
-import MkCustomEmojiDetailedDialog from './MkCustomEmojiDetailedDialog.vue';
 import type { MenuItem } from '@/types/menu';
 import XDetails from '@/components/MkReactionsViewer.details.vue';
 import MkReactionIcon from '@/components/MkReactionIcon.vue';
@@ -166,10 +165,11 @@ async function menu(ev: PointerEvent) {
 			text: i18n.ts.info,
 			icon: 'ti ti-info-circle',
 			action: async () => {
-				const { dispose } = os.popup(MkCustomEmojiDetailedDialog, {
-					emoji: await misskeyApiGet('emoji', {
-						name: emojiName.value,
-					}),
+				const emoji = await misskeyApiGet('emoji', {
+					name: emojiName.value,
+				});
+				const { dispose } = await os.popupAsyncWithDialog(import('./MkCustomEmojiDetailedDialog.vue').then(x => x.default), {
+					emoji,
 				}, {
 					closed: () => dispose(),
 				});

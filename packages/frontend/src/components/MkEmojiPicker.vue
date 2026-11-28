@@ -91,8 +91,8 @@ SPDX-License-Identifier: AGPL-3.0-only
 				v-for="child in customEmojiFolderRoot.children"
 				:key="`custom:${child.value}`"
 				:initialShown="false"
-				:emojis="computed(() => customEmojis.filter(e => filterCategory(e, child.value)).map(e => `:${e.name}:`))"
-				:disabledEmojis="computed(() => customEmojis.filter(e => filterCategory(e, child.value)).filter(e => !canReact(e)).map(e => `:${e.name}:`))"
+				:emojis="getCategoryEmojiNames(child.value)"
+				:disabledEmojis="getDisabledCustomEmojis()"
 				:hasChildSection="child.children.length !== 0"
 				:customEmojiTree="child.children"
 				@chosen="chosen"
@@ -126,7 +126,6 @@ import {
 } from '@@/js/emojilist.js';
 import type {
 	UnicodeEmojiDef,
-	CustomEmojiFolderTree,
 } from '@@/js/emojilist.js';
 import XSection from '@/components/MkEmojiPicker.section.vue';
 import MkRippleEffect from '@/components/MkRippleEffect.vue';
@@ -135,7 +134,7 @@ import { isTouchUsing } from '@/utility/touch.js';
 import { deviceKind } from '@/utility/device-kind.js';
 import { i18n } from '@/i18n.js';
 import { store } from '@/store.js';
-import { customEmojiCategories, customEmojis, customEmojisMap } from '@/custom-emojis.js';
+import { customEmojiFolderRoot, customEmojiNamesByCategory, customEmojis, customEmojisMap } from '@/custom-emojis.js';
 import { $i } from '@/i.js';
 import { checkReactionPermissions } from '@/utility/check-reaction-permissions.js';
 import { prefer } from '@/preferences.js';
@@ -188,34 +187,27 @@ const searchResultCustom = ref<Misskey.entities.EmojiSimple[]>([]);
 const searchResultUnicode = ref<UnicodeEmojiDef[]>([]);
 const tab = ref<'index' | 'custom' | 'unicode' | 'tags'>('index');
 
-const customEmojiFolderRoot: CustomEmojiFolderTree = { value: '', category: '', children: [] };
+const EMPTY_EMOJI_LIST: string[] = [];
+const EMPTY_DISABLED_SET: ReadonlySet<string> = new Set();
 
-function parseAndMergeCategories(input: string, root: CustomEmojiFolderTree): CustomEmojiFolderTree {
-	const parts = input.split('/').map(p => p.trim());
-	let currentNode: CustomEmojiFolderTree = root;
-
-	for (const part of parts) {
-		let existingNode = currentNode.children.find((node) => node.value === part);
-
-		if (!existingNode) {
-			const newNode: CustomEmojiFolderTree = { value: part, category: input, children: [] };
-			currentNode.children.push(newNode);
-			existingNode = newNode;
+const disabledCustomEmojis = computed<ReadonlySet<string>>(() => {
+	if (!props.targetNote) return EMPTY_DISABLED_SET;
+	const disabled = new Set<string>();
+	for (const emoji of customEmojis.value) {
+		if (!canReact(emoji)) {
+			disabled.add(`:${emoji.name}:`);
 		}
-
-		currentNode = existingNode;
 	}
-
-	return currentNode;
-}
-
-customEmojiCategories.value.forEach(ec => {
-	if (ec !== null) {
-		parseAndMergeCategories(ec, customEmojiFolderRoot);
-	}
+	return disabled;
 });
 
-parseAndMergeCategories('', customEmojiFolderRoot);
+function getCategoryEmojiNames(category: string) {
+	return computed(() => customEmojiNamesByCategory.value.get(category) ?? EMPTY_EMOJI_LIST);
+}
+
+function getDisabledCustomEmojis() {
+	return disabledCustomEmojis;
+}
 
 watch(q, () => {
 	if (emojisEl.value) emojisEl.value.scrollTop = 0;
@@ -374,10 +366,6 @@ watch(q, () => {
 
 function canReact(emoji: Misskey.entities.EmojiSimple | UnicodeEmojiDef | string): boolean {
 	return !props.targetNote || checkReactionPermissions($i!, props.targetNote, emoji);
-}
-
-function filterCategory(emoji: Misskey.entities.EmojiSimple, category: string): boolean {
-	return category === '' ? (emoji.category === 'null' || !emoji.category) : emoji.category === category;
 }
 
 function focus() {

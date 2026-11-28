@@ -207,6 +207,7 @@ function isTop() {
 let scrollContainer: HTMLElement | null = null;
 
 function onScrollContainerScroll() {
+	if (paginator.queuedAheadItemsCount.value === 0) return;
 	if (isTop()) {
 		paginator.releaseQueue();
 	}

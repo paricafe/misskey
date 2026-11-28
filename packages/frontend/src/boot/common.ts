@@ -23,10 +23,10 @@ import { updateDeviceKind } from '@/utility/device-kind.js';
 import { reloadChannel } from '@/utility/unison-reload.js';
 import { getUrlWithoutLoginId } from '@/utility/login-id.js';
 import { getAccountFromId } from '@/utility/get-account-from-id.js';
-import { deckStore } from '@/ui/deck/deck-store.js';
+import '@/ui/deck/deck-store.js';
 import { analytics, initAnalytics } from '@/analytics.js';
 import { miLocalStorage } from '@/local-storage.js';
-import { fetchCustomEmojisForBoot } from '@/custom-emojis.js';
+import { customEmojisReady, fetchCustomEmojisForBoot } from '@/custom-emojis.js';
 import { loadFontStyle } from '@/utility/load-font.js';
 import { applyTextAutospacePreference } from '@/utility/text-autospace.js';
 import { prefer } from '@/preferences.js';
@@ -93,11 +93,12 @@ export async function common(createVue: () => Promise<App<Element>>) {
 	const html = window.document.documentElement;
 	html.setAttribute('lang', lang);
 
-	await store.ready;
-	await initializeAccountStorage();
-	await deckStore.ready;
-
 	const fetchInstanceMetaPromise = fetchInstance();
+
+	await Promise.all([
+		initializeAccountStorage(),
+		customEmojisReady,
+	]);
 
 	fetchInstanceMetaPromise.then(() => {
 		miLocalStorage.setItem('v', instance.version);

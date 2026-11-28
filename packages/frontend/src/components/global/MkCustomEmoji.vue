@@ -37,7 +37,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 </template>
 
 <script lang="ts" setup>
-import { computed, defineAsyncComponent, inject, ref, watch } from 'vue';
+import { computed, inject, ref, watch } from 'vue';
 import { normalizeCustomEmojiName, isLocalCustomEmojiName, getCustomEmojiImagePath, isCustomEmojiImagePath } from '@@/js/emoji-name.js';
 import type { MenuItem } from '@/types/menu.js';
 import { getProxiedImageUrl, getStaticImageUrl } from '@/utility/media-proxy.js';
@@ -46,7 +46,6 @@ import * as os from '@/os.js';
 import { misskeyApi, misskeyApiGet } from '@/utility/misskey-api.js';
 import { copyToClipboard } from '@/utility/copy-to-clipboard.js';
 import { i18n } from '@/i18n.js';
-import MkCustomEmojiDetailedDialog from '@/components/MkCustomEmojiDetailedDialog.vue';
 import { $i } from '@/i.js';
 import { prefer } from '@/preferences.js';
 import { DI } from '@/di.js';
@@ -145,10 +144,11 @@ function onClick(ev: PointerEvent) {
 				text: i18n.ts.info,
 				icon: 'ti ti-info-circle',
 				action: async () => {
-					const { dispose } = os.popup(MkCustomEmojiDetailedDialog, {
-						emoji: await misskeyApiGet('emoji', {
-							name: customEmojiName.value,
-						}),
+					const emoji = await misskeyApiGet('emoji', {
+						name: customEmojiName.value,
+					});
+					const { dispose } = await os.popupAsyncWithDialog(import('@/components/MkCustomEmojiDetailedDialog.vue').then(x => x.default), {
+						emoji,
 					}, {
 						closed: () => dispose(),
 					});

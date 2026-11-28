@@ -10,7 +10,7 @@ export class VirtualListLayout {
 	private indices = new Map<string, number>();
 	private heights = new Map<string, number>();
 	private offsets = [0];
-	private dirty = false;
+	private dirtyFrom = Infinity;
 
 	constructor(private estimatedHeight = 200) {}
 
@@ -20,21 +20,29 @@ export class VirtualListLayout {
 		for (const id of this.heights.keys()) {
 			if (!this.indices.has(id)) this.heights.delete(id);
 		}
-		this.dirty = true;
+		this.dirtyFrom = 0;
 	}
 
 	public measure(id: string, height: number): boolean {
-		if (!this.indices.has(id) || !Number.isFinite(height) || height < 0 || this.heights.get(id) === height) return false;
+		const index = this.indices.get(id);
+		if (index == null || !Number.isFinite(height) || height < 0 || this.heights.get(id) === height) return false;
 		this.heights.set(id, height);
-		this.dirty = true;
+		if (index < this.dirtyFrom) this.dirtyFrom = index;
 		return true;
 	}
 
 	private rebuild(): void {
-		if (!this.dirty) return;
-		this.offsets = [0];
-		for (const id of this.ids) this.offsets.push(this.offsets.at(-1)! + (this.heights.get(id) ?? this.estimatedHeight));
-		this.dirty = false;
+		if (this.dirtyFrom === Infinity) return;
+		const start = this.dirtyFrom;
+		if (start === 0) {
+			this.offsets = [0];
+		} else {
+			this.offsets.length = start + 1;
+		}
+		for (let i = start; i < this.ids.length; i++) {
+			this.offsets.push(this.offsets[i] + (this.heights.get(this.ids[i]) ?? this.estimatedHeight));
+		}
+		this.dirtyFrom = Infinity;
 	}
 
 	public offset(index: number): number {

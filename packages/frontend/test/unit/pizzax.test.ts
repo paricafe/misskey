@@ -71,4 +71,23 @@ describe('Pizzax cross-tab synchronization', () => {
 		expect(state.s.darkMode).toBe(true);
 		expect(state.r.darkMode.value).toBe(true);
 	});
+
+	test('reads device, device-account, and registry cache keys in parallel during init', async () => {
+		const { get } = await import('@/utility/idb-proxy.js');
+		const getMock = vi.mocked(get);
+		const pending: Array<() => void> = [];
+		getMock.mockImplementation(() => new Promise(resolve => {
+			pending.push(() => resolve({}));
+		}));
+		const state = new Pizzax('parallel', {
+			visibility: { where: 'deviceAccount', default: 'public' },
+			darkMode: { where: 'device', default: false },
+		});
+		await Promise.resolve();
+		await Promise.resolve();
+		expect(pending).toHaveLength(3);
+		pending.forEach(fn => fn());
+		await state.ready;
+		getMock.mockReset();
+	});
 });

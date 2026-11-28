@@ -41,8 +41,16 @@
 
 	localStorage.setItem('lang', lang);
 
+	const appEntryUrl = CLIENT_ENTRY ? `/vite/${CLIENT_ENTRY.replace('scripts', lang)}` : '/vite/src/_boot_.ts';
+	if (CLIENT_ENTRY && document.head) {
+		const preload = document.createElement('link');
+		preload.rel = 'modulepreload';
+		preload.href = appEntryUrl;
+		document.head.appendChild(preload);
+	}
+
 	async function importAppScript() {
-		await import(CLIENT_ENTRY ? `/vite/${CLIENT_ENTRY.replace('scripts', lang)}` : '/vite/src/_boot_.ts')
+		await import(appEntryUrl)
 			.catch(async e => {
 				console.error(e);
 				renderError('APP_IMPORT', e);

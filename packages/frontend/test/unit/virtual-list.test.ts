@@ -67,4 +67,16 @@ describe('VirtualListLayout', () => {
 		expect(layout.offset(1)).toBe(100);
 		expect(layout.totalHeight).toBe(130);
 	});
+
+	test('incrementally rebuilds offsets when measuring middle and trailing rows', () => {
+		const layout = new VirtualListLayout(100);
+		layout.update(['a', 'b', 'c', 'd', 'e']);
+		expect(layout.totalHeight).toBe(500);
+		expect(layout.measure('d', 250)).toBe(true);
+		expect([0, 1, 2, 3, 4, 5].map(i => layout.offset(i))).toEqual([0, 100, 200, 300, 550, 650]);
+		expect(layout.measure('b', 40)).toBe(true);
+		expect(layout.measure('e', 60)).toBe(true);
+		expect([0, 1, 2, 3, 4, 5].map(i => layout.offset(i))).toEqual([0, 100, 140, 240, 490, 550]);
+		expect(layout.totalHeight).toBe(550);
+	});
 });

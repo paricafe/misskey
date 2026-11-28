@@ -13,27 +13,26 @@ SPDX-License-Identifier: AGPL-3.0-only
 		<slot name="empty"><MkResult type="empty" :text="i18n.ts.noNotifications"/></slot>
 	</div>
 
-	<div v-else ref="rootEl">
-		<component
-			:is="prefer.s.animation ? TransitionGroup : 'div'" :class="[$style.notifications]"
-			:enterActiveClass="$style.transition_x_enterActive"
-			:leaveActiveClass="$style.transition_x_leaveActive"
-			:enterFromClass="$style.transition_x_enterFrom"
-			:leaveToClass="$style.transition_x_leaveTo"
-			:moveClass="$style.transition_x_move"
-			tag="div"
-		>
-			<div v-for="(notification, i) in paginator.items.value" :key="notification.id" :data-scroll-anchor="notification.id" :class="$style.item">
-				<div v-if="i > 0 && isSeparatorNeeded(paginator.items.value[i -1].createdAt, notification.createdAt)" :class="$style.date">
-					<span><i class="ti ti-chevron-up"></i> {{ getSeparatorInfo(paginator.items.value[i -1].createdAt, notification.createdAt)?.prevText }}</span>
+	<div v-else ref="rootEl" :class="$style.root">
+		<MkVirtualList v-slot="{ item: notification, index: i }" :items="virtualItems" :estimatedHeight="120" :animate="prefer.s.animation" :class="$style.notifications">
+			<div :data-scroll-anchor="notification.id" :class="$style.item">
+				<div v-if="i > 0 && isSeparatorNeeded(paginator.items.value[i - 1].createdAt, notification.createdAt)" :class="$style.date">
+					<span><i class="ti ti-chevron-up"></i> {{ getSeparatorInfo(paginator.items.value[i - 1].createdAt, notification.createdAt)?.prevText }}</span>
 					<span style="height: 1em; width: 1px; background: var(--MI_THEME-divider);"></span>
-					<span>{{ getSeparatorInfo(paginator.items.value[i -1].createdAt, notification.createdAt)?.nextText }} <i class="ti ti-chevron-down"></i></span>
+					<span>{{ getSeparatorInfo(paginator.items.value[i - 1].createdAt, notification.createdAt)?.nextText }} <i class="ti ti-chevron-down"></i></span>
 				</div>
 				<MkNote v-if="['reply', 'quote', 'mention'].includes(notification.type) && 'note' in notification" :class="$style.content" :note="notification.note" :withHardMute="true"/>
 				<XNotification v-else :class="$style.content" :notification="notification" :withTime="true" :full="true"/>
 			</div>
-		</component>
-		<button v-show="paginator.canFetchOlder.value" key="_more_" v-appear="prefer.s.enableInfiniteScroll ? paginator.fetchOlder : null" :disabled="paginator.fetchingOlder.value" class="_button" :class="$style.more" @click="paginator.fetchOlder">
+		</MkVirtualList>
+		<div
+			v-if="prefer.s.enableInfiniteScroll && paginator.canFetchOlder.value"
+			:key="paginator.items.value.at(-1)?.id"
+			v-appear="paginator.fetchOlder"
+			aria-hidden="true"
+			style="height: 1px"
+		></div>
+		<button v-show="paginator.canFetchOlder.value" key="_more_" :disabled="paginator.fetchingOlder.value" class="_button" :class="$style.more" @click="paginator.fetchOlder">
 			<div v-if="!paginator.fetchingOlder.value">{{ i18n.ts.loadMore }}</div>
 			<MkLoading v-else/>
 		</button>
@@ -42,7 +41,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 </template>
 
 <script lang="ts" setup>
-import { onUnmounted, onMounted, computed, useTemplateRef, TransitionGroup, markRaw, watch } from 'vue';
+import { onUnmounted, onMounted, computed, provide, useTemplateRef, markRaw, watch } from 'vue';
 import * as Misskey from 'misskey-js';
 import { notificationTypes } from 'misskey-js';
 import { useInterval } from '@@/js/use-interval.js';
@@ -50,6 +49,9 @@ import { useDocumentVisibility } from '@@/js/use-document-visibility.js';
 import { getScrollContainer, scrollToTop } from '@@/js/scroll.js';
 import XNotification from '@/components/MkNotification.vue';
 import MkNote from '@/components/MkNote.vue';
+import MkVirtualList from '@/components/MkVirtualList.vue';
+import { DI } from '@/di.js';
+import { useNoteViewStateCache } from '@/composables/use-note-view-cache.js';
 import { useStream } from '@/stream.js';
 import { i18n } from '@/i18n.js';
 import MkPullToRefresh from '@/components/MkPullToRefresh.vue';
@@ -69,12 +71,20 @@ const paginator = prefer.s.useGroupedNotifications ? markRaw(new Paginator('i/no
 	computedParams: computed(() => ({
 		excludeTypes: props.excludeTypes ?? undefined,
 	})),
+	useShallowRef: true,
 })) : markRaw(new Paginator('i/notifications', {
 	limit: 20,
 	computedParams: computed(() => ({
 		excludeTypes: props.excludeTypes ?? undefined,
 	})),
+	useShallowRef: true,
 }));
+
+const virtualItems = computed(() => [...paginator.items.value]);
+const notificationNotes = computed(() =>
+	paginator.items.value.flatMap(notification => (['reply', 'quote', 'mention'].includes(notification.type) && 'note' in notification ? [notification.note] : [])),
+);
+provide(DI.noteViewStateCache, useNoteViewStateCache(notificationNotes));
 
 const MIN_POLLING_INTERVAL = 1000 * 10;
 const POLLING_INTERVAL =
@@ -110,6 +120,7 @@ function releaseQueue() {
 let scrollContainer: HTMLElement | null = null;
 
 function onScrollContainerScroll() {
+	if (paginator.queuedAheadItemsCount.value === 0) return;
 	if (isTop()) {
 		paginator.releaseQueue();
 	}
@@ -189,37 +200,8 @@ defineExpose({
 </script>
 
 <style lang="scss" module>
-.transition_x_move {
-	transition: transform 0.7s cubic-bezier(0.23, 1, 0.32, 1);
-}
-
-.transition_x_enterActive {
-	transition: transform 0.7s cubic-bezier(0.23, 1, 0.32, 1), opacity 0.7s cubic-bezier(0.23, 1, 0.32, 1);
-
-	&.content,
-	.content {
-		content-visibility: visible !important;
-	}
-}
-
-.transition_x_leaveActive {
-	transition: height 0.2s cubic-bezier(0,.5,.5,1), opacity 0.2s cubic-bezier(0,.5,.5,1);
-}
-
-.transition_x_enterFrom {
-	opacity: 0;
-	transform: translateY(max(-64px, -100%));
-}
-
-@supports (interpolate-size: allow-keywords) {
-	.transition_x_enterFrom {
-		interpolate-size: allow-keywords;
-		height: 0;
-	}
-}
-
-.transition_x_leaveTo {
-	opacity: 0;
+.root {
+	overflow-anchor: none;
 }
 
 .notifications {

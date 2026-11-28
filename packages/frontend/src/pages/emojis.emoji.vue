@@ -20,7 +20,6 @@ import * as os from '@/os.js';
 import { misskeyApiGet } from '@/utility/misskey-api.js';
 import { copyToClipboard } from '@/utility/copy-to-clipboard.js';
 import { i18n } from '@/i18n.js';
-import MkCustomEmojiDetailedDialog from '@/components/MkCustomEmojiDetailedDialog.vue';
 import { $i } from '@/i.js';
 
 const props = defineProps<{
@@ -42,10 +41,11 @@ function menu(ev: PointerEvent) {
 		text: i18n.ts.info,
 		icon: 'ti ti-info-circle',
 		action: async () => {
-			const { dispose } = os.popup(MkCustomEmojiDetailedDialog, {
-				emoji: await misskeyApiGet('emoji', {
-					name: props.emoji.name,
-				}),
+			const emoji = await misskeyApiGet('emoji', {
+				name: props.emoji.name,
+			});
+			const { dispose } = await os.popupAsyncWithDialog(import('@/components/MkCustomEmojiDetailedDialog.vue').then(x => x.default), {
+				emoji,
 			}, {
 				closed: () => dispose(),
 			});

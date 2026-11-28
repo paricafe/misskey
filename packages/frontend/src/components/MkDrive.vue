@@ -273,12 +273,18 @@ watch(sortModeSelect, () => {
 	initialize();
 });
 
+let initializeSeq = 0;
+
 async function initialize() {
+	const seq = ++initializeSeq;
 	fetching.value = true;
-	await foldersPaginator.reload();
 	filesPaginator.initialDirection = sortModeSelect.value === '-createdAt' ? 'newer' : 'older';
 	filesPaginator.order.value = sortModeSelect.value === '-createdAt' ? 'oldest' : 'newest';
-	await filesPaginator.reload();
+	await Promise.all([
+		foldersPaginator.reload(),
+		filesPaginator.reload(),
+	]);
+	if (seq !== initializeSeq) return;
 	fetching.value = false;
 }
 

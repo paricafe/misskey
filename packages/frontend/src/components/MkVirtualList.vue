@@ -36,11 +36,13 @@ const props = withDefaults(defineProps<{
 	overscan?: number;
 	gap?: number;
 	animate?: boolean;
+	reversed?: boolean;
 }>(), {
 	estimatedHeight: 200,
 	overscan: 600,
 	gap: 0,
 	animate: false,
+	reversed: false,
 });
 
 defineSlots<{ default?: (props: { item: T; index: number }) => void }>();
@@ -49,9 +51,13 @@ const rootEl = useTemplateRef('rootEl');
 const layout = new VirtualListLayout(props.estimatedHeight + props.gap);
 const revision = ref(0);
 const viewport = shallowRef({ top: 0, height: 800 });
-const range = computed(() => {
-	revision.value;
-	return layout.range(viewport.value.top, viewport.value.height, props.overscan);
+const range = computed<{ start: number; end: number; revision: number }>((previous) => {
+	const rev = revision.value;
+	const next = layout.range(viewport.value.top, viewport.value.height, props.overscan);
+	if (previous && previous.start === next.start && previous.end === next.end && previous.revision === rev) {
+		return previous;
+	}
+	return { start: next.start, end: next.end, revision: rev };
 });
 const focusedId = ref<string | null>(null);
 const visibleItems = computed(() => {
@@ -114,13 +120,17 @@ let frame: number | null = null;
 let active = false;
 let activated = false;
 
-function updateViewport() {
+function updateViewport(knownRootRect?: DOMRect) {
 	if (!rootEl.value || !active) return;
-	const rect = rootEl.value.getBoundingClientRect();
+	const rect = knownRootRect ?? rootEl.value.getBoundingClientRect();
 	if (rect.width === 0 && rect.height === 0) return;
 	const top = rect.top;
 	const containerTop = scrollContainer ? scrollContainer.getBoundingClientRect().top + scrollContainer.clientTop : 0;
-	viewport.value = { top: containerTop - top, height: scrollContainer?.clientHeight ?? window.innerHeight };
+	const nextTop = containerTop - top;
+	const nextHeight = scrollContainer?.clientHeight ?? window.innerHeight;
+	if (viewport.value.top !== nextTop || viewport.value.height !== nextHeight) {
+		viewport.value = { top: nextTop, height: nextHeight };
+	}
 }
 
 function scheduleViewport() {
@@ -131,12 +141,47 @@ function scheduleViewport() {
 	});
 }
 
-function changeLayout(change: () => boolean | void) {
-	updateViewport();
+function changeLayout(change: () => boolean | void, knownRootRect?: DOMRect) {
+	updateViewport(knownRootRect);
 	const top = viewport.value.top;
-	const anchor = top > 0 ? layout.anchor(top) : null;
+	const beforeTotalHeight = layout.totalHeight;
+	const pinnedAtReversedEdge = props.reversed && (
+		scrollContainer != null
+			? -scrollContainer.scrollTop <= 0
+			: beforeTotalHeight - (top + viewport.value.height) <= 0
+	);
+	const anchor = props.reversed
+		? (!pinnedAtReversedEdge ? layout.anchor(Math.max(0, top)) : null)
+		: (top > 0 ? layout.anchor(top) : null);
 	if (change() === false) return;
 	revision.value++;
+	if (props.reversed) {
+		if (pinnedAtReversedEdge) {
+			const heightDelta = layout.totalHeight - beforeTotalHeight;
+			if (heightDelta !== 0) {
+				viewport.value = { ...viewport.value, top: Math.max(0, top + heightDelta) };
+			}
+			return;
+		}
+		const position = anchor && layout.position(anchor);
+		if (position == null) return;
+		const beforeFromBottom = beforeTotalHeight - Math.max(0, top);
+		const afterFromBottom = layout.totalHeight - position;
+		const deltaFromBottom = afterFromBottom - beforeFromBottom;
+		const deltaTop = position - top;
+		if (deltaTop !== 0) {
+			viewport.value = { ...viewport.value, top: top + deltaTop };
+		}
+		if (deltaFromBottom !== 0) {
+			nextTick(() => {
+				if (!active) return;
+				if (scrollContainer) scrollContainer.scrollTop -= deltaFromBottom;
+				else window.scrollBy(0, -deltaFromBottom);
+				updateViewport();
+			});
+		}
+		return;
+	}
 	const position = anchor && layout.position(anchor);
 	const delta = position == null ? 0 : position - top;
 	if (delta !== 0) {
@@ -225,13 +270,22 @@ function start() {
 				const el = entry.target as HTMLElement;
 				const id = el.dataset.virtualItem;
 				if (!id) continue;
-				const rect = el.getBoundingClientRect();
-				if (rect.width === 0 && rect.height === 0) continue;
-				changed = layout.measure(id, rect.height) || changed;
+				const borderBox = entry.borderBoxSize?.[0];
+				let width: number;
+				let height: number;
+				if (borderBox != null) {
+					width = borderBox.inlineSize;
+					height = borderBox.blockSize;
+				} else {
+					const rect = el.getBoundingClientRect();
+					width = rect.width;
+					height = rect.height;
+				}
+				if (width === 0 && height === 0) continue;
+				changed = layout.measure(id, height) || changed;
 			}
 			return changed;
-		});
-		updateViewport();
+		}, rootRect);
 	});
 	for (const el of elements.values()) observer.observe(el);
 	observer.observe(rootEl.value);

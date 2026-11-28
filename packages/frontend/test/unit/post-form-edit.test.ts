@@ -5,12 +5,14 @@
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { cleanup, fireEvent, render, waitFor } from '@testing-library/vue';
+import { nextTick } from 'vue';
 import type * as Misskey from 'misskey-js';
 import MkPostForm from '@/components/MkPostForm.vue';
 import { misskeyApi } from '@/utility/misskey-api.js';
 import { incNotesCount } from '@/i.js';
 import { claimAchievement } from '@/utility/achievements.js';
 import { i18n } from '@/i18n.js';
+import { miLocalStorage } from '@/local-storage.js';
 
 const { me } = vi.hoisted(() => ({ me: { id: 'author', username: 'author', host: null, avatarUrl: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', policies: { scheduledNoteLimit: 10 }, isSilenced: false } }));
 vi.mock('@/i.js', () => ({ $i: me, ensureSignin: () => me, notesCount: 2, incNotesCount: vi.fn() }));
@@ -110,5 +112,57 @@ describe('post form editing', () => {
 		await waitFor(() => expect(misskeyApi).toHaveBeenCalledWith('notes/update', { noteId: 'note', text: 'I love Misskey', cw: null, fileIds: [] }, undefined));
 		expect(incNotesCount).not.toHaveBeenCalled();
 		expect(claimAchievement).not.toHaveBeenCalled();
+	});
+
+	test('debounces local draft writes, flushes on unmount, and cancels pending save after posting', async () => {
+		vi.useFakeTimers();
+		window.localStorage.clear();
+		const setItemSpy = vi.spyOn(miLocalStorage, 'setItem');
+		vi.mocked(misskeyApi).mockResolvedValue({ createdNote: note({ text: 'final' }) } as never);
+		try {
+			const result = render(MkPostForm, {
+				props: { autofocus: false },
+				global: { stubs: { MkAcct: true }, directives: { clickAnime: {}, tooltip: {} } },
+			});
+			await nextTick();
+			await nextTick();
+			const textarea = result.getByTestId<HTMLTextAreaElement>('post-form-text');
+			setItemSpy.mockClear();
+
+			await fireEvent.update(textarea, 'a');
+			await fireEvent.update(textarea, 'ab');
+			await fireEvent.update(textarea, 'abc');
+			expect(setItemSpy).not.toHaveBeenCalled();
+
+			await vi.advanceTimersByTimeAsync(300);
+			const draftWrites = setItemSpy.mock.calls.filter(([key]) => key === 'drafts');
+			expect(draftWrites).toHaveLength(1);
+			expect(JSON.parse(window.localStorage.getItem('drafts')!)['note:author'].data.text).toBe('abc');
+
+			setItemSpy.mockClear();
+			await fireEvent.update(textarea, 'abcd');
+			expect(setItemSpy).not.toHaveBeenCalled();
+			result.unmount();
+			expect(JSON.parse(window.localStorage.getItem('drafts')!)['note:author'].data.text).toBe('abcd');
+
+			const result2 = render(MkPostForm, {
+				props: { autofocus: false },
+				global: { stubs: { MkAcct: true }, directives: { clickAnime: {}, tooltip: {} } },
+			});
+			await nextTick();
+			await nextTick();
+			const textarea2 = result2.getByTestId<HTMLTextAreaElement>('post-form-text');
+			await fireEvent.update(textarea2, 'to-be-posted');
+			await fireEvent.click(result2.getByTestId('post-form-submit'));
+			await nextTick();
+			await nextTick();
+			await vi.advanceTimersByTimeAsync(500);
+			result2.unmount();
+			expect(JSON.parse(window.localStorage.getItem('drafts') ?? '{}')['note:author']).toBeUndefined();
+		} finally {
+			setItemSpy.mockRestore();
+			vi.useRealTimers();
+			window.localStorage.clear();
+		}
 	});
 });
